@@ -1,0 +1,34 @@
+{
+  "id": "session-m0a-fixture",
+  "providerId": "codex",
+  "title": "Migration baseline session",
+  "titleGenerationStatus": "success",
+  "createdAt": 1770000000000,
+  "updatedAt": 1770000600000,
+  "lastResponseAt": 1770000590000,
+  "sessionId": "thread_01HZXQ",
+  "model": "gpt-5.3-codex",
+  "providerState": {
+    "threadId": "thread_01HZXQ",
+    "sessionFilePath": ".codex/sessions/2026/08/thread_01HZXQ.jsonl",
+    "transcriptRootPath": ".codex/sessions",
+    "forkSource": {
+      "conversationId": "session-m0a-parent",
+      "messageId": "msg-42"
+    },
+    "unknownProviderField": {
+      "writtenByANewerBuild": true,
+      "nested": ["a", "b"]
+    }
+  },
+  "currentNote": "Notes/Migration.md",
+  "externalContextPaths": ["Notes/Plan.md"],
+  "enabledMcpServers": ["grimoire-vault"],
+  "orchestratorMode": false,
+  "usage": {
+    "inputTokens": 1200,
+    "outputTokens": 340
+  },
+  "resumeAtMessageId": "msg-43",
+  "unknownTopLevelField": "written by a newer build"
+}

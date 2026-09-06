@@ -1,13 +1,13 @@
 import { TFile } from 'obsidian';
 
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import {
   DEFAULT_CHAT_PROVIDER_ID,
   type ProviderId,
   type ProviderSubagentLifecycleAdapter,
 } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { normalizeProviderError } from '../../../core/runtime/providerError';
 import { parseTodoInput } from '../../../core/tools/todo';
 import { extractResolvedAnswers, extractResolvedAnswersFromResultText } from '../../../core/tools/toolInput';
@@ -85,6 +85,10 @@ import {
   updateWriteEditWithDiff,
 } from '../rendering/WriteEditRenderer';
 import type { SubagentManager } from '../services/SubagentManager';
+import {
+  TurnFeedbackMetrics,
+  type TurnFeedbackMetricsSnapshot,
+} from '../services/TurnFeedbackMetrics';
 import type { ChatState } from '../state/ChatState';
 import type { FileContextManager } from '../ui/FileContext';
 
@@ -98,7 +102,7 @@ export interface StreamControllerDeps {
   getFileContextManager: () => FileContextManager | null;
   updateQueueIndicator: () => void;
   /** Get the agent service from the tab. */
-  getAgentService?: () => ChatRuntime | null;
+  getAgentService?: () => ExecutionChatRuntimeAdapter | null;
   /** Tab-local provider settings used when a usage event omits its model. */
   getActiveProviderSettings?: () => Record<string, unknown>;
   /** True when this tab should treat the final assistant response as an orchestrator plan. */
@@ -112,7 +116,6 @@ export interface StreamControllerDeps {
 }
 
 export class StreamController {
-  private static readonly ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS = [200, 600, 1500] as const;
 
   private deps: StreamControllerDeps;
   private pendingTextRenderFrame: ScheduledAnimationFrame | null = null;
@@ -131,11 +134,11 @@ export class StreamController {
   private silentTurnTimeout: number | null = null;
   private silentTurnElapsedInterval: number | null = null;
   private silentTurnProviderId: ProviderId | null = null;
+  private turnFeedback: TurnFeedbackMetrics | null = null;
   private silentTurnPaused = false;
   private silentTurnStatusEl: HTMLElement | null = null;
   private silentTurnStartedAt: number | null = null;
   private silentTurnTimerWindow: Window | null = null;
-  private asyncSubagentRetryTimeouts = new Set<number>();
 
   // Provider lifecycle agent tracking (spawn → wait/close lifecycle)
   private lifecycleSubagentStates = new Map<string, SubagentState>(); // spawn callId → SubagentState
@@ -171,6 +174,7 @@ export class StreamController {
 
   async handleStreamChunk(chunk: StreamChunk, msg: ChatMessage): Promise<void> {
     this.noteTurnActivity();
+    this.turnFeedback?.observe(chunk, performance.now());
     const { state } = this.deps;
 
     switch (chunk.type) {
@@ -207,6 +211,17 @@ export class StreamController {
         break;
 
       case 'tool_use': {
+        // **Whose work it is, before what it is.** A tool call belonging to a
+        // subagent is drawn inside that subagent's block rather than in the
+        // turn, and it used to arrive as its own chunk type; it is the same
+        // chunk with an owner now, so the ownership question is asked first and
+        // everything below is about the turn's own calls.
+        const owner = chunk.subagentId;
+        if (owner !== undefined) {
+          this.deps.onSubagentActivityDetected?.();
+          await this.handleSubagentChunk({ ...chunk, subagentId: owner }, msg);
+          break;
+        }
         if (state.currentThinkingState) {
           await this.finalizeCurrentThinkingBlock(msg);
         }
@@ -241,15 +256,15 @@ export class StreamController {
       }
 
       case 'tool_result': {
+        const owner = chunk.subagentId;
+        if (owner !== undefined) {
+          this.deps.onSubagentActivityDetected?.();
+          await this.handleSubagentChunk({ ...chunk, subagentId: owner }, msg);
+          break;
+        }
         await this.handleToolResult(chunk, msg);
         break;
       }
-
-      case 'subagent_tool_use':
-      case 'subagent_tool_result':
-        this.deps.onSubagentActivityDetected?.();
-        await this.handleSubagentChunk(chunk, msg);
-        break;
 
       case 'async_subagent_result':
         await this.handleAsyncSubagentResult(chunk, msg);
@@ -261,24 +276,13 @@ export class StreamController {
 
       case 'notice':
         this.flushPendingTools();
-        await this.appendText(`\n\n⚠️ **${chunk.level === 'warning' ? 'Blocked' : 'Notice'}:** ${chunk.content}`);
-        break;
-
-      case 'status':
-        this.showThinkingIndicator(chunk.content);
+        await this.appendText(`\n\n⚠️ **${chunk.level === 'warning'
+          ? t('chat.ui.messages.noticeBlocked')
+          : t('chat.ui.messages.noticeLabel')}:** ${chunk.content}`);
         break;
 
       case 'error':
-        // Flush pending tools before rendering error message
-        this.flushPendingTools();
-        await this.appendText(`\n\n❌ **Error:** ${this.normalizeErrorMessage(chunk.content)}`);
-        break;
-
-      case 'done':
-        // Flush any remaining pending tools
-        this.flushPendingTools();
-        await this.finalizeProgressBlocks(msg);
-        this.handleDone(msg);
+        await this.renderTurnFailure(chunk.content);
         break;
 
       case 'context_compacted': {
@@ -330,6 +334,30 @@ export class StreamController {
   // ============================================
   // Tool Use Handling
   // ============================================
+
+  /**
+   * Draws the reason a turn failed into the message it was drawing.
+   *
+   * Called directly by the projection's render target, which used to say the
+   * same thing by handing this an `error` chunk. A turn ending is a fact the
+   * projection states, so it asks for it by name rather than dressing it as
+   * something a provider sent.
+   */
+  async renderTurnFailure(content: string): Promise<void> {
+    // Pending tools go first, so the reason lands after what was in flight.
+    this.flushPendingTools();
+    await this.appendText(
+      `\n\n❌ **${t('chat.ui.messages.errorLabel')}:** `
+      + `${this.normalizeErrorMessage(content)}`,
+    );
+  }
+
+  /** Closes out a turn's message. The other half of the pair above. */
+  async finishTurn(msg: ChatMessage): Promise<void> {
+    this.flushPendingTools();
+    await this.finalizeProgressBlocks(msg);
+    this.handleDone(msg);
+  }
 
   private handleDone(msg: ChatMessage): void {
     this.maybeHandleOrchestratorPlan(msg);
@@ -503,7 +531,7 @@ export class StreamController {
 
     return normalizeProviderError(
       message,
-      ProviderRegistry.getProviderDisplayName(providerId),
+      providerCatalog().displayName(providerId),
     ).message;
   }
 
@@ -909,6 +937,10 @@ export class StreamController {
   async appendText(text: string, phase?: AssistantTextPhase): Promise<void> {
     const { state } = this.deps;
     if (!state.currentContentEl) return;
+    // The projection path draws prose through here rather than through
+    // `handleStreamChunk`, so a turn made entirely of it is invisible to the
+    // metrics unless this says so.
+    this.turnFeedback?.observeText(text, performance.now());
 
     this.hideThinkingIndicator();
 
@@ -1390,7 +1422,7 @@ export class StreamController {
   }
 
   private async handleSubagentChunk(
-    chunk: Extract<StreamChunk, { type: 'subagent_tool_use' | 'subagent_tool_result' }>,
+    chunk: Extract<StreamChunk, { type: 'tool_use' | 'tool_result' }> & { subagentId: string },
     msg: ChatMessage,
   ): Promise<void> {
     const parentToolUseId = chunk.subagentId;
@@ -1408,7 +1440,7 @@ export class StreamController {
     }
 
     switch (chunk.type) {
-      case 'subagent_tool_use': {
+      case 'tool_use': {
         const toolCall: ToolCallInfo = {
           id: chunk.id,
           name: chunk.name,
@@ -1421,7 +1453,7 @@ export class StreamController {
         break;
       }
 
-      case 'subagent_tool_result': {
+      case 'tool_result': {
         const toolCall = subagentState.info.toolCalls.find((tc: ToolCallInfo) => tc.id === chunk.id);
         if (toolCall) {
           const normalizedContent = this.normalizeToolResultContent(chunk.content);
@@ -1515,8 +1547,6 @@ export class StreamController {
       chunk.toolUseResult
     );
 
-    await this.hydrateAsyncSubagentToolCalls(handled);
-
     return isLinked || handled !== undefined;
   }
 
@@ -1529,8 +1559,6 @@ export class StreamController {
       chunk.status,
       chunk.result
     );
-
-    await this.hydrateAsyncSubagentToolCalls(handled);
     const lifecycleHandled = handled
       ? false
       : this.handleProviderLifecycleAsyncSubagentResult(chunk, msg);
@@ -1567,117 +1595,6 @@ export class StreamController {
     finalizeSubagentBlock(subagentState, result, chunk.status === 'error');
     this.deps.recordRuntimeToolCall?.(spawnToolCall);
     return true;
-  }
-
-  private async hydrateAsyncSubagentToolCalls(subagent: SubagentInfo | undefined): Promise<void> {
-    if (!subagent) return;
-    if (subagent.mode !== 'async') return;
-    if (!subagent.agentId) return;
-
-    const asyncStatus = subagent.asyncStatus ?? subagent.status;
-    if (asyncStatus !== 'completed' && asyncStatus !== 'error') return;
-
-    const runtime = this.deps.getAgentService?.();
-    if (!runtime) return;
-
-    const { hasHydrated, finalResultHydrated } = await this.tryHydrateAsyncSubagent(
-      subagent,
-      runtime,
-      true
-    );
-
-    if (hasHydrated) {
-      this.deps.subagentManager.refreshAsyncSubagent(subagent);
-    }
-
-    if (!finalResultHydrated) {
-      this.scheduleAsyncSubagentResultRetry(subagent, runtime, 0);
-    }
-  }
-
-  private async tryHydrateAsyncSubagent(
-    subagent: SubagentInfo,
-    runtime: ChatRuntime,
-    hydrateToolCalls: boolean
-  ): Promise<{ hasHydrated: boolean; finalResultHydrated: boolean }> {
-    let hasHydrated = false;
-    let finalResultHydrated = false;
-
-    if (hydrateToolCalls && !subagent.toolCalls?.length) {
-      const recoveredToolCalls = await runtime.loadSubagentToolCalls?.(
-        subagent.agentId || ''
-      ) ?? [];
-      if (recoveredToolCalls.length > 0) {
-        subagent.toolCalls = recoveredToolCalls.map((toolCall) => ({
-          ...toolCall,
-          input: { ...toolCall.input },
-        }));
-        hasHydrated = true;
-      }
-    }
-
-    const recoveredFinalResult = await runtime.loadSubagentFinalResult?.(
-      subagent.agentId || ''
-    ) ?? null;
-    if (recoveredFinalResult && recoveredFinalResult.trim().length > 0) {
-      finalResultHydrated = true;
-      if (recoveredFinalResult !== subagent.result) {
-        subagent.result = recoveredFinalResult;
-        hasHydrated = true;
-      }
-    }
-
-    return { hasHydrated, finalResultHydrated };
-  }
-
-  private scheduleAsyncSubagentResultRetry(
-    subagent: SubagentInfo,
-    runtime: ChatRuntime,
-    attempt: number
-  ): void {
-    if (!subagent.agentId) return;
-    if (attempt >= StreamController.ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS.length) return;
-
-    const delay = StreamController.ASYNC_SUBAGENT_RESULT_RETRY_DELAYS_MS[attempt];
-    const streamGeneration = this.deps.state.streamGeneration;
-    const timeoutId = window.setTimeout(() => {
-      this.asyncSubagentRetryTimeouts.delete(timeoutId);
-      if (this.deps.state.streamGeneration !== streamGeneration) {
-        return;
-      }
-      void this.retryAsyncSubagentResult(subagent, runtime, attempt);
-    }, delay);
-    this.asyncSubagentRetryTimeouts.add(timeoutId);
-  }
-
-  private clearAsyncSubagentResultRetries(): void {
-    for (const timeoutId of this.asyncSubagentRetryTimeouts) {
-      window.clearTimeout(timeoutId);
-    }
-    this.asyncSubagentRetryTimeouts.clear();
-  }
-
-  private async retryAsyncSubagentResult(
-    subagent: SubagentInfo,
-    runtime: ChatRuntime,
-    attempt: number
-  ): Promise<void> {
-    if (!subagent.agentId) return;
-    const asyncStatus = subagent.asyncStatus ?? subagent.status;
-    if (asyncStatus !== 'completed' && asyncStatus !== 'error') return;
-
-    const { hasHydrated, finalResultHydrated } = await this.tryHydrateAsyncSubagent(
-      subagent,
-      runtime,
-      false
-    );
-    if (hasHydrated) {
-      this.deps.subagentManager.refreshAsyncSubagent(subagent);
-    }
-
-    if (!finalResultHydrated) {
-      this.scheduleAsyncSubagentResultRetry(subagent, runtime, attempt + 1);
-    }
   }
 
   /** Callback from SubagentManager when async state changes. Updates messages only (DOM handled by manager). */
@@ -1752,6 +1669,11 @@ export class StreamController {
   /** Starts the per-tab heartbeat that acknowledges a provider's silent turn. */
   startTurnSilenceIndicator(providerId: ProviderId): void {
     this.stopTurnSilenceIndicator();
+    // **Started here because this is what sees the output.** The metrics used
+    // to be kept by `InputController` and fed from its generator loop; with
+    // that loop gone, every field but the duration was structurally empty and
+    // each turn logged a provider that had produced nothing.
+    this.turnFeedback = new TurnFeedbackMetrics(performance.now());
     this.silentTurnProviderId = providerId;
     this.silentTurnPaused = false;
     this.silentTurnStartedAt = Date.now();
@@ -1779,6 +1701,19 @@ export class StreamController {
   }
 
   /** Stops the heartbeat and removes any transient status. */
+  /**
+   * What the turn's output looked like, and clears it.
+   *
+   * Consumed rather than read, because a snapshot belongs to one turn and the
+   * next one starts its own. `null` when no turn has run since the last read,
+   * which is a truer answer than a row of zeros.
+   */
+  consumeTurnFeedback(): TurnFeedbackMetricsSnapshot | null {
+    const metrics = this.turnFeedback;
+    this.turnFeedback = null;
+    return metrics?.finish(performance.now()) ?? null;
+  }
+
   stopTurnSilenceIndicator(): void {
     this.clearSilenceTimeout();
     this.clearSilentTurnStatus();
@@ -1812,7 +1747,7 @@ export class StreamController {
     const statusEl = contentEl.createDiv({ cls: 'grimoire-silent-turn-status' });
     statusEl.setAttribute('aria-live', 'polite');
     statusEl.setAttribute('role', 'status');
-    const icon = ProviderRegistry.getChatUIConfig(providerId).getProviderIcon?.();
+    const icon = providerCatalog().declarations(providerId).chatUI.icon();
     if (icon) {
       statusEl.appendChild(createProviderIconSvg(icon, {
         className: 'grimoire-silent-turn-status-icon',
@@ -1823,7 +1758,7 @@ export class StreamController {
       }));
     }
     statusEl.createSpan({
-      text: `${ProviderRegistry.getProviderDisplayName(providerId)} · ${t('chat.ui.progress.stillWorking')}`,
+      text: `${providerCatalog().displayName(providerId)} · ${t('chat.ui.progress.stillWorking')}`,
     });
     const elapsedEl = statusEl.createSpan({ cls: 'grimoire-silent-turn-status-elapsed' });
     const updateElapsed = () => {
@@ -2097,7 +2032,6 @@ export class StreamController {
     this.cancelPendingThinkingRender();
     this.cancelPendingToolOutputRenders();
     this.cancelPendingScroll();
-    this.clearAsyncSubagentResultRetries();
     this.hideThinkingIndicator();
     this.stopTurnSilenceIndicator();
     for (const progress of this.progressBlocks.values()) {

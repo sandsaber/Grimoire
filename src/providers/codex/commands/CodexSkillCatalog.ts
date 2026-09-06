@@ -1,8 +1,8 @@
 import type {
   ProviderCommandCatalog,
-  ProviderCommandDropdownConfig,
 } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
+import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import type { SlashCommand } from '../../../core/types';
 import type { SkillMetadata } from '../runtime/codexAppServerTypes';
 import {
@@ -168,18 +168,9 @@ export class CodexSkillCatalog implements ProviderCommandCatalog {
     this.listProvider.invalidate();
   }
 
-  getDropdownConfig(): ProviderCommandDropdownConfig {
-    return {
-      providerId: 'codex',
-      triggerChars: ['/', '$'],
-      builtInPrefix: '/',
-      skillPrefix: '$',
-      commandPrefix: '/',
-    };
-  }
-
-  async refresh(): Promise<void> {
+  async refresh(): Promise<ProviderCatalogRefreshOutcome> {
     this.listProvider.invalidate();
     await this.listProvider.listSkills({ forceReload: true });
+    return 'refreshed';
   }
 }

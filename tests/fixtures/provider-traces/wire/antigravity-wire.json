@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "providerId": "antigravity",
+  "kind": "wire-recording",
+  "recordedAgainst": "agy 1.1.13",
+  "transport": "process stdout (`agy --print`)",
+  "cases": [
+    "single print run"
+  ],
+  "exchange": [
+    {
+      "seq": 1,
+      "direction": "process->client",
+      "stdout": "OK\n",
+      "stderr": "",
+      "exitCode": 0
+    }
+  ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content."
+}

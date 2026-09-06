@@ -249,3 +249,49 @@ describe('AcpSessionConfig', () => {
     });
   });
 });
+
+describe('a model list in the shape ACP actually sends it', () => {
+  // Found by Gemini's live smoke, and shared by three CLIs: `gemini 0.55.1`,
+  // `grok` and `mimo` all answer `session/new` with `modelId` where this
+  // codebase declared `id`. Every consumer read `undefined` — Gemini threw on
+  // `.trim()` and took the session open down with it, and its two siblings
+  // discovered no models at all and said nothing.
+  it('reads the wire name for a model id', () => {
+    const state = extractAcpSessionModelState({
+      models: {
+        availableModels: [
+          { modelId: 'auto', name: 'Auto', description: 'Let the CLI decide' },
+          { modelId: 'gemini-2.5-pro', name: 'gemini-2.5-pro' },
+        ],
+        currentModelId: 'auto',
+      },
+    });
+
+    expect(state.availableModels.map(model => model.id)).toEqual(['auto', 'gemini-2.5-pro']);
+    expect(state.currentModelId).toBe('auto');
+  });
+
+  it('still reads the name this codebase used, where an agent sends that', () => {
+    const state = extractAcpSessionModelState({
+      models: {
+        availableModels: [{ id: 'sonnet', name: 'Sonnet' }],
+        currentModelId: 'sonnet',
+      },
+    });
+
+    expect(state.availableModels.map(model => model.id)).toEqual(['sonnet']);
+  });
+
+  it('drops a model with no id at all rather than carrying an empty one', () => {
+    // It cannot be selected and cannot be labelled; every consumer downstream
+    // would trim it, and one of them threw.
+    const state = extractAcpSessionModelState({
+      models: {
+        availableModels: [{ name: 'Nameless' }, { modelId: '   ', name: 'Blank' }],
+        currentModelId: '',
+      },
+    });
+
+    expect(state.availableModels).toEqual([]);
+  });
+});

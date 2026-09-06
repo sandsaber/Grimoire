@@ -1,0 +1,11 @@
+{"timestamp":"2000-01-01T00:00:00.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"turn-replay"}}
+{"timestamp":"2000-01-01T00:00:01.000Z","type":"response_item","payload":{"type":"function_call","name":"spawn_agent","arguments":"{\"parent_agent_id\":\"root-agent\"}","call_id":"spawn-replay"}}
+{"timestamp":"2000-01-01T00:00:02.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"spawn-replay","output":"{\"agent_id\":\"native-agent-replay\"}"}}
+{"timestamp":"2000-01-01T00:00:03.000Z","type":"response_item","payload":{"type":"function_call","name":"send_input","arguments":"{\"agent_id\":\"native-agent-replay\"}","call_id":"input-replay"}}
+{"timestamp":"2000-01-01T00:00:04.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"input-replay","output":"{\"submission_id\":\"submission-replay\"}"}}
+{"timestamp":"2000-01-01T00:00:05.000Z","type":"response_item","payload":{"type":"function_call","name":"wait","arguments":"{\"ids\":[\"native-agent-replay\"]}","call_id":"wait-replay"}}
+{"timestamp":"2000-01-01T00:00:06.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"wait-replay","output":"{\"status\":{\"native-agent-replay\":{\"completed\":\"Recovered child result\"}}}"}}
+{"timestamp":"2000-01-01T00:00:07.000Z","type":"response_item","payload":{"type":"function_call","name":"close_agent","arguments":"{\"agent_id\":\"native-agent-replay\"}","call_id":"close-replay"}}
+{"timestamp":"2000-01-01T00:00:08.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"close-replay","output":"{\"status\":\"closed\"}"}}
+{"timestamp":"2000-01-01T00:00:09.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Recovered parent result"}]}}
+{"timestamp":"2000-01-01T00:00:10.000Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-replay"}}

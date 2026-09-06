@@ -4,9 +4,9 @@ import { Decoration, EditorView, WidgetType } from '@codemirror/view';
 import type { App, Editor, MarkdownView } from 'obsidian';
 import { Notice } from 'obsidian';
 
+import { AuxiliaryExecutionOwner } from '../../../app/auxiliary/AuxiliaryExecutionOwner';
 import { getHiddenProviderCommandSet } from '../../../core/providers/commands/hiddenCommands';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import { DEFAULT_CHAT_PROVIDER_ID, type InlineEditMode, type InlineEditService, type ProviderId } from '../../../core/providers/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
@@ -322,10 +322,13 @@ class InlineEditController {
       ?? activeTab?.service?.providerId
       ?? activeTab?.providerId
       ?? DEFAULT_CHAT_PROVIDER_ID;
-    this.inlineEditService = ProviderRegistry.createInlineEditService(plugin, providerId);
-    const auxiliaryModel = activeTab?.service?.providerId === providerId
-      ? activeTab.service.getAuxiliaryModel?.()
-      : activeTab?.providerId === providerId
+    const auxiliary = plugin.getApplicationRuntimeOrNull()?.auxiliary
+      ?? AuxiliaryExecutionOwner.unavailable(providerId);
+    this.inlineEditService = auxiliary.inlineEditService(providerId);
+    // Was two branches, and the first could never answer: `getAuxiliaryModel`
+    // is absent from the adapter by contract, so a bound tab fell through to
+    // `undefined` while an unbound one on the same provider answered its draft.
+    const auxiliaryModel = activeTab?.providerId === providerId
       ? activeTab?.draftModel
       : null;
     this.inlineEditService.setModelOverride?.(auxiliaryModel ?? undefined);
@@ -456,7 +459,8 @@ class InlineEditController {
     this.inputEl.spellcheck = false;
     this.spinnerEl = inputWrap.createDiv({ cls: 'grimoire-inline-spinner grimoire-hidden' });
 
-    const inlineCatalog = ProviderWorkspaceRegistry.getCommandCatalog(this.resolvedProviderId);
+    const inlineDropdown = providerCatalog().declarations(this.resolvedProviderId).commandDropdown;
+    const providerId = this.resolvedProviderId;
     this.slashCommandDropdown = new SlashCommandDropdown(
       ownerDocument.body,
       this.inputEl,
@@ -467,9 +471,12 @@ class InlineEditController {
       {
         fixed: true,
         hiddenCommands: getHiddenProviderCommandSet(this.plugin.settings, this.resolvedProviderId),
-        ...(inlineCatalog ? {
-          providerConfig: inlineCatalog.getDropdownConfig(),
-          getProviderEntries: () => inlineCatalog.listDropdownEntries({ includeBuiltIns: false }),
+        ...(inlineDropdown ? {
+          providerConfig: { providerId, ...inlineDropdown },
+          getProviderEntries: async () => (
+            (await this.plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))
+              ?.commands?.listDropdownEntries({ includeBuiltIns: false }) ?? []
+          ),
         } : {}),
       }
     );

@@ -1,5 +1,6 @@
 import type { ProviderSubagentLifecycleAdapter } from '../../../core/providers/types';
 import type { StreamChunk, SubagentInfo, ToolCallInfo } from '../../../core/types';
+import { isRecord } from '../../../utils/records';
 
 export const GROK_SUBAGENT_SPAWN_TOOL = 'spawn_subagent';
 export const GROK_SUBAGENT_WAIT_TOOL = 'get_command_or_subagent_output';
@@ -17,10 +18,6 @@ interface GrokWaitStatus {
 interface GrokWaitResult {
   statuses: Record<string, GrokWaitStatus>;
   timedOut: boolean;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function parseJsonRecord(raw: string | undefined): Record<string, unknown> | null {
@@ -244,37 +241,56 @@ export function buildGrokSubagentInfo(
   };
 }
 
-export function normalizeGrokSubagentExtensionNotification(
-  params: unknown,
-  activeSessionId: string | null,
+/**
+ * xAI's out-of-band "this subagent finished" update, as a shared chunk.
+ *
+ * **Restored, not written.** `GrokChatRuntime` read this off every session
+ * notification, and Grok's flip did not carry it onto the kernel path; the
+ * orphaned normalizer was then swept as dead code, which is what made the loss
+ * invisible. Without it a subagent that finishes while nothing is polling the
+ * wait tool never completes its block — the tab keeps rendering it as running
+ * until the turn ends.
+ *
+ * The session is matched by the caller: the presenter is given only the
+ * notifications for the session the connection is bound to.
+ *
+ * The field spellings are the shipped runtime's, not a recording's — the wire
+ * recording covers `initialize`, `session/new` and `session/prompt`, and no
+ * subagent ran in it. Confirming them is the Grok live harness's job.
+ */
+export function normalizeGrokSubagentFinishedUpdate(
+  update: unknown,
 ): Extract<StreamChunk, { type: 'async_subagent_result' }> | null {
-  if (!activeSessionId || !isRecord(params)) return null;
-  const sessionId = firstString(params.sessionId, params.session_id);
-  if (sessionId !== activeSessionId || !isRecord(params.update)) return null;
-
-  const update = params.update;
-  if (update.sessionUpdate !== 'subagent_finished') return null;
-
+  if (!isRecord(update) || update.sessionUpdate !== 'subagent_finished') {
+    return null;
+  }
   const agentId = firstString(update.subagent_id, update.subagentId);
   const rawStatus = firstString(update.status)?.toLowerCase();
-  if (!agentId || !rawStatus) return null;
-
-  const status = rawStatus === 'completed' || rawStatus === 'success'
-    ? 'completed'
-    : rawStatus === 'error' || rawStatus === 'failed' || rawStatus === 'cancelled' || rawStatus === 'canceled'
-      ? 'error'
-      : null;
-  if (!status) return null;
-
+  if (!agentId || !rawStatus) {
+    return null;
+  }
+  const status = SUBAGENT_FINISHED_STATUSES[rawStatus];
+  if (!status) {
+    return null;
+  }
+  const result = firstString(update.output, update.result, update.error);
   return {
     agentId,
-    ...(firstString(update.output, update.result, update.error) !== undefined
-      ? { result: firstString(update.output, update.result, update.error) }
-      : {}),
+    ...(result !== undefined ? { result } : {}),
     status,
     type: 'async_subagent_result',
   };
 }
+
+/** What xAI calls an ending, mapped onto the two the chunk has. */
+const SUBAGENT_FINISHED_STATUSES: Readonly<Record<string, 'completed' | 'error'>> = {
+  canceled: 'error',
+  cancelled: 'error',
+  completed: 'completed',
+  error: 'error',
+  failed: 'error',
+  success: 'completed',
+};
 
 export const grokSubagentLifecycleAdapter: ProviderSubagentLifecycleAdapter = {
   isHiddenTool(name): boolean {

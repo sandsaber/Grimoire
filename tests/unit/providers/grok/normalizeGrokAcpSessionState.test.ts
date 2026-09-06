@@ -50,7 +50,7 @@ describe('normalizeGrokAcpSessionModels', () => {
         { id: 'grok-fast', name: 'Grok Fast', description: 'Fast model' },
       ],
       currentModelId: 'grok-build',
-    } as never)).toEqual({
+    })).toEqual({
       availableModels: [
         { id: 'grok-build', name: 'Grok Build' },
         { description: 'Fast model', id: 'grok-fast', name: 'Grok Fast' },
@@ -81,7 +81,7 @@ describe('normalizeGrokAcpSessionModels', () => {
 
 describe('readGrokAcpModelThinkingOptions', () => {
   it('reads the reasoning levels the agent reports for every available model', () => {
-    const options = readGrokAcpModelThinkingOptions(LIVE_SESSION_MODELS as never);
+    const options = readGrokAcpModelThinkingOptions(LIVE_SESSION_MODELS);
 
     expect(Object.keys(options)).toEqual(['grok-4.6', 'grok-4.5']);
     // Normalized into the ascending order the picker renders, same as the

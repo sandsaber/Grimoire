@@ -1,24 +1,21 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
+import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
+import type GrimoirePlugin from '../../../main';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
-} from '../../../core/providers/types';
-import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import type GrimoirePlugin from '../../../main';
+} from '../../../providers/shared/providerHostContracts';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { QwenCommandCatalog } from '../commands/QwenCommandCatalog';
 import {
   buildQwenModelCatalogFingerprint,
   resolveQwenModelCatalogFingerprint,
 } from '../modelCatalogFingerprint';
-import { QwenChatRuntime } from '../runtime/QwenChatRuntime';
-import { QwenCliResolver } from '../runtime/QwenCliResolver';
+import { qwenCliResolver } from '../runtime/QwenCliResolver';
 import { getQwenProviderSettings } from '../settings';
 import { QwenAgentStorage } from '../storage/QwenAgentStorage';
 import { qwenSettingsTabRenderer } from '../ui/QwenSettingsTab';
@@ -34,14 +31,8 @@ export interface QwenWorkspaceServices extends ProviderWorkspaceServices {
 }
 
 function createQwenCliResolver(): ProviderCliResolver {
-  return new QwenCliResolver();
+  return qwenCliResolver();
 }
-
-const qwenTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'runtime';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -51,8 +42,7 @@ function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
   if (initialSettings.discoveredModels.length > 0) {
     // The resolved CLI path is part of the fingerprint but is not available
     // here: this catalog is built inside createQwenWorkspaceServices, which runs
-    // inside ProviderWorkspaceRegistry.initialize(), and the registry assigns
-    // this.services[providerId] only after that resolves - until then
+    // the workspace manager runs before it publishes the services - until then
     // getResolvedProviderCliPath returns null and an eager seed would be filed
     // under settings.cliPath while every later refresh looks it up under the
     // resolved path. Hold the seed back until the path is known.
@@ -99,7 +89,7 @@ function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'debug',
           scope: 'provider.qwen',
         });
-        return false;
+        return 'skipped';
       }
 
       if (!force && refreshCache.isFresh(fingerprint, hasCachedModels)) {
@@ -114,7 +104,7 @@ function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'debug',
           scope: 'provider.qwen',
         });
-        return false;
+        return 'skipped';
       }
 
       return refreshCache.refresh({
@@ -122,15 +112,15 @@ function createQwenModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
         force,
         hasCachedModels,
         load: async () => {
-          const before = JSON.stringify(getQwenProviderSettings(settings).discoveredModels);
-          const runtime = new QwenChatRuntime(plugin);
-          try {
-            const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-            const after = JSON.stringify(getQwenProviderSettings(settings).discoveredModels);
-            return loaded && before !== after;
-          } finally {
-            runtime.cleanup();
-          }
+          // One isolated session, opened and closed. Building a whole chat
+          // runtime to get here was the only thing that runtime did for this
+          // surface: open a session and read its reply.
+          //
+          // Its answer is whether the agent said anything, which is the question
+          // the surface asks. Whether the *list* changed is a different one, and a
+          // refresh that returns the same models did not fail.
+          const loaded = await plugin.getQwenExecution().metadata.discoverMetadata();
+          return loaded ? 'refreshed' : 'failed';
         },
       });
     },
@@ -154,21 +144,16 @@ export async function createQwenWorkspaceServices(
     mcpServerManager,
     usageProvider: qwenPlanUsageStore,
     settingsTabRenderer: qwenSettingsTabRenderer,
-    tabWarmupPolicy: qwenTabWarmupPolicy,
   };
 }
 
 export const qwenWorkspaceRegistration: ProviderWorkspaceRegistration<QwenWorkspaceServices> = {
-  workspaceCapabilities: {
-    skills: { inventory: 'managed', manager: 'managed' },
-    commands: { inventory: 'managed', manager: 'managed', runtimeCommandDiscovery: 'active-session-only' },
-    agents: { inventory: 'managed', manager: 'managed' },
-    mcp: { inventory: 'managed', manager: 'managed' },
-    environment: { inventory: 'managed', manager: 'managed' },
-  },
   initialize: async ({ plugin, vaultAdapter }) => createQwenWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetQwenWorkspaceServices(): QwenWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('qwen') as QwenWorkspaceServices | null;
+export function maybeGetQwenWorkspaceServices(
+  plugin: GrimoirePlugin,
+): QwenWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('qwen') as QwenWorkspaceServices | null ?? null;
 }

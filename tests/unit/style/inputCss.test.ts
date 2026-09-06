@@ -44,7 +44,7 @@ describe('input.css', () => {
     const css = readInputCss();
     const contextRule = getRule(css, '.grimoire-container--chat-window .grimoire-context-row');
 
-    expect(contextRule).toContain('padding: 0 2px 5px');
+    expect(contextRule).toContain('padding: 0 var(--grimoire-space-1) var(--grimoire-space-2)');
   });
 
   it('uses a borderless soft-accent send button with a deeper hover surface', () => {
@@ -55,7 +55,7 @@ describe('input.css', () => {
     expect(sendRule).toContain('border: 0');
     expect(sendRule).toContain('background: var(--grimoire-accent-soft)');
     expect(sendRule).toContain('color: var(--grimoire-accent-text)');
-    expect(hoverRule).toContain('background: rgba(var(--grimoire-brand-rgb), 0.22)');
+    expect(hoverRule).toContain('background: color-mix(in srgb, var(--grimoire-brand) 22%, transparent)');
     expect(hoverRule).toContain('filter: none');
   });
 

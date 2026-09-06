@@ -2,7 +2,7 @@ import type {
   ProviderPlanUsage,
   ProviderPlanUsageContext,
   ProviderPlanUsageProvider,
-} from '../../../core/providers/types';
+} from '../../../providers/shared/providerHostContracts';
 import { getAntigravityProviderSettings } from '../settings';
 
 export const antigravityPlanUsageStore: ProviderPlanUsageProvider = {

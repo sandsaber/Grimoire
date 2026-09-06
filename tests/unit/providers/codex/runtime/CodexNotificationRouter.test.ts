@@ -48,10 +48,10 @@ describe('CodexNotificationRouter', () => {
         threadId: 't1',
         turnId: 'turn1',
         itemId: 'msg1',
-        delta: 'Готово: создал заметку.\nMEMORY.md:77-100|note=[Obsidian vault note style and short Russian workflow] 019e97fa-4949-7c11-a3bb-540145b5d1d2\n',
+        delta: 'Done: created the note.\nMEMORY.md:77-100|note=[Obsidian vault note style and short Russian workflow] 019e97fa-4949-7c11-a3bb-540145b5d1d2\n',
       });
 
-      expect(chunks).toEqual([{ type: 'text', content: 'Готово: создал заметку.\n' }]);
+      expect(chunks).toEqual([{ type: 'text', content: 'Done: created the note.\n' }]);
     });
 
     it('does not emit Codex memory citation blocks from completed assistant text', () => {
@@ -123,7 +123,7 @@ describe('CodexNotificationRouter', () => {
         threadId: 't1',
         turnId: 'turn1',
         itemId: 'stream-msg',
-        delta: 'Кратко: это небольшой тематический Obsidian-вальт.\n\n- Объём: 32 markdown-ноты.\n',
+        delta: 'In short: this is a small themed Obsidian vault.\n\n- Size: 32 markdown notes.\n',
       });
 
       router.handleNotification('item/completed', {
@@ -132,7 +132,7 @@ describe('CodexNotificationRouter', () => {
         item: {
           type: 'agentMessage',
           id: 'completed-msg',
-          text: 'Кратко: это небольшой тематический Obsidian-вальт.\n\n- Объём: 32 markdown-ноты.\n',
+          text: 'In short: this is a small themed Obsidian vault.\n\n- Size: 32 markdown notes.\n',
           phase: 'completed',
           memoryCitation: null,
         },
@@ -141,7 +141,7 @@ describe('CodexNotificationRouter', () => {
       expect(chunks.filter(chunk => chunk.type === 'text')).toEqual([
         {
           type: 'text',
-          content: 'Кратко: это небольшой тематический Obsidian-вальт.\n\n- Объём: 32 markdown-ноты.\n',
+          content: 'In short: this is a small themed Obsidian vault.\n\n- Size: 32 markdown notes.\n',
         },
       ]);
     });
@@ -434,7 +434,6 @@ describe('CodexNotificationRouter', () => {
         content: 'file.txt',
         isError: false,
       });
-      expect(chunks[chunks.length - 1]).toEqual({ type: 'done' });
     });
 
     it('suppresses the raw exec wrapper while preserving typed nested tool events', () => {
@@ -665,7 +664,10 @@ describe('CodexNotificationRouter', () => {
         turn: { id: 'turn1', items: [], status: 'completed', error: null },
       });
 
-      expect(chunks).toEqual([{ type: 'done' }]);
+      // Nothing on completion: the surface learns a turn ended from the run's
+      // terminal, and the chunk this used to emit was filtered back out by this
+      // router's own presenter before anything saw it.
+      expect(chunks).toEqual([]);
     });
 
     it('maps fileChange item/started to tool_use chunk', () => {
@@ -1036,17 +1038,20 @@ describe('CodexNotificationRouter', () => {
   });
 
   describe('turn completion', () => {
-    it('records assistant turn metadata then emits done on completion', () => {
+    it('records assistant turn metadata on completion', () => {
       router.handleNotification('turn/completed', {
         threadId: 't1',
         turn: { id: 'turn1', items: [], status: 'completed', error: null },
       });
 
       expect(turnMetadata).toContainEqual({ assistantMessageId: 'turn1' });
-      expect(chunks).toEqual([{ type: 'done' }]);
+      // Nothing on completion: the surface learns a turn ended from the run's
+      // terminal, and the chunk this used to emit was filtered back out by this
+      // router's own presenter before anything saw it.
+      expect(chunks).toEqual([]);
     });
 
-    it('emits error then done on turn/completed with status failed', () => {
+    it('emits the error on turn/completed with status failed', () => {
       router.handleNotification('turn/completed', {
         threadId: 't1',
         turn: {
@@ -1057,19 +1062,19 @@ describe('CodexNotificationRouter', () => {
         },
       });
 
-      expect(chunks).toEqual([
-        { type: 'error', content: 'Model error' },
-        { type: 'done' },
-      ]);
+      expect(chunks).toEqual([{ type: 'error', content: 'Model error' }]);
     });
 
-    it('emits done on turn/completed with status interrupted', () => {
+    it('emits nothing on turn/completed with status interrupted', () => {
       router.handleNotification('turn/completed', {
         threadId: 't1',
         turn: { id: 'turn1', items: [], status: 'interrupted', error: null },
       });
 
-      expect(chunks).toEqual([{ type: 'done' }]);
+      // Nothing on completion: the surface learns a turn ended from the run's
+      // terminal, and the chunk this used to emit was filtered back out by this
+      // router's own presenter before anything saw it.
+      expect(chunks).toEqual([]);
     });
   });
 
@@ -1188,7 +1193,7 @@ describe('CodexNotificationRouter', () => {
   });
 
   describe('plan_completed emission', () => {
-    it('records plan completion metadata before done on successful plan turn with plan deltas', () => {
+    it('records plan completion metadata on a successful plan turn with plan deltas', () => {
       router.beginTurn({ isPlanTurn: true });
 
       router.handleNotification('item/plan/delta', {
@@ -1200,7 +1205,6 @@ describe('CodexNotificationRouter', () => {
       });
 
       expect(turnMetadata).toContainEqual(expect.objectContaining({ planCompleted: true }));
-      expect(chunks.map(c => c.type)).toContain('done');
     });
 
     it('does not emit plan_completed when no plan delta was seen', () => {
@@ -1212,7 +1216,6 @@ describe('CodexNotificationRouter', () => {
       });
 
       expect(chunks.map(c => c.type)).not.toContain('plan_completed');
-      expect(chunks.map(c => c.type)).toContain('done');
     });
 
     it('does not emit plan_completed when turn failed', () => {
@@ -1353,26 +1356,57 @@ describe('CodexNotificationRouter', () => {
       expect(chunks).toHaveLength(0);
     });
 
-    it('maps userMessage item/started to a user_message_start chunk', () => {
+    it('draws nothing from a user item, and still draws the assistant\'s', () => {
+      // The boundary chunk this asserted was filtered off the content channel
+      // before it reached anything, and the user's message is what the
+      // projection carries. Paired with an assistant item so the emptiness is
+      // this router staying silent rather than the harness collecting nothing.
       router.handleNotification('item/started', {
         item: { type: 'userMessage', id: 'u1', content: [{ type: 'text', text: 'hi' }] },
         threadId: 't1',
         turnId: 'turn1',
       });
-      expect(chunks).toEqual([
-        { type: 'user_message_start', itemId: 'u1', content: 'hi' },
-      ]);
-    });
 
-    it('maps agentMessage item/started to an assistant_message_start chunk', () => {
-      router.handleNotification('item/started', {
-        item: { type: 'agentMessage', id: 'a1', text: '', phase: 'streaming', memoryCitation: null },
+      expect(chunks).toEqual([]);
+
+      router.handleNotification('item/completed', {
+        item: {
+          type: 'agentMessage', id: 'a1', text: 'answer', phase: 'final_answer',
+          memoryCitation: null,
+        },
         threadId: 't1',
         turnId: 'turn1',
       });
 
       expect(chunks).toEqual([
-        { type: 'assistant_message_start', itemId: 'a1' },
+        { type: 'text', content: 'answer', phase: 'final_answer' },
+      ]);
+    });
+
+    it('records the phase an agent item started with, for a completion that omits it', () => {
+      // This asserted the boundary chunk, which no surface received. What the
+      // boundary still does is remember the phase, and the reader is a
+      // completion that arrives without one — so the recording is asserted
+      // through the text chunk it decides the phase of.
+      router.handleNotification('item/started', {
+        item: {
+          type: 'agentMessage', id: 'a1', text: '', phase: 'final_answer',
+          memoryCitation: null,
+        },
+        threadId: 't1',
+        turnId: 'turn1',
+      });
+
+      expect(chunks).toEqual([]);
+
+      router.handleNotification('item/completed', {
+        item: { type: 'agentMessage', id: 'a1', text: 'answer', memoryCitation: null },
+        threadId: 't1',
+        turnId: 'turn1',
+      });
+
+      expect(chunks).toEqual([
+        { type: 'text', content: 'answer', phase: 'final_answer' },
       ]);
     });
 
@@ -1389,22 +1423,21 @@ describe('CodexNotificationRouter', () => {
         turnId: 'turn1',
       });
 
+      // The boundary chunk that led this list is gone; the phase it carried is
+      // on the text chunk, which is the one a surface reads.
       expect(chunks).toEqual([
-        { type: 'assistant_message_start', itemId: 'a1', phase: 'final_answer' },
         { type: 'text', content: 'The implementation is complete.', phase: 'final_answer' },
       ]);
     });
   });
 
   describe('assistant metadata emission', () => {
-    it('records assistant metadata before done on completed turn', () => {
+    it('records assistant metadata on a completed turn', () => {
       router.handleNotification('turn/completed', {
         threadId: 't1',
         turn: { id: 'turn-uuid-123', items: [], status: 'completed', error: null },
       });
 
-      const types = chunks.map(c => c.type);
-      expect(types).toContain('done');
       expect(turnMetadata).toContainEqual({ assistantMessageId: 'turn-uuid-123' });
     });
 

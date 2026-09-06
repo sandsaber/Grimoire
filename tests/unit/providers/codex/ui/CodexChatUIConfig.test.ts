@@ -1,3 +1,5 @@
+import '@/providers';
+
 import { updateCodexModelDiscoveryState } from '@/providers/codex/modelDiscoveryState';
 import { CODEX_SPARK_MODEL, DEFAULT_CODEX_PRIMARY_MODEL } from '@/providers/codex/types/models';
 import { codexChatUIConfig } from '@/providers/codex/ui/CodexChatUIConfig';

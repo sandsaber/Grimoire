@@ -5,9 +5,11 @@
 ## Current Scope
 
 - Qwen is opt-in and disabled by default.
-- `QwenChatRuntime` supports ACP startup, initialize, new session, load session, prompt streaming, cancel, proxied file read/write requests, Qwen mode/model updates, and structured `AskUserQuestion` permission metadata.
+- Chat execution runs through the kernel: `QwenExecution` (`src/providers/qwen/execution/`) owns the backend, the permission bridge, the question bridge and the isolated metadata session, and `ApplicationRuntime.createRuntimeFor('qwen')` reaches it through the composition.
+- `AskUserQuestion` is carried as a `kind: 'question'` interaction, the first of that kind in the product. Its answers ride on `InteractionResolution.payload`, which is never persisted; a question caught mid-resolution by a reload is cancelled rather than replayed.
 - Per-turn prompts include Grimoire context from the active note, editor selection, browser selection, canvas selection, vault search, and project workspace.
-- Model and mode discovery come from ACP session config options and are stored in provider settings for the UI.
+- Model and mode discovery come from the reply to `session/new` and are stored in provider settings for the UI. The mode a session *reports when it opens* is recorded and never adopted: only a `current_mode_update` moves the toolbar, and it is translated on the way — `Tab.ts` expects already-normalized Grimoire modes.
+- The context window comes from `qwen/status/session/context_usage`, a method ACP does not define, asked once per turn as it ends. No `usage_update` this CLI sends carries it.
 - Reasoning effort offers Low, Medium, High, XHigh, and Max (High by default). Apply Qwen's native `/effort <tier>` command before the normal turn and cache the applied tier per session; effective support remains model-dependent.
 - Auxiliary workflows such as title generation, instruction refinement, and inline edit are unsupported until a Qwen auxiliary runner exists.
 - Plan indicators are spend-only today. `QwenPlanUsageStore` records ACP cost when Qwen CLI reports it; daily quota remains unavailable until a reliable CLI/API source is wired.
@@ -36,3 +38,12 @@ Custom CLI paths are stored per host under `providerConfigs.qwen.cliPathsByHost`
 
 - On `session/load` failure, decide with `isAcpSessionGone` rather than treating any failure as proof the session is gone. Qwen Code names a missing session in the error (`-32002 Resource not found: session:<id>`) and also answers `session/list`, so both paths are available; anything unrecognised - transport, authentication, configuration - propagates with the binding intact.
 - A dropped session is recorded in `providerState.sessionDropped` and read back on load, because the in-memory flag is consumed by the first save. Never replay the transcript into a replacement session: history bootstrap is for a cold resume that never held a session id.
+
+- **The decision is wired; the notice is not.** `ManagedAcpExecutionBackend` asks
+  `isAcpSessionGone` on every failed `session/load`, so a refusal whose words say nothing
+  is settled by asking the agent through `session/list`, and a session it no longer lists
+  soft-fails into a fresh one. `isMissingSessionError` overrides that decision and takes
+  the whole probe, so a provider adds what its own CLI says and defers to the shared
+  question for everything else. What is still missing here is the surface: this
+  provider implements no `sessionDropped` port, so a conversation whose session was
+  replaced resumes without the notice. OpenCode and MiMoCode are wired; this one is not.

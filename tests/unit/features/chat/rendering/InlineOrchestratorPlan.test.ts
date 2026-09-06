@@ -62,7 +62,7 @@ describe('InlineOrchestratorPlan', () => {
     expect(text).toContain('Render inline approval controls');
     expect(text).toContain('Independent tasks for this note');
     expect(text).toContain('2 of 2 selected');
-    expect(text).toContain('Open worker tabs');
+    expect(text).toContain('Start background work');
     expect(text).toContain('Cancel');
     expect(root.querySelectorAll('.grimoire-orchestrator-plan-task')).toHaveLength(2);
 
@@ -78,7 +78,7 @@ describe('InlineOrchestratorPlan', () => {
 
     expect(text).toContain('Независимые задачи для этой заметки');
     expect(text).toContain('Выбрано 2 из 2');
-    expect(text).toContain('Открыть вкладки исполнителей');
+    expect(text).toContain('Запустить фоновую работу');
     expect(text).toContain('Отмена');
   });
 

@@ -1,0 +1,1062 @@
+{
+  "schemaVersion": 1,
+  "providerId": "kimicode",
+  "kind": "wire-recording",
+  "recordedAgainst": "kimi 0.39.1",
+  "transport": "stdio JSON-RPC 2.0 (`kimi acp`)",
+  "coverage": "complete",
+  "cases": [
+    "initialize",
+    "session/new",
+    "session/set_config_option",
+    "session/prompt"
+  ],
+  "sessionUpdatesObserved": [
+    "agent_message_chunk",
+    "agent_thought_chunk",
+    "available_commands_update",
+    "config_option_update",
+    "session_info_update",
+    "usage_update"
+  ],
+  "serverMethodsObserved": [
+    "session/update"
+  ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content.",
+  "exchange": [
+    {
+      "seq": 1,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 2,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": true,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "resume": {},
+              "close": {},
+              "delete": {},
+              "fork": {},
+              "additionalDirectories": {}
+            },
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "auth": {
+              "logout": {}
+            }
+          },
+          "authMethods": [
+            {
+              "id": "login",
+              "type": "terminal",
+              "name": "Login with Kimi account",
+              "description": "Open the device-code login flow in a terminal.",
+              "args": [
+                "--login"
+              ],
+              "env": {},
+              "_meta": {
+                "terminal-auth": {
+                  "type": "terminal",
+                  "label": "Login with Kimi account",
+                  "command": "kimi",
+                  "args": [
+                    "login"
+                  ],
+                  "env": {}
+                }
+              }
+            }
+          ],
+          "agentInfo": {
+            "name": "Kimi Code CLI",
+            "version": "0.39.1"
+          }
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/new",
+        "params": {
+          "cwd": "/tmp/grimoire-kimicode-wire-Z1qRyz",
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "configOptions": [
+            {
+              "type": "select",
+              "id": "model",
+              "name": "Model",
+              "category": "model",
+              "currentValue": "zai-coding-plan/glm-5.3-flash",
+              "options": [
+                {
+                  "value": "zai-coding-plan/glm-4.7",
+                  "name": "GLM-4.7"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5-turbo",
+                  "name": "GLM-5-Turbo"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.3",
+                  "name": "GLM-5.3"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.2",
+                  "name": "GLM-5.2"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.2-highspeed",
+                  "name": "GLM-5.2 Highspeed"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.3-highspeed",
+                  "name": "GLM-5.3 Highspeed"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.3-flash",
+                  "name": "GLM-5.3-Flash"
+                }
+              ]
+            },
+            {
+              "type": "select",
+              "id": "thinking",
+              "name": "Thinking",
+              "category": "thought_level",
+              "currentValue": "high",
+              "options": [
+                {
+                  "value": "low",
+                  "name": "Thinking Low"
+                },
+                {
+                  "value": "high",
+                  "name": "Thinking High"
+                },
+                {
+                  "value": "max",
+                  "name": "Thinking Max"
+                }
+              ]
+            },
+            {
+              "type": "select",
+              "id": "mode",
+              "name": "Mode",
+              "category": "mode",
+              "currentValue": "default",
+              "options": [
+                {
+                  "value": "default",
+                  "name": "Default",
+                  "description": "Manual approvals; tools execute normally."
+                },
+                {
+                  "value": "plan",
+                  "name": "Plan",
+                  "description": "Read-only planning; no tool execution."
+                },
+                {
+                  "value": "auto",
+                  "name": "Auto",
+                  "description": "Auto-approve safe operations."
+                },
+                {
+                  "value": "yolo",
+                  "name": "YOLO",
+                  "description": "Auto-approve everything."
+                }
+              ]
+            }
+          ],
+          "modes": {
+            "currentModeId": "default",
+            "availableModes": [
+              {
+                "id": "default",
+                "name": "Default",
+                "description": "Manual approvals; tools execute normally."
+              },
+              {
+                "id": "plan",
+                "name": "Plan",
+                "description": "Read-only planning; no tool execution."
+              },
+              {
+                "id": "auto",
+                "name": "Auto",
+                "description": "Auto-approve safe operations."
+              },
+              {
+                "id": "yolo",
+                "name": "YOLO",
+                "description": "Auto-approve everything."
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compact the conversation context",
+                "input": {
+                  "hint": "<optional custom summarization instructions>"
+                }
+              },
+              {
+                "name": "status",
+                "description": "Show current session status"
+              },
+              {
+                "name": "usage",
+                "description": "Show session token usage"
+              },
+              {
+                "name": "mcp",
+                "description": "Show MCP server status"
+              },
+              {
+                "name": "tasks",
+                "description": "List background tasks"
+              },
+              {
+                "name": "help",
+                "description": "Show available ACP commands"
+              },
+              {
+                "name": "check-kimi-code-docs",
+                "description": "Answer questions about the Kimi Code product using the official documentation — CLI usage, configuration, slash commands, features, membership and quota, API onboarding, third-party tool set… (elided)"
+              },
+              {
+                "name": "custom-theme",
+                "description": "Create or edit a kimi-code custom color theme — a JSON file under the resolved KIMI_CODE_HOME data directory that recolors the TUI. Use when the user wants their own theme, asks for a specif… (elided)"
+              },
+              {
+                "name": "import-from-cc-codex",
+                "description": "Import Claude Code and Codex instructions, skills, and MCP settings into Kimi Code."
+              },
+              {
+                "name": "mcp-config",
+                "description": "Configure MCP servers and handle MCP OAuth login."
+              },
+              {
+                "name": "sub-skill",
+                "description": "Discover and reorganize the skill inventory into hierarchical sub-skill bundles. Use when the user asks to review, group, or consolidate skills into a parent bundle."
+              },
+              {
+                "name": "sub-skill.consolidate",
+                "description": "Apply an approved sub-skill grouping by moving user-specified skills into a parent bundle, with timestamped backups of every modified directory."
+              },
+              {
+                "name": "sub-skill.review",
+                "description": "Analyze the available skill set and recommend candidate groups that could be consolidated into sub-skill bundles. Read-only — proposes a plan, does not move files."
+              },
+              {
+                "name": "update-config",
+                "description": "Inspect or edit kimi-code's own config — `config.toml` (model, provider, permission, hooks) and `tui.toml` (theme, editor, notifications, auto-update). Use when the user asks what a setting … (elided)"
+              },
+              {
+                "name": "write-goal",
+                "description": "Help the user craft a well-specified `/goal` objective for goal mode — turn a rough intention into a completion contract with a clear finish line, proof, boundaries, and stop rule. Use when … (elided)"
+              },
+              {
+                "name": "skill:brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+              },
+              {
+                "name": "skill:coding-guidelines",
+                "description": "Use when asking about Rust code style or best practices. Keywords: naming, formatting, comment, clippy, rustfmt, lint, code style, best practice, P.NAM, G.FMT, code review, naming convention… (elided)"
+              },
+              {
+                "name": "skill:dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies"
+              },
+              {
+                "name": "skill:domain-cli",
+                "description": "Use when building CLI tools. Keywords: CLI, command line, terminal, clap, structopt, argument parsing, subcommand, interactive, TUI, ratatui, crossterm, indicatif, progress bar, colored outp… (elided)"
+              },
+              {
+                "name": "skill:domain-cloud-native",
+                "description": "Use when building cloud-native apps. Keywords: kubernetes, k8s, docker, container, grpc, tonic, microservice, service mesh, observability, tracing, metrics, health check, cloud, deployment, … (elided)"
+              },
+              {
+                "name": "skill:domain-embedded",
+                "description": "Use when developing embedded/no_std Rust. Keywords: embedded, no_std, microcontroller, MCU, ARM, RISC-V, bare metal, firmware, HAL, PAC, RTIC, embassy, interrupt, DMA, peripheral, GPIO, SPI,… (elided)"
+              },
+              {
+                "name": "skill:domain-fintech",
+                "description": "Use when building fintech apps. Keywords: fintech, trading, decimal, currency, financial, money, transaction, ledger, payment, exchange rate, precision, rounding, accounting, 金融, 交易系统, 货币, 支付"
+              },
+              {
+                "name": "skill:domain-iot",
+                "description": "Use when building IoT apps. Keywords: IoT, Internet of Things, sensor, MQTT, device, edge computing, telemetry, actuator, smart home, gateway, protocol, 物联网, 传感器, 边缘计算, 智能家居"
+              },
+              {
+                "name": "skill:domain-ml",
+                "description": "Use when building ML/AI apps in Rust. Keywords: machine learning, ML, AI, tensor, model, inference, neural network, deep learning, training, prediction, ndarray, tch-rs, burn, candle, 机器学习, 人工智能, 模型推理"
+              },
+              {
+                "name": "skill:domain-web",
+                "description": "Use when building web services. Keywords: web server, HTTP, REST API, GraphQL, WebSocket, axum, actix, warp, rocket, tower, hyper, reqwest, middleware, router, handler, extractor, state mana… (elided)"
+              },
+              {
+                "name": "skill:executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints"
+              },
+              {
+                "name": "skill:find-skills",
+                "description": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilitie… (elided)"
+              },
+              {
+                "name": "skill:finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup"
+              },
+              {
+                "name": "skill:m01-ownership",
+                "description": "CRITICAL: Use for ownership/borrow/lifetime issues. Triggers: E0382, E0597, E0506, E0507, E0515, E0716, E0106, value moved, borrowed value does not live long enough, cannot move out of, use … (elided)"
+              },
+              {
+                "name": "skill:m02-resource",
+                "description": "CRITICAL: Use for smart pointers and resource management. Triggers: Box, Rc, Arc, Weak, RefCell, Cell, smart pointer, heap allocation, reference counting, RAII, Drop, should I use Box or Rc,… (elided)"
+              },
+              {
+                "name": "skill:m03-mutability",
+                "description": "CRITICAL: Use for mutability issues. Triggers: E0596, E0499, E0502, cannot borrow as mutable, already borrowed as immutable, mut, &mut, interior mutability, Cell, RefCell, Mutex, RwLock, 可变性… (elided)"
+              },
+              {
+                "name": "skill:m04-zero-cost",
+                "description": "CRITICAL: Use for generics, traits, zero-cost abstraction. Triggers: E0277, E0308, E0599, generic, trait, impl, dyn, where, monomorphization, static dispatch, dynamic dispatch, impl Trait, t… (elided)"
+              },
+              {
+                "name": "skill:m05-type-driven",
+                "description": "CRITICAL: Use for type-driven design. Triggers: type state, PhantomData, newtype, marker trait, builder pattern, make invalid states unrepresentable, compile-time validation, sealed trait, Z… (elided)"
+              },
+              {
+                "name": "skill:m06-error-handling",
+                "description": "CRITICAL: Use for error handling. Triggers: Result, Option, Error, ?, unwrap, expect, panic, anyhow, thiserror, when to panic vs return Result, custom error, error propagation, 错误处理, Result … (elided)"
+              },
+              {
+                "name": "skill:m07-concurrency",
+                "description": "CRITICAL: Use for concurrency/async. Triggers: E0277 Send Sync, cannot be sent between threads, thread, spawn, channel, mpsc, Mutex, RwLock, Atomic, async, await, Future, tokio, deadlock, ra… (elided)"
+              },
+              {
+                "name": "skill:m09-domain",
+                "description": "CRITICAL: Use for domain modeling. Triggers: domain model, DDD, domain-driven design, entity, value object, aggregate, repository pattern, business rules, validation, invariant, 领域模型, 领域驱动设计, 业务规则"
+              },
+              {
+                "name": "skill:m10-performance",
+                "description": "CRITICAL: Use for performance optimization. Triggers: performance, optimization, benchmark, profiling, flamegraph, criterion, slow, fast, allocation, cache, SIMD, make it faster, 性能优化, 基准测试"
+              },
+              {
+                "name": "skill:m11-ecosystem",
+                "description": "Use when integrating crates or ecosystem questions. Keywords: E0425, E0433, E0603, crate, cargo, dependency, feature flag, workspace, which crate to use, using external C libraries, creating… (elided)"
+              },
+              {
+                "name": "skill:m12-lifecycle",
+                "description": "Use when designing resource lifecycles. Keywords: RAII, Drop, resource lifecycle, connection pool, lazy initialization, connection pool design, resource cleanup patterns, cleanup, scope, Onc… (elided)"
+              },
+              {
+                "name": "skill:m13-domain-error",
+                "description": "Use when designing domain error handling. Keywords: domain error, error categorization, recovery strategy, retry, fallback, domain error hierarchy, user-facing vs internal errors, error code… (elided)"
+              },
+              {
+                "name": "skill:m14-mental-model",
+                "description": "Use when learning Rust concepts. Keywords: mental model, how to think about ownership, understanding borrow checker, visualizing memory layout, analogy, misconception, explaining ownership, … (elided)"
+              },
+              {
+                "name": "skill:m15-anti-pattern",
+                "description": "Use when reviewing code for anti-patterns. Keywords: anti-pattern, common mistake, pitfall, code smell, bad practice, code review, is this an anti-pattern, better way to do this, common mist… (elided)"
+              },
+              {
+                "name": "skill:meta-cognition-parallel",
+                "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, 三层分析, parallel analysis, 并行元认知"
+              },
+              {
+                "name": "skill:receiving-code-review",
+                "description": "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not pe… (elided)"
+              },
+              {
+                "name": "skill:requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements"
+              },
+              {
+                "name": "skill:rust-call-graph",
+                "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, 调用图, 调用关系, 谁调用了, 调用了谁"
+              },
+              {
+                "name": "skill:rust-code-navigator",
+                "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, 跳转定义, 查找引用, 定义在哪, 谁用了这个"
+              },
+              {
+                "name": "skill:rust-daily",
+                "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust 日报, Rust 周报, Rust 新闻, Rust 动态"
+              },
+              {
+                "name": "skill:rust-deps-visualizer",
+                "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, 依赖图, 依赖可视化, 显示依赖"
+              },
+              {
+                "name": "skill:rust-learner",
+                "description": "Use when asking about Rust versions or crate info. Keywords: latest version, what's new, changelog, Rust 1.x, Rust release, stable, nightly, crate info, crates.io, lib.rs, docs.rs, API docum… (elided)"
+              },
+              {
+                "name": "skill:rust-refactor-helper",
+                "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, 重构, 重命名, 提取函数, 安全重构"
+              },
+              {
+                "name": "skill:rust-router",
+                "description": "CRITICAL: Use for ALL Rust questions including errors, design, and coding.\nHIGHEST PRIORITY for: 比较, 对比, compare, vs, versus, 区别, difference, 最佳实践, best practice,\ntokio vs, async-std vs, 比较 … (elided)"
+              },
+              {
+                "name": "skill:rust-symbol-analyzer",
+                "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, 符号分析, 项目结构, 列出所有, 有哪些struct"
+              },
+              {
+                "name": "skill:rust-trait-explorer",
+                "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait 实现, 谁实现了, 实现了哪些trait"
+              },
+              {
+                "name": "skill:subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session"
+              },
+              {
+                "name": "skill:systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes"
+              },
+              {
+                "name": "skill:test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code"
+              },
+              {
+                "name": "skill:unsafe-checker",
+                "description": "CRITICAL: Use for unsafe Rust code review and FFI. Triggers on: unsafe, raw pointer, FFI, extern, transmute, *mut, *const, union, #[repr(C)], libc, std::ffi, MaybeUninit, NonNull, SAFETY com… (elided)"
+              },
+              {
+                "name": "skill:using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback"
+              },
+              {
+                "name": "skill:using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions"
+              },
+              {
+                "name": "skill:verification-before-completion",
+                "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims… (elided)"
+              },
+              {
+                "name": "skill:writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code"
+              },
+              {
+                "name": "skill:writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/set_config_option",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "configId": "model",
+          "value": "zai-coding-plan/glm-5.3-flash"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "config_option_update",
+            "configOptions": [
+              {
+                "type": "select",
+                "id": "model",
+                "name": "Model",
+                "category": "model",
+                "currentValue": "zai-coding-plan/glm-5.3-flash",
+                "options": [
+                  {
+                    "value": "zai-coding-plan/glm-4.7",
+                    "name": "GLM-4.7"
+                  },
+                  {
+                    "value": "zai-coding-plan/glm-5-turbo",
+                    "name": "GLM-5-Turbo"
+                  },
+                  {
+                    "value": "zai-coding-plan/glm-5.3",
+                    "name": "GLM-5.3"
+                  },
+                  {
+                    "value": "zai-coding-plan/glm-5.2",
+                    "name": "GLM-5.2"
+                  },
+                  {
+                    "value": "zai-coding-plan/glm-5.2-highspeed",
+                    "name": "GLM-5.2 Highspeed"
+                  },
+                  {
+                    "value": "zai-coding-plan/glm-5.3-highspeed",
+                    "name": "GLM-5.3 Highspeed"
+                  },
+                  {
+                    "value": "zai-coding-plan/glm-5.3-flash",
+                    "name": "GLM-5.3-Flash"
+                  }
+                ]
+              },
+              {
+                "type": "select",
+                "id": "thinking",
+                "name": "Thinking",
+                "category": "thought_level",
+                "currentValue": "high",
+                "options": [
+                  {
+                    "value": "low",
+                    "name": "Thinking Low"
+                  },
+                  {
+                    "value": "high",
+                    "name": "Thinking High"
+                  },
+                  {
+                    "value": "max",
+                    "name": "Thinking Max"
+                  }
+                ]
+              },
+              {
+                "type": "select",
+                "id": "mode",
+                "name": "Mode",
+                "category": "mode",
+                "currentValue": "default",
+                "options": [
+                  {
+                    "value": "default",
+                    "name": "Default",
+                    "description": "Manual approvals; tools execute normally."
+                  },
+                  {
+                    "value": "plan",
+                    "name": "Plan",
+                    "description": "Read-only planning; no tool execution."
+                  },
+                  {
+                    "value": "auto",
+                    "name": "Auto",
+                    "description": "Auto-approve safe operations."
+                  },
+                  {
+                    "value": "yolo",
+                    "name": "YOLO",
+                    "description": "Auto-approve everything."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "configOptions": [
+            {
+              "type": "select",
+              "id": "model",
+              "name": "Model",
+              "category": "model",
+              "currentValue": "zai-coding-plan/glm-5.3-flash",
+              "options": [
+                {
+                  "value": "zai-coding-plan/glm-4.7",
+                  "name": "GLM-4.7"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5-turbo",
+                  "name": "GLM-5-Turbo"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.3",
+                  "name": "GLM-5.3"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.2",
+                  "name": "GLM-5.2"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.2-highspeed",
+                  "name": "GLM-5.2 Highspeed"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.3-highspeed",
+                  "name": "GLM-5.3 Highspeed"
+                },
+                {
+                  "value": "zai-coding-plan/glm-5.3-flash",
+                  "name": "GLM-5.3-Flash"
+                }
+              ]
+            },
+            {
+              "type": "select",
+              "id": "thinking",
+              "name": "Thinking",
+              "category": "thought_level",
+              "currentValue": "high",
+              "options": [
+                {
+                  "value": "low",
+                  "name": "Thinking Low"
+                },
+                {
+                  "value": "high",
+                  "name": "Thinking High"
+                },
+                {
+                  "value": "max",
+                  "name": "Thinking Max"
+                }
+              ]
+            },
+            {
+              "type": "select",
+              "id": "mode",
+              "name": "Mode",
+              "category": "mode",
+              "currentValue": "default",
+              "options": [
+                {
+                  "value": "default",
+                  "name": "Default",
+                  "description": "Manual approvals; tools execute normally."
+                },
+                {
+                  "value": "plan",
+                  "name": "Plan",
+                  "description": "Read-only planning; no tool execution."
+                },
+                {
+                  "value": "auto",
+                  "name": "Auto",
+                  "description": "Auto-approve safe operations."
+                },
+                {
+                  "value": "yolo",
+                  "name": "YOLO",
+                  "description": "Auto-approve everything."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "Reply with exactly: ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 10,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "session_info_update",
+            "title": "Reply with exactly: ok"
+          }
+        }
+      }
+    },
+    {
+      "seq": 11,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "The"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 12,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " user"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 13,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " wants"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 14,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " an"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 15,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " exact"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 16,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " reply"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 17,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": ":"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 18,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " \""
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 19,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "ok"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 20,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "\"."
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 21,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " No"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 22,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " skill"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 23,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " applies"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 24,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "."
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 25,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "ok"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 26,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "stopReason": "end_turn"
+        }
+      }
+    },
+    {
+      "seq": 27,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "session_1aa551b3-8267-4779-80e2-11bc22650bfe",
+          "update": {
+            "sessionUpdate": "usage_update",
+            "used": 25242,
+            "size": 1000000
+          }
+        }
+      }
+    }
+  ]
+}

@@ -34,7 +34,7 @@ export interface MentionDropdownCallbacks {
 }
 
 export interface McpMentionProvider {
-  getContextSavingServers: () => Array<{ name: string }>;
+  getContextSavingServers: () => readonly { readonly name: string }[];
 }
 
 const FOLLOWING_TEXT_AFTER_MENTION_REGEX = /\s+\S+$/;

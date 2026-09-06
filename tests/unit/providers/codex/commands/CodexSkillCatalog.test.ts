@@ -328,21 +328,6 @@ Prompt`,
     });
   });
 
-  describe('getDropdownConfig', () => {
-    it('returns Codex-specific config with $ for skills', () => {
-      const adapter = createMockAdapter({});
-      const storage = new CodexSkillStorage(adapter);
-      const catalog = new CodexSkillCatalog(storage, createMockSkillListProvider(), '/test/vault');
-
-      const config = catalog.getDropdownConfig();
-
-      expect(config.triggerChars).toEqual(['/', '$']);
-      expect(config.builtInPrefix).toBe('/');
-      expect(config.skillPrefix).toBe('$');
-      expect(config.commandPrefix).toBe('/');
-    });
-  });
-
   describe('refresh', () => {
     it('forces an app-server reload instead of relying on scans', async () => {
       const adapter = createMockAdapter({});

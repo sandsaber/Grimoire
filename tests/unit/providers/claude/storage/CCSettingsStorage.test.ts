@@ -146,19 +146,32 @@ describe('CCSettingsStorage', () => {
     });
 
     describe('save', () => {
-        it('should handle parse error on existing file', async () => {
+        it('refuses to write over a file it could not read back', async () => {
             mockAdapter.exists.mockResolvedValue(true);
             mockAdapter.read.mockResolvedValue('invalid json{{{');
 
-            await storage.save({
+            // The merge is a read-modify-write, and everything this build does
+            // not model — hooks, env, model, statusLine — survives only by
+            // being read back. It could not be, so nothing is written: writing
+            // would rewrite the user's file, and Claude Code's, down to two
+            // keys on one "Always allow" click.
+            await expect(storage.save({
                 permissions: { allow: [], deny: [], ask: [] }
-            });
+            })).rejects.toThrow('not valid JSON');
 
-            // Should still write successfully after parse error
-            expect(mockAdapter.write).toHaveBeenCalled();
-            const writeCall = mockAdapter.write.mock.calls[0];
-            const writtenContent = JSON.parse(writeCall[1]);
-            expect(writtenContent.permissions).toEqual({ allow: [], deny: [], ask: [] });
+            expect(mockAdapter.write).not.toHaveBeenCalled();
+        });
+
+        it('still answers a permission read when the file cannot be parsed', async () => {
+            mockAdapter.exists.mockResolvedValue(true);
+            mockAdapter.read.mockResolvedValue('invalid json{{{');
+
+            // The read degrades and the write refuses, which is the asymmetry:
+            // one stray character must not break the approval surface, and it
+            // must not be allowed to destroy the file either.
+            await expect(storage.getPermissions()).resolves.toEqual(
+                expect.objectContaining({ allow: expect.any(Array) }),
+            );
         });
 
         it('should not write enabledPlugins from settings argument', async () => {
@@ -325,4 +338,73 @@ describe('CCSettingsStorage', () => {
             expect(writtenContent.enabledPlugins).toEqual({ 'plugin-a': false });
         });
     });
+  it('does not lose one save to another that overlapped it', async () => {
+    // The merge is a read-modify-write, and nothing serialized it: two saves
+    // overlapping meant the second read the file before the first wrote it, and
+    // whichever finished last silently won — dropping the other's permissions.
+    const files = new Map<string, string>();
+    const adapter = createSlowAdapter(files);
+    const storage = new CCSettingsStorage(adapter);
+
+    await Promise.all([
+      storage.save({ permissions: { allow: ['Read(a)'], deny: [], ask: [] } } as never),
+      storage.save({ permissions: { allow: ['Read(b)'], deny: [], ask: [] } } as never),
+    ]);
+
+    // The second write wins, which is what "last one wins" should mean — but it
+    // read the first one's file, so nothing was lost on the way.
+    const saved = JSON.parse(files.get('.claude/settings.json') as string);
+    expect(saved.permissions.allow).toEqual(['Read(b)']);
+    expect(files.has('.claude/settings.json.grimoire-pending')).toBe(false);
+  });
+
+  it('leaves the previous file whole when the replacement cannot land', async () => {
+    const files = new Map<string, string>([['.claude/settings.json', '{"permissions":{"allow":["Read(old)"]}}']]);
+    const adapter = createSlowAdapter(files);
+    adapter.rename = jest.fn(async () => {
+      throw new Error('rename failed');
+    });
+    const storage = new CCSettingsStorage(adapter);
+
+    await expect(storage.save({ permissions: { allow: ['Read(new)'], deny: [], ask: [] } } as never))
+      .rejects.toThrow('rename failed');
+
+    // Whole, and no staged copy left beside it for the next reader — Claude
+    // Code reads this directory too.
+    expect(JSON.parse(files.get('.claude/settings.json') as string).permissions.allow)
+      .toEqual(['Read(old)']);
+    expect(files.has('.claude/settings.json.grimoire-pending')).toBe(false);
+  });
+
 });
+
+/** An adapter whose reads and writes take a turn, so overlaps are real. */
+function createSlowAdapter(files: Map<string, string>): any {
+  const yieldTurn = () => new Promise(resolve => setTimeout(resolve, 0));
+  return {
+    exists: async (path: string) => {
+      await yieldTurn();
+      return files.has(path);
+    },
+    read: async (path: string) => {
+      await yieldTurn();
+      const content = files.get(path);
+      if (content === undefined) throw new Error(`ENOENT: ${path}`);
+      return content;
+    },
+    write: async (path: string, content: string) => {
+      await yieldTurn();
+      files.set(path, content);
+    },
+    rename: jest.fn(async (from: string, to: string) => {
+      await yieldTurn();
+      const content = files.get(from);
+      if (content === undefined) throw new Error(`ENOENT: ${from}`);
+      files.delete(from);
+      files.set(to, content);
+    }),
+    delete: async (path: string) => {
+      files.delete(path);
+    },
+  };
+}

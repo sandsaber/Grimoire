@@ -19,7 +19,8 @@
     "disabled": "Отключено",
     "platform": "Платформа",
     "refresh": "Обновить",
-    "rewind": "Откатить"
+    "rewind": "Откатить",
+    "close": "Закрыть"
   },
   "chat": {
     "rewind": {
@@ -37,6 +38,14 @@
       "cannot": "Невозможно откатить: {error}",
       "unavailableStreaming": "Невозможно откатить во время потоковой передачи",
       "unavailableNoUuid": "Невозможно откатить: отсутствуют идентификаторы сообщений"
+    },
+    "agents": {
+      "runningCount": "{count} выполняется в фоне",
+      "finished": "Фоновая работа",
+      "finishedOne": "завершено",
+      "failedOne": "ошибка",
+      "runningOne": "выполняется",
+      "unobservable": "выполняется, прогресс не сообщается"
     },
     "history": {
       "deleteAll": "Удалить всё",
@@ -77,16 +86,17 @@
     "orchestrator": {
       "planTitle": "Независимые задачи для этой заметки",
       "planEyebrow": "Параллельные исполнители",
-      "planSummary": "Подготовлено независимых задач: {count}. Каждая выполняется в отдельной вкладке и не делится с другими ни контекстом, ни результатами.",
+      "planSummary": "Подготовлено независимых задач: {count}. Каждая выполняется в фоне в отдельном чате и не делится с другими ни контекстом, ни результатами.",
       "badge": "Параллельные исполнители",
       "workerCount": "Выбрано {count} из {total}",
-      "spawnWorkers": "Открыть вкладки исполнителей",
+      "spawnWorkers": "Запустить фоновую работу",
       "parallel": "Независимая",
       "toggleTask": "Включить задачу: {task}",
-      "workerTabsHint": "Один независимый исполнитель на вкладку · без общего контекста",
+      "workerTabsHint": "По одному независимому исполнителю · без общего контекста",
       "toggleTitle": "Параллельные исполнители",
       "toggleAriaLabel": "Переключить параллельных исполнителей",
-      "toggleFailed": "Не удалось переключить параллельных исполнителей"
+      "toggleFailed": "Не удалось переключить параллельных исполнителей",
+      "dispatchFailed": "Часть фоновой работы не удалось запустить."
     },
     "vaultSearch": {
       "toolName": "Поиск в хранилище",
@@ -398,6 +408,9 @@
       "messages": {
         "interrupted": "Прервано",
         "interruptedHint": "· Что Grimoire должен сделать вместо этого?",
+        "historyUnavailable": "Ранние сообщения этого разговора больше недоступны — у провайдера не осталось сессии, в которой они хранились.",
+        "historyPartial": "Часть этого разговора не удалось загрузить, поэтому некоторых ранних сообщений может не хватать.",
+        "historyUnreadable": "Ранние сообщения этого разговора не удалось прочитать, поэтому дальнейшее может быть неполным.",
         "conversationCompacted": "Диалог сжат",
         "sessionRestarted": "Новая сессия",
         "sessionRestartedHint": "Агенту не удалось восстановить предыдущую сессию, поэтому диалог продолжается в новой. Сообщения выше не входят в её контекст - повторите то, что всё ещё нужно, или начните заново в новой вкладке.",
@@ -407,7 +420,16 @@
         "renderFailed": "Не удалось отобразить содержимое сообщения.",
         "copyMessage": "Копировать сообщение",
         "copyResponse": "Копировать ответ",
-        "awaitingYou": "Ожидание вас"
+        "awaitingYou": "Ожидание вас",
+        "noticeBlocked": "Заблокировано",
+        "noticeLabel": "Уведомление",
+        "errorLabel": "Ошибка",
+        "queuedPrefix": "В очереди",
+        "steeringPrefix": "Корректировка",
+        "newChatTitle": "Новый чат",
+        "closeImage": "Закрыть изображение",
+        "viewFullImage": "Открыть изображение целиком",
+        "copyCode": "Скопировать код"
       },
       "errors": {
         "generic": "Ошибка: {message}",
@@ -426,7 +448,6 @@
           "startFailed": "Не удалось запустить {provider}. Проверьте путь к CLI и состояние входа.",
           "notReady": "Среда выполнения {provider} не готова.",
           "sessionCreateFailed": "Не удалось создать сеанс для {provider}.",
-          "sessionResumeFailed": "Не удалось возобновить предыдущий сеанс {provider}. Запускается новый; история в Grimoire сохранена.",
           "emptyResponse": "{provider} завершил работу без ответа. Проверьте учётные данные и журналы провайдера, затем повторите попытку.",
           "requestFailed": "Сбой запроса к {provider}",
           "antigravityDisabled": "Antigravity отключён. Включите его в настройках провайдера.",
@@ -456,6 +477,9 @@
         "searchPlaceholder": "Искать прошлые чаты...",
         "empty": "Нет прошлых чатов",
         "noMatches": "Нет совпадений",
+        "unreadableTitle": "Нечитаемый чат",
+        "unreadableFuture": "Записан более новой версией Grimoire.",
+        "unreadableCorrupt": "Файл повреждён и не может быть открыт.",
         "current": "Текущий",
         "openNewTab": "Открыть в новой вкладке",
         "generatingTitle": "Создание названия...",
@@ -970,7 +994,46 @@
       }
     },
     "hub": {
-      "general": "Общие", "providers": "Провайдеры", "workspace": "Расширенные", "about": "О плагине", "cliDetected": "CLI обнаружен", "cliNotDetected": "CLI не обнаружен", "geminiLegacy": "Gemini CLI (устаревший)", "providerDetails": "Настройки {provider}", "skills": "Навыки", "agents": "Субагенты", "mcp": "MCP", "environment": "Окружение", "commands": "Команды", "search": "Поиск по имени, описанию, источнику или провайдеру", "name": "Имя", "source": "Источник", "provider": "Провайдер", "actions": "Действия", "manage": "Управлять", "manageTitle": "Управление: {section}", "edit": "Изменить", "delete": "Удалить", "deleteConfirm": "Удалить «{name}»?", "deleted": "«{name}» удалён", "deleteFailed": "Не удалось удалить: {message}", "providerOptions": "Расширенные параметры провайдера", "readonly": "Только чтение", "available": "Доступно", "connected": "Подключено", "disabled": "Отключено", "shared": "Общее", "loading": "Загрузка ресурсов…", "unsupported": "Этот провайдер не поддерживает данную категорию ресурсов.", "none": "Нет подходящих расширенных ресурсов.", "aboutCopy": "Grimoire подключает локальных ИИ-агентов в Obsidian. Здесь доступны версия и примечания к выпуску.", "native": "Нативный", "nativeCli": "Нативная CLI", "nativeMcpDescription": "Нативная поддержка MCP", "runtimeCommandsPending": "Один раз запустите чат {provider}, чтобы загрузить его нативные команды.", "releases": "Релизы"
+      "general": "Общие",
+      "providers": "Провайдеры",
+      "workspace": "Расширенные",
+      "about": "О плагине",
+      "cliDetected": "CLI обнаружен",
+      "cliNotDetected": "CLI не обнаружен",
+      "geminiLegacy": "Gemini CLI (устаревший)",
+      "providerDetails": "Настройки {provider}",
+      "skills": "Навыки",
+      "agents": "Субагенты",
+      "mcp": "MCP",
+      "environment": "Окружение",
+      "commands": "Команды",
+      "search": "Поиск по имени, описанию, источнику или провайдеру",
+      "name": "Имя",
+      "source": "Источник",
+      "provider": "Провайдер",
+      "actions": "Действия",
+      "manage": "Управлять",
+      "manageTitle": "Управление: {section}",
+      "edit": "Изменить",
+      "delete": "Удалить",
+      "deleteConfirm": "Удалить «{name}»?",
+      "deleted": "«{name}» удалён",
+      "deleteFailed": "Не удалось удалить: {message}",
+      "providerOptions": "Расширенные параметры провайдера",
+      "readonly": "Только чтение",
+      "available": "Доступно",
+      "connected": "Подключено",
+      "disabled": "Отключено",
+      "shared": "Общее",
+      "loading": "Загрузка ресурсов…",
+      "unsupported": "Этот провайдер не поддерживает данную категорию ресурсов.",
+      "none": "Нет подходящих расширенных ресурсов.",
+      "aboutCopy": "Grimoire подключает локальных ИИ-агентов в Obsidian. Здесь доступны версия и примечания к выпуску.",
+      "native": "Нативный",
+      "nativeCli": "Нативная CLI",
+      "nativeMcpDescription": "Нативная поддержка MCP",
+      "runtimeCommandsPending": "Один раз запустите чат {provider}, чтобы загрузить его нативные команды.",
+      "releases": "Релизы"
     },
     "grok": {
       "cliPath": {
@@ -1445,8 +1508,61 @@
       }
     }
   },
-  "plugin": { "openRibbon": "Открыть Grimoire", "openChatView": "Открыть чат", "inlineEdit": "Редактировать в строке", "inlineEditViewUnavailable": "Встроенное редактирование недоступно: не удалось получить активный Markdown-представление.", "inlineEditInserted": "Вставлено", "inlineEditApplied": "Изменение применено", "newTab": "Новая вкладка", "newSession": "Новая сессия (в текущей вкладке)", "closeCurrentTab": "Закрыть текущую вкладку", "switchToTab": "Перейти на вкладку {index}", "environmentRestartFailed": "Изменения окружения применены, но не удалось перезапустить затронутые вкладки: {count}.", "environmentAppliedRebuild": "Переменные окружения применены. Сессии будут пересозданы при следующем сообщении.", "environmentApplied": "Переменные окружения применены." },
-  "shared": { "slashCommands": { "noMatches": "Нет подходящих команд" }, "resumeConversation": { "title": "Продолжить разговор", "empty": "Нет разговоров", "current": "Текущая сессия" }, "instructionModal": { "title": "Добавить пользовательскую инструкцию", "yourInput": "Ваш ввод:", "processingInstruction": "Обрабатываем вашу инструкцию...", "yourResponse": "Ваш ответ:", "responsePlaceholder": "Укажите больше деталей...", "refinedSnippet": "Уточнённый фрагмент:", "processing": "Обработка...", "submit": "Отправить", "submitResponseAria": "Отправить ответ", "editAria": "Редактировать инструкцию", "accept": "Принять", "acceptAria": "Принять инструкцию", "preview": "Предпросмотр" }, "whatsNew": { "title": "Что нового в Grimoire v{version}", "released": "Выпущено {date}", "latestReleaseNotes": "Последние примечания к выпуску", "fullChangelog": "Полный список изменений", "gotIt": "Понятно" } },
-  "inlineEdit": { "rejectTitle": "Отклонить (Esc)", "acceptTitle": "Принять (Enter)", "editorUnavailable": "Встроенное редактирование недоступно: не удалось получить активный редактор. Откройте заметку заново.", "vaultFilesLoadFailed": "Не удалось загрузить файлы vault. @-упоминания могут быть недоступны.", "invalidFilePath": "Не удалось прикрепить файл: неверный путь" },
-  "storage": { "tabLayoutSaveFailed": "Не удалось сохранить расположение вкладок" }
+  "plugin": {
+    "openRibbon": "Открыть Grimoire",
+    "openChatView": "Открыть чат",
+    "inlineEdit": "Редактировать в строке",
+    "inlineEditViewUnavailable": "Встроенное редактирование недоступно: не удалось получить активный Markdown-представление.",
+    "inlineEditInserted": "Вставлено",
+    "inlineEditApplied": "Изменение применено",
+    "newTab": "Новая вкладка",
+    "newSession": "Новая сессия (в текущей вкладке)",
+    "closeCurrentTab": "Закрыть текущую вкладку",
+    "switchToTab": "Перейти на вкладку {index}",
+    "environmentRestartFailed": "Изменения окружения применены, но не удалось перезапустить затронутые вкладки: {count}.",
+    "environmentAppliedRebuild": "Переменные окружения применены. Сессии будут пересозданы при следующем сообщении.",
+    "environmentApplied": "Переменные окружения применены."
+  },
+  "shared": {
+    "slashCommands": {
+      "noMatches": "Нет подходящих команд"
+    },
+    "resumeConversation": {
+      "title": "Продолжить разговор",
+      "empty": "Нет разговоров",
+      "current": "Текущая сессия"
+    },
+    "instructionModal": {
+      "title": "Добавить пользовательскую инструкцию",
+      "yourInput": "Ваш ввод:",
+      "processingInstruction": "Обрабатываем вашу инструкцию...",
+      "yourResponse": "Ваш ответ:",
+      "responsePlaceholder": "Укажите больше деталей...",
+      "refinedSnippet": "Уточнённый фрагмент:",
+      "processing": "Обработка...",
+      "submit": "Отправить",
+      "submitResponseAria": "Отправить ответ",
+      "editAria": "Редактировать инструкцию",
+      "accept": "Принять",
+      "acceptAria": "Принять инструкцию",
+      "preview": "Предпросмотр"
+    },
+    "whatsNew": {
+      "title": "Что нового в Grimoire v{version}",
+      "released": "Выпущено {date}",
+      "latestReleaseNotes": "Последние примечания к выпуску",
+      "fullChangelog": "Полный список изменений",
+      "gotIt": "Понятно"
+    }
+  },
+  "inlineEdit": {
+    "rejectTitle": "Отклонить (Esc)",
+    "acceptTitle": "Принять (Enter)",
+    "editorUnavailable": "Встроенное редактирование недоступно: не удалось получить активный редактор. Откройте заметку заново.",
+    "vaultFilesLoadFailed": "Не удалось загрузить файлы vault. @-упоминания могут быть недоступны.",
+    "invalidFilePath": "Не удалось прикрепить файл: неверный путь"
+  },
+  "storage": {
+    "tabLayoutSaveFailed": "Не удалось сохранить расположение вкладок"
+  }
 }

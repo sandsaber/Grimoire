@@ -1,6 +1,6 @@
 # Claude Provider Agent Instructions
 
-`src/providers/claude/` wraps `@anthropic-ai/claude-agent-sdk` behind Grimoire's `ChatRuntime` boundary and maintains Claude Code-compatible vault files.
+`src/providers/claude/` wraps `@anthropic-ai/claude-agent-sdk` behind Grimoire's execution kernel — `ClaudeExecutionBackend`, presented by `ExecutionChatRuntimeAdapter` — and maintains Claude Code-compatible vault files.
 
 ## Runtime Rules
 

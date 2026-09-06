@@ -1,0 +1,529 @@
+{
+  "schemaVersion": 1,
+  "providerId": "claude",
+  "kind": "wire-recording",
+  "recordedAgainst": "Claude Code 2.1.233",
+  "transport": "stdout stream-json (`claude --print --output-format stream-json`)",
+  "cases": [
+    "single print turn"
+  ],
+  "messageTypesObserved": [
+    "assistant",
+    "rate_limit_event",
+    "result/success",
+    "system/hook_response",
+    "system/hook_started",
+    "system/init",
+    "system/thinking_tokens"
+  ],
+  "exchange": [
+    {
+      "type": "system",
+      "subtype": "hook_started",
+      "hook_id": "<uuid>",
+      "hook_name": "SessionStart:startup",
+      "hook_event": "SessionStart",
+      "uuid": "<uuid>",
+      "session_id": "<uuid>"
+    },
+    {
+      "type": "system",
+      "subtype": "hook_response",
+      "hook_id": "<uuid>",
+      "hook_name": "SessionStart:startup",
+      "hook_event": "SessionStart",
+      "output": "<3518 chars elided>",
+      "stdout": "<3518 chars elided>",
+      "stderr": "",
+      "exit_code": 0,
+      "outcome": "success",
+      "uuid": "<uuid>",
+      "session_id": "<uuid>"
+    },
+    {
+      "type": "system",
+      "subtype": "init",
+      "cwd": "<tmp>",
+      "session_id": "<uuid>",
+      "tools": [
+        "Task",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "DesignSync",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "LSP",
+        "Monitor",
+        "NotebookEdit",
+        "PushNotification",
+        "Read",
+        "RemoteTrigger",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskCreate",
+        "TaskGet",
+        "TaskList",
+        "TaskOutput",
+        "TaskStop",
+        "TaskUpdate",
+        "ToolSearch",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write",
+        "mcp__web-reader__webReader",
+        "mcp__web-search-prime__web_search_prime",
+        "mcp__zai-mcp-server__analyze_data_visualization",
+        "mcp__zai-mcp-server__analyze_image",
+        "mcp__zai-mcp-server__analyze_video",
+        "mcp__zai-mcp-server__diagnose_error_screenshot",
+        "mcp__zai-mcp-server__extract_text_from_screenshot",
+        "mcp__zai-mcp-server__ui_diff_check",
+        "mcp__zai-mcp-server__ui_to_artifact",
+        "mcp__zai-mcp-server__understand_technical_diagram",
+        "mcp__zread__get_repo_structure",
+        "mcp__zread__read_file",
+        "mcp__zread__search_doc"
+      ],
+      "mcp_servers": [
+        {
+          "name": "zread",
+          "status": "connected"
+        },
+        {
+          "name": "zai-mcp-server",
+          "status": "connected"
+        },
+        {
+          "name": "web-search-prime",
+          "status": "connected"
+        },
+        {
+          "name": "web-reader",
+          "status": "connected"
+        }
+      ],
+      "model": "claude-haiku-4-5-20251001",
+      "permissionMode": "default",
+      "slash_commands": [
+        "karpathy-guidelines",
+        "deep-research",
+        "claude-md-management:revise-claude-md",
+        "ralph-loop:cancel-ralph",
+        "ralph-loop:help",
+        "ralph-loop:ralph-loop",
+        "code-review:code-review",
+        "feature-dev:feature-dev",
+        "agent-sdk-dev:new-sdk-app",
+        "claude-code-setup:claude-automation-recommender",
+        "claude-md-management:claude-md-improver",
+        "superpowers:brainstorming",
+        "superpowers:dispatching-parallel-agents",
+        "superpowers:executing-plans",
+        "superpowers:finishing-a-development-branch",
+        "superpowers:receiving-code-review",
+        "superpowers:requesting-code-review",
+        "superpowers:subagent-driven-development",
+        "superpowers:systematic-debugging",
+        "superpowers:test-driven-development",
+        "superpowers:using-git-worktrees",
+        "superpowers:using-superpowers",
+        "superpowers:verification-before-completion",
+        "superpowers:writing-plans",
+        "superpowers:writing-skills",
+        "frontend-design:frontend-design",
+        "skill-creator:skill-creator",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "run",
+        "run-skill-generator",
+        "agents",
+        "auto-mode-setup",
+        "autocompact",
+        "clear",
+        "color",
+        "compact",
+        "config",
+        "context",
+        "effort",
+        "fast",
+        "heapdump",
+        "init",
+        "mcp",
+        "import",
+        "model",
+        "__remote-workflow",
+        "workflow-launch-exec",
+        "reload-skills",
+        "rename",
+        "ultrareview",
+        "security-review",
+        "usage-credits",
+        "extra-usage",
+        "usage",
+        "insights",
+        "recap",
+        "goal",
+        "design",
+        "design-consent",
+        "design-revoke",
+        "list-agents",
+        "team-onboarding"
+      ],
+      "terminal_slash_commands": [
+        "doctor",
+        "color"
+      ],
+      "apiKeySource": "none",
+      "claude_code_version": "2.1.233",
+      "output_style": "default",
+      "agents": [
+        "agent-sdk-dev:agent-sdk-verifier-py",
+        "agent-sdk-dev:agent-sdk-verifier-ts",
+        "claude",
+        "code-simplifier:code-simplifier",
+        "Explore",
+        "feature-dev:code-architect",
+        "feature-dev:code-explorer",
+        "feature-dev:code-reviewer",
+        "general-purpose",
+        "Plan",
+        "statusline-setup"
+      ],
+      "skills": [
+        "karpathy-guidelines",
+        "deep-research",
+        "claude-code-setup:claude-automation-recommender",
+        "claude-md-management:claude-md-improver",
+        "superpowers:brainstorming",
+        "superpowers:dispatching-parallel-agents",
+        "superpowers:executing-plans",
+        "superpowers:finishing-a-development-branch",
+        "superpowers:receiving-code-review",
+        "superpowers:requesting-code-review",
+        "superpowers:subagent-driven-development",
+        "superpowers:systematic-debugging",
+        "superpowers:test-driven-development",
+        "superpowers:using-git-worktrees",
+        "superpowers:using-superpowers",
+        "superpowers:verification-before-completion",
+        "superpowers:writing-plans",
+        "superpowers:writing-skills",
+        "frontend-design:frontend-design",
+        "skill-creator:skill-creator",
+        "design-sync",
+        "dataviz",
+        "update-config",
+        "verify",
+        "debug",
+        "code-review",
+        "simplify",
+        "batch",
+        "fewer-permission-prompts",
+        "doctor",
+        "loop",
+        "schedule",
+        "claude-api",
+        "run",
+        "run-skill-generator"
+      ],
+      "plugins": [
+        {
+          "name": "claude-code-setup",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/claude-code-setup/1.0.0",
+          "source": "claude-code-setup@claude-plugins-official",
+          "version": "1.0.0"
+        },
+        {
+          "name": "claude-md-management",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/claude-md-management/1.0.0",
+          "source": "claude-md-management@claude-plugins-official",
+          "version": "1.0.0"
+        },
+        {
+          "name": "ralph-loop",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/ralph-loop/1.0.0",
+          "source": "ralph-loop@claude-plugins-official",
+          "version": "1.0.0"
+        },
+        {
+          "name": "superpowers",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0",
+          "source": "superpowers@claude-plugins-official",
+          "version": "6.3.0"
+        },
+        {
+          "name": "frontend-design",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/frontend-design/unknown",
+          "source": "frontend-design@claude-plugins-official"
+        },
+        {
+          "name": "code-review",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/code-review/unknown",
+          "source": "code-review@claude-plugins-official"
+        },
+        {
+          "name": "skill-creator",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown",
+          "source": "skill-creator@claude-plugins-official"
+        },
+        {
+          "name": "code-simplifier",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/code-simplifier/1.0.0",
+          "source": "code-simplifier@claude-plugins-official",
+          "version": "1.0.0"
+        },
+        {
+          "name": "feature-dev",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/feature-dev/unknown",
+          "source": "feature-dev@claude-plugins-official"
+        },
+        {
+          "name": "typescript-lsp",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/typescript-lsp/1.0.0",
+          "source": "typescript-lsp@claude-plugins-official",
+          "version": "1.0.0"
+        },
+        {
+          "name": "agent-sdk-dev",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/agent-sdk-dev/unknown",
+          "source": "agent-sdk-dev@claude-plugins-official"
+        },
+        {
+          "name": "rust-analyzer-lsp",
+          "path": "<home>/.claude/plugins/cache/claude-plugins-official/rust-analyzer-lsp/1.0.0",
+          "source": "rust-analyzer-lsp@claude-plugins-official",
+          "version": "1.0.0"
+        }
+      ],
+      "capabilities": [
+        "interrupt_receipt_v1",
+        "interrupt_cancel_queued_v1",
+        "msg_lifecycle_v1"
+      ],
+      "analytics_disabled": false,
+      "product_feedback_disabled": false,
+      "uuid": "<uuid>",
+      "memory_paths": {
+        "auto": "<home>/.claude/projects/-tmp-claude-1000--home-m5-HomeBrew-git-Grimoire-<uuid>-scratchpad/memory/"
+      },
+      "messaging_socket_path": "/run/user/1000/cc-socks/167439.sock",
+      "fast_mode_state": "off",
+      "fast_mode_disabled_reason": "sdk_opt_in_required"
+    },
+    {
+      "type": "system",
+      "subtype": "thinking_tokens",
+      "estimated_tokens": 5,
+      "estimated_tokens_delta": 5,
+      "uuid": "<uuid>",
+      "session_id": "<uuid>"
+    },
+    {
+      "type": "system",
+      "subtype": "thinking_tokens",
+      "estimated_tokens": 38,
+      "estimated_tokens_delta": 33,
+      "uuid": "<uuid>",
+      "session_id": "<uuid>"
+    },
+    {
+      "type": "system",
+      "subtype": "thinking_tokens",
+      "estimated_tokens": 62,
+      "estimated_tokens_delta": 24,
+      "uuid": "<uuid>",
+      "session_id": "<uuid>"
+    },
+    {
+      "type": "system",
+      "subtype": "thinking_tokens",
+      "estimated_tokens": 75,
+      "estimated_tokens_delta": 13,
+      "uuid": "<uuid>",
+      "session_id": "<uuid>"
+    },
+    {
+      "type": "system",
+      "subtype": "thinking_tokens",
+      "estimated_tokens": 137,
+      "estimated_tokens_delta": 62,
+      "uuid": "<uuid>",
+      "session_id": "<uuid>"
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "model": "claude-haiku-4-5-20251001",
+        "id": "msg_011Ce6xAXBXUp6S8i5NzSMoL",
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "<292 chars elided>",
+            "signature": "<728 chars elided>"
+          }
+        ],
+        "stop_reason": null,
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 9226,
+          "cache_read_input_tokens": 18213,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 9226
+          },
+          "output_tokens": 4,
+          "service_tier": "standard",
+          "inference_geo": "not_available"
+        },
+        "diagnostics": null,
+        "context_management": null
+      },
+      "parent_tool_use_id": null,
+      "session_id": "<uuid>",
+      "uuid": "<uuid>",
+      "timestamp": "2026-08-16T19:07:21.715Z",
+      "request_id": "req_011Ce6xAVQsJAoLeTSwdt8Bh"
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "model": "claude-haiku-4-5-20251001",
+        "id": "msg_011Ce6xAXBXUp6S8i5NzSMoL",
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "OK"
+          }
+        ],
+        "stop_reason": null,
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 10,
+          "cache_creation_input_tokens": 9226,
+          "cache_read_input_tokens": 18213,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 9226
+          },
+          "output_tokens": 4,
+          "service_tier": "standard",
+          "inference_geo": "not_available"
+        },
+        "diagnostics": null,
+        "context_management": null
+      },
+      "parent_tool_use_id": null,
+      "session_id": "<uuid>",
+      "uuid": "<uuid>",
+      "timestamp": "2026-08-16T19:07:21.724Z",
+      "request_id": "req_011Ce6xAVQsJAoLeTSwdt8Bh"
+    },
+    {
+      "type": "rate_limit_event",
+      "rate_limit_info": {
+        "status": "allowed",
+        "resetsAt": 1786921800,
+        "rateLimitType": "five_hour",
+        "overageStatus": "rejected",
+        "overageDisabledReason": "org_level_disabled",
+        "isUsingOverage": false
+      },
+      "uuid": "<uuid>",
+      "session_id": "<uuid>"
+    },
+    {
+      "is_error": false,
+      "duration_api_ms": 2131,
+      "num_turns": 1,
+      "stop_reason": "end_turn",
+      "session_id": "<uuid>",
+      "total_cost_usd": 0.0206483,
+      "usage": {
+        "input_tokens": 10,
+        "cache_creation_input_tokens": 9226,
+        "cache_read_input_tokens": 18213,
+        "output_tokens": 73,
+        "output_tokens_details": {
+          "thinking_tokens": 67
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 9226,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "not_available",
+        "iterations": [
+          {
+            "input_tokens": 10,
+            "output_tokens": 73,
+            "cache_read_input_tokens": 18213,
+            "cache_creation_input_tokens": 9226,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 9226
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard"
+      },
+      "modelUsage": {
+        "claude-haiku-4-5-20251001": {
+          "inputTokens": 10,
+          "outputTokens": 73,
+          "cacheReadInputTokens": 18213,
+          "cacheCreationInputTokens": 9226,
+          "webSearchRequests": 0,
+          "costUSD": 0.0206483,
+          "contextWindow": 200000,
+          "maxOutputTokens": 32000,
+          "canonicalModel": "claude-haiku-4-5",
+          "provider": "firstParty"
+        }
+      },
+      "permission_denials": [],
+      "terminal_reason": "completed",
+      "fast_mode_state": "off",
+      "fast_mode_disabled_reason": "sdk_opt_in_required",
+      "subtype": "success",
+      "api_error_status": null,
+      "result": "OK",
+      "ttft_ms": 2093,
+      "ttft_stream_ms": 1303,
+      "time_to_request_ms": 24,
+      "type": "result",
+      "duration_ms": 2167,
+      "uuid": "<uuid>"
+    }
+  ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content."
+}

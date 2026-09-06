@@ -21,12 +21,17 @@
 ## Provider-Owned Services
 
 - `CodexSkillListingService` uses a short-lived app-server process for `skills/list`; keep it independent from chat runtime lifecycle.
-- `CodexAuxQueryRunner` uses its own process, transport, and thread.
+- `CodexAuxiliaryQuery` runs auxiliary work — titles, refinement, inline edits — on its own
+  app-server process and its own thread, one per retained conversation. What makes a turn
+  auxiliary is on `thread/start`: `approvalPolicy: 'never'`, `sandbox: 'read-only'` whatever the
+  chat is set to, and `persistExtendedHistory: false`. What this provider contributes is
+  `CodexExecution.auxiliarySource()` — a runner per purpose — and the three services themselves are
+  the application's, shared with every other provider.
 - `CodexTaskResultInterpreter` is intentionally no-op because Grimoire's async Claude task system does not apply to Codex.
 - Image inputs are written to a temp directory, sent as local image paths, and cleaned up in `query()` finally blocks.
 
 ## Storage and Environment
 
-- Codex is opt-in; `isEnabled()` defaults to false.
+- Codex is the product's default provider and ships enabled; `settings.ts` defaults `enabled` to true, and a test pins it.
 - Environment hash invalidation watches `OPENAI_MODEL`, `OPENAI_BASE_URL`, and `OPENAI_API_KEY`; changes invalidate existing Codex session IDs.
 - Session file paths may include a date prefix. `findCodexSessionFile` handles both direct and DFS fallback patterns.

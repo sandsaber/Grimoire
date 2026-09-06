@@ -23,6 +23,7 @@ Repository documentation and user-facing product copy should be in English unles
 - `src/providers/kimicode/` - Kimi Code ACP adapter and launch/workspace artifacts.
 - `src/providers/qwen/` - Qwen Code ACP adapter and Qwen-owned runtime, history, settings, and UI behavior.
 - `src/providers/acp/` - Shared ACP transport and normalization helpers.
+- `src/providers/shared/` - Provider-neutral helpers that need the plugin type, and so cannot live in `src/core/`. A helper belongs here only when at least two providers use it and its implementation is genuinely the same question asked twice.
 
 Read the nested `AGENTS.md` in a provider directory before changing provider-specific runtime, storage, history, settings, or UI behavior.
 OpenCode and MiMoCode intentionally mirror each other closely; when changing launch, ACP runtime, workspace, storage, history, settings, or UI behavior in one provider, check and usually apply the same change to the other provider unless the CLIs intentionally differ.
@@ -31,11 +32,11 @@ OpenCode and MiMoCode intentionally mirror each other closely; when changing lau
 
 - Keep `src/core/` provider-neutral. Shared chat/runtime/settings contracts belong there only when at least two providers need the behavior.
 - Keep provider-specific protocol, storage, CLI resolution, history parsing, model discovery, settings UI, and launch artifacts inside `src/providers/<provider>/`.
-- Register provider runtime and auxiliary services through `ProviderRegistry`.
-- Register provider workspace services through `ProviderWorkspaceRegistry`.
+- Declare every built-in provider once, in `src/providers/BuiltInProviderCatalog.ts`. The catalog owns provider identity, display name, ordering, and the inventory itself; it validates the modules at construction and refuses a duplicate id, order, or execution backend.
+- **Both provider registries are deleted.** A provider's runtime comes from `ApplicationRuntime.createRuntimeFor(providerId)`, its declarations and capabilities from `ProviderCatalog`, and its workspace slots from `ApplicationRuntime.workspaceFor(providerId)`. The legacy workspace services that back some of those slots are built at load by `ProviderWorkspaceManager` and held on `ApplicationRuntime` — reached with a plugin, by `maybeGet<Provider>WorkspaceServices(plugin)`, never through a global.
 - Feature code must consume provider-neutral contracts. Do not read provider-specific `Conversation.providerState` fields directly from `src/features/`.
 - Preserve provider-native behavior first. Prefer adapting official CLI/runtime semantics over reimplementing provider features inside Grimoire.
-- Use `.grimoire/` for Grimoire-owned vault data. Do not add legacy storage migration behavior unless a migration milestone explicitly asks for it.
+- Use `.grimoire/` for Grimoire-owned vault data. Do not add legacy storage migration behavior unless a release explicitly asks for it.
 
 ## Key Paths
 
@@ -98,6 +99,41 @@ Dependency changes use npm as the canonical package manager. Keep `package-lock.
 
 The project requires Obsidian 1.13.0 or newer and uses the declarative settings API for native settings search. Implement settings tabs through `getSettingDefinitions()`; do not restore the deprecated `PluginSettingTab.display()` fallback.
 
+## Design System
+
+Grimoire's visual system is **Nordic**, and [`docs/design-system.md`](docs/design-system.md) is its
+canonical description. Read it before changing any surface's appearance, adding a stylesheet, or
+introducing a control.
+
+The rule the whole system rests on: **feature code reads a Grimoire token; only
+`src/style/base/variables.css` reads an Obsidian one.** That is what makes a theme swap a no-op and a
+system change a one-line edit. A colour, size, weight, radius, spacing value, shadow or duration
+written as a literal is a defect, not a choice — every one of those categories had already drifted
+into fifteen, thirteen or twenty-seven variants before the system existed.
+
+Two habits the system exists to enforce, both learned from shipped defects:
+
+- **Read Obsidian's `app.css`, do not remember it.** `var(--missing)` on a `color` property inherits
+  rather than falling back, so a dependency on a variable the app does not define fails silently. The
+  plugin shipped a fixed violet on thirty-two surfaces this way, because Obsidian defines
+  `--color-<hue>-rgb` for its palette but no accent triple at all. The checked-in evidence is
+  `tests/fixtures/obsidian/theme-tokens.json`, taken from the `app.css` inside the installed `.asar`.
+- **A fallback hides a missing dependency**, so a value that looks considered can be frozen. Prefer no
+  fallback on a Grimoire token, and let the gate catch a missing one.
+
+The system is enforced, not documented: `tests/unit/style/designSystem.test.ts` and
+`tests/unit/style/themeAdaptation.test.ts`. Extend them when you extend the system, and prove a new
+rule by breaking it.
+
+Icons carry recognition, words carry meaning. Icon plus label where a choice has a cost; icon only in
+dense repeating chrome, and never without an accessible name; never icon-only for something that
+cannot be taken back. A non-button element that responds to a click goes through
+`asActivatable` in `src/shared/components/activatable.ts`, which gives it the role, the name, the tab
+stop and the Enter/Space handling a button has.
+
+Settings surfaces are built with the declarative settings API and must look native: style what
+Grimoire puts *inside* a row, never `.setting-item` and its parts.
+
 ## Testing Rules
 
 - Tests mirror `src/` under `tests/unit/` and `tests/integration/`.
@@ -109,9 +145,10 @@ The project requires Obsidian 1.13.0 or newer and uses the declarative settings 
 | Path | Owner |
 |------|-------|
 | `.grimoire/grimoire-settings.json` | Shared Grimoire app settings plus provider-specific configuration |
-| `.grimoire/sessions/*.meta.json` | Provider-neutral session metadata |
+| `.grimoire/sessions/*.meta.json` | Provider-neutral session metadata, written as a versioned record: `{ schemaVersion, recordId, revision, updatedAt, payload }`, where `payload` is the conversation. A file written before the envelope existed is read as revision 1 and rewritten in place at the next write, never renamed. A writer applies the fields it changed rather than the whole conversation it holds |
 | `.grimoire/attachments/<sha256>.<ext>` | Image attachment bytes, addressed by content and shared by every provider |
 | `.grimoire/logs/YYYY-MM-DD.jsonl` | Optional sanitized debug logs, written only when Advanced debug logging is enabled |
+| `.grimoire/control/**` | Grimoire-owned execution lifecycle control records: ownership, generations, state-machine positions, terminals, dispatch intents, and recovery evidence. Never a second provider transcript, and never prompts, secrets, or raw payloads. Written by the execution kernel the plugin constructs at load and shuts down at unload; retention, deletion, versioning, and redaction are decided in [`docs/provider-execution-persistence-decisions.md`](docs/provider-execution-persistence-decisions.md). A plugin build that does not read these files must neither depend on them nor break on their presence, which is what makes a downgrade safe |
 | `.grimoire/mcp/<provider>.json` | Grimoire-owned MCP servers injected into ACP sessions for OpenCode, Grok Build, MiMoCode, Kimi Code, Qwen Code, and Gemini CLI |
 | `.grimoire/claude/statusline-usage.json` | Claude Code status-line usage snapshot used to hydrate plan-limit indicators |
 | `.claude/settings.json` | Claude Code-compatible project settings and permissions |
@@ -148,7 +185,7 @@ The `_grimoire` MCP metadata key and `grimoire-*` internal OpenCode IDs are impl
 - When work is tied to an issue or ticket, include its identifier in the branch name or commit message. Prefer the commit message when committing directly to an existing branch.
 - Local test Obsidian vault: set `OBSIDIAN_VAULT` in `.env.local` (gitignored) to your vault path so `npm run build` / `npm run build:release` copy artifacts there automatically. When copying a local build for manual testing, install Grimoire into `<vault>/.obsidian/plugins/grimoire`.
 - For provider integrations, inspect real runtime output before normalizing event shapes. Real transcripts and wire traces beat guessed schemas.
-- For future provider work and implementation sequencing, use `docs/provider-roadmap.md` before adding new provider directories.
+- For future provider work, read `docs/provider-roadmap.md` for the integration path and `docs/provider-execution-adapter-contract.md` for what the execution kernel guarantees a chat surface. A provider implements an execution backend that the kernel drives; its presentation contract is `ExecutionChatRuntimeAdapter`, and there is no other runtime seam to implement.
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands

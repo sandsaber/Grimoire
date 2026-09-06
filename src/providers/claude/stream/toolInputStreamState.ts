@@ -1,3 +1,5 @@
+import { isRecord } from '../../../utils/records';
+
 type JsonTokenType = 'brace' | 'bracket' | 'separator' | 'delimiter' | 'string' | 'number' | 'name';
 
 type JsonToken = {
@@ -27,10 +29,6 @@ export interface TransformStreamState {
 }
 
 const MAIN_AGENT_STREAM = '__main__';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function normalizeToolInput(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};

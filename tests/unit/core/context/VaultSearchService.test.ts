@@ -1,5 +1,6 @@
 import type { App, TFile } from 'obsidian';
 
+import { createObsidianVaultNoteSource } from '@/app/context/ObsidianVaultNoteSource';
 import type { VaultSearchQuery } from '@/core/context/types';
 import { VaultSearchService } from '@/core/context/VaultSearchService';
 import { VaultTextIndex } from '@/core/context/VaultTextIndex';
@@ -27,6 +28,17 @@ function createApp(files: TFile[], contents: Record<string, string>): App {
   } as unknown as App;
 }
 
+/**
+ * The index takes a note source now, not the plugin host.
+ *
+ * The double still speaks Obsidian, because the adapter is what translates —
+ * so this exercises the same translation production uses rather than a second
+ * one written for the test.
+ */
+function createNotes(files: TFile[], contents: Record<string, string>) {
+  return createObsidianVaultNoteSource(createApp(files, contents));
+}
+
 function createQuery(overrides: Partial<VaultSearchQuery> = {}): VaultSearchQuery {
   return {
     raw: 'roadmap',
@@ -44,7 +56,7 @@ describe('VaultSearchService', () => {
     const titleFile = createFile('notes/Roadmap.md', 100);
     const bodyFile = createFile('notes/Ideas.md', 300);
     const index = new VaultTextIndex(
-      createApp([titleFile, bodyFile], {
+      createNotes([titleFile, bodyFile], {
         'notes/Roadmap.md': 'Sparse planning note',
         'notes/Ideas.md': 'The roadmap appears in body text several times. roadmap roadmap.',
       })
@@ -68,39 +80,39 @@ describe('VaultSearchService', () => {
   });
 
   it('extracts a query after a standalone vault mention', () => {
-    const service = new VaultSearchService(new VaultTextIndex({} as App));
+    const service = new VaultSearchService(new VaultTextIndex(createNotes([], {})));
 
     expect(service.extractVaultQuery('@vault roadmap')).toBe('roadmap');
   });
 
   it('falls back to the full input without the vault mention when mention has no trailing query', () => {
-    const service = new VaultSearchService(new VaultTextIndex({} as App));
+    const service = new VaultSearchService(new VaultTextIndex(createNotes([], {})));
 
     expect(service.extractVaultQuery('ask @vault')).toBe('ask');
   });
 
   it('does not match email addresses or longer mentions', () => {
-    const service = new VaultSearchService(new VaultTextIndex({} as App));
+    const service = new VaultSearchService(new VaultTextIndex(createNotes([], {})));
 
     expect(service.extractVaultQuery('email@vault.com')).toBeNull();
     expect(service.extractVaultQuery('@vaulted thing')).toBeNull();
   });
 
   it('removes other file mentions from the extracted query', () => {
-    const service = new VaultSearchService(new VaultTextIndex({} as App));
+    const service = new VaultSearchService(new VaultTextIndex(createNotes([], {})));
 
     expect(service.extractVaultQuery('ask @vault @file roadmap')).toBe('roadmap');
   });
 
   it('removes full file mentions with spaces before extracting the search query', () => {
-    const service = new VaultSearchService(new VaultTextIndex({} as App));
+    const service = new VaultSearchService(new VaultTextIndex(createNotes([], {})));
 
     expect(service.extractVaultQuery('@vault @Artic Ocean.md')).toBe('');
     expect(service.extractVaultQuery('@vault @Artic Ocean.md climate notes')).toBe('climate notes');
   });
 
   it('escapes XML attributes and text in formatted prompts', () => {
-    const service = new VaultSearchService(new VaultTextIndex({} as App));
+    const service = new VaultSearchService(new VaultTextIndex(createNotes([], {})));
 
     const prompt = service.formatForPrompt({
       query: createQuery({ raw: 'a "quoted" & <unsafe>' }),

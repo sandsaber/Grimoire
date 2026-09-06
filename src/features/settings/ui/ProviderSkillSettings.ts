@@ -2,6 +2,7 @@ import { type App, Modal, Notice, setIcon, Setting } from 'obsidian';
 
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderId } from '../../../core/providers/types';
 import { t } from '../../../i18n/i18n';
 import { confirmDelete } from '../../../shared/modals/ConfirmModal';
@@ -103,7 +104,7 @@ export class ProviderSkillModal extends Modal {
           return;
         }
         const targetStoragePath = existing?.storagePath
-          ?? this.options.catalog.getDefaultVaultStoragePath?.();
+          ?? this.options.catalog.defaultVaultStoragePath?.();
         const duplicate = hasProviderSkillNameConflict(
           this.options.entries,
           name,
@@ -115,7 +116,8 @@ export class ProviderSkillModal extends Modal {
           return;
         }
 
-        const prefix = this.options.catalog.getDropdownConfig().skillPrefix;
+        const prefix = providerCatalog()
+          .declarations(this.options.providerId).commandDropdown?.skillPrefix ?? '/';
         try {
           await this.options.catalog.saveVaultEntry({
             id: existing?.id ?? `${this.options.providerId}-skill-${name}`,

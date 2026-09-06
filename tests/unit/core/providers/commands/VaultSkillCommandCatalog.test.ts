@@ -304,7 +304,7 @@ describe('VaultSkillCommandCatalog', () => {
   it('exposes the primary editable root for UI collision checks', () => {
     const catalog = createCatalog(createAdapter());
 
-    expect(catalog.getDefaultVaultStoragePath()).toBe('.kimi-code/skills');
+    expect(catalog.defaultVaultStoragePath()).toBe('.kimi-code/skills');
   });
 
   it('does not overwrite an existing skill when creating a duplicate in the primary root', async () => {

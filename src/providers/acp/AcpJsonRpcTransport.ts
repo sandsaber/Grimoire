@@ -73,10 +73,57 @@ export class JsonRpcErrorResponse extends Error {
   }
 }
 
+/**
+ * A JSON-RPC code a request handler chose, rather than the internal error every
+ * other failure answers with.
+ *
+ * Raised by the client's own handlers where the protocol has a word for what
+ * happened — a file that is not there is `-32002 Resource not found`, and an
+ * agent that reads it can go on to create the file. Without it every refusal,
+ * every missing path and every bug answer alike, and the agent has to guess.
+ */
+export class JsonRpcHandlerError extends Error {
+  constructor(
+    readonly code: number,
+    message: string,
+    readonly data?: unknown,
+  ) {
+    super(message);
+    this.name = 'JsonRpcHandlerError';
+  }
+}
+
+/**
+ * What a failed request handler answers the peer with.
+ *
+ * The message is read from anything that carries one rather than from
+ * `instanceof Error`, which is false for an error raised in another realm — the
+ * shape `node:fs` produces under Jest, and the difference between an agent
+ * being told "no such file or directory" and being told "Internal error".
+ */
+function describeHandlerFailure(error: unknown): { code: number; message: string; data?: unknown } {
+  if (error instanceof JsonRpcHandlerError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.data === undefined ? {} : { data: error.data }),
+    };
+  }
+  const message = (error as { message?: unknown } | null)?.message;
+  return {
+    code: -32603,
+    message: typeof message === 'string' && message.length > 0 ? message : 'Internal error',
+  };
+}
+
 export class AcpJsonRpcTransport {
   private readonly abortController = new AbortController();
   private readonly closeListeners = new Set<(error?: Error) => void>();
   private disposed = false;
+  /** Whether the output stream has asked us to wait before writing more. */
+  private awaitingDrain = false;
+  /** Lines written while it was waiting, in the order they were sent. */
+  private readonly queuedWrites: string[] = [];
   private nextId = 1;
   private readonly notificationHandlers = new Map<string, Set<JsonRpcNotificationHandler>>();
   private readonly pending = new Map<number, PendingRequest>();
@@ -378,10 +425,7 @@ export class AcpJsonRpcTransport {
       },
       (error) => {
         this.trySendRaw({
-          error: {
-            code: -32603,
-            message: error instanceof Error ? error.message : 'Internal error',
-          },
+          error: describeHandlerFailure(error),
           id: message.id,
           jsonrpc: '2.0',
         });
@@ -393,7 +437,52 @@ export class AcpJsonRpcTransport {
     if (this.disposed) {
       throw new JsonRpcTransportClosedError();
     }
-    this.streams.output.write(`${JSON.stringify(message)}\n`);
+    // `write` answers whether the buffer took it. A `false` means the stream
+    // asked us to wait for `drain`, and ignoring it is how a transport ends up
+    // buffering without bound — not a problem at the sizes an ACP turn sends,
+    // which is why it went unnoticed, but a large image attachment is the shape
+    // that changes that.
+    //
+    // Held rather than merely noted. The first version of this recorded the
+    // backpressure in a field nothing read and wrote anyway, which is the same
+    // unbounded buffering with a flag beside it. Queueing keeps the order the
+    // protocol requires — a response that overtook its request would be a reply
+    // to nothing — and hands the bound back to the stream that asked for it.
+    const line = `${JSON.stringify(message)}\n`;
+    if (this.awaitingDrain) {
+      this.queuedWrites.push(line);
+      return;
+    }
+    if (!this.streams.output.write(line)) {
+      this.beginDrainWait();
+    }
+  }
+
+  /**
+   * Stops writing until the stream asks for more, then sends what waited.
+   *
+   * Re-entrant by design: a flush can fill the buffer again on any line, and
+   * the rest go back into the queue behind the next `drain` rather than through
+   * it.
+   */
+  private beginDrainWait(): void {
+    this.awaitingDrain = true;
+    this.streams.output.once('drain', () => {
+      this.awaitingDrain = false;
+      while (this.queuedWrites.length > 0) {
+        if (this.disposed) {
+          // Nothing left to write to. Dropped rather than thrown: this runs on
+          // a stream event with no caller to report to.
+          this.queuedWrites.length = 0;
+          return;
+        }
+        const line = this.queuedWrites.shift() as string;
+        if (!this.streams.output.write(line)) {
+          this.beginDrainWait();
+          return;
+        }
+      }
+    });
   }
 
   private trySendRaw(message: JsonRpcMessage): void {

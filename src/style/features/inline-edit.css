@@ -5,8 +5,8 @@
 .cm-line .grimoire-selection-highlight,
 .grimoire-selection-highlight {
   background: var(--text-selection);
-  border-radius: 2px;
-  padding: 3px 0;
+  border-radius: var(--grimoire-radius-1);
+  padding: var(--grimoire-space-1) 0;
   margin: -3px 0;
 }
 
@@ -28,7 +28,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 2px 0;
+  padding: var(--grimoire-space-1) 0;
   background: transparent;
 }
 
@@ -43,12 +43,12 @@
 /* Input - fully transparent */
 .grimoire-inline-input {
   width: 100%;
-  padding: 4px 8px;
-  padding-inline-end: 30px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-4);
+  padding-inline-end: 32px;
   border-width: 1px;
   border-style: solid;
   border-color: var(--background-modifier-border);
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   background: transparent;
   color: var(--text-normal);
   font-family: var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif);
@@ -86,13 +86,13 @@
 
 /* Agent reply - shown when agent asks clarifying question */
 .grimoire-inline-agent-reply {
-  padding: 8px;
-  margin-bottom: 4px;
+  padding: var(--grimoire-space-4);
+  margin-bottom: var(--grimoire-space-2);
   background: transparent;
   border-width: 1px;
   border-style: solid;
   border-color: var(--background-modifier-border);
-  border-radius: 8px;
+  border-radius: var(--grimoire-radius-2);
   font-family: var(--font-interface, -apple-system, BlinkMacSystemFont, sans-serif);
   font-size: var(--font-ui-small, 13px);
   line-height: 1.4;
@@ -112,31 +112,31 @@
 
 /* Deleted text - red strikethrough */
 .grimoire-diff-del {
-  background: rgba(255, 80, 80, 0.2);
+  background: color-mix(in srgb, var(--color-red) 22%, transparent);
   text-decoration: line-through;
   color: var(--text-muted);
 }
 
 /* Inserted text - green background */
 .grimoire-diff-ins {
-  background: rgba(80, 200, 80, 0.2);
+  background: color-mix(in srgb, var(--color-green) 22%, transparent);
 }
 
 /* Accept/Reject buttons inline with diff */
 .grimoire-inline-diff-buttons {
   display: inline-flex;
-  gap: 8px;
-  margin-inline-start: 6px;
+  gap: var(--grimoire-space-4);
+  margin-inline-start: var(--grimoire-space-3);
   background: none;
 }
 
 .grimoire-inline-diff-btn {
-  padding: 4px 6px;
+  padding: var(--grimoire-space-2) var(--grimoire-space-3);
   border: none;
   background: none;
   box-shadow: none;
   outline: none;
-  font-size: 16px;
+  font-size: var(--grimoire-text-xl);
   cursor: pointer;
 }
 

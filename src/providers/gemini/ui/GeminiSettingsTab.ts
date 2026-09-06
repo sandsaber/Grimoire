@@ -1,12 +1,14 @@
 import * as fs from 'fs';
 import { Notice, Setting } from 'obsidian';
 
-import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
 import { renderEnvironmentSettingsSection } from '../../../features/settings/ui/EnvironmentSettingsSection';
 import { McpSettingsManager } from '../../../features/settings/ui/McpSettingsManager';
 import { renderProviderDisabledNotice } from '../../../features/settings/ui/ProviderDisabledNotice';
 import { ProviderSkillSettings } from '../../../features/settings/ui/ProviderSkillSettings';
 import { t } from '../../../i18n/i18n';
+import type {
+  ProviderSettingsTabRenderer,
+} from '../../../providers/shared/providerHostContracts';
 import { getHostnameKey } from '../../../utils/env';
 import { expandHomePath } from '../../../utils/path';
 import { maybeGetGeminiWorkspaceServices } from '../app/GeminiWorkspaceServices';
@@ -18,7 +20,7 @@ const GEMINI_CLI_PATH_PLACEHOLDER = '/usr/local/bin/gemini';
 
 export const geminiSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const geminiWorkspace = maybeGetGeminiWorkspaceServices();
+    const geminiWorkspace = maybeGetGeminiWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const geminiSettings = getGeminiProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();

@@ -4,34 +4,63 @@ patchSetMaxListenersForElectron();
 
 import './providers';
 
+import { randomUUID } from 'node:crypto';
+
 import type { Command, Editor, WorkspaceLeaf } from 'obsidian';
 import { addIcon, MarkdownView, Notice, Plugin, setTooltip } from 'obsidian';
 
+import type { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
+import type { ClaudeExecution } from '@/providers/claude/execution/ClaudeExecutionComposition';
+import type { CodexExecution } from '@/providers/codex/execution/CodexExecutionComposition';
+import type { GeminiExecution } from '@/providers/gemini/execution/GeminiExecutionComposition';
+import type { GrokExecution } from '@/providers/grok/execution/GrokExecutionComposition';
+import type { KimicodeExecution } from '@/providers/kimicode/execution/KimicodeExecutionComposition';
+import type { MimocodeExecution } from '@/providers/mimocode/execution/MimocodeExecutionComposition';
+import type { OpencodeExecution } from '@/providers/opencode/execution/OpencodeExecutionComposition';
+import type { QwenExecution } from '@/providers/qwen/execution/QwenExecutionComposition';
+
+import { ApplicationRuntime } from './app/ApplicationRuntime';
 import { shouldShowWhatsNew } from './app/changelog/display';
 import { parseChangelogRelease } from './app/changelog/parser';
 import { readBundledChangelog } from './app/changelog/source';
 import type { ChangelogRelease } from './app/changelog/types';
+import type { ChatExecutionComposition } from './app/chat/ChatExecutionComposition';
+import type { ExecutionKernelHost } from './app/execution/ExecutionKernelHost';
+import {
+  type LocalShellCommandOutcome,
+} from './app/execution/local/LocalShellExecution';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
 import { collectReferencedHashes, hydrateImageAttachments } from './core/attachments/hydrateImages';
+import type { UnreadableConversation } from './core/bootstrap/SessionStorage';
 import {
   applyAssistantResponseMetadataToMessages,
   applyVaultSearchContextsToMessages,
-  clonePersistedMessages,
   collectAssistantResponseMetadata,
   collectVaultSearchContexts,
+  CONVERSATION_METADATA_FIELDS,
+  type ConversationMetadataField,
 } from './core/bootstrap/SessionStorage';
 import type { SharedAppStorage } from './core/bootstrap/storage';
+import { ConversationAlreadyExistsError } from './core/conversations/ConversationRepository';
 import { type DebugLogEvent, DebugLogService } from './core/debug/DebugLogService';
+import type { LocalShellInvocation } from './core/execution/local/LocalShellBackend';
+import {
+  resolveSettingsProviderId,
+  resolveTitleGenerationProviderId,
+} from './core/providers/modelRouting';
+import { providerCatalog } from './core/providers/ProviderCatalog';
 import {
   getEnvironmentVariablesForScope as getScopedEnvironmentVariables,
   getRuntimeEnvironmentText,
   setEnvironmentVariablesForScope,
 } from './core/providers/providerEnvironment';
-import { ProviderRegistry } from './core/providers/ProviderRegistry';
+import type { ProviderHistoryHydration } from './core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from './core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from './core/providers/ProviderWorkspaceRegistry';
-import type { ProviderId } from './core/providers/types';
+import { ProviderWorkspaceManager } from './core/providers/ProviderWorkspaceManager';
+import type {
+  ProviderId,
+} from './core/providers/types';
 import type { AppTabManagerState } from './core/providers/types';
 import { DEFAULT_CHAT_PROVIDER_ID } from './core/providers/types';
 import { HomeFileAdapter } from './core/storage/HomeFileAdapter';
@@ -53,6 +82,7 @@ import { type InlineEditContext, InlineEditModal } from './features/inline-edit/
 import { GrimoireSettingTab } from './features/settings/GrimoireSettings';
 import { setLocale, t } from './i18n/i18n';
 import type { Locale } from './i18n/types';
+import { builtInWorkspaceInitializers } from './providers';
 import {
   getClaudeProviderSettings,
   getClaudeRuntimeEnvironmentText,
@@ -61,6 +91,9 @@ import {
 } from './providers/claude/settings';
 import { CCSettingsStorage } from './providers/claude/storage/CCSettingsStorage';
 import { OPENCODE_PLAN_MODE_ID, OPENCODE_SAFE_MODE_ID } from './providers/opencode/modes';
+import type {
+  ProviderWorkspaceServices,
+} from './providers/shared/providerHostContracts';
 import { GRIMOIRE_APP_ICON_ID, GRIMOIRE_APP_ICON_SVG } from './shared/appIcon';
 import { buildCursorContext } from './utils/editor';
 import { revealWorkspaceLeaf } from './utils/obsidianCompat';
@@ -91,20 +124,48 @@ export default class GrimoirePlugin extends Plugin {
   settings!: GrimoireSettings;
   storage!: SharedAppStorage;
   private conversations: Conversation[] = [];
+  /**
+   * What the last hydration of each conversation reported.
+   *
+   * In memory only: it describes what this session found on disk, and a session
+   * that starts again looks again.
+   */
+  private readonly historyHydration = new Map<string, ProviderHistoryHydration>();
+  /**
+   * Everything one load composes, owned by one object with one lifetime.
+   *
+   * These were eleven fields, each with a getter naming a provider. The getters
+   * below still do — that is the seam the provider rows remove, since a
+   * provider's registration asks the plugin for its own composition today — but
+   * what they answer from is `ApplicationRuntime`, and it is what a reload
+   * replaces.
+   */
+  private applicationRuntime: ApplicationRuntime | null = null;
+  private unloading = false;
   private debugLogService: DebugLogService | null = null;
   private lastKnownTabManagerState: AppTabManagerState | null = null;
   private pendingWhatsNewRelease: ChangelogRelease | null = null;
   private pendingWhatsNewVersion = '';
   private ribbonIconEl: HTMLElement | null = null;
   private readonly shellCommands = new Map<string, Command>();
+  private providerWorkspaces: ProviderWorkspaceManager<ProviderWorkspaceServices> | null = null;
+  /**
+   * Conversations the vault holds and this build cannot read.
+   *
+   * Kept beside the list rather than folded into it: they have no title, no
+   * messages and no provider, and every conversation operation would have to
+   * guard against that. The history surface renders them as their own row.
+   */
+  private unreadableConversations: readonly UnreadableConversation[] = [];
 
   async onload() {
     try {
       await this.loadSettings();
-      await ProviderWorkspaceRegistry.initializeAll(this);
+      await this.startExecutionKernel();
+      await this.startProviderWorkspaces();
       await this.writeDebugLog({
         data: {
-          providerCount: ProviderRegistry.getRegisteredProviderIds().length,
+          providerCount: providerCatalog().ids().length,
         },
         event: 'loaded',
         level: 'info',
@@ -319,12 +380,237 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   onunload(): void {
+    // Recorded before anything else, and synchronously. `onload` is async and
+    // this is not withheld until it finishes, so unload can land while settings
+    // are still loading — before the kernel exists to be told. Without this the
+    // load that follows would open an acceptance gate for a plugin instance
+    // that is gone, and the next reload would put a second registry on the same
+    // control store: the dual ownership the host exists to prevent.
+    this.unloading = true;
     this.recordDebugLog({
       event: 'unload',
       level: 'info',
       scope: 'plugin',
     });
+    // Not awaited, because `onunload` returns void. The kernel's contract is
+    // built for exactly that: the acceptance gate closes synchronously, so
+    // nothing is admitted from here on, and the bounded cancellation and
+    // cleanup that follow record a checkpoint the next startup recovers from.
+    // Before the kernel, because it takes down whatever prompt is on screen and
+    // releases the scratch directories a turn was holding; the kernel's own
+    // shutdown then cancels what is still running.
+    // Before the compositions, because a workspace holds vault-facing services
+    // a composition may still be reading from. Not awaited, for the same reason
+    // the kernel's shutdown is not: `onunload` returns void.
+    void this.providerWorkspaces?.disposeAll();
+    this.providerWorkspaces = null;
+    // One call, and the order inside it is the runtime's: providers release the
+    // scratch a turn was holding, the chat surface detaches what is watching
+    // runs, and the kernel decides last what happens to the runs themselves.
+    this.applicationRuntime?.dispose();
+    this.applicationRuntime = null;
     void this.persistOpenTabStates();
+  }
+
+  /**
+   * The chat execution path this plugin instance owns.
+   *
+   * One per load, for the reason the kernel is: a reload replaces it rather
+   * than sharing one with the instance it replaced. One for every tab, because
+   * a conversation's projection belongs to the conversation and two tabs open
+   * on one chat must see one turn rather than two.
+   */
+  getChatExecution(): ChatExecutionComposition {
+    if (!this.applicationRuntime) {
+      throw new Error('Chat execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.chat;
+  }
+
+  /**
+   * The execution kernel this plugin instance owns.
+   *
+   * One per load, held here rather than in a module singleton: a singleton
+   * outlives the instance a reload replaces, and two registries over one
+   * control store would each believe they own every run in it.
+   */
+  /**
+   * Everything this load composed, or `null` before it has.
+   *
+   * The `null` is the point: a tab can be built while `loadSettings` is still
+   * running, and a caller that only wants to record something in passing should
+   * skip it rather than throw. The getters below that must have it still throw.
+   */
+  getApplicationRuntimeOrNull(): ApplicationRuntime | null {
+    return this.applicationRuntime;
+  }
+
+  getExecutionKernel(): ExecutionKernelHost {
+    if (!this.applicationRuntime) {
+      throw new Error('Execution kernel is not available before plugin load.');
+    }
+    return this.applicationRuntime.kernel;
+  }
+
+  /**
+   * Antigravity's chat execution, held here for the duration of one load.
+   *
+   * A provider name on the plugin surface is not where this belongs, and it
+   * does not stay: `ApplicationRuntime` becomes the composition root at M5 and
+   * takes this with it. Until then the registration needs one object per load — the
+   * request store the backend and every tab runtime must share — and this is
+   * the only place with that lifetime.
+   */
+  getAntigravityExecution(): AntigravityExecution {
+    if (!this.applicationRuntime) {
+      throw new Error('Antigravity execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.antigravity;
+  }
+
+  /** The Codex execution this plugin instance owns; see the note above. */
+  getCodexExecution(): CodexExecution {
+    if (!this.applicationRuntime) {
+      throw new Error('Codex execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.codex;
+  }
+
+  /** The Claude execution this plugin instance owns; see the note above. */
+  getClaudeExecution(): ClaudeExecution {
+    if (!this.applicationRuntime) {
+      throw new Error('Claude execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.claude;
+  }
+
+  /** The OpenCode execution this plugin instance owns; see the note above. */
+  getOpencodeExecution(): OpencodeExecution {
+    if (!this.applicationRuntime) {
+      throw new Error('OpenCode execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.opencode;
+  }
+
+  /** The Grok execution this plugin instance owns; see the note above. */
+  getGrokExecution(): GrokExecution {
+    if (!this.applicationRuntime) {
+      throw new Error('Grok execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.grok;
+  }
+
+  /** The MiMoCode execution this plugin instance owns; see the note above. */
+  getMimocodeExecution(): MimocodeExecution {
+    if (!this.applicationRuntime) {
+      throw new Error('MiMoCode execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.mimocode;
+  }
+
+  /** The Kimi Code execution this plugin instance owns; see the note above. */
+  getKimicodeExecution(): KimicodeExecution {
+    if (!this.applicationRuntime) {
+      throw new Error('Kimi Code execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.kimicode;
+  }
+
+  /** The Gemini execution this plugin instance owns; see the note above. */
+  getGeminiExecution(): GeminiExecution {
+    if (!this.applicationRuntime) {
+      throw new Error('Gemini execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.gemini;
+  }
+
+  /** The Qwen execution this plugin instance owns; see the note above. */
+  getQwenExecution(): QwenExecution {
+    if (!this.applicationRuntime) {
+      throw new Error('Qwen execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.qwen;
+  }
+
+  /**
+   * Brings the kernel up before anything can ask it for work.
+   *
+   * A kernel that cannot start must not take the plugin down with it: the
+   * providers running through it are Antigravity and Codex, and every other
+   * surface is unaffected. The registry refuses work it never accepted, so a
+   * failed start surfaces as refused turns for those two rather than a vault
+   * without Grimoire in it.
+   */
+  /**
+   * Brings every provider's workspace services up, isolated from each other.
+   *
+   * Startup awaits this and cannot be taken down by it: a provider whose
+   * initializer throws is recorded and left retryable, and the others are
+   * unaffected. The loop this replaces awaited each provider in turn with no
+   * `try`, so one failure silently cost every provider after it in the
+   * iteration order its command catalog, model list, CLI resolution and
+   * settings tab.
+   */
+  private async startProviderWorkspaces(): Promise<void> {
+    if (this.unloading) {
+      return;
+    }
+    const manager = new ProviderWorkspaceManager<ProviderWorkspaceServices>({
+      contribution: providerId => ({
+        // The context is assembled here because it is plugin-shaped, and the
+        // builder is looked up in the providers' own table rather than through
+        // a registry: what a registration held, after its capability map was
+        // deleted as a duplicate, was this one function.
+        initialize: () => builtInWorkspaceInitializers[providerId]({
+          plugin: this,
+          storage: this.storage,
+          vaultAdapter: this.storage.getAdapter(),
+          homeAdapter: new HomeFileAdapter(),
+        }),
+        // Legacy workspace services hold no process, watcher or timer — the
+        // half is declared because a provider that grows one needs somewhere to
+        // release it, and because init without dispose is what the first
+        // attempt shipped.
+        dispose: async () => {},
+      }),
+      publish: (providerId, services) => {
+        // Into the composition root, which is what holds a provider's services
+        // now: every consumer of them has a plugin, so the static that used to
+        // stand in for one is gone.
+        this.applicationRuntime?.publishWorkspaceServices(providerId, services ?? undefined);
+      },
+      reportFailure: ({ providerId, phase, error }) => {
+        this.recordDebugLog({
+          data: { phase, providerId },
+          error,
+          event: 'provider.workspace.failed',
+          level: 'warn',
+          scope: 'plugin',
+        });
+      },
+    });
+    this.providerWorkspaces = manager;
+    await manager.initializeAll(providerCatalog().ids());
+  }
+
+  private async startExecutionKernel(): Promise<void> {
+    if (this.unloading) {
+      // Unload won the race with settings loading. A runtime built now would
+      // open a gate that the shutdown which already ran can no longer close.
+      return;
+    }
+    this.applicationRuntime = new ApplicationRuntime({
+      plugin: this,
+      adapter: this.storage.getAdapter(),
+      sessions: this.storage.sessions,
+      defaultProviderId: DEFAULT_CHAT_PROVIDER_ID,
+      report: event => this.recordDebugLog(event),
+      // Read per title rather than captured: the model that decides which
+      // provider writes a title is a setting the user can change with tabs
+      // already open.
+      resolveTitleProviderId: () => resolveTitleGenerationProviderId(this.settings),
+    });
+    await this.applicationRuntime.start();
   }
 
   async writeDebugLog(event: DebugLogEvent): Promise<void> {
@@ -522,32 +808,14 @@ export default class GrimoirePlugin extends Plugin {
     );
     const didNormalizeModelVariants = this.normalizeModelVariantSettings();
 
-    const allMetadata = await this.storage.sessions.listMetadata();
-    this.conversations = allMetadata.map(meta => {
-      const resumeSessionId = meta.sessionId !== undefined ? meta.sessionId : meta.id;
-
-      return {
-        id: meta.id,
-        providerId: meta.providerId ?? DEFAULT_CHAT_PROVIDER_ID,
-        title: meta.title,
-        createdAt: meta.createdAt,
-        updatedAt: meta.updatedAt,
-        lastResponseAt: meta.lastResponseAt,
-        sessionId: resumeSessionId,
-        model: meta.model,
-        providerState: meta.providerState,
-        messages: clonePersistedMessages(meta.messages),
-        currentNote: meta.currentNote,
-        externalContextPaths: meta.externalContextPaths,
-        enabledMcpServers: meta.enabledMcpServers,
-        orchestratorMode: meta.orchestratorMode,
-        usage: meta.usage,
-        titleGenerationStatus: meta.titleGenerationStatus,
-        resumeAtMessageId: meta.resumeAtMessageId,
-        vaultSearchContexts: meta.vaultSearchContexts,
-        assistantResponseMetadata: meta.assistantResponseMetadata,
-      };
-    }).sort(
+    const listing = await this.storage.sessions.listConversations();
+    this.unreadableConversations = listing.unreadable;
+    // The same projection the execution path applies to the one conversation a
+    // turn is running on. Two copies of it means a conversation means one thing
+    // to a tab and another to the turn inside it.
+    this.conversations = listing.metadata.map(meta => (
+      this.storage.sessions.toConversation(meta, DEFAULT_CHAT_PROVIDER_ID)
+    )).sort(
       (a, b) => (b.lastResponseAt ?? b.updatedAt) - (a.lastResponseAt ?? a.updatedAt)
     );
     setLocale(this.settings.locale as Locale);
@@ -564,11 +832,15 @@ export default class GrimoirePlugin extends Plugin {
       await this.saveSettings();
     }
 
-    const conversationsToSave = new Set([...backfilledConversations, ...invalidatedConversations]);
-    for (const conv of conversationsToSave) {
-      await this.storage.sessions.saveMetadata(
-        this.storage.sessions.toSessionMetadata(conv)
-      );
+    // Two different repairs, and each writes only what it repaired: the backfill
+    // sets a timestamp, and an invalidation clears the session binding. A whole
+    // conversation written here would take a message appended in another window
+    // with it.
+    for (const conv of backfilledConversations) {
+      await this.storage.sessions.updateMetadata(conv, ['lastResponseAt']);
+    }
+    for (const conv of invalidatedConversations) {
+      await this.storage.sessions.updateMetadata(conv, SESSION_INVALIDATION_FIELDS);
     }
   }
 
@@ -676,9 +948,7 @@ export default class GrimoirePlugin extends Plugin {
 
     if (invalidatedConversations.length > 0) {
       for (const conv of invalidatedConversations) {
-        await this.storage.sessions.saveMetadata(
-          this.storage.sessions.toSessionMetadata(conv)
-        );
+        await this.storage.sessions.updateMetadata(conv, SESSION_INVALIDATION_FIELDS);
       }
     }
 
@@ -697,13 +967,8 @@ export default class GrimoirePlugin extends Plugin {
         const conversation = tab.conversationId
           ? this.getConversationSync(tab.conversationId)
           : null;
-        const hasConversationContext = (conversation?.messages.length ?? 0) > 0;
-        const externalContextPaths = tab.ui.externalContextSelector?.getExternalContexts()
-          ?? (hasConversationContext
-            ? conversation?.externalContextPaths ?? []
-            : this.settings.persistentExternalContextPaths ?? []);
 
-        tab.service.syncConversationState(conversation, externalContextPaths);
+        tab.service.syncConversationState(conversation);
       };
 
       for (const tab of affectedTabs) {
@@ -757,7 +1022,7 @@ export default class GrimoirePlugin extends Plugin {
 
   /** Returns the runtime environment variables (fixed at plugin load). */
   getActiveEnvironmentVariables(
-    providerId: ProviderId = ProviderRegistry.resolveSettingsProviderId(
+    providerId: ProviderId = resolveSettingsProviderId(
       this.settings,
     ),
   ): string {
@@ -780,16 +1045,31 @@ export default class GrimoirePlugin extends Plugin {
     );
   }
 
-  getResolvedProviderCliPath(providerId: ProviderId): string | null {
-    const cliResolver = ProviderWorkspaceRegistry.getCliResolver(providerId);
-    if (!cliResolver) {
-      return null;
+  /**
+   * Runs one shell command on the kernel.
+   *
+   * The bang-bash surface's only way to reach a process. It used to hold its
+   * own `child_process` handle inside the chat feature, which meant a command
+   * still running at unload had nobody to stop it.
+   */
+  async runShellCommand(invocation: LocalShellInvocation): Promise<LocalShellCommandOutcome> {
+    const shell = this.applicationRuntime?.localShell;
+    if (!shell) {
+      throw new Error('Shell execution is not available.');
     }
-
-    return cliResolver.resolveFromSettings(this.settings);
+    return shell.run(invocation);
   }
 
-  private reconcileModelWithEnvironment(providerIds: ProviderId[] = ProviderRegistry.getRegisteredProviderIds()): {
+  getResolvedProviderCliPath(providerId: ProviderId): string | null {
+    // A declaration, not a workspace service: the CLI path is what a workspace
+    // is created *with*, so it has to be answerable before one exists — which
+    // is exactly when this is asked, at launch.
+    return providerCatalog().declarations(providerId).cli?.resolve(this.settings) ?? null;
+  }
+
+  private reconcileModelWithEnvironment(
+    providerIds: readonly ProviderId[] = providerCatalog().ids(),
+  ): {
     changed: boolean;
     invalidatedConversations: Conversation[];
   } {
@@ -801,7 +1081,7 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   private getAffectedEnvironmentProviders(scopes: EnvironmentScope[]): ProviderId[] {
-    const registeredProviderIds = new Set(ProviderRegistry.getRegisteredProviderIds());
+    const registeredProviderIds = new Set(providerCatalog().ids());
     const affectedProviderIds = new Set<ProviderId>();
 
     for (const scope of scopes) {
@@ -844,9 +1124,20 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   private async loadSdkMessagesForConversation(conversation: Conversation): Promise<void> {
-    await ProviderRegistry
-      .getConversationHistoryService(conversation.providerId)
-      .hydrateConversationHistory(conversation, getVaultPath(this.app));
+    const transcripts = (
+      await this.getApplicationRuntimeOrNull()?.workspaceFor(conversation.providerId)
+    )?.transcripts;
+    // `absent`, not an error: a provider whose workspace this build does not
+    // compose has no transcript to load, which reads the same as a conversation
+    // whose provider never stored one.
+    const hydration = await transcripts?.hydrate(conversation, getVaultPath(this.app))
+      ?? { outcome: 'absent' as const };
+    // Kept per conversation rather than returned, because the callers that open
+    // one — `switchConversation`, `getConversationById` — hand back the
+    // conversation itself and the surface asks separately. What it is for is a
+    // conversation whose transcript could not be loaded: without this it looks
+    // exactly like a conversation with nothing in it.
+    this.historyHydration.set(conversation.id, hydration);
     // Attachment bytes are left out of metadata, so they come back here rather
     // than for every conversation in the vault at startup.
     await hydrateImageAttachments(conversation.messages, this.storage.attachments);
@@ -867,9 +1158,8 @@ export default class GrimoirePlugin extends Plugin {
   }): Promise<Conversation> {
     const providerId = options?.providerId ?? DEFAULT_CHAT_PROVIDER_ID;
     const sessionId = options?.sessionId;
-    const conversationId = sessionId ?? this.generateConversationId();
-    const conversation: Conversation = {
-      id: conversationId,
+    const build = (id: string): Conversation => ({
+      id,
       providerId,
       title: this.generateDefaultTitle(),
       createdAt: Date.now(),
@@ -877,12 +1167,38 @@ export default class GrimoirePlugin extends Plugin {
       sessionId: sessionId ?? null,
       model: options?.model,
       messages: [],
-    };
+    });
 
+    // A conversation created from a live session is keyed by that session id,
+    // which is how its transcript is found again. When the vault already holds
+    // one under that id, the new chat takes an id of its own and keeps the
+    // session in its `sessionId` field, so resume still works and the existing
+    // conversation is left alone. Written as a refusal and a retry rather than
+    // a lookup first: the store serializes per id, and a check-then-write can
+    // lose the race with another window.
+    let conversation = build(sessionId ?? this.generateConversationId());
+    try {
+      await this.storage.sessions.createMetadata(
+        this.storage.sessions.toSessionMetadata(conversation)
+      );
+    } catch (error) {
+      if (!(error instanceof ConversationAlreadyExistsError)) {
+        throw error;
+      }
+      this.recordDebugLog({
+        data: { conversationId: conversation.id },
+        event: 'conversation.create.collision',
+        level: 'warn',
+        scope: 'plugin',
+      });
+      conversation = build(this.generateConversationId());
+      await this.storage.sessions.createMetadata(
+        this.storage.sessions.toSessionMetadata(conversation)
+      );
+    }
+
+    // After the write, so a refused id never reaches the in-memory list.
     this.conversations.unshift(conversation);
-    await this.storage.sessions.saveMetadata(
-      this.storage.sessions.toSessionMetadata(conversation)
-    );
 
     return conversation;
   }
@@ -903,11 +1219,13 @@ export default class GrimoirePlugin extends Plugin {
     const conversation = this.conversations[index];
     this.conversations.splice(index, 1);
 
-    await ProviderRegistry
-      .getConversationHistoryService(conversation.providerId)
-      .deleteConversationSession(conversation, getVaultPath(this.app));
+    const transcripts = (
+      await this.getApplicationRuntimeOrNull()?.workspaceFor(conversation.providerId)
+    )?.transcripts;
+    await transcripts?.deleteSession(conversation, getVaultPath(this.app));
 
     await this.storage.sessions.deleteMetadata(id);
+    this.historyHydration.delete(id);
     await this.collectAttachmentGarbage();
 
     for (const view of this.getAllViews()) {
@@ -921,6 +1239,58 @@ export default class GrimoirePlugin extends Plugin {
         }
       }
     }
+
+    await this.deleteConversationControlRecords(id);
+  }
+
+  /**
+   * Removes what the execution kernel recorded about a conversation (D4).
+   *
+   * Last, and after the tabs holding it have been moved off it. The waiting is
+   * the registry's: cancelling a tab's turn is fire-and-forget and its disposal
+   * is a void call on a queue, so a caller can only ask — `deleteOwnedRecords`
+   * cancels and disposes what the conversation owns before removing anything.
+   * Retention is tied to the conversation's lifetime and to nothing else — no
+   * clock expires a run record — so this is the only thing that removes one.
+   *
+   * Reported rather than thrown: a conversation the user deleted is gone from
+   * the vault either way, and a failure here must not leave them looking at a
+   * chat that would not delete.
+   */
+  private async deleteConversationControlRecords(id: string): Promise<void> {
+    if (!this.applicationRuntime) {
+      return;
+    }
+    const owner = { kind: 'conversation' as const, ownerId: id };
+    try {
+      await this.applicationRuntime.kernel.registry.deleteOwnedRecords(owner);
+    } catch (error) {
+      this.recordDebugLog({
+        error,
+        event: 'execution.control.deleteFailed',
+        level: 'warn',
+        scope: 'plugin',
+      });
+    }
+    // **Its own call, because the two stores are two domains.** The registry
+    // removes sessions, runs, interactions and reconciliations and knows
+    // nothing about agents, which is right; D3 keeps an agent's records until
+    // its owning conversation is deleted, and this is the deletion. Attempted
+    // even when the first failed: they are separate stores, and leaving one
+    // full because the other would not empty helps nobody.
+    try {
+      await this.applicationRuntime.agents.deleteOwnedRecords(
+        owner,
+        `tx-${randomUUID().replaceAll('-', '')}`,
+      );
+    } catch (error) {
+      this.recordDebugLog({
+        error,
+        event: 'agents.control.deleteFailed',
+        level: 'warn',
+        scope: 'plugin',
+      });
+    }
   }
 
   async renameConversation(id: string, title: string): Promise<void> {
@@ -930,9 +1300,10 @@ export default class GrimoirePlugin extends Plugin {
     conversation.title = title.trim() || this.generateDefaultTitle();
     conversation.updatedAt = Date.now();
 
-    await this.storage.sessions.saveMetadata(
-      this.storage.sessions.toSessionMetadata(conversation)
-    );
+    // The title and nothing else. A rename that landed mid-stream used to write
+    // the whole conversation this window was holding, which put back the
+    // messages it had before the stream started.
+    await this.storage.sessions.updateMetadata(conversation, ['title']);
 
     for (const view of this.getAllViews()) {
       view.getTabManager()?.notifyConversationRenamed?.(id, conversation.title);
@@ -950,8 +1321,12 @@ export default class GrimoirePlugin extends Plugin {
     conversation.vaultSearchContexts = collectVaultSearchContexts(conversation.messages);
     conversation.assistantResponseMetadata = collectAssistantResponseMetadata(conversation.messages);
 
-    await this.storage.sessions.saveMetadata(
-      this.storage.sessions.toSessionMetadata(conversation)
+    // **What this caller actually set**, not everything it happens to hold. The
+    // callers already speak in deltas — a status, a model, a message list — and
+    // this is where that was being thrown away.
+    await this.storage.sessions.updateMetadata(
+      conversation,
+      conversationMetadataFields(safeUpdates),
     );
   }
 
@@ -972,6 +1347,16 @@ export default class GrimoirePlugin extends Plugin {
     }
   }
 
+  /**
+   * What happened the last time this conversation's history was loaded.
+   *
+   * `undefined` before it has been opened. The surface reads this to say why a
+   * transcript is short or empty, which the provider knew and nobody carried.
+   */
+  getHistoryHydration(conversationId: string): ProviderHistoryHydration | undefined {
+    return this.historyHydration.get(conversationId);
+  }
+
   async getConversationById(id: string): Promise<Conversation | null> {
     const conversation = this.conversations.find(c => c.id === id) || null;
 
@@ -988,6 +1373,18 @@ export default class GrimoirePlugin extends Plugin {
 
   findEmptyConversation(): Conversation | null {
     return this.conversations.find(c => c.messages.length === 0) || null;
+  }
+
+  /**
+   * Conversations the vault holds and this build cannot read.
+   *
+   * Answered separately from `getConversationList`, because they have no title,
+   * no messages and no provider: folding them into that list would make every
+   * consumer of it — tab titles, search, delete-all — guard against a
+   * conversation that cannot be opened.
+   */
+  getUnreadableConversations(): readonly UnreadableConversation[] {
+    return this.unreadableConversations;
   }
 
   getConversationList(): ConversationMeta[] {
@@ -1056,12 +1453,11 @@ export default class GrimoirePlugin extends Plugin {
   private getConversationModelLabel(conversation: Conversation): string | undefined {
     const model = conversation.usage?.model?.trim();
     if (!model) {
-      return ProviderRegistry.getProviderDisplayName(conversation.providerId);
+      return providerCatalog().displayName(conversation.providerId);
     }
 
-    const uiConfig = ProviderRegistry.getChatUIConfig(conversation.providerId);
-    const modelInfo = uiConfig
-      .getModelOptions(this.settings)
+    const modelInfo = providerCatalog().declarations(conversation.providerId)
+      .chatUI.models.options(this.settings)
       .find(option => option.value === model);
     return modelInfo?.label ?? formatHistoryModelFallbackLabel(model);
   }
@@ -1094,4 +1490,30 @@ export default class GrimoirePlugin extends Plugin {
     return sources.size > 0 ? sources.size : undefined;
   }
 
+}
+
+/**
+ * What an environment change clears when it invalidates a conversation.
+ *
+ * The reconcilers set exactly these two: the session is no longer resumable and
+ * the provider's own state described a session that is gone. Everything else
+ * the conversation holds is untouched, so nothing else is written.
+ */
+const SESSION_INVALIDATION_FIELDS: readonly ConversationMetadataField[] = [
+  'sessionId',
+  'providerState',
+];
+
+/**
+ * The metadata fields an update actually set.
+ *
+ * Callers already pass deltas — `{ titleGenerationStatus }`, `{ model }`, the
+ * stream's message list — and this is what keeps them deltas all the way to the
+ * file. A key that is not a metadata field, or one this build does not persist,
+ * is dropped rather than written.
+ */
+function conversationMetadataFields(
+  updates: Partial<Conversation>,
+): ConversationMetadataField[] {
+  return CONVERSATION_METADATA_FIELDS.filter(field => field in updates);
 }

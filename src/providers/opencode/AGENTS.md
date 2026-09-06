@@ -19,6 +19,17 @@
 ## Session resume
 
 - Persist `sessionId`, `providerState.databasePath`, and `providerState.sessionDropped` after turns.
-- On ACP `session/load` failure, decide with `isAcpSessionGone`: it asks the agent through `session/list` rather than reading the answer out of the error text, which OpenCode does not put there. A session the agent no longer lists is soft-failed into a fresh one; anything else - transport, authentication, configuration, or an agent that cannot list - propagates with the live and persisted binding intact. Log the failure via debug and **keep** `databasePath` so SQLite hydrate and `OPENCODE_DB` still resolve.
+- On ACP `session/load` failure, the decision belongs to `isAcpSessionGone`: it asks the agent through `session/list` rather than reading the answer out of the error text, which OpenCode does not put there. A session the agent no longer lists is soft-failed into a fresh one; anything else - transport, authentication, configuration, or an agent that cannot list - propagates with the live and persisted binding intact. Log the failure via debug and **keep** `databasePath` so SQLite hydrate and `OPENCODE_DB` still resolve.
 - A dropped session is recorded in `providerState.sessionDropped` and read back on load, because the in-memory flag is consumed by the first save. Never replay the transcript into a replacement session: history bootstrap is for a cold resume that never held a session id.
 - Use shared helpers in `src/providers/acp/acpSessionResume.ts` rather than inventing a fourth wipe policy.
+
+- **The decision and the notice are both wired.** `ManagedAcpExecutionBackend` asks
+  `isAcpSessionGone` on every failed `session/load`, so a refusal whose words say nothing
+  is settled by asking the agent through `session/list`, and a session it no longer lists
+  soft-fails into a fresh one. `isMissingSessionError` overrides that decision and takes
+  the whole probe, so a provider adds what its own CLI says and defers to the shared
+  question for everything else. The resume outcome travels on the content
+  channel, which is what reaches the tab the run belongs to, and this provider records it:
+  `sessionDropped` answers the notice on every render, is written into `providerState` so
+  the tab that opens the conversation next still knows, and comes back off the moment a
+  resume succeeds.

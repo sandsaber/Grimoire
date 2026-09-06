@@ -1,6 +1,5 @@
 import '@/providers';
 
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { Conversation } from '@/core/types';
 import { DEFAULT_CLAUDE_PROVIDER_SETTINGS } from '@/providers/claude/settings';
@@ -81,31 +80,101 @@ describe('ProviderSettingsCoordinator', () => {
       expect(Array.isArray(result.invalidatedConversations)).toBe(true);
     });
 
-    it('filters conversations per provider', () => {
-      const reconcileSpy = jest.spyOn(
-        ProviderRegistry.getSettingsReconciler('claude'),
-        'reconcileModelWithEnvironment',
-      );
-
-      const claudeConv = { providerId: 'claude', messages: [] } as unknown as Conversation;
-      const otherConv = { providerId: 'codex', messages: [] } as unknown as Conversation;
+    // The reconciler no longer sees conversations at all: it answers whether
+    // this provider's sessions survived, and the host applies that to its own
+    // list. So what "per provider" means is which conversations get cleared,
+    // which is what this asserts now rather than which list was passed in.
+    it('clears only the conversations of the provider whose environment changed', () => {
+      const claudeConv = {
+        providerId: 'claude',
+        messages: [],
+        sessionId: 'claude-session',
+      } as unknown as Conversation;
+      const otherConv = {
+        providerId: 'codex',
+        messages: [],
+        sessionId: 'codex-thread',
+      } as unknown as Conversation;
       const settings: Record<string, unknown> = {
         model: 'haiku',
         settingsProvider: 'claude',
+        sharedEnvironmentVariables: 'ANTHROPIC_BASE_URL=https://example.invalid\n',
         providerConfigs: {
           claude: { enabled: true },
         },
       };
 
-      ProviderSettingsCoordinator.reconcileAllProviders(settings, [claudeConv, otherConv]);
+      const { invalidatedConversations } = ProviderSettingsCoordinator
+        .reconcileAllProviders(settings, [claudeConv, otherConv]);
 
-      // Claude reconciler should only receive claude conversations
-      expect(reconcileSpy).toHaveBeenCalledWith(
-        settings,
-        [claudeConv],
-      );
+      expect(invalidatedConversations).toEqual([claudeConv]);
+      expect(claudeConv.sessionId).toBeNull();
+      expect(otherConv.sessionId).toBe('codex-thread');
+    });
 
-      reconcileSpy.mockRestore();
+    it('keeps Claude provider state through an invalidation, and clears Codex thread state', () => {
+      // **What comes off with the session is the provider's answer.** Claude's
+      // `providerState` holds subagent transcripts and a fork source; its
+      // reconciler has always cleared the session id alone. Codex's holds a
+      // thread id belonging to a daemon the old environment launched.
+      const claudeConv = {
+        providerId: 'claude',
+        messages: [],
+        sessionId: 'claude-session',
+        providerState: { subagentData: { 'agent-1': [] } },
+      } as unknown as Conversation;
+      const settings: Record<string, unknown> = {
+        model: 'haiku',
+        settingsProvider: 'claude',
+        sharedEnvironmentVariables: 'ANTHROPIC_BASE_URL=https://example.invalid\n',
+        providerConfigs: { claude: { enabled: true } },
+      };
+
+      ProviderSettingsCoordinator.reconcileAllProviders(settings, [claudeConv]);
+
+      expect(claudeConv.sessionId).toBeNull();
+      expect(claudeConv.providerState).toEqual({ subagentData: { 'agent-1': [] } });
+
+      const codexConv = {
+        providerId: 'codex',
+        messages: [],
+        sessionId: 'codex-thread',
+        providerState: { threadId: 'thread-1' },
+      } as unknown as Conversation;
+      const codexSettings: Record<string, unknown> = {
+        model: 'gpt-5.5',
+        settingsProvider: 'codex',
+        sharedEnvironmentVariables: 'OPENAI_BASE_URL=https://example.invalid\n',
+        providerConfigs: { codex: { enabled: true } },
+      };
+
+      ProviderSettingsCoordinator.reconcileAllProviders(codexSettings, [codexConv]);
+
+      expect(codexConv.sessionId).toBeNull();
+      expect(codexConv.providerState).toBeUndefined();
+    });
+
+    it('leaves a conversation that has no session binding out of the invalidated list', () => {
+      // The caller writes one metadata file per entry, so a conversation with
+      // nothing to clear must not appear: it would be a write per conversation
+      // of the provider on every environment change.
+      const bound = {
+        providerId: 'claude',
+        messages: [],
+        sessionId: 'claude-session',
+      } as unknown as Conversation;
+      const unbound = { providerId: 'claude', messages: [] } as unknown as Conversation;
+      const settings: Record<string, unknown> = {
+        model: 'haiku',
+        settingsProvider: 'claude',
+        sharedEnvironmentVariables: 'ANTHROPIC_BASE_URL=https://example.invalid\n',
+        providerConfigs: { claude: { enabled: true } },
+      };
+
+      const { invalidatedConversations } = ProviderSettingsCoordinator
+        .reconcileAllProviders(settings, [bound, unbound]);
+
+      expect(invalidatedConversations).toEqual([bound]);
     });
   });
 
@@ -367,6 +436,30 @@ describe('ProviderSettingsCoordinator', () => {
         codex: 'normal',
       });
     });
+
+    // Gemini and Antigravity declare `reasoningControl: { kind: 'none' }` and
+    // contribute no reasoning group. Their chat-UI configs still answer the
+    // row's reasoning methods, and answer them differently from each other —
+    // Gemini says a model is not adaptive, Antigravity says it is — so before
+    // the coordinator read the contribution, Gemini kept a thinking budget and
+    // Antigravity kept none, from the same declaration.
+    it.each(['gemini', 'antigravity'])(
+      'keeps no thinking budget for %s, which contributes no reasoning group',
+      (providerId) => {
+        const settings: Record<string, unknown> = {
+          settingsProvider: providerId,
+          providerConfigs: { [providerId]: { enabled: true } },
+          model: '',
+          thinkingBudget: 'off',
+          savedProviderThinkingBudget: { [providerId]: 'off', claude: 'off' },
+        };
+
+        ProviderSettingsCoordinator.projectProviderState(settings, providerId);
+        ProviderSettingsCoordinator.persistProjectedProviderState(settings, providerId);
+
+        expect(settings.savedProviderThinkingBudget).toEqual({ claude: 'off' });
+      },
+    );
   });
 
   describe('projectProviderState', () => {

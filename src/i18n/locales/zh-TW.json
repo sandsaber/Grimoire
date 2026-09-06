@@ -19,7 +19,8 @@
     "disabled": "已禁用",
     "platform": "平台",
     "refresh": "重新整理",
-    "rewind": "回退"
+    "rewind": "回退",
+    "close": "關閉"
   },
   "chat": {
     "rewind": {
@@ -37,6 +38,14 @@
       "cannot": "無法回退：{error}",
       "unavailableStreaming": "串流回應中無法回退",
       "unavailableNoUuid": "無法回退：缺少訊息識別碼"
+    },
+    "agents": {
+      "runningCount": "{count} 個在背景執行",
+      "finished": "背景工作",
+      "finishedOne": "已完成",
+      "failedOne": "已失敗",
+      "runningOne": "執行中",
+      "unobservable": "執行中，未回報進度"
     },
     "history": {
       "deleteAll": "全部刪除",
@@ -77,16 +86,17 @@
     "orchestrator": {
       "planTitle": "此筆記的獨立任務",
       "planEyebrow": "平行工作者",
-      "planSummary": "已準備 {count} 個獨立任務。每個任務都在自己的分頁中執行，且不與其他任務共用脈絡或結果。",
+      "planSummary": "已準備 {count} 個獨立任務。每個任務都在各自的對話中背景執行，且不與其他任務共用脈絡或結果。",
       "badge": "平行工作者",
       "workerCount": "已選取 {count}/{total}",
-      "spawnWorkers": "開啟工作者分頁",
+      "spawnWorkers": "開始背景工作",
       "parallel": "獨立",
       "toggleTask": "包含任務：{task}",
-      "workerTabsHint": "每個分頁一位獨立工作者 · 不共用脈絡",
+      "workerTabsHint": "每個任務一位獨立工作者 · 不共用脈絡",
       "toggleTitle": "平行工作者",
       "toggleAriaLabel": "切換平行工作者",
-      "toggleFailed": "無法切換平行工作者"
+      "toggleFailed": "無法切換平行工作者",
+      "dispatchFailed": "部分背景工作無法啟動。"
     },
     "vaultSearch": {
       "toolName": "庫存搜尋",
@@ -398,6 +408,9 @@
       "messages": {
         "interrupted": "已中斷",
         "interruptedHint": "· Grimoire 應改做什麼？",
+        "historyUnavailable": "此對話的早期訊息已無法使用——提供者已不再保留儲存它們的工作階段。",
+        "historyPartial": "此對話的一部分無法載入，因此可能缺少部分早期訊息。",
+        "historyUnreadable": "無法讀取此對話的早期訊息，因此後續內容可能不完整。",
         "conversationCompacted": "對話已壓縮",
         "sessionRestarted": "新工作階段",
         "sessionRestartedHint": "代理無法還原先前的工作階段，因此這段對話會在新的工作階段中繼續。上方的訊息不在它的脈絡中——請重述仍然需要的內容，或在新分頁中重新開始。",
@@ -407,7 +420,16 @@
         "renderFailed": "無法呈現訊息內容。",
         "copyMessage": "複製訊息",
         "copyResponse": "複製回覆",
-        "awaitingYou": "等待您的回覆"
+        "awaitingYou": "等待您的回覆",
+        "noticeBlocked": "已封鎖",
+        "noticeLabel": "提示",
+        "errorLabel": "錯誤",
+        "queuedPrefix": "已排隊",
+        "steeringPrefix": "引導中",
+        "newChatTitle": "新增對話",
+        "closeImage": "關閉圖片",
+        "viewFullImage": "檢視原圖",
+        "copyCode": "複製程式碼"
       },
       "errors": {
         "generic": "錯誤：{message}",
@@ -426,7 +448,6 @@
           "startFailed": "無法啟動 {provider}。請檢查 CLI 路徑和登入狀態。",
           "notReady": "{provider} 執行階段尚未就緒。",
           "sessionCreateFailed": "無法為 {provider} 建立工作階段。",
-          "sessionResumeFailed": "無法還原先前的 {provider} 工作階段。將開始新工作階段；Grimoire 中的對話紀錄會保留。",
           "emptyResponse": "{provider} 已完成，但未傳回回應。請檢查提供者憑證和日誌，然後重試。",
           "requestFailed": "{provider} 請求失敗",
           "antigravityDisabled": "Antigravity 已停用。請在供應商設定中啟用它。",
@@ -456,6 +477,9 @@
         "searchPlaceholder": "搜尋過往聊天…",
         "empty": "沒有過往聊天",
         "noMatches": "沒有符合項目",
+        "unreadableTitle": "無法讀取的對話",
+        "unreadableFuture": "由較新版本的 Grimoire 寫入。",
+        "unreadableCorrupt": "此檔案已損毀，無法開啟。",
         "current": "目前",
         "openNewTab": "在新分頁開啟",
         "generatingTitle": "正在生成標題…",
@@ -970,7 +994,46 @@
       }
     },
     "hub": {
-      "general": "一般", "providers": "供應商", "workspace": "進階設定", "about": "關於", "cliDetected": "已偵測到 CLI", "cliNotDetected": "未偵測到 CLI", "geminiLegacy": "Gemini CLI（舊版）", "providerDetails": "{provider} 設定", "skills": "技能", "agents": "子代理", "mcp": "MCP", "environment": "環境", "commands": "命令", "search": "搜尋名稱、說明、來源或供應商", "name": "名稱", "source": "來源", "provider": "供應商", "actions": "操作", "manage": "管理", "manageTitle": "管理 {section}", "edit": "編輯", "delete": "刪除", "deleteConfirm": "確定刪除「{name}」嗎？", "deleted": "已刪除「{name}」", "deleteFailed": "刪除失敗：{message}", "providerOptions": "供應商進階選項", "readonly": "唯讀", "available": "可用", "connected": "已連線", "disabled": "已停用", "shared": "共用", "loading": "正在載入資源…", "unsupported": "目前供應商不支援此類資源管理。", "none": "沒有相符的進階設定資源。", "aboutCopy": "Grimoire 在 Obsidian 中連接本機 AI Agent。此處保留外掛版本、說明和更新入口。", "native": "原生", "nativeCli": "原生 CLI", "nativeMcpDescription": "原生 MCP 支援", "runtimeCommandsPending": "啟動一次 {provider} 聊天以載入其原生命令。", "releases": "發布版本"
+      "general": "一般",
+      "providers": "供應商",
+      "workspace": "進階設定",
+      "about": "關於",
+      "cliDetected": "已偵測到 CLI",
+      "cliNotDetected": "未偵測到 CLI",
+      "geminiLegacy": "Gemini CLI（舊版）",
+      "providerDetails": "{provider} 設定",
+      "skills": "技能",
+      "agents": "子代理",
+      "mcp": "MCP",
+      "environment": "環境",
+      "commands": "命令",
+      "search": "搜尋名稱、說明、來源或供應商",
+      "name": "名稱",
+      "source": "來源",
+      "provider": "供應商",
+      "actions": "操作",
+      "manage": "管理",
+      "manageTitle": "管理 {section}",
+      "edit": "編輯",
+      "delete": "刪除",
+      "deleteConfirm": "確定刪除「{name}」嗎？",
+      "deleted": "已刪除「{name}」",
+      "deleteFailed": "刪除失敗：{message}",
+      "providerOptions": "供應商進階選項",
+      "readonly": "唯讀",
+      "available": "可用",
+      "connected": "已連線",
+      "disabled": "已停用",
+      "shared": "共用",
+      "loading": "正在載入資源…",
+      "unsupported": "目前供應商不支援此類資源管理。",
+      "none": "沒有相符的進階設定資源。",
+      "aboutCopy": "Grimoire 在 Obsidian 中連接本機 AI Agent。此處保留外掛版本、說明和更新入口。",
+      "native": "原生",
+      "nativeCli": "原生 CLI",
+      "nativeMcpDescription": "原生 MCP 支援",
+      "runtimeCommandsPending": "啟動一次 {provider} 聊天以載入其原生命令。",
+      "releases": "發布版本"
     },
     "grok": {
       "cliPath": {
@@ -1445,8 +1508,61 @@
       }
     }
   },
-  "plugin": { "openRibbon": "開啟 Grimoire", "openChatView": "開啟聊天檢視", "inlineEdit": "內嵌編輯", "inlineEditViewUnavailable": "內嵌編輯無法使用：無法存取目前的 Markdown 檢視。", "inlineEditInserted": "已插入", "inlineEditApplied": "已套用編輯", "newTab": "新增分頁", "newSession": "新增工作階段（目前分頁）", "closeCurrentTab": "關閉目前分頁", "switchToTab": "切換至分頁 {index}", "environmentRestartFailed": "環境變更已套用，但有 {count} 個受影響的分頁無法重新啟動。", "environmentAppliedRebuild": "已套用環境變數。工作階段將在下一則訊息時重建。", "environmentApplied": "已套用環境變數。" },
-  "shared": { "slashCommands": { "noMatches": "沒有相符的命令" }, "resumeConversation": { "title": "繼續對話", "empty": "沒有對話", "current": "目前工作階段" }, "instructionModal": { "title": "新增自訂指令", "yourInput": "你的輸入：", "processingInstruction": "正在處理你的指令...", "yourResponse": "你的回覆：", "responsePlaceholder": "請提供更多詳細資料...", "refinedSnippet": "優化後的片段：", "processing": "正在處理...", "submit": "提交", "submitResponseAria": "提交回覆", "editAria": "編輯指令", "accept": "接受", "acceptAria": "接受指令", "preview": "預覽" }, "whatsNew": { "title": "Grimoire v{version} 的新功能", "released": "發佈於 {date}", "latestReleaseNotes": "最新發行說明", "fullChangelog": "完整變更日誌", "gotIt": "知道了" } },
-  "inlineEdit": { "rejectTitle": "拒絕 (Esc)", "acceptTitle": "接受 (Enter)", "editorUnavailable": "內嵌編輯無法使用：無法存取目前的編輯器。請重新開啟筆記。", "vaultFilesLoadFailed": "無法載入 vault 檔案。@ 提及可能無法使用。", "invalidFilePath": "無法附加檔案：路徑無效" },
-  "storage": { "tabLayoutSaveFailed": "無法儲存分頁版面配置" }
+  "plugin": {
+    "openRibbon": "開啟 Grimoire",
+    "openChatView": "開啟聊天檢視",
+    "inlineEdit": "內嵌編輯",
+    "inlineEditViewUnavailable": "內嵌編輯無法使用：無法存取目前的 Markdown 檢視。",
+    "inlineEditInserted": "已插入",
+    "inlineEditApplied": "已套用編輯",
+    "newTab": "新增分頁",
+    "newSession": "新增工作階段（目前分頁）",
+    "closeCurrentTab": "關閉目前分頁",
+    "switchToTab": "切換至分頁 {index}",
+    "environmentRestartFailed": "環境變更已套用，但有 {count} 個受影響的分頁無法重新啟動。",
+    "environmentAppliedRebuild": "已套用環境變數。工作階段將在下一則訊息時重建。",
+    "environmentApplied": "已套用環境變數。"
+  },
+  "shared": {
+    "slashCommands": {
+      "noMatches": "沒有相符的命令"
+    },
+    "resumeConversation": {
+      "title": "繼續對話",
+      "empty": "沒有對話",
+      "current": "目前工作階段"
+    },
+    "instructionModal": {
+      "title": "新增自訂指令",
+      "yourInput": "你的輸入：",
+      "processingInstruction": "正在處理你的指令...",
+      "yourResponse": "你的回覆：",
+      "responsePlaceholder": "請提供更多詳細資料...",
+      "refinedSnippet": "優化後的片段：",
+      "processing": "正在處理...",
+      "submit": "提交",
+      "submitResponseAria": "提交回覆",
+      "editAria": "編輯指令",
+      "accept": "接受",
+      "acceptAria": "接受指令",
+      "preview": "預覽"
+    },
+    "whatsNew": {
+      "title": "Grimoire v{version} 的新功能",
+      "released": "發佈於 {date}",
+      "latestReleaseNotes": "最新發行說明",
+      "fullChangelog": "完整變更日誌",
+      "gotIt": "知道了"
+    }
+  },
+  "inlineEdit": {
+    "rejectTitle": "拒絕 (Esc)",
+    "acceptTitle": "接受 (Enter)",
+    "editorUnavailable": "內嵌編輯無法使用：無法存取目前的編輯器。請重新開啟筆記。",
+    "vaultFilesLoadFailed": "無法載入 vault 檔案。@ 提及可能無法使用。",
+    "invalidFilePath": "無法附加檔案：路徑無效"
+  },
+  "storage": {
+    "tabLayoutSaveFailed": "無法儲存分頁版面配置"
+  }
 }

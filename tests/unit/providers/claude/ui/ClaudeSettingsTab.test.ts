@@ -103,8 +103,8 @@ jest.mock('@/features/settings/ui/McpSettingsManager', () => ({
   McpSettingsManager: jest.fn(),
 }));
 
-const mockRefreshModels = jest.fn().mockResolvedValue(true);
-const mockRefreshCommands = jest.fn().mockResolvedValue(undefined);
+const mockRefreshModels = jest.fn().mockResolvedValue('refreshed');
+const mockRefreshCommands = jest.fn().mockResolvedValue('refreshed');
 
 jest.mock('@/providers/claude/app/ClaudeWorkspaceServices', () => ({
   getClaudeWorkspaceServices: jest.fn(() => ({
@@ -604,6 +604,58 @@ describe('ClaudeSettingsTab', () => {
     expect(mockRefreshCommands).toHaveBeenCalledTimes(1);
     expect(Notice).toHaveBeenCalledWith('settings.refreshCommands.done:{"count":2}');
     expect(button.setDisabled).toHaveBeenLastCalledWith(false);
+  });
+
+  it('does not report a model count the refresh did not produce', async () => {
+    // The persisted list still holds the previous models when a refresh fails,
+    // so counting it said "Model list refreshed: 2 models" for a refresh against
+    // a logged-out CLI. The catalog's own answer is the only honest signal, and
+    // it did not throw here — it came back and said it found nothing.
+    const { Notice } = await import('obsidian');
+    mockRefreshModels.mockResolvedValueOnce('failed');
+    const plugin = createPlugin({
+      providerConfigs: {
+        claude: {
+          discoveredModels: [
+            { id: 'opus', displayName: 'Opus', source: 'sdk' },
+            { id: 'sonnet', displayName: 'Sonnet', source: 'sdk' },
+          ],
+        },
+      },
+    });
+    const context = createContext(plugin);
+
+    claudeSettingsTabRenderer.render(createContainer(), context);
+    await findSetting('settings.refreshModels.name').buttonComponents[0].onClickCallback?.();
+
+    expect(Notice).toHaveBeenCalledWith('settings.provider.loadModelsFailed');
+    expect(Notice).not.toHaveBeenCalledWith('settings.refreshModels.done:{"count":2}');
+    expect(context.refreshModelSelectors).not.toHaveBeenCalled();
+  });
+
+  it('does not report a command count the refresh did not produce', async () => {
+    // Same for commands, and the catalog is explicit about it: a probe that
+    // finds nothing puts the previous list back, so the list it leaves behind
+    // is evidence of the refresh *before* this one.
+    const { Notice } = await import('obsidian');
+    mockRefreshCommands.mockResolvedValueOnce('failed');
+    const plugin = createPlugin({
+      providerConfigs: {
+        claude: {
+          discoveredCommands: [
+            { id: 'sdk:commit', name: 'commit', content: '', source: 'sdk' },
+            { id: 'sdk:review', name: 'review', content: '', source: 'sdk' },
+          ],
+        },
+      },
+    });
+    const context = createContext(plugin);
+
+    claudeSettingsTabRenderer.render(createContainer(), context);
+    await findSetting('settings.refreshCommands.name').buttonComponents[0].onClickCallback?.();
+
+    expect(Notice).toHaveBeenCalledWith('settings.provider.loadCommandsFailed');
+    expect(Notice).not.toHaveBeenCalledWith('settings.refreshCommands.done:{"count":2}');
   });
 
   it('reports a failed command refresh instead of leaving the button stuck', async () => {

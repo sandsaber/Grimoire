@@ -1,17 +1,16 @@
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
+import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
+import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
+import type GrimoirePlugin from '../../../main';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
-} from '../../../core/providers/types';
-import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import type GrimoirePlugin from '../../../main';
+} from '../../../providers/shared/providerHostContracts';
 import { AntigravityCommandCatalog } from '../commands/AntigravityCommandCatalog';
 import { ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS } from '../models';
-import { AntigravityCliResolver } from '../runtime/AntigravityCliResolver';
+import { antigravityCliResolver } from '../runtime/AntigravityCliResolver';
 import { discoverAntigravityModels } from '../runtime/AntigravityModelDiscovery';
 import { getAntigravityProviderSettings, updateAntigravityProviderSettings } from '../settings';
 import { antigravitySettingsTabRenderer } from '../ui/AntigravitySettingsTab';
@@ -24,20 +23,14 @@ export interface AntigravityWorkspaceServices extends ProviderWorkspaceServices 
 }
 
 function createAntigravityCliResolver(): ProviderCliResolver {
-  return new AntigravityCliResolver();
+  return antigravityCliResolver();
 }
-
-const antigravityTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'none';
-  },
-};
 
 function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
   const initialSettings = getAntigravityProviderSettings(plugin.settings ?? {});
   let lastRefreshAt = initialSettings.discoveredModels.length > 0 ? Date.now() : 0;
   let lastRefreshCacheKey = buildAntigravityModelCatalogCacheKey(initialSettings);
-  let refreshPromise: Promise<boolean> | null = null;
+  let refreshPromise: Promise<ProviderCatalogRefreshOutcome> | null = null;
   return {
     isAvailable(settings) {
       return getAntigravityProviderSettings(settings).enabled;
@@ -70,7 +63,7 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
           level: 'debug',
           scope: 'provider.antigravity',
         });
-        return false;
+        return 'skipped';
       }
 
       if (refreshPromise) {
@@ -110,7 +103,9 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
             level: 'warn',
             scope: 'provider.antigravity',
           });
-          return false;
+          // The CLI said nothing and the list on screen is the one from before,
+          // so nothing was refreshed however healthy the catalog looks.
+          return 'failed';
         }
         const usingFallbackModels = cliDiscoveredModels.length === 0;
         const discoveredModels = usingFallbackModels
@@ -137,7 +132,11 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
           level: usingFallbackModels ? 'warn' : 'info',
           scope: 'provider.antigravity',
         });
-        return changed;
+        // The fallback list counts as a refresh: on Windows `agy models` can
+        // answer empty on a healthy CLI, the seeded Pro list is what the picker
+        // is meant to show there, and a user who can now choose a model was not
+        // failed. The `warn` above is where that substitution is recorded.
+        return 'refreshed';
       })();
 
       try {
@@ -179,21 +178,16 @@ export async function createAntigravityWorkspaceServices(
     modelCatalog: createAntigravityModelCatalog(plugin),
     usageProvider: antigravityPlanUsageStore,
     settingsTabRenderer: antigravitySettingsTabRenderer,
-    tabWarmupPolicy: antigravityTabWarmupPolicy,
   };
 }
 
 export const antigravityWorkspaceRegistration: ProviderWorkspaceRegistration<AntigravityWorkspaceServices> = {
-  workspaceCapabilities: {
-    skills: { inventory: 'readonly', manager: 'none' },
-    commands: { inventory: 'none', manager: 'none' },
-    agents: { inventory: 'none', manager: 'none' },
-    mcp: { inventory: 'none', manager: 'none' },
-    environment: { inventory: 'managed', manager: 'managed' },
-  },
   initialize: async ({ plugin, vaultAdapter }) => createAntigravityWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetAntigravityWorkspaceServices(): AntigravityWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('antigravity') as AntigravityWorkspaceServices | null;
+export function maybeGetAntigravityWorkspaceServices(
+  plugin: GrimoirePlugin,
+): AntigravityWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('antigravity') as AntigravityWorkspaceServices | null ?? null;
 }

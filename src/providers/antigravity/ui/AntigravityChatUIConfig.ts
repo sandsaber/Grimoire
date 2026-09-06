@@ -1,9 +1,11 @@
 import type {
-  ProviderChatUIConfig,
   ProviderPermissionModeToggleConfig,
   ProviderReasoningOption,
   ProviderUIOption,
 } from '../../../core/providers/types';
+import type {
+  ProviderChatUIConfig,
+} from '../../../providers/shared/providerHostContracts';
 import { ANTIGRAVITY_PROVIDER_ICON } from '../../../shared/icons';
 import {
   ANTIGRAVITY_DEFAULT_REASONING_LEVEL,
@@ -21,11 +23,10 @@ const ANTIGRAVITY_MODELS: ProviderUIOption[] = [
     value: ANTIGRAVITY_SYNTHETIC_MODEL_ID,
   },
 ];
+// One entry, which is the picker not offering a choice: the tiers below it
+// reached no argument and no prompt. See `capabilities.ts` for the whole of it.
 const ANTIGRAVITY_REASONING_OPTIONS: ProviderReasoningOption[] = [
   { value: ANTIGRAVITY_DEFAULT_REASONING_LEVEL, label: 'Default' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
 ];
 const DEFAULT_CONTEXT_WINDOW = 1_000_000;
 const ANTIGRAVITY_PERMISSION_MODE_TOGGLE: ProviderPermissionModeToggleConfig = {

@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as https from 'node:https';
 
 import type { ProviderPlanUsageWindow } from '../../../core/providers/types';
+import { isRecord } from '../../../utils/records';
 import { resolveGrokAuthPath } from '../runtime/GrokPaths';
 
 const GROK_CREDITS_CONFIG_URL = 'https://grok.com/grok_api_v2.GrokBuildBilling/GetGrokCreditsConfig';
@@ -420,10 +421,6 @@ function indexOfAscii(buffer: Uint8Array, needle: string): number {
   }
 
   return -1;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 function readString(value: unknown): string | null {

@@ -1,11 +1,13 @@
 import type { Component, WorkspaceLeaf } from 'obsidian';
 
+import type { ChatTabExecution } from '../../../app/chat/ChatTabExecution';
+import type { ProviderAgentMentionService } from '../../../app/mentions/ProviderAgentMentionService';
 import type { RelevantNotesService } from '../../../core/context/RelevantNotesService';
 import type { VaultSearchService } from '../../../core/context/VaultSearchService';
 import type { VaultTextIndex } from '../../../core/context/VaultTextIndex';
 import { MAX_TITLE_LENGTH } from '../../../core/prompt/titleLength';
 import type { InstructionRefineService, ProviderId, TitleGenerationService } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { UsageInfo } from '../../../core/types';
 import type { SlashCommandDropdown } from '../../../shared/components/SlashCommandDropdown';
 import type { BrowserSelectionController } from '../controllers/BrowserSelectionController';
@@ -40,12 +42,7 @@ import type { NavigationSidebar } from '../ui/NavigationSidebar';
 import type { RelevantNotesView } from '../ui/RelevantNotesView';
 import type { StatusPanel } from '../ui/StatusPanel';
 
-export {
-  DEFAULT_MAX_TABS,
-  MAX_TABS,
-  MIN_TABS,
-  normalizeMaxTabs,
-} from '../../../core/types/settings';
+export { normalizeMaxTabs } from '../../../core/types/settings';
 
 /**
  * Minimal interface for the GrimoireView methods used by TabManager and Tab.
@@ -106,6 +103,14 @@ export interface TabControllers {
  * Services managed per-tab.
  */
 export interface TabServices {
+  /**
+   * The `@agents/` list per provider this tab has shown.
+   *
+   * Per tab and per provider, because the mention dropdown compares the service
+   * it was handed by identity: a new object on every render would close the
+   * list while the user is typing into it.
+   */
+  agentMentionServices: Map<ProviderId, ProviderAgentMentionService>;
   subagentManager: SubagentManager;
   instructionRefineService: InstructionRefineService | null;
   titleGenerationService: TitleGenerationService | null;
@@ -243,7 +248,7 @@ export interface TabData {
   titleOverride?: string | null;
 
   /** Per-tab chat runtime instance for independent streaming. */
-  service: ChatRuntime | null;
+  service: ExecutionChatRuntimeAdapter | null;
 
   /** Whether the service has been initialized (lazy start). */
   serviceInitialized: boolean;
@@ -266,14 +271,19 @@ export interface TabData {
   /** Per-tab renderer. */
   renderer: MessageRenderer | null;
 
+  /**
+   * This tab's end of the projection execution path.
+   *
+   * A tab submits its turns through the coordinator and draws them from the
+   * projection. `null` only before the kernel has started — a restored
+   * workspace builds its tabs while settings are still loading — and a tab
+   * without one refuses to send rather than falling back, because there is no
+   * longer anything to fall back to.
+   */
+  execution: ChatTabExecution | null;
+
   /** Whether this tab should ask the provider to produce parallel-worker plans. */
   orchestratorMode: boolean;
-
-  /** Set on worker tabs: the tab ID of the orchestrator that spawned this tab. */
-  orchestratorTabId?: TabId | null;
-
-  /** Set on orchestrator tabs: IDs of all worker tabs spawned by this orchestrator. */
-  workerTabIds?: TabId[];
 
   /** Monotonic guard for overlapping bound-session model selections. */
   modelSelectionGeneration?: number;
@@ -304,8 +314,6 @@ export interface ClosedTabSnapshot {
   draftSettings: Record<string, unknown> | null;
   titleOverride: string | null;
   orchestratorMode: boolean;
-  orchestratorTabId?: TabId | null;
-  workerTabIds?: TabId[];
   inputValue: string;
 }
 
@@ -375,8 +383,4 @@ export interface TabBarItem {
   isStreaming: boolean;
   needsAttention: boolean;
   canClose: boolean;
-  /** True when this tab has spawned worker tabs. */
-  isOrchestrator?: boolean;
-  /** True when this tab was spawned by an orchestrator tab. */
-  isWorker?: boolean;
 }

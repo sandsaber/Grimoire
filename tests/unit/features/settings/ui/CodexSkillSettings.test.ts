@@ -31,12 +31,6 @@ function createMockCatalog(
     saveVaultEntry: jest.fn().mockResolvedValue(undefined),
     deleteVaultEntry: jest.fn().mockResolvedValue(undefined),
     setRuntimeCommands: jest.fn(),
-    getDropdownConfig: jest.fn().mockReturnValue({
-      triggerChars: ['/', '$'],
-      builtInPrefix: '/',
-      skillPrefix: '$',
-      commandPrefix: '/',
-    }),
     refresh: jest.fn().mockResolvedValue(undefined),
   };
 }

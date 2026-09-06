@@ -65,12 +65,6 @@ export class TabBar {
     // Tooltip with full title (aria-label only; adding title too causes double tooltip)
     badgeEl.setAttribute('aria-label', this.getAccessibleTitle(item));
     badgeEl.setAttribute('data-provider', item.providerId);
-    if (item.isOrchestrator) {
-      badgeEl.setAttribute('data-orchestrator', 'true');
-    }
-    if (item.isWorker) {
-      badgeEl.setAttribute('data-worker', 'true');
-    }
 
     badgeEl.addEventListener('contextmenu', (event: MouseEvent) => {
       event.preventDefault();
@@ -90,12 +84,8 @@ export class TabBar {
   }
 
   private getAccessibleTitle(item: TabBarItem): string {
-    if (item.isOrchestrator) {
-      return `Parallel workers: ${item.title}`;
-    }
-    if (item.isWorker) {
-      return `Worker: ${item.title}`;
-    }
+    // No orchestrator or worker variants any more: a worker is a dispatched
+    // agent rather than a tab, so no tab is one and no tab owns one.
     return item.title;
   }
 

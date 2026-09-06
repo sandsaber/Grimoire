@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
+import { isRecord } from '../../../utils/records';
 import { dumpYamlFrontmatter, loadYamlFrontmatter } from '../../../utils/yamlFrontmatter';
 import type { GeminiAgentDefinition } from '../types/agent';
 
@@ -160,6 +161,3 @@ export function validateGeminiAgentName(name: string): void {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}

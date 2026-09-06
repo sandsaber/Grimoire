@@ -1,5 +1,6 @@
 import { Notice } from 'obsidian';
 
+import type { ChatTabExecution } from '../../../app/chat/ChatTabExecution';
 import { hydrateImages } from '../../../core/attachments/hydrateImages';
 import {
   type BuiltInCommand,
@@ -13,7 +14,8 @@ import {
 import { tokenizeSearchText } from '../../../core/context/text';
 import type { ProjectWorkspace } from '../../../core/context/types';
 import type { VaultSearchService } from '../../../core/context/VaultSearchService';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
+import { resolveProviderForModel } from '../../../core/providers/modelRouting';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import {
   DEFAULT_CHAT_PROVIDER_ID,
   type InstructionRefineService,
@@ -21,7 +23,7 @@ import {
   type ProviderId,
   type TitleGenerationService,
 } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { normalizeProviderError } from '../../../core/runtime/providerError';
 import {
   cloneChatTurnRequest,
@@ -35,7 +37,7 @@ import type {
 } from '../../../core/runtime/types';
 import { isTrustedReadOnlyMcpTool } from '../../../core/tools/mcpTrust';
 import { TOOL_BASH } from '../../../core/tools/toolNames';
-import type { ApprovalDecision, ChatMessage, ExitPlanModeDecision, StreamChunk } from '../../../core/types';
+import type { ApprovalDecision, ChatMessage, ExitPlanModeDecision } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
 import { ResumeSessionDropdown } from '../../../shared/components/ResumeSessionDropdown';
@@ -56,7 +58,6 @@ import { InlinePlanApproval,type PlanApprovalDecision } from '../rendering/Inlin
 import type { MessageRenderer } from '../rendering/MessageRenderer';
 import { getToolSummary } from '../rendering/ToolCallRenderer';
 import type { SubagentManager } from '../services/SubagentManager';
-import { TurnFeedbackMetrics } from '../services/TurnFeedbackMetrics';
 import type { ChatState } from '../state/ChatState';
 import type { QueuedMessage } from '../state/types';
 import type { FileContextManager } from '../ui/FileContext';
@@ -112,7 +113,15 @@ export interface InputControllerDeps {
   generateId: () => string;
   resetInputHeight: () => void;
   getAuxiliaryModel?: () => string | null;
-  getAgentService?: () => ChatRuntime | null;
+  getAgentService?: () => ExecutionChatRuntimeAdapter | null;
+  /**
+   * This tab's end of the projection execution path, where it has one.
+   *
+   * Read late and absent for every provider not on that path, which is what
+   * makes the branch below a per-provider flip rather than a rewrite: a tab
+   * without one runs the generator loop exactly as it always has.
+   */
+  getProjectionExecution?: () => ChatTabExecution | null;
   getSubagentManager: () => SubagentManager;
   /** Tab-level provider fallback for blank tabs (derived from draft model). */
   getTabProviderId?: () => ProviderId;
@@ -211,28 +220,21 @@ export class InputController {
   /** Index at which to re-insert a message being edited, or null if not editing. */
   private pendingEditIndex: number | null = null;
   private activeStreamingAssistantMessage: ChatMessage | null = null;
-  private pendingProviderUserMessages: Array<{
-    displayContent: string;
-    persistedContent?: string;
-    currentNote?: string;
-    images?: ChatMessage['images'];
-    vaultSearchContext?: ChatMessage['vaultSearchContext'];
-  }> = [];
-  private sawInitialProviderUserMessage = false;
-  private awaitingProviderAssistantStart = false;
 
   constructor(deps: InputControllerDeps) {
     this.deps = deps;
   }
 
-  private getAgentService(): ChatRuntime | null {
+  private getAgentService(): ExecutionChatRuntimeAdapter | null {
     return this.deps.getAgentService?.() ?? null;
   }
 
   private getAuxiliaryModel(): string | null {
-    return this.deps.getAuxiliaryModel?.()
-      ?? this.getAgentService()?.getAuxiliaryModel?.()
-      ?? null;
+    // The tab's answer, and only the tab's: the runtime fallback that used to
+    // sit here reached a member the adapter does not have — absent by contract,
+    // recorded in `adapterMemberCoverage.test.ts` — so it answered `undefined`
+    // for every flipped provider, which is all nine.
+    return this.deps.getAuxiliaryModel?.() ?? null;
   }
 
   private syncInstructionRefineModelOverride(
@@ -262,7 +264,7 @@ export class InputController {
       return agentService.getCapabilities();
     }
 
-    return ProviderRegistry.getCapabilities(providerId);
+    return providerCatalog().capabilities(providerId);
   }
 
   private isResumeSessionAtStillNeeded(resumeUuid: string, previousMessages: ChatMessage[]): boolean {
@@ -493,7 +495,10 @@ export class InputController {
     fileContextManager?.markCurrentNoteSent();
 
     const userCompletedAt = Date.now();
-    const userMsg: ChatMessage = {
+    // Reassigned on the projection path once the turn is durable, so the block
+    // that runs after a turn ends writes to the messages that are on screen and
+    // in the vault rather than to the copies this method built.
+    let userMsg: ChatMessage = {
       id: this.deps.generateId(),
       role: 'user',
       content: displayContent,
@@ -503,36 +508,55 @@ export class InputController {
       images: imagesForMessage,
       vaultSearchContext: turnRequest.vaultSearchContext,
     };
-    state.addMessage(userMsg);
+    // **Every provider is on this path**, so a tab without one cannot send. The
+    // only way to be here is a tab whose provider left the catalog or one built
+    // before the kernel did — and the second resolves on the next attempt,
+    // because the tab asks again every time.
+    //
+    // **So the message has to survive the refusal.** The composer was cleared
+    // and the images detached on the way here; a refusal that kept them cleared
+    // would destroy what the person typed at the one moment they are told to
+    // try again. Restored the way the `catch` below restores them, which is the
+    // shape this was missing.
+    const projection = this.deps.getProjectionExecution?.() ?? null;
+    if (!projection) {
+      new Notice(t('chat.ui.errors.agentUnavailable'));
+      streamController.hideThinkingIndicator();
+      streamController.stopTurnSilenceIndicator();
+      state.isStreaming = false;
+      if (shouldUseInput) {
+        inputEl.value = content;
+        this.deps.resetInputHeight();
+        imageContextManager?.setImages(imagesForMessage ?? []);
+      }
+      return;
+    }
     state.hasPendingConversationSave = true;
-    renderer.addMessage(userMsg);
 
-    await this.triggerTitleGeneration();
+    // Both messages arrive from the projection: the question when the
+    // coordinator has made it durable, and the answer as a turn the target
+    // opens. Adding either here would draw it twice — and the question would be
+    // drawn before it was recorded, which is the one thing the barrier exists
+    // to stop being possible.
+    await this.triggerTitleGeneration(userMsg);
 
-    const assistantMsg = this.createAssistantMessage(queryOptions);
-    state.addMessage(assistantMsg);
-    this.activeStreamingAssistantMessage = assistantMsg;
-    this.activateStreamingAssistantMessage(assistantMsg);
-    this.pendingProviderUserMessages = [{
-      displayContent,
-      images: imagesForMessage,
-      vaultSearchContext: turnRequest.vaultSearchContext,
-    }];
-    this.sawInitialProviderUserMessage = false;
-    this.awaitingProviderAssistantStart = true;
+    let assistantMsg = this.createAssistantMessage(queryOptions);
 
     streamController.showThinkingIndicator(
       isCompact ? 'Compacting...' : undefined,
       isCompact ? 'grimoire-thinking--compact' : undefined,
     );
     state.responseStartTime = performance.now();
-    const feedbackMetrics = new TurnFeedbackMetrics(state.responseStartTime);
 
     let wasInterrupted = false;
-    let wasInvalidated = false;
+    // `turnFailed` alone: the `wasInvalidated` flag beside it on `main` was
+    // read by the legacy generator branch, and the generation is the whole of
+    // it now — see the comment further down that says so.
     let turnFailed = false;
     let didEnqueueToSdk = false;
     let planCompleted = false;
+    /** What the provider addressed this turn by, as the completion reports it. */
+    let turnIdentities: { userMessageId?: string; assistantMessageId?: string } = {};
 
     // Lazy initialization: ensure service is ready before first query
     if (this.deps.ensureServiceInitialized) {
@@ -543,7 +567,6 @@ export class InputController {
         streamController.stopTurnSilenceIndicator();
         state.isStreaming = false;
         this.activeStreamingAssistantMessage = null;
-        this.resetProviderMessageBoundaryState();
         return;
       }
     }
@@ -555,16 +578,29 @@ export class InputController {
       streamController.stopTurnSilenceIndicator();
       state.isStreaming = false;
       this.activeStreamingAssistantMessage = null;
-      this.resetProviderMessageBoundaryState();
       return;
     }
 
     // Restore pendingResumeAt from persisted conversation state (survives plugin reload)
     const conversationIdForSend = state.currentConversationId;
+    // What this turn continues, passed with the turn rather than left on the
+    // runtime's session: the kernel dispatches it, and a resume point held only
+    // by a runtime is one a reload or a tab switch loses.
+    let resumeCheckpoint: string | undefined;
+    let nativeSessionRef: string | undefined;
     if (conversationIdForSend) {
       const conv = plugin.getConversationSync(conversationIdForSend);
+      nativeSessionRef = conv?.sessionId ?? undefined;
       if (conv?.resumeAtMessageId) {
-        if (this.isResumeSessionAtStillNeeded(conv.resumeAtMessageId, state.messages.slice(0, -2))) {
+        // Whether the checkpoint still names something in the transcript, read
+        // from the transcript that *has* it. `state.messages` is the surface's,
+        // and the surface has not drawn this turn's messages yet — the
+        // projection draws them once the coordinator has made them durable — so
+        // reading it here would answer "no" for every checkpoint and clear one
+        // that was perfectly good.
+        const transcript = conv.messages ?? [];
+        if (this.isResumeSessionAtStillNeeded(conv.resumeAtMessageId, transcript)) {
+          resumeCheckpoint = conv.resumeAtMessageId;
           agentService.setResumeCheckpoint(conv.resumeAtMessageId);
         } else {
           try {
@@ -579,37 +615,58 @@ export class InputController {
     streamController.startTurnSilenceIndicator(this.getActiveProviderId());
 
     try {
-      const preparedTurn = agentService.prepareTurn(turnRequest);
-      userMsg.content = preparedTurn.persistedContent;
-      userMsg.currentNote = preparedTurn.isCompact
-        ? undefined
-        : preparedTurn.request.currentNotePath;
-
-      // Pass history WITHOUT current turn (userMsg + assistantMsg we just added)
-      // This prevents duplication when rebuilding context for new sessions
-      const previousMessages = state.messages.slice(0, -2);
-      for await (const chunk of agentService.query(preparedTurn, previousMessages, queryOptions)) {
-        streamController.noteTurnActivity();
-        if (state.streamGeneration !== streamGeneration) {
-          wasInvalidated = true;
-          break;
-        }
-        if (state.cancelRequested) {
-          wasInterrupted = true;
-          break;
-        }
-
-        feedbackMetrics.observe(chunk, performance.now());
-
-        if (await this.handleProviderMessageBoundaryChunk(chunk)) {
-          continue;
-        }
-
-        await streamController.handleStreamChunk(
-          chunk,
-          this.activeStreamingAssistantMessage ?? assistantMsg,
-        );
-      }
+      // The turn goes to the kernel and comes back as a projection: the
+      // coordinator makes the question durable, dispatches the run, and the
+      // attachment draws every part of it. What is awaited here is the turn
+      // being *finished*, which is what the `finally` below is written against
+      // — everything it does after a turn ends still applies.
+      //
+      // The session this conversation continues and the checkpoint this turn
+      // resumes at both travel with the command, because this path does not go
+      // through the runtime's own session: a turn sent without them opens a
+      // *new* provider session and abandons the conversation's thread.
+      const submitted = await projection.send(turnRequest, userMsg, {
+        queryOptions,
+        ...(nativeSessionRef ? { nativeSessionRef } : {}),
+        ...(resumeCheckpoint ? { resumeCheckpoint } : {}),
+        // **Built by the tab, written by the barrier.** Three providers resolve
+        // their session state through a context that reads *this tab's* last
+        // launch first, so a conversation-scoped caller would write the
+        // previous turn's path over the one this turn established. The closure
+        // keeps the tab as the one answering; what moved to the barrier is the
+        // write, so the session a turn ended on reaches the vault in the same
+        // write as the answer it produced.
+        sessionBinding: () => agentService.sessionBinding({
+          // Read at the barrier, not captured at submit: a blank tab has no
+          // conversation until the coordinator creates one.
+          conversation: projection.conversationId
+            ? { id: projection.conversationId }
+            : null,
+          // One-shot, and this is its only consumer now.
+          sessionInvalidated: agentService.consumeSessionInvalidation?.() ?? false,
+        }),
+      });
+      userMsg.content = submitted.userMessage.content;
+      userMsg.currentNote = submitted.userMessage.currentNote;
+      const completed = await submitted.ticket.completion;
+      // The column may still be drawing the end of the turn. Everything the
+      // block below does is against that same column, so it follows rather than
+      // interleaves.
+      await projection.settled();
+      didEnqueueToSdk = completed.terminal.kind !== 'invalidated';
+      wasInterrupted = completed.terminal.kind === 'cancelled';
+      planCompleted = completed.planCompleted === true;
+      // The messages the projection drew and the barrier stored are the ones
+      // everything after a turn writes to: the native identities a rewind
+      // addresses, the completion time, the duration footer. Written to the
+      // copies this method built, all of that would be thrown away with them.
+      userMsg = findMessage(state.messages, userMsg.id) ?? userMsg;
+      assistantMsg = findMessage(state.messages, completed.assistantMessageId) ?? assistantMsg;
+      this.activeStreamingAssistantMessage = assistantMsg;
+      turnIdentities = {
+        ...(completed.userMessageId ? { userMessageId: completed.userMessageId } : {}),
+        ...(completed.assistantMessageId ? { assistantMessageId: completed.assistantMessageId } : {}),
+      };
     } catch (error) {
       plugin.recordDebugLog?.({
         data: {
@@ -625,24 +682,47 @@ export class InputController {
       const providerId = this.getActiveProviderId();
       const errorMsg = normalizeProviderError(
         rawErrorMessage,
-        ProviderRegistry.getProviderDisplayName(providerId),
+        providerCatalog().displayName(providerId),
       ).message;
-      await streamController.appendText(`\n\n**Error:** ${errorMsg}`);
+      // **The turn may have failed before it had a bubble to fail in.** A throw
+      // out of `send` — no encoder, a conversation that could not be created, a
+      // backend that refused before dispatch — happens before the projection
+      // opens the turn, so nothing has been drawn and `appendText` returns
+      // early on a null cursor. The person is left with a spinner that stops
+      // and no reason for it. So the message gets somewhere to go.
+      if (!state.currentContentEl) {
+        state.addMessage(assistantMsg);
+        const messageEl = renderer.addMessage(assistantMsg);
+        this.activeStreamingAssistantMessage = assistantMsg;
+        state.currentContentEl = messageEl.querySelector<HTMLElement>('.grimoire-message-content');
+      }
+      await streamController.appendText(
+        `\n\n**${t('chat.ui.messages.errorLabel')}:** ${errorMsg}`,
+      );
     } finally {
       streamController.stopTurnSilenceIndicator();
+      // **The generation is the whole of it now.** A `wasInvalidated` flag used
+      // to say the same thing, set inside the generator loop when the surface
+      // moved on mid-turn; with that loop gone it was never set, which left the
+      // recovery at the end of this block unreachable and a steer that raced a
+      // conversation switch stuck on "Steering…" for the life of the tab.
+      const invalidated = state.streamGeneration !== streamGeneration;
       const finalAssistantMsg = this.activeStreamingAssistantMessage ?? assistantMsg;
-      const turnMetadata = agentService.consumeTurnMetadata();
-      userMsg.userMessageId = turnMetadata.userMessageId ?? userMsg.userMessageId;
-      finalAssistantMsg.assistantMessageId = turnMetadata.assistantMessageId ?? finalAssistantMsg.assistantMessageId;
-      didEnqueueToSdk = didEnqueueToSdk || turnMetadata.wasSent === true;
-      planCompleted = planCompleted || turnMetadata.planCompleted === true;
+      // **From the completion, not from the runtime.** The turn-metadata member
+      // this replaces read the same three facts off the same envelopes, one
+      // object further out, and the surface had to ask a `ExecutionChatRuntimeAdapter` for the
+      // half the projection did not bring. `wasSent` and `planCompleted` were
+      // already taken from `completed` above; the identities are on it now too.
+      userMsg.userMessageId = turnIdentities.userMessageId ?? userMsg.userMessageId;
+      finalAssistantMsg.assistantMessageId = turnIdentities.assistantMessageId
+        ?? finalAssistantMsg.assistantMessageId;
       plugin.recordDebugLog?.({
         data: {
           didEnqueueToSdk,
           planCompleted,
           providerId: this.getActiveProviderId(),
           wasInterrupted,
-          wasInvalidated,
+          invalidated,
         },
         event: 'send.finished',
         level: 'debug',
@@ -651,7 +731,10 @@ export class InputController {
       plugin.recordDebugLog?.({
         data: {
           providerId: this.getActiveProviderId(),
-          ...feedbackMetrics.finish(performance.now()),
+          // Read from the controller that draws the turn: it is what sees the
+          // output now, and metrics kept here reported a provider that had
+          // produced nothing on every successful turn.
+          ...(streamController.consumeTurnFeedback?.() ?? {}),
         },
         event: 'turn.feedback_metrics',
         level: 'debug',
@@ -662,7 +745,7 @@ export class InputController {
       state.clearFlavorTimerInterval();
 
       // Skip remaining cleanup if stream was invalidated (tab closed or conversation switched)
-      if (!wasInvalidated && state.streamGeneration === streamGeneration) {
+      if (!invalidated) {
         const didCancelThisTurn = wasInterrupted || state.cancelRequested;
         // A turn that died takes the queue off the rails with it: the follow-ups
         // were written for a conversation that did not happen. Holding them is
@@ -677,7 +760,10 @@ export class InputController {
           this.pauseQueue(turnFailed ? 'failed' : 'cancelled');
         }
         if (didCancelThisTurn) {
-          await streamController.appendText('\n\n<span class="grimoire-interrupted">Interrupted</span> <span class="grimoire-interrupted-hint">· What should Grimoire do instead?</span>');
+          await streamController.appendText(
+            `\n\n<span class="grimoire-interrupted">${t('chat.ui.messages.interrupted')}</span> `
+            + `<span class="grimoire-interrupted-hint">${t('chat.ui.messages.interruptedHint')}</span>`,
+          );
         }
         streamController.hideThinkingIndicator();
         state.isStreaming = false;
@@ -767,13 +853,15 @@ export class InputController {
         }
       }
 
-      if (wasInvalidated) {
+      if (invalidated) {
+        // The turn this steer belonged to is not the one on screen any more.
+        // Left set, `steerInFlight` refuses every future steer on this tab and
+        // the indicator renders a disabled button nobody can clear.
         this.clearPendingSteerState();
         this.updateQueueIndicator();
       }
 
       this.activeStreamingAssistantMessage = null;
-      this.resetProviderMessageBoundaryState();
     }
   }
 
@@ -1126,8 +1214,8 @@ export class InputController {
 
     if (requestedProviderId) {
       if (
-        !ProviderRegistry.getRegisteredProviderIds().includes(requestedProviderId)
-        || !ProviderRegistry.isEnabled(requestedProviderId, settings)
+        !providerCatalog().ids().includes(requestedProviderId)
+        || !providerCatalog().isEnabled(settings, requestedProviderId)
       ) {
         throw new ProjectWorkspaceRoutingError(
           `Project workspace provider "${requestedProviderId}" is not enabled.`,
@@ -1137,13 +1225,13 @@ export class InputController {
     }
 
     if (requestedModel) {
-      const modelProviderId = ProviderRegistry.resolveProviderForModel(requestedModel, settings, {
+      const modelProviderId = resolveProviderForModel(requestedModel, settings, {
         onlyEnabledProviders: true,
         fallbackProviderId: targetProviderId,
       });
       if (requestedProviderId && modelProviderId !== targetProviderId) {
         throw new ProjectWorkspaceRoutingError(
-          `Project workspace model "${requestedModel}" belongs to ${ProviderRegistry.getProviderDisplayName(modelProviderId)}, not ${ProviderRegistry.getProviderDisplayName(targetProviderId)}.`,
+          `Project workspace model "${requestedModel}" belongs to ${providerCatalog().displayName(modelProviderId)}, not ${providerCatalog().displayName(targetProviderId)}.`,
         );
       }
       targetProviderId = requestedProviderId ?? modelProviderId;
@@ -1163,13 +1251,13 @@ export class InputController {
             return requestedModel ? { model: requestedModel } : undefined;
           }
           throw new ProjectWorkspaceRoutingError(
-            `Project workspace uses ${ProviderRegistry.getProviderDisplayName(targetProviderId)}, but this session is bound to ${ProviderRegistry.getProviderDisplayName(activeProviderId)}. Start a new session or choose a matching workspace provider.`,
+            `Project workspace uses ${providerCatalog().displayName(targetProviderId)}, but this session is bound to ${providerCatalog().displayName(activeProviderId)}. Start a new session or choose a matching workspace provider.`,
           );
         });
       }
 
       throw new ProjectWorkspaceRoutingError(
-        `Project workspace uses ${ProviderRegistry.getProviderDisplayName(targetProviderId)}, but this session is bound to ${ProviderRegistry.getProviderDisplayName(activeProviderId)}. Start a new session or choose a matching workspace provider.`,
+        `Project workspace uses ${providerCatalog().displayName(targetProviderId)}, but this session is bound to ${providerCatalog().displayName(activeProviderId)}. Start a new session or choose a matching workspace provider.`,
       );
     }
 
@@ -1265,7 +1353,25 @@ export class InputController {
       const { displayContent, request } = this.toQueuedChatTurn(queuedMessage);
 
       const preparedTurn = agentService.prepareTurn(request);
-      const accepted = await agentService.steer(preparedTurn);
+      // The kernel owns the run on the projection path, so the steer goes there.
+      // Asked of the runtime instead, it answers `false` for every provider on
+      // that path — its `steer` acts on a run it started and it started none —
+      // and the controller reads that as "no turn to join" and quietly requeues
+      // the message. The feature disappeared without a failure.
+      const projection = this.deps.getProjectionExecution?.() ?? null;
+      const steeredAt = Date.now();
+      const accepted = projection
+        ? await projection.steer(preparedTurn, {
+          id: this.deps.generateId(),
+          role: 'user',
+          content: displayContent,
+          displayContent,
+          timestamp: steeredAt,
+          completedAt: steeredAt,
+          images: request.images,
+          vaultSearchContext: request.vaultSearchContext,
+        })
+        : await agentService.steer(preparedTurn);
       if (state.cancelRequested || !this.pendingSteerMessage) {
         return;
       }
@@ -1276,59 +1382,55 @@ export class InputController {
 
       this.deps.getFileContextManager()?.markCurrentNoteSent();
 
-      this.pendingProviderUserMessages.push({
-        displayContent,
-        persistedContent: preparedTurn.persistedContent,
-        currentNote: preparedTurn.isCompact
-          ? undefined
-          : preparedTurn.request.currentNotePath,
-        images: request.images,
-        vaultSearchContext: request.vaultSearchContext,
-      });
+      // The provider has taken it, so the indicator stops saying "steering"
+      // now rather than at the end of the turn. What used to clear it was the
+      // provider echoing the steered message back — this path filters that echo
+      // out as turn framing, and the acceptance is a better signal anyway: it
+      // is the moment the input actually arrived.
+      this.clearPendingSteerState();
+      this.updateQueueIndicator();
     } catch {
-      this.restoreQueuedMessageAfterSteerFailure(queuedMessage);
-      new Notice(t('chat.ui.queue.steerFailed'));
+      if (this.restoreQueuedMessageAfterSteerFailure(queuedMessage)) {
+        new Notice(t('chat.ui.queue.steerFailed'));
+      }
     }
   }
 
+  /**
+   * Returns a steer that did not land, unless something already has.
+   *
+   * The turn's own teardown puts a pending steer back on the head of the queue
+   * when the turn dies, and the steer's promise can reject after that — the
+   * rejection is usually *because* the turn died. Without the guard the same
+   * follow-up ends up in the queue and in the composer, and the user sends it
+   * twice. `false` says nothing was restored, so the caller can keep quiet
+   * rather than report a failure the queue has already absorbed.
+   */
   private restoreQueuedMessageAfterSteerFailure(
     message: QueuedMessage,
-  ): void {
+  ): boolean {
     const { state } = this.deps;
+    if (this.pendingSteerMessage !== message) {
+      this.updateQueueIndicator();
+      return false;
+    }
     this.clearPendingSteerState();
     if (state.cancelRequested) {
       this.updateQueueIndicator();
-      return;
+      return true;
     }
 
     if (state.isStreaming) {
       state.queue.unshift(message);
       this.updateQueueIndicator();
-      return;
+      return true;
     }
 
     this.restoreMessageToInput(message, { mergeWithComposer: true });
     this.updateQueueIndicator();
+    return true;
   }
 
-  private activateStreamingAssistantMessage(message: ChatMessage): void {
-    const { state, renderer } = this.deps;
-    const msgEl = renderer.addMessage(message);
-    const contentEl = msgEl.querySelector<HTMLElement>('.grimoire-message-content');
-
-    if (!contentEl) {
-      return;
-    }
-
-    if (!state.currentContentEl) {
-      state.toolCallElements.clear();
-    }
-
-    state.currentContentEl = contentEl;
-    state.currentTextEl = null;
-    state.currentTextContent = '';
-    state.currentThinkingState = null;
-  }
 
   private createAssistantMessage(queryOptions?: ChatRuntimeQueryOptions): ChatMessage {
     const settings = this.deps.getActiveProviderSettings?.()
@@ -1348,120 +1450,11 @@ export class InputController {
     };
   }
 
-  private resetProviderMessageBoundaryState(): void {
-    this.pendingProviderUserMessages = [];
-    this.sawInitialProviderUserMessage = false;
-    this.awaitingProviderAssistantStart = false;
-  }
 
-  private async handleProviderMessageBoundaryChunk(chunk: StreamChunk): Promise<boolean> {
-    switch (chunk.type) {
-      case 'user_message_start':
-        await this.handleProviderUserMessageStart(chunk);
-        return true;
-      case 'assistant_message_start':
-        await this.handleProviderAssistantMessageStart();
-        return true;
-      default:
-        return false;
-    }
-  }
 
-  private async handleProviderUserMessageStart(
-    chunk: Extract<StreamChunk, { type: 'user_message_start' }>,
-  ): Promise<void> {
-    const expected = this.pendingProviderUserMessages.shift();
-    if (!this.sawInitialProviderUserMessage) {
-      this.sawInitialProviderUserMessage = true;
-      return;
-    }
 
-    this.clearPendingSteerState();
-    this.updateQueueIndicator();
 
-    const previousAssistant = this.activeStreamingAssistantMessage;
-    const shouldDiscardPlaceholder = this.shouldDiscardPendingAssistantPlaceholder(previousAssistant);
-    if (previousAssistant) {
-      if (shouldDiscardPlaceholder) {
-        this.discardStreamingAssistantMessage(previousAssistant.id);
-      } else {
-        await this.deps.streamController.finalizeProgressBlocks(previousAssistant);
-        await this.deps.streamController.finalizeCurrentThinkingBlock(previousAssistant);
-        await this.deps.streamController.finalizeCurrentTextBlock(previousAssistant);
-        previousAssistant.completedAt = Date.now();
-        this.deps.renderer.updateMessageCompletionTime(previousAssistant);
-      }
-    }
-    this.deps.streamController.hideThinkingIndicator();
 
-    const displayContent = expected?.displayContent ?? chunk.content;
-    const persistedContent = expected?.persistedContent ?? displayContent;
-    const images = expected?.images;
-    if (displayContent || (images?.length ?? 0) > 0) {
-      const userCompletedAt = Date.now();
-      const userMessage: ChatMessage = {
-        id: this.deps.generateId(),
-        role: 'user',
-        content: persistedContent,
-        displayContent,
-        timestamp: userCompletedAt,
-        completedAt: userCompletedAt,
-        currentNote: expected?.currentNote,
-        images,
-        vaultSearchContext: expected?.vaultSearchContext,
-      };
-      this.deps.state.addMessage(userMessage);
-      this.deps.renderer.addMessage(userMessage);
-    }
-
-    const assistantMessage = this.createAssistantMessage();
-    this.deps.state.addMessage(assistantMessage);
-    this.activeStreamingAssistantMessage = assistantMessage;
-    this.activateStreamingAssistantMessage(assistantMessage);
-    this.deps.streamController.showThinkingIndicator();
-    this.deps.state.responseStartTime = performance.now();
-    this.awaitingProviderAssistantStart = true;
-  }
-
-  private async handleProviderAssistantMessageStart(): Promise<void> {
-    if (this.awaitingProviderAssistantStart) {
-      this.awaitingProviderAssistantStart = false;
-      return;
-    }
-
-    const previousAssistant = this.activeStreamingAssistantMessage;
-    if (previousAssistant) {
-      await this.deps.streamController.finalizeProgressBlocks(previousAssistant);
-      await this.deps.streamController.finalizeCurrentThinkingBlock(previousAssistant);
-      await this.deps.streamController.finalizeCurrentTextBlock(previousAssistant);
-      previousAssistant.completedAt = Date.now();
-      this.deps.renderer.updateMessageCompletionTime(previousAssistant);
-    }
-
-    const assistantMessage = this.createAssistantMessage();
-    this.deps.state.addMessage(assistantMessage);
-    this.activeStreamingAssistantMessage = assistantMessage;
-    this.activateStreamingAssistantMessage(assistantMessage);
-    this.deps.streamController.showThinkingIndicator();
-  }
-
-  private shouldDiscardPendingAssistantPlaceholder(message: ChatMessage | null): boolean {
-    return this.awaitingProviderAssistantStart
-      && !!message
-      && !message.content.trim()
-      && (message.toolCalls?.length ?? 0) === 0
-      && (message.contentBlocks?.length ?? 0) === 0;
-  }
-
-  private discardStreamingAssistantMessage(messageId: string): void {
-    const { state, renderer } = this.deps;
-    state.messages = state.messages.filter((message) => message.id !== messageId);
-    renderer.removeMessage(messageId);
-    state.currentContentEl = null;
-    state.currentTextEl = null;
-    state.currentTextContent = '';
-    state.currentThinkingState = null;
-  }
 
   // ============================================
   // Title Generation
@@ -1471,10 +1464,17 @@ export class InputController {
    * Triggers AI title generation after first user message.
    * Handles setting fallback title, firing async generation, and updating UI.
    */
-  private async triggerTitleGeneration(): Promise<void> {
+  private async triggerTitleGeneration(pendingUserMessage: ChatMessage): Promise<void> {
     const { plugin, state, conversationController } = this.deps;
 
-    if (state.messages.length !== 1) {
+    // The first turn of a conversation, which is an empty `state.messages`:
+    // the projection draws the user's message once the coordinator has made it
+    // durable, so at this point it is not in state yet and the caller hands it
+    // over instead. The parameter used to be optional, for a second path where
+    // the message *was* already in state and the count meaning "first turn" was
+    // one higher. That path is gone and its branch was unreachable — one call
+    // site, always passing the message.
+    if (state.messages.length !== 0) {
       return;
     }
 
@@ -1491,7 +1491,7 @@ export class InputController {
     }
 
     // Find first user message by role (not by index)
-    const firstUserMsg = state.messages.find(m => m.role === 'user');
+    const firstUserMsg = pendingUserMessage ?? state.messages.find(m => m.role === 'user');
 
     if (!firstUserMsg) {
       return;
@@ -1565,7 +1565,16 @@ export class InputController {
     this.restorePendingSteerMessageToQueue();
     this.pauseQueue('cancelled');
     this.updateQueueIndicator();
-    this.getAgentService()?.cancel();
+    const projection = this.deps.getProjectionExecution?.() ?? null;
+    if (projection) {
+      // The kernel owns the run, so the stop request goes to it and the turn
+      // ends when the provider says it did — or when recovery establishes that
+      // it cannot say. Cancelling the runtime here as well would be a second
+      // opinion about a run this tab no longer drives.
+      void projection.cancel();
+    } else {
+      this.getAgentService()?.cancel();
+    }
     streamController.hideThinkingIndicator();
     streamController.stopTurnSilenceIndicator();
   }
@@ -2141,4 +2150,9 @@ export class InputController {
       }
     );
   }
+}
+
+/** The message a turn actually wrote, by the id it was written under. */
+function findMessage(messages: ChatMessage[], id: string | undefined): ChatMessage | undefined {
+  return id ? messages.find(message => message.id === id) : undefined;
 }

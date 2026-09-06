@@ -1,25 +1,24 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
-import type {
-  ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
-  ProviderWorkspaceRegistration,
-  ProviderWorkspaceServices,
-} from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderWorkspaceRegistration,
+} from '../../../providers/shared/providerHostContracts';
+import type {
+  ProviderModelCatalog,
+  ProviderWorkspaceServices,
+} from '../../../providers/shared/providerHostContracts';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { KimicodeAgentMentionProvider } from '../agents/KimicodeAgentMentionProvider';
 import { KimicodeCommandCatalog } from '../commands/KimicodeCommandCatalog';
-import { KimicodeChatRuntime } from '../runtime/KimicodeChatRuntime';
-import { KimicodeCliResolver } from '../runtime/KimicodeCliResolver';
+import { kimicodeCliResolver } from '../runtime/KimicodeCliResolver';
 import { getKimicodeProviderSettings } from '../settings';
 import { KimicodeAgentStorage } from '../storage/KimicodeAgentStorage';
 import { kimicodeSettingsTabRenderer } from '../ui/KimicodeSettingsTab';
 import { kimicodePlanUsageStore } from './KimicodePlanUsageStore';
-import { KimicodeRuntimeCommandLoader } from './KimicodeRuntimeCommandLoader';
+import { createKimicodeRuntimeCommandLoader } from './KimicodeRuntimeCommandLoader';
 
 export interface KimicodeWorkspaceServices extends ProviderWorkspaceServices {
   agentStorage: KimicodeAgentStorage;
@@ -30,13 +29,6 @@ export interface KimicodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpServerManager: McpServerManager;
 }
 
-const KIMICODE_METADATA_WARMUP_DB = ':memory:';
-
-const kimicodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'commands';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -67,7 +59,7 @@ function createKimicodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
           level: 'debug',
           scope: 'provider.kimicode',
         });
-        return false;
+        return 'skipped';
       }
 
       return refreshCache.refresh({
@@ -75,19 +67,14 @@ function createKimicodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
         force,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
         load: async () => {
-          const before = JSON.stringify(currentSettings.discoveredModels);
-          const runtime = new KimicodeChatRuntime(plugin);
-          try {
-            runtime.syncConversationState({
-              providerState: { databasePath: KIMICODE_METADATA_WARMUP_DB },
-              sessionId: null,
-            });
-            const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-            const after = JSON.stringify(getKimicodeProviderSettings(settings).discoveredModels);
-            return loaded && before !== after;
-          } finally {
-            runtime.cleanup();
-          }
+          // One isolated session, opened and closed: what the legacy runtime
+          // was doing here was opening a session and reading its reply.
+          //
+          // Its answer is whether the agent said anything, which is the question
+          // the surface asks. Whether the *list* changed is a different one, and
+          // a refresh that returns the same models did not fail.
+          const loaded = await plugin.getKimicodeExecution().metadata.discoverMetadata();
+          return loaded ? 'refreshed' : 'failed';
         },
       });
     },
@@ -118,14 +105,13 @@ export async function createKimicodeWorkspaceServices(
     agentStorage,
     agentMentionProvider,
     commandCatalog: new KimicodeCommandCatalog(vaultAdapter),
-    cliResolver: new KimicodeCliResolver(),
+    cliResolver: kimicodeCliResolver(),
     modelCatalog: createKimicodeModelCatalog(plugin),
     mcpStorage,
     mcpServerManager,
     usageProvider: kimicodePlanUsageStore,
-    runtimeCommandLoader: new KimicodeRuntimeCommandLoader(),
+    runtimeCommandLoader: createKimicodeRuntimeCommandLoader(plugin),
     settingsTabRenderer: kimicodeSettingsTabRenderer,
-    tabWarmupPolicy: kimicodeTabWarmupPolicy,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
     },
@@ -133,16 +119,12 @@ export async function createKimicodeWorkspaceServices(
 }
 
 export const kimicodeWorkspaceRegistration: ProviderWorkspaceRegistration<KimicodeWorkspaceServices> = {
-  workspaceCapabilities: {
-    skills: { inventory: 'managed', manager: 'managed' },
-    commands: { inventory: 'readonly', manager: 'managed', runtimeCommandDiscovery: 'ephemeral' },
-    agents: { inventory: 'managed', manager: 'managed' },
-    mcp: { inventory: 'managed', manager: 'managed' },
-    environment: { inventory: 'managed', manager: 'managed' },
-  },
   initialize: async ({ plugin, vaultAdapter }) => createKimicodeWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetKimicodeWorkspaceServices(): KimicodeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('kimicode') as KimicodeWorkspaceServices | null;
+export function maybeGetKimicodeWorkspaceServices(
+  plugin: GrimoirePlugin,
+): KimicodeWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('kimicode') as KimicodeWorkspaceServices | null ?? null;
 }

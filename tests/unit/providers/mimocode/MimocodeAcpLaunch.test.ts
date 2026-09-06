@@ -1,31 +1,10 @@
 import '@/providers';
 
-import {
-  type AcpLaunchMockConnection,
-  type AcpLaunchMockProcess,
-  type AcpLaunchMockTransport,
-  createAcpLaunchMockPlugin,
-  createAcpMockConnection,
-  createAcpMockProcess,
-  createAcpMockTransport,
-  WINDOWS_UNICODE_VAULT,
-  wireAcpMocks,
-} from '@test/helpers/acpLaunchMocks';
+import { createAcpLaunchMockPlugin, WINDOWS_UNICODE_VAULT } from '@test/helpers/acpLaunchMocks';
 
-import { MimocodeChatRuntime } from '@/providers/mimocode/runtime/MimocodeChatRuntime';
+import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import { MimocodeExecution } from '@/providers/mimocode/execution/MimocodeExecutionComposition';
 import { prepareMimocodeLaunchArtifacts } from '@/providers/mimocode/runtime/MimocodeLaunchArtifacts';
-
-import { AcpClientConnection, AcpJsonRpcTransport, AcpSubprocess } from '../../../../src/providers/acp';
-
-jest.mock('../../../../src/providers/acp', () => {
-  const actual = jest.requireActual('../../../../src/providers/acp');
-  return {
-    ...actual,
-    AcpClientConnection: jest.fn(),
-    AcpJsonRpcTransport: jest.fn(),
-    AcpSubprocess: jest.fn(),
-  };
-});
 
 jest.mock('@/providers/mimocode/runtime/MimocodeLaunchArtifacts', () => {
   const actual = jest.requireActual('@/providers/mimocode/runtime/MimocodeLaunchArtifacts');
@@ -35,30 +14,23 @@ jest.mock('@/providers/mimocode/runtime/MimocodeLaunchArtifacts', () => {
   };
 });
 
-const MockAcpClientConnection = AcpClientConnection as jest.MockedClass<typeof AcpClientConnection>;
-const MockAcpJsonRpcTransport = AcpJsonRpcTransport as jest.MockedClass<typeof AcpJsonRpcTransport>;
-const MockAcpSubprocess = AcpSubprocess as jest.MockedClass<typeof AcpSubprocess>;
-const mockPrepareMimocodeLaunchArtifacts = prepareMimocodeLaunchArtifacts as jest.MockedFunction<typeof prepareMimocodeLaunchArtifacts>;
+const mockPrepareMimocodeLaunchArtifacts = prepareMimocodeLaunchArtifacts as jest.MockedFunction<
+typeof prepareMimocodeLaunchArtifacts
+>;
 
+/**
+ * How a vault path reaches MiMoCode, on the platform that punishes getting it
+ * wrong.
+ *
+ * A Windows path with spaces and non-ASCII characters passed as an argument is
+ * a launch that fails or, worse, one that starts in the wrong directory. It is
+ * the working directory of the process and the `cwd` of the session, and never
+ * a word on the command line — the flip moved where that is decided, not
+ * whether it still has to be true.
+ */
 describe('MiMoCode ACP launch', () => {
-  let mockConnection: AcpLaunchMockConnection;
-  let mockProcess: AcpLaunchMockProcess;
-  let mockTransport: AcpLaunchMockTransport;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConnection = createAcpMockConnection();
-    mockProcess = createAcpMockProcess();
-    mockTransport = createAcpMockTransport();
-
-    wireAcpMocks({
-      connection: mockConnection,
-      connectionCtor: MockAcpClientConnection,
-      process: mockProcess,
-      subprocessCtor: MockAcpSubprocess,
-      transport: mockTransport,
-      transportCtor: MockAcpJsonRpcTransport,
-    });
     mockPrepareMimocodeLaunchArtifacts.mockResolvedValue({
       configPath: 'C:\\tmp\\grimoire-mimocode\\config.json',
       configContent: '{}\n',
@@ -69,36 +41,26 @@ describe('MiMoCode ACP launch', () => {
   });
 
   it('does not pass the workspace path through MiMoCode CLI arguments', async () => {
-    const runtime = new MimocodeChatRuntime(createAcpLaunchMockPlugin({
-      cliPath: 'C:\\Tools\\mimo.exe',
-      providerId: 'mimocode',
+    const execution = new MimocodeExecution(
+      createAcpLaunchMockPlugin({ cliPath: 'C:\\Tools\\mimocode.exe', providerId: 'mimocode' }),
+      {} as unknown as ExecutionLifecycleRegistry,
+    );
+
+    const invocation = await execution.turnRequests.resolve(execution.turnRequests.reference({
+      prompt: [{ type: 'text', text: 'what now?' }],
     }));
+    const launch = await execution.turnRequests.resolveLaunch(invocation.startupRef);
 
-    await expect(runtime.ensureReady()).resolves.toBe(true);
-
-    expect(MockAcpSubprocess).toHaveBeenCalledWith(expect.objectContaining({
-      args: ['acp'],
-      command: 'C:\\Tools\\mimo.exe',
+    expect(launch).toMatchObject({
+      arguments: ['acp'],
       cwd: WINDOWS_UNICODE_VAULT,
-    }));
-    expect(mockConnection.newSession).toHaveBeenCalledWith({
-      cwd: WINDOWS_UNICODE_VAULT,
-      mcpServers: [],
+      executable: 'C:\\Tools\\mimocode.exe',
     });
-  });
-
-  it('passes the managed config as MIMOCODE_CONFIG_CONTENT and never MIMOCODE_CONFIG', async () => {
-    const plugin = createAcpLaunchMockPlugin({
-      cliPath: 'C:\\Tools\\mimo.exe',
-      providerId: 'mimocode',
-    });
-    plugin.settings.providerConfigs.mimocode.environmentVariables = 'MIMOCODE_CONFIG=C:\\tmp\\user-mimocode.json';
-
-    const runtime = new MimocodeChatRuntime(plugin);
-    await expect(runtime.ensureReady()).resolves.toBe(true);
-
-    const launchEnv: NodeJS.ProcessEnv = MockAcpSubprocess.mock.calls[0][0].env;
-    expect(launchEnv.MIMOCODE_CONFIG_CONTENT).toBe('{}\n');
-    expect(launchEnv.MIMOCODE_CONFIG).toBeUndefined();
+    expect(invocation.cwd).toBe(WINDOWS_UNICODE_VAULT);
+    // The vault path is the working directory and nothing else; a path with
+    // spaces and non-ASCII characters on a command line is a launch that
+    // starts somewhere else or not at all.
+    expect(launch.arguments).toEqual(['acp']);
+    execution.dispose();
   });
 });

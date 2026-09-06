@@ -1,0 +1,142 @@
+{
+  "_note": [
+    "Exports no other module in src/ takes: the baseline this gate holds the line at.",
+    "What the gate is for is the entry that is NOT here: a symbol added with tests and",
+    "no caller, which is what the main sync produced three times.",
+    "",
+    "The 50 left are what a deletion pass decided to keep, and they fall in four kinds.",
+    "1. Recorded orphans with an owner. ContextIngestionService and",
+    "   acp/history/sqliteModule are in tests/unit/architecture/presentationParityManifest.ts",
+    "   with a reason and an owner outside this migration. Check that manifest before",
+    "   deleting anything here - one of them was deleted and restored for this reason.",
+    "2. Exported so a test can reach them, deliberately. classifyForPresentation says so",
+    "   in its own doc comment; resetAntigravityCliCapabilitiesCache is how a test isolates",
+    "   a module cache. Removing either makes a test worse, not the source better.",
+    "3. Shapes: types re-exported by a barrel, and the Codex app-server wire types kept as",
+    "   documentation of a protocol. Deletable, and each needs a reader who knows whether",
+    "   the shape is still the wire's.",
+    "4. Helpers with no caller that may be lost wiring rather than dead code. This",
+    "   migration has already found one of those - a normalizer deleted as dead that two",
+    "   providers needed - so each wants reading, not a sweep.",
+    "",
+    "Removing an entry is always allowed. Adding one needs a reason in the commit."
+  ],
+  "modules": {
+    "src/core/agents/AgentFidelity.ts": [
+      "agentFidelityFromCapabilities"
+    ],
+    "src/core/agents/AgentPolicy.ts": [
+      "approveAgentPermission"
+    ],
+    "src/core/context/ContextIngestionService.ts": [
+      "ContextIngestionService",
+      "MarkdownIngestor",
+      "PdfIngestor"
+    ],
+    "src/core/conversations/ConversationRepository.ts": [
+      "RevisionConflictError"
+    ],
+    "src/core/runtime/QueuedTurn.ts": [
+      "mergeQueuedChatTurns"
+    ],
+    "src/core/runtime/execution/ExecutionChatRuntimeAdapter.ts": [
+      "classifyForPresentation"
+    ],
+    "src/core/security/ApprovalManager.ts": [
+      "matchesRulePattern"
+    ],
+    "src/core/tools/todo.ts": [
+      "extractLastTodosFromMessages"
+    ],
+    "src/core/tools/toolInput.ts": [
+      "getPathFromToolInput"
+    ],
+    "src/core/types/index.ts": [
+      "AskUserQuestionOption",
+      "ChatTurnFailureChunk",
+      "DiffLine",
+      "DiffStats",
+      "HostnameCliPaths",
+      "McpConfigFile",
+      "PermissionMode",
+      "StructuredPatchHunk",
+      "SubagentMode",
+      "TabBarPosition"
+    ],
+    "src/features/chat/projections/ChatProjection.ts": [
+      "hasMissingRequiredResult"
+    ],
+    "src/features/chat/rendering/ThinkingBlockRenderer.ts": [
+      "appendThinkingContent"
+    ],
+    "src/features/chat/state/types.ts": [
+      "SubagentInfo"
+    ],
+    "src/features/chat/tabs/tabSettings.ts": [
+      "hasStartedConversation",
+      "TabCreateOptions"
+    ],
+    "src/core/attachments/imageScaling.ts": [
+      "shouldRescale"
+    ],
+    "src/features/chat/ui/imageViewerStack.ts": [
+      "resetOpenImageViewers"
+    ],
+    "src/i18n/constants.ts": [
+      "DEFAULT_LOCALE",
+      "getLocaleDisplayString"
+    ],
+    "src/providers/acp/history/sqliteModule.ts": [
+      "loadNodeSqliteModule"
+    ],
+    "src/providers/antigravity/execution/AntigravityExecutionBackend.ts": [
+      "AntigravityResultCommitOutcome"
+    ],
+    "src/providers/antigravity/runtime/AntigravityCliCapabilities.ts": [
+      "resetAntigravityCliCapabilitiesCache"
+    ],
+    "src/providers/claude/ClaudeProviderModule.ts": [
+      "ClaudeDiscoveredModel"
+    ],
+    "src/providers/claude/runtime/types.ts": [
+      "createResponseHandler",
+      "isTurnCompleteMessage"
+    ],
+    "src/providers/claude/sdk/messages.ts": [
+      "SDKMessage"
+    ],
+    "src/providers/claude/sdk/toolResultContent.ts": [
+      "ToolResultContentOptions"
+    ],
+    "src/providers/claude/types/settings.ts": [
+      "DEFAULT_SETTINGS",
+      "parseCCPermissionRule"
+    ],
+    "src/providers/codex/execution/NodeCodexExecutionProcess.ts": [
+      "NodeCodexExecutionProcessFactory"
+    ],
+    "src/providers/codex/runtime/codexAppServerTypes.ts": [
+      "CommandExecutionApprovalResponse",
+      "FileChangeApprovalResponse",
+      "PermissionsApprovalResponse",
+      "TurnSteerParams",
+      "UserInputResponse"
+    ],
+    "src/providers/codex/types/models.ts": [
+      "DEFAULT_CODEX_PRIMARY_MODEL_LABEL"
+    ],
+    "src/providers/grok/runtime/grokDebugLog.ts": [
+      "grokAuthPathExists",
+      "summarizeGrokCliText"
+    ],
+    "src/utils/context.ts": [
+      "stripCurrentNoteContext"
+    ],
+    "src/utils/externalContext.ts": [
+      "isValidDirectoryPath"
+    ],
+    "src/utils/session.ts": [
+      "isSessionExpiredError"
+    ]
+  }
+}

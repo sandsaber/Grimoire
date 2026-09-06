@@ -1,7 +1,9 @@
 import '@/providers';
 
-import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
-import type { Conversation, SessionMetadata, UsageInfo } from '@/core/types';
+import { createDurableInMemoryVaultAdapter } from '@test/helpers/inMemoryVaultAdapter';
+import { createPassthroughDurableStorage } from '@test/helpers/passthroughDurableStorage';
+
+import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import {
   applyAssistantResponseMetadataToMessages,
   applyVaultSearchContextsToMessages,
@@ -9,7 +11,9 @@ import {
   LEGACY_SESSIONS_PATH,
   SESSIONS_PATH,
   SessionStorage,
-} from '@/providers/claude/storage/SessionStorage';
+} from '@/core/bootstrap/SessionStorage';
+import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
+import type { Conversation, SessionMetadata, UsageInfo } from '@/core/types';
 
 describe('SessionStorage', () => {
   let mockAdapter: jest.Mocked<VaultFileAdapter>;
@@ -23,8 +27,15 @@ describe('SessionStorage', () => {
       delete: jest.fn(),
       listFiles: jest.fn(),
     } as unknown as jest.Mocked<VaultFileAdapter>;
+    // Absence reported the way the real adapters report it. A bare `jest.fn()`
+    // resolves `undefined`, which is neither a file nor the absence of one —
+    // and a store that reads it back gets "undefined is not valid JSON", which
+    // reads as a damaged conversation rather than a missing one.
+    mockAdapter.read.mockRejectedValue(new Error('file not found'));
+    mockAdapter.exists.mockResolvedValue(false);
+    mockAdapter.listFiles.mockResolvedValue([]);
 
-    storage = new SessionStorage(mockAdapter);
+    storage = new SessionStorage(mockAdapter, createPassthroughDurableStorage(mockAdapter));
   });
 
   describe('SESSIONS_PATH', () => {
@@ -59,8 +70,10 @@ describe('SessionStorage', () => {
         expect.any(String)
       );
 
+      // The conversation now travels inside a record envelope, in the same file
+      // under the same name. What is asserted is the conversation.
       const writtenContent = mockAdapter.write.mock.calls[0][1];
-      const parsed = JSON.parse(writtenContent);
+      const parsed = JSON.parse(writtenContent).payload;
 
       expect(parsed.id).toBe('session-456');
       expect(parsed.title).toBe('Test Session');
@@ -92,7 +105,7 @@ describe('SessionStorage', () => {
       await storage.saveMetadata(metadata);
 
       const writtenContent = mockAdapter.write.mock.calls[0][1];
-      const parsed = JSON.parse(writtenContent);
+      const parsed = JSON.parse(writtenContent).payload;
 
       expect(parsed.externalContextPaths).toEqual(['/path/to/external']);
       expect(parsed.enabledMcpServers).toEqual(['server1', 'server2']);
@@ -117,10 +130,17 @@ describe('SessionStorage', () => {
         updatedAt: 1700001000,
       };
 
-      mockAdapter.exists.mockImplementation(async (path: string) => (
-        path === `${LEGACY_SESSIONS_PATH}/session-legacy.meta.json`
-      ));
-      mockAdapter.read.mockResolvedValue(JSON.stringify(metadata));
+      // Only the legacy file is there, and a real adapter says so by failing
+      // the read of the one that is not — the `exists` mock alone left the
+      // double answering for a file it had just said did not exist.
+      const legacyPath = `${LEGACY_SESSIONS_PATH}/session-legacy.meta.json`;
+      mockAdapter.exists.mockImplementation(async (path: string) => path === legacyPath);
+      mockAdapter.read.mockImplementation(async (path: string) => {
+        if (path !== legacyPath) {
+          throw new Error(`ENOENT: ${path}`);
+        }
+        return JSON.stringify(metadata);
+      });
 
       const result = await storage.loadMetadata('session-legacy');
 
@@ -200,6 +220,31 @@ describe('SessionStorage', () => {
     });
   });
 
+  describe('listMetadata recovery', () => {
+    it('finds a conversation whose last write was interrupted mid-rename', async () => {
+      // `writeAtomic` renames the live file to `.backup` before it renames the
+      // pending one into place. A crash inside that window leaves no
+      // `x.meta.json` at all, and nothing else in the product ever asks for an
+      // id it did not first see listed — so listing through the adapter made
+      // the conversation invisible for good, which is the failure the durable
+      // path exists to prevent.
+      const adapter = createDurableInMemoryVaultAdapter({
+        [`${SESSIONS_PATH}/interrupted.meta.json.backup`]: JSON.stringify({
+          id: 'interrupted',
+          title: 'Interrupted',
+          createdAt: 1,
+          updatedAt: 2,
+        }),
+      });
+      const recovering = new SessionStorage(adapter, new VaultDurableStorage(adapter));
+
+      const metas = await recovering.listMetadata();
+
+      expect(metas.map(meta => meta.id)).toEqual(['interrupted']);
+      expect(adapter.files.has(`${SESSIONS_PATH}/interrupted.meta.json`)).toBe(true);
+    });
+  });
+
   describe('listAllConversations - provider routing', () => {
     it('preserves providerId from metadata', async () => {
       mockAdapter.listFiles.mockResolvedValue([
@@ -269,6 +314,85 @@ describe('SessionStorage', () => {
       }));
 
       await expect(storage.listAllConversations()).resolves.toEqual([]);
+    });
+  });
+
+  describe('toConversation', () => {
+    it('gives a conversation back the way the plugin loads one', async () => {
+      // The projection the plugin applies to every conversation it loads and
+      // the execution path applies to the one a turn is running on. Two copies
+      // of it means a conversation means one thing to a tab and another to the
+      // turn inside it.
+      const conversation: Conversation = {
+        id: 'conv-projection',
+        providerId: 'claude',
+        title: 'Tomatoes',
+        createdAt: 1,
+        updatedAt: 2,
+        lastResponseAt: 3,
+        sessionId: 'sdk-session',
+        model: 'a-model',
+        providerState: { providerSessionId: 'active-session' },
+        messages: [{ id: 'msg-1', role: 'user', content: 'Hi', timestamp: 1 }],
+        currentNote: 'Note.md',
+        externalContextPaths: ['/tmp/context'],
+        enabledMcpServers: ['server-1'],
+        orchestratorMode: true,
+        usage: {
+          inputTokens: 10,
+          contextWindow: 200_000,
+          contextTokens: 10,
+          percentage: 1,
+        },
+        titleGenerationStatus: 'success',
+        resumeAtMessageId: 'msg-1',
+      };
+
+      const restored = storage.toConversation(storage.toSessionMetadata(conversation), 'codex');
+
+      expect(restored).toMatchObject(conversation);
+      // Rebuilt from the messages rather than carried, which is what
+      // `toSessionMetadata` does with them: these messages have none.
+      expect(restored.vaultSearchContexts).toBeUndefined();
+      expect(restored.assistantResponseMetadata).toBeUndefined();
+    });
+
+    it('resumes a conversation with no binding under its own id', async () => {
+      // How every conversation written before the field existed still resumes.
+      const restored = storage.toConversation({
+        id: 'conv-legacy',
+        title: 'Older',
+        createdAt: 1,
+        updatedAt: 1,
+      }, 'claude');
+
+      expect(restored.sessionId).toBe('conv-legacy');
+      // `undefined` and `null` are different answers: the second is a binding
+      // that was deliberately cleared, and reviving it would resume a session
+      // the provider was told to forget.
+      expect(storage.toConversation({
+        id: 'conv-cleared',
+        title: 'Cleared',
+        createdAt: 1,
+        updatedAt: 1,
+        sessionId: null,
+      }, 'claude').sessionId).toBeNull();
+    });
+
+    it('takes the caller\'s provider only where the record names none', () => {
+      expect(storage.toConversation({
+        id: 'conv-1',
+        title: 'Older',
+        createdAt: 1,
+        updatedAt: 1,
+      }, 'codex').providerId).toBe('codex');
+      expect(storage.toConversation({
+        id: 'conv-2',
+        providerId: 'claude',
+        title: 'Newer',
+        createdAt: 1,
+        updatedAt: 1,
+      }, 'codex').providerId).toBe('claude');
     });
   });
 
@@ -397,9 +521,36 @@ describe('SessionStorage', () => {
 
   describe('deleteMetadata', () => {
     it('deletes the meta.json file', async () => {
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        schemaVersion: 1,
+        recordId: 'session-del',
+        revision: 3,
+        updatedAt: 1,
+        payload: { id: 'session-del', title: 'Doomed', createdAt: 1, updatedAt: 1 },
+      }));
+
       await storage.deleteMetadata('session-del');
 
       expect(mockAdapter.delete).toHaveBeenCalledWith('.grimoire/sessions/session-del.meta.json');
+    });
+
+    it('deletes a conversation whatever revision it reached', async () => {
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        schemaVersion: 1,
+        recordId: 'session-del',
+        revision: 12,
+        updatedAt: 1,
+        payload: { id: 'session-del', title: 'Doomed', createdAt: 1, updatedAt: 1 },
+      }));
+
+      // A user deleting a conversation is not racing themselves for a newer
+      // version of something they asked to be gone.
+      await expect(storage.deleteMetadata('session-del')).resolves.toBeUndefined();
+      expect(mockAdapter.delete).toHaveBeenCalledWith('.grimoire/sessions/session-del.meta.json');
+    });
+
+    it('is quiet about a conversation that is not there', async () => {
+      await expect(storage.deleteMetadata('session-gone')).resolves.toBeUndefined();
     });
   });
 

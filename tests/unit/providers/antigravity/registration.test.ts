@@ -1,8 +1,12 @@
 import '@/providers';
 
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
+import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
+
+import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
+import { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { antigravityWorkspaceRegistration } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
-import { AntigravityChatRuntime } from '@/providers/antigravity/runtime/AntigravityChatRuntime';
+import { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
 import { discoverAntigravityModels } from '@/providers/antigravity/runtime/AntigravityModelDiscovery';
 import {
   getAntigravityProviderSettings,
@@ -19,30 +23,50 @@ describe('Antigravity provider registration', () => {
   });
 
   it('registers Antigravity as an opt-in provider', () => {
-    expect(ProviderRegistry.getRegisteredProviderIds()).toContain('antigravity');
-    expect(ProviderRegistry.getProviderDisplayName('antigravity')).toBe('Antigravity');
-    expect(ProviderRegistry.isEnabled('antigravity', {})).toBe(false);
+    expect(providerCatalog().ids()).toContain('antigravity');
+    expect(providerCatalog().displayName('antigravity')).toBe('Antigravity');
+    expect(providerCatalog().isEnabled({}, 'antigravity')).toBe(false);
 
     const settings: Record<string, unknown> = {};
     updateAntigravityProviderSettings(settings, { enabled: true });
-    expect(ProviderRegistry.isEnabled('antigravity', settings)).toBe(true);
+    expect(providerCatalog().isEnabled(settings, 'antigravity')).toBe(true);
   });
 
-  it('creates an Antigravity runtime through the provider registry', () => {
-    const runtime = ProviderRegistry.createChatRuntime({
-      plugin: {} as any,
-      providerId: 'antigravity',
+  it('creates a kernel-backed Antigravity runtime through the provider registry', () => {
+    // The flip, asked of the composition rather than of a registration whose
+    // factory reached the same composition through the plugin. A runtime that
+    // is not a client of the execution kernel means chat execution never left
+    // the legacy path, which no other assertion in this file would notice.
+    const host = new ExecutionKernelHost({
+      storage: new TestDurableStorage(),
+      scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
     });
+    const plugin = { settings: {} } as any;
+    plugin.getAntigravityExecution = () => new AntigravityExecution(plugin, host.registry);
 
-    expect(runtime).toBeInstanceOf(AntigravityChatRuntime);
+    const runtime = plugin.getAntigravityExecution().createRuntime();
+
+    expect(runtime).toBeInstanceOf(ExecutionChatRuntimeAdapter);
     expect(runtime.providerId).toBe('antigravity');
+    // 'none', because nothing in the print path reads an effort level. A
+    // declaration is a promise to the toolbar, and this one had nothing behind
+    // it.
+    expect(runtime.getCapabilities().reasoningControl).toBe('none');
   });
 
   it('advertises image attachments so the chat input accepts pasted images', () => {
-    const runtime = ProviderRegistry.createChatRuntime({
-      plugin: {} as any,
-      providerId: 'antigravity',
+    // Written against the catalog rather than a registry: `main` asked
+    // `ProviderRegistry.createChatRuntime`, and both registries are deleted on
+    // this branch. The capability now projects from the module descriptor,
+    // where this provider declares `imageAttachments: 'grimoire'` — agy has no
+    // image flag, so Grimoire writes the temp files and names their paths in
+    // the prompt.
+    const host = new ExecutionKernelHost({
+      storage: new TestDurableStorage(),
+      scheduler: { setTimeout: () => undefined, clearTimeout: () => undefined },
     });
+    const plugin = { settings: {} } as any;
+    const runtime = new AntigravityExecution(plugin, host.registry).createRuntime();
 
     // This flag is what gates ImageContextManager: with it false, paste and
     // drop are refused before the runtime is ever asked.
@@ -180,7 +204,7 @@ describe('Antigravity provider registration', () => {
 
     const changed = await services.modelCatalog.refreshModels({ plugin: {} as any, settings });
 
-    expect(changed).toBe(false);
+    expect(changed).toBe('skipped');
     expect(discoverAntigravityModels).not.toHaveBeenCalled();
     expect(recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
@@ -218,10 +242,10 @@ describe('Antigravity provider registration', () => {
 
       // Past the former ten-minute window, with no reload in between.
       jest.advanceTimersByTime(60 * 60 * 1000);
-      await expect(services.modelCatalog.refreshModels({ plugin, settings })).resolves.toBe(false);
+      await expect(services.modelCatalog.refreshModels({ plugin, settings })).resolves.toBe('skipped');
       expect(discoverAntigravityModels).not.toHaveBeenCalled();
 
-      await expect(services.modelCatalog.refreshModels({ force: true, plugin, settings })).resolves.toBe(true);
+      await expect(services.modelCatalog.refreshModels({ force: true, plugin, settings })).resolves.toBe('refreshed');
       expect(discoverAntigravityModels).toHaveBeenCalledTimes(1);
     } finally {
       jest.useRealTimers();

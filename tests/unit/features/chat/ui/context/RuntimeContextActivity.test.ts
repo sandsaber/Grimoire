@@ -15,14 +15,14 @@ describe('RuntimeContextActivity', () => {
       toolCall: {
         id: 'tool-1',
         name: 'Read',
-        input: { file_path: 'Книги/Book/CLAUDE.md' },
+        input: { file_path: 'Books/Book/CLAUDE.md' },
         status: 'completed',
       },
     });
 
     expect(event).toMatchObject({
       id: 'tool-1',
-      path: 'Книги/Book/CLAUDE.md',
+      path: 'Books/Book/CLAUDE.md',
       providerId: 'claude',
       method: 'read note',
       status: 'loaded',
@@ -35,14 +35,14 @@ describe('RuntimeContextActivity', () => {
       toolCall: {
         id: 'tool-2',
         name: 'Bash',
-        input: { command: "sed -n '1,120p' 'Книги/Book/Глава 2.md'" },
+        input: { command: "sed -n '1,120p' 'Books/Book/Chapter 2.md'" },
         status: 'completed',
       },
     });
 
     expect(event).toMatchObject({
       id: 'tool-2',
-      path: 'Книги/Book/Глава 2.md',
+      path: 'Books/Book/Chapter 2.md',
       providerId: 'codex',
       method: 'shell',
       status: 'loaded',
@@ -55,13 +55,13 @@ describe('RuntimeContextActivity', () => {
       toolCall: {
         id: 'tool-3',
         name: 'Bash',
-        input: { command: "cat Книги/Book/AGENTS.md" },
+        input: { command: "cat Books/Book/AGENTS.md" },
         status: 'running',
       },
     });
 
     expect(event).toMatchObject({
-      path: 'Книги/Book/AGENTS.md',
+      path: 'Books/Book/AGENTS.md',
       method: 'shell',
       status: 'loading',
     });
@@ -91,14 +91,14 @@ describe('RuntimeContextActivity', () => {
       toolCall: {
         id: 'tool-4b',
         name: 'Bash',
-        input: { command: "sed -n '1,260p' 'Книги/CLAUDE.md' && git status --short" },
+        input: { command: "sed -n '1,260p' 'Books/CLAUDE.md' && git status --short" },
         status: 'error',
-        result: '# CLAUDE.md -- Книги\n\nИнструкции для работы с книгами.\n\nfatal: not a git repository',
+        result: '# CLAUDE.md -- Books\n\nInstructions for working with books.\n\nfatal: not a git repository',
       },
     });
 
     expect(event).toMatchObject({
-      path: 'Книги/CLAUDE.md',
+      path: 'Books/CLAUDE.md',
       method: 'shell',
       status: 'loaded',
     });

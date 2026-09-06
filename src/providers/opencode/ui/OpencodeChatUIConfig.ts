@@ -1,9 +1,11 @@
 import type {
-  ProviderChatUIConfig,
   ProviderPermissionModeToggleConfig,
   ProviderReasoningOption,
   ProviderUIOption,
 } from '../../../core/providers/types';
+import type {
+  ProviderChatUIConfig,
+} from '../../../providers/shared/providerHostContracts';
 import { OPENCODE_PROVIDER_ICON } from '../../../shared/icons';
 import {
   buildOpencodeBaseModels,
@@ -18,7 +20,6 @@ import {
   resolveOpencodeModeForPermissionMode,
   resolvePermissionModeForManagedOpencodeMode,
 } from '../modes';
-import { OpencodeChatRuntime } from '../runtime/OpencodeChatRuntime';
 import { getOpencodeProviderSettings, updateOpencodeProviderSettings } from '../settings';
 
 const OPENCODE_MODELS: ProviderUIOption[] = [
@@ -31,7 +32,6 @@ const OPENCODE_FALLBACK_THINKING_OPTIONS: ProviderReasoningOption[] = [
 ];
 const OPENCODE_FALLBACK_THINKING_DEFAULT = 'high';
 const DEFAULT_CONTEXT_WINDOW = 200_000;
-const OPENCODE_METADATA_WARMUP_DB = ':memory:';
 const OPENCODE_PERMISSION_MODE_TOGGLE: ProviderPermissionModeToggleConfig = {
   inactiveValue: 'normal',
   inactiveLabel: 'Safe',
@@ -183,17 +183,12 @@ export const opencodeChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    const runtime = new OpencodeChatRuntime(context.plugin);
     try {
-      runtime.syncConversationState({
-        providerState: { databasePath: OPENCODE_METADATA_WARMUP_DB },
-        sessionId: null,
-      });
-      await runtime.warmModelMetadata(model);
+      // Opportunistic: the first real turn discovers the same thing if this
+      // session cannot open, or if the kernel has not started yet.
+      await context.plugin.getOpencodeExecution().metadata.discoverMetadata({ rawModelId });
     } catch {
-      // Metadata warmup is opportunistic; the first real turn can still discover it.
-    } finally {
-      runtime.cleanup();
+      // Metadata warmup never blocks the toolbar.
     }
   },
 

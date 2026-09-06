@@ -30,19 +30,3 @@ export function buildGrokRuntimeEnv(
     PATH: getEnhancedPath(envVars.PATH, cliPath || undefined),
   };
 }
-
-export function resolveGrokProviderAuthPath(
-  settings: Record<string, unknown>,
-  runtimeEnv?: NodeJS.ProcessEnv,
-): string {
-  if (typeof runtimeEnv?.GROK_AUTH_PATH === 'string' && runtimeEnv.GROK_AUTH_PATH.trim()) {
-    return runtimeEnv.GROK_AUTH_PATH.trim();
-  }
-
-  const envText = getRuntimeEnvironmentText(settings, 'grok');
-  const envVars = parseEnvironmentVariables(envText);
-  return resolveGrokAuthPath({
-    ...process.env,
-    ...envVars,
-  });
-}

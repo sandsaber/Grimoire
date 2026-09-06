@@ -19,7 +19,8 @@
     "disabled": "Deshabilitado",
     "platform": "Plataforma",
     "refresh": "Actualizar",
-    "rewind": "Rebobinar"
+    "rewind": "Rebobinar",
+    "close": "Cerrar"
   },
   "chat": {
     "rewind": {
@@ -37,6 +38,14 @@
       "cannot": "No se puede rebobinar: {error}",
       "unavailableStreaming": "No se puede rebobinar durante la transmisión",
       "unavailableNoUuid": "No se puede rebobinar: faltan identificadores de mensaje"
+    },
+    "agents": {
+      "runningCount": "{count} en segundo plano",
+      "finished": "Trabajo en segundo plano",
+      "finishedOne": "completado",
+      "failedOne": "con error",
+      "runningOne": "en curso",
+      "unobservable": "en curso, sin informe de progreso"
     },
     "history": {
       "deleteAll": "Eliminar todo",
@@ -77,16 +86,17 @@
     "orchestrator": {
       "planTitle": "Tareas independientes para esta nota",
       "planEyebrow": "Trabajadores en paralelo",
-      "planSummary": "Se prepararon {count} tareas independientes. Cada una se ejecuta en su propia pestaña y no comparte contexto ni resultados con las demás.",
+      "planSummary": "Se prepararon {count} tareas independientes. Cada una se ejecuta como trabajo en segundo plano en su propio chat y no comparte contexto ni resultados con las demás.",
       "badge": "Trabajadores en paralelo",
       "workerCount": "{count} de {total} seleccionadas",
-      "spawnWorkers": "Abrir pestañas de trabajadores",
+      "spawnWorkers": "Iniciar trabajo en segundo plano",
       "parallel": "Independiente",
       "toggleTask": "Incluir tarea: {task}",
-      "workerTabsHint": "Un trabajador independiente por pestaña · sin contexto compartido",
+      "workerTabsHint": "Un trabajador independiente cada una · sin contexto compartido",
       "toggleTitle": "Trabajadores en paralelo",
       "toggleAriaLabel": "Alternar trabajadores en paralelo",
-      "toggleFailed": "No se pudieron alternar los trabajadores en paralelo"
+      "toggleFailed": "No se pudieron alternar los trabajadores en paralelo",
+      "dispatchFailed": "No se pudo iniciar parte del trabajo en segundo plano."
     },
     "vaultSearch": {
       "toolName": "Búsqueda en la bóveda",
@@ -398,6 +408,9 @@
       "messages": {
         "interrupted": "Interrumpido",
         "interruptedHint": "· ¿Qué debería hacer Grimoire en su lugar?",
+        "historyUnavailable": "Los mensajes anteriores de esta conversación ya no están disponibles: el proveedor ya no conserva la sesión en la que se guardaron.",
+        "historyPartial": "No se pudo cargar parte de esta conversación, por lo que pueden faltar algunos mensajes anteriores.",
+        "historyUnreadable": "No se pudieron leer los mensajes anteriores de esta conversación, por lo que lo que sigue puede estar incompleto.",
         "conversationCompacted": "Conversación compactada",
         "sessionRestarted": "Nueva sesión",
         "sessionRestartedHint": "El agente no pudo restaurar la sesión anterior, así que esta conversación continúa en una nueva. Los mensajes de arriba no están en su contexto: repite lo que siga haciendo falta o empieza de nuevo en otra pestaña.",
@@ -407,7 +420,16 @@
         "renderFailed": "No se pudo renderizar el contenido del mensaje.",
         "copyMessage": "Copiar mensaje",
         "copyResponse": "Copiar respuesta",
-        "awaitingYou": "Esperando tu respuesta"
+        "awaitingYou": "Esperando tu respuesta",
+        "noticeBlocked": "Bloqueado",
+        "noticeLabel": "Aviso",
+        "errorLabel": "Error",
+        "queuedPrefix": "En cola",
+        "steeringPrefix": "Dirigiendo",
+        "newChatTitle": "Nuevo chat",
+        "closeImage": "Cerrar imagen",
+        "viewFullImage": "Ver imagen a tamaño completo",
+        "copyCode": "Copiar código"
       },
       "errors": {
         "generic": "Error: {message}",
@@ -426,7 +448,6 @@
           "startFailed": "No se pudo iniciar {provider}. Comprueba la ruta de la CLI y el estado de inicio de sesión.",
           "notReady": "El entorno de ejecución de {provider} no está listo.",
           "sessionCreateFailed": "No se pudo crear una sesión para {provider}.",
-          "sessionResumeFailed": "No se pudo reanudar la sesión anterior de {provider}. Se inicia una nueva; el historial en Grimoire se conserva.",
           "emptyResponse": "{provider} terminó sin devolver una respuesta. Comprueba las credenciales y los registros del proveedor e inténtalo de nuevo.",
           "requestFailed": "Falló la solicitud a {provider}",
           "antigravityDisabled": "Antigravity está desactivado. Actívalo en la configuración del proveedor.",
@@ -456,6 +477,9 @@
         "searchPlaceholder": "Buscar chats anteriores...",
         "empty": "No hay chats anteriores",
         "noMatches": "No hay coincidencias",
+        "unreadableTitle": "Chat ilegible",
+        "unreadableFuture": "Escrito por una versión más reciente de Grimoire.",
+        "unreadableCorrupt": "Este archivo está dañado y no se puede abrir.",
         "current": "Actual",
         "openNewTab": "Abrir en una pestaña nueva",
         "generatingTitle": "Generando título...",
@@ -574,7 +598,7 @@
         "noPrompt": "No se proporcionó ningún prompt",
         "expandAria": "Tarea de subagente: {description} — Estado: {status} — haz clic para expandir",
         "result": "Resultado",
-        "prompt": "Prompt",
+        "prompt": "Indicación",
         "runningBackground": "En ejecución en segundo plano",
         "backgroundExpandAria": "Tarea en segundo plano: {description} — {status} — haz clic para expandir",
         "endedEarly": "La conversación terminó antes de completar la tarea",
@@ -970,7 +994,46 @@
       }
     },
     "hub": {
-      "general": "General", "providers": "Proveedores", "workspace": "Avanzado", "about": "Acerca de", "cliDetected": "CLI detectada", "cliNotDetected": "CLI no detectada", "geminiLegacy": "Gemini CLI (heredada)", "providerDetails": "Configuración de {provider}", "skills": "Habilidades", "agents": "Subagentes", "mcp": "MCP", "environment": "Entorno", "commands": "Comandos", "search": "Buscar nombre, descripción, fuente o proveedor", "name": "Nombre", "source": "Fuente", "provider": "Proveedor", "actions": "Acciones", "manage": "Gestionar", "manageTitle": "Gestionar {section}", "edit": "Editar", "delete": "Eliminar", "deleteConfirm": "¿Eliminar “{name}”?", "deleted": "Se eliminó “{name}”", "deleteFailed": "Error al eliminar: {message}", "providerOptions": "Opciones avanzadas del proveedor", "readonly": "Solo lectura", "available": "Disponible", "connected": "Conectado", "disabled": "Desactivado", "shared": "Compartido", "loading": "Cargando recursos…", "unsupported": "Este proveedor no admite esta categoría de recursos.", "none": "No hay recursos avanzados coincidentes.", "aboutCopy": "Grimoire conecta agentes de IA locales dentro de Obsidian. La versión y las notas de lanzamiento se guardan aquí.", "native": "Nativo", "nativeCli": "CLI nativa", "nativeMcpDescription": "Compatibilidad nativa con MCP", "runtimeCommandsPending": "Inicia un chat de {provider} una vez para cargar sus comandos nativos.", "releases": "Versiones"
+      "general": "General",
+      "providers": "Proveedores",
+      "workspace": "Avanzado",
+      "about": "Acerca de",
+      "cliDetected": "CLI detectada",
+      "cliNotDetected": "CLI no detectada",
+      "geminiLegacy": "Gemini CLI (heredada)",
+      "providerDetails": "Configuración de {provider}",
+      "skills": "Habilidades",
+      "agents": "Subagentes",
+      "mcp": "MCP",
+      "environment": "Entorno",
+      "commands": "Comandos",
+      "search": "Buscar nombre, descripción, fuente o proveedor",
+      "name": "Nombre",
+      "source": "Fuente",
+      "provider": "Proveedor",
+      "actions": "Acciones",
+      "manage": "Gestionar",
+      "manageTitle": "Gestionar {section}",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "deleteConfirm": "¿Eliminar “{name}”?",
+      "deleted": "Se eliminó “{name}”",
+      "deleteFailed": "Error al eliminar: {message}",
+      "providerOptions": "Opciones avanzadas del proveedor",
+      "readonly": "Solo lectura",
+      "available": "Disponible",
+      "connected": "Conectado",
+      "disabled": "Desactivado",
+      "shared": "Compartido",
+      "loading": "Cargando recursos…",
+      "unsupported": "Este proveedor no admite esta categoría de recursos.",
+      "none": "No hay recursos avanzados coincidentes.",
+      "aboutCopy": "Grimoire conecta agentes de IA locales dentro de Obsidian. La versión y las notas de lanzamiento se guardan aquí.",
+      "native": "Nativo",
+      "nativeCli": "CLI nativa",
+      "nativeMcpDescription": "Compatibilidad nativa con MCP",
+      "runtimeCommandsPending": "Inicia un chat de {provider} una vez para cargar sus comandos nativos.",
+      "releases": "Versiones"
     },
     "grok": {
       "cliPath": {
@@ -1445,8 +1508,61 @@
       }
     }
   },
-  "plugin": { "openRibbon": "Abrir Grimoire", "openChatView": "Abrir vista de chat", "inlineEdit": "Edición en línea", "inlineEditViewUnavailable": "La edición en línea no está disponible: no se pudo acceder a la vista Markdown activa.", "inlineEditInserted": "Insertado", "inlineEditApplied": "Edición aplicada", "newTab": "Nueva pestaña", "newSession": "Nueva sesión (en la pestaña actual)", "closeCurrentTab": "Cerrar pestaña actual", "switchToTab": "Cambiar a la pestaña {index}", "environmentRestartFailed": "Se aplicaron los cambios de entorno, pero no se pudieron reiniciar {count} pestañas afectadas.", "environmentAppliedRebuild": "Variables de entorno aplicadas. Las sesiones se reconstruirán con el próximo mensaje.", "environmentApplied": "Variables de entorno aplicadas." },
-  "shared": { "slashCommands": { "noMatches": "No hay comandos coincidentes" }, "resumeConversation": { "title": "Reanudar conversación", "empty": "No hay conversaciones", "current": "Sesión actual" }, "instructionModal": { "title": "Añadir instrucción personalizada", "yourInput": "Tu entrada:", "processingInstruction": "Procesando tu instrucción...", "yourResponse": "Tu respuesta:", "responsePlaceholder": "Proporciona más detalles...", "refinedSnippet": "Fragmento refinado:", "processing": "Procesando...", "submit": "Enviar", "submitResponseAria": "Enviar respuesta", "editAria": "Editar instrucción", "accept": "Aceptar", "acceptAria": "Aceptar instrucción", "preview": "Vista previa" }, "whatsNew": { "title": "Novedades de Grimoire v{version}", "released": "Publicado el {date}", "latestReleaseNotes": "Últimas notas de la versión", "fullChangelog": "Registro de cambios completo", "gotIt": "Entendido" } },
-  "inlineEdit": { "rejectTitle": "Rechazar (Esc)", "acceptTitle": "Aceptar (Intro)", "editorUnavailable": "La edición en línea no está disponible: no se pudo acceder al editor activo. Intenta volver a abrir la nota.", "vaultFilesLoadFailed": "No se pudieron cargar los archivos del vault. Las menciones @ podrían no estar disponibles.", "invalidFilePath": "No se pudo adjuntar el archivo: ruta no válida" },
-  "storage": { "tabLayoutSaveFailed": "No se pudo guardar el diseño de pestañas" }
+  "plugin": {
+    "openRibbon": "Abrir Grimoire",
+    "openChatView": "Abrir vista de chat",
+    "inlineEdit": "Edición en línea",
+    "inlineEditViewUnavailable": "La edición en línea no está disponible: no se pudo acceder a la vista Markdown activa.",
+    "inlineEditInserted": "Insertado",
+    "inlineEditApplied": "Edición aplicada",
+    "newTab": "Nueva pestaña",
+    "newSession": "Nueva sesión (en la pestaña actual)",
+    "closeCurrentTab": "Cerrar pestaña actual",
+    "switchToTab": "Cambiar a la pestaña {index}",
+    "environmentRestartFailed": "Se aplicaron los cambios de entorno, pero no se pudieron reiniciar {count} pestañas afectadas.",
+    "environmentAppliedRebuild": "Variables de entorno aplicadas. Las sesiones se reconstruirán con el próximo mensaje.",
+    "environmentApplied": "Variables de entorno aplicadas."
+  },
+  "shared": {
+    "slashCommands": {
+      "noMatches": "No hay comandos coincidentes"
+    },
+    "resumeConversation": {
+      "title": "Reanudar conversación",
+      "empty": "No hay conversaciones",
+      "current": "Sesión actual"
+    },
+    "instructionModal": {
+      "title": "Añadir instrucción personalizada",
+      "yourInput": "Tu entrada:",
+      "processingInstruction": "Procesando tu instrucción...",
+      "yourResponse": "Tu respuesta:",
+      "responsePlaceholder": "Proporciona más detalles...",
+      "refinedSnippet": "Fragmento refinado:",
+      "processing": "Procesando...",
+      "submit": "Enviar",
+      "submitResponseAria": "Enviar respuesta",
+      "editAria": "Editar instrucción",
+      "accept": "Aceptar",
+      "acceptAria": "Aceptar instrucción",
+      "preview": "Vista previa"
+    },
+    "whatsNew": {
+      "title": "Novedades de Grimoire v{version}",
+      "released": "Publicado el {date}",
+      "latestReleaseNotes": "Últimas notas de la versión",
+      "fullChangelog": "Registro de cambios completo",
+      "gotIt": "Entendido"
+    }
+  },
+  "inlineEdit": {
+    "rejectTitle": "Rechazar (Esc)",
+    "acceptTitle": "Aceptar (Intro)",
+    "editorUnavailable": "La edición en línea no está disponible: no se pudo acceder al editor activo. Intenta volver a abrir la nota.",
+    "vaultFilesLoadFailed": "No se pudieron cargar los archivos del vault. Las menciones @ podrían no estar disponibles.",
+    "invalidFilePath": "No se pudo adjuntar el archivo: ruta no válida"
+  },
+  "storage": {
+    "tabLayoutSaveFailed": "No se pudo guardar el diseño de pestañas"
+  }
 }

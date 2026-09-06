@@ -1,4 +1,5 @@
 import { carryOverImageAttachments } from '../../../core/attachments/carryOverImages';
+import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
 import type { ProviderConversationHistoryService } from '../../../core/providers/types';
 import type { Conversation } from '../../../core/types';
 import { getGrokState, type GrokProviderState } from '../types';
@@ -13,11 +14,13 @@ export class GrokConversationHistoryService implements ProviderConversationHisto
   async hydrateConversationHistory(
     conversation: Conversation,
     vaultPath: string | null,
-  ): Promise<void> {
+  ): Promise<ProviderHistoryHydration> {
     const sessionId = conversation.sessionId;
     if (!sessionId) {
+      // Never bound to a session, so there is no provider history to be
+      // missing: what the conversation shows is what its own metadata holds.
       this.hydratedKeys.delete(conversation.id);
-      return;
+      return { outcome: 'absent' };
     }
 
     conversation.messages = conversation.messages
@@ -34,7 +37,7 @@ export class GrokConversationHistoryService implements ProviderConversationHisto
       conversation.messages.length > 0
       && this.hydratedKeys.get(conversation.id) === hydrationKey
     ) {
-      return;
+      return { outcome: 'complete' };
     }
 
     const messages = await loadGrokSessionMessages(
@@ -44,7 +47,13 @@ export class GrokConversationHistoryService implements ProviderConversationHisto
     );
     if (messages.length === 0) {
       this.hydratedKeys.delete(conversation.id);
-      return;
+      // **The silence this outcome exists to replace.** The conversation names
+      // a session and the native log has nothing under it: the session was
+      // deleted, the managed home moved, or it was written by a CLI this
+      // machine no longer has.
+      return conversation.messages.length > 0
+        ? { outcome: 'stale', reason: 'sessionNotFound' }
+        : { outcome: 'absent' };
     }
 
     // A prompt that never reached Grok (Invalid params before session/prompt)
@@ -52,11 +61,14 @@ export class GrokConversationHistoryService implements ProviderConversationHisto
     // native log would drop that question when the user reopens the chat.
     if (conversation.messages.length > messages.length) {
       this.hydratedKeys.set(conversation.id, hydrationKey);
-      return;
+      // What is on screen is Grimoire's own record, which has more in it than
+      // the native log does — the turn the agent never saw.
+      return { outcome: 'partial', reason: 'localTranscriptAhead' };
     }
 
     conversation.messages = carryOverImageAttachments(conversation.messages, messages);
     this.hydratedKeys.set(conversation.id, hydrationKey);
+    return { outcome: 'complete' };
   }
 
   async deleteConversationSession(

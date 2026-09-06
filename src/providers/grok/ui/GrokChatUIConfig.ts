@@ -1,9 +1,11 @@
 import type {
-  ProviderChatUIConfig,
   ProviderPermissionModeToggleConfig,
   ProviderReasoningOption,
   ProviderUIOption,
 } from '../../../core/providers/types';
+import type {
+  ProviderChatUIConfig,
+} from '../../../providers/shared/providerHostContracts';
 import { GROK_PROVIDER_ICON } from '../../../shared/icons';
 import {
   buildGrokBaseModels,
@@ -21,7 +23,6 @@ import {
   resolveGrokModeForPermissionMode,
   resolvePermissionModeForManagedGrokMode,
 } from '../modes';
-import { GrokChatRuntime } from '../runtime/GrokChatRuntime';
 import { getGrokProviderSettings, updateGrokProviderSettings } from '../settings';
 
 const GROK_MODELS: ProviderUIOption[] = [
@@ -198,17 +199,12 @@ export const grokChatUIConfig: ProviderChatUIConfig = {
       return;
     }
 
-    const runtime = new GrokChatRuntime(context.plugin);
     try {
-      runtime.syncConversationState({
-        providerState: {},
-        sessionId: null,
-      });
-      await runtime.warmModelMetadata(model);
+      // Opportunistic: the first real turn discovers the same thing if this
+      // session cannot open, or if the kernel has not started yet.
+      await context.plugin.getGrokExecution().metadata.discoverMetadata({ model });
     } catch {
-      // Metadata warmup is opportunistic; the first real turn can still discover it.
-    } finally {
-      runtime.cleanup();
+      // Metadata warmup never blocks the toolbar.
     }
   },
 

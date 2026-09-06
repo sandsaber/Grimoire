@@ -84,12 +84,49 @@ export interface AcpClientConnectionDelegate {
   terminal?: AcpTerminalDelegate;
 }
 
+/**
+ * Session updates an agent sends under names ACP does not define.
+ *
+ * Grok is the first: beside `session/update` it sends its own updates on
+ * `_x.ai/session_notification`, and a client subscribed only to the standard
+ * method never sees the turn's usage or its stop reason. The parser is the
+ * provider's, because only it knows what its envelope looks like — and
+ * returning `null` is how it declines one that is not a session notification
+ * at all.
+ */
+/**
+ * Which channel an update arrived on, for a provider that sends both.
+ *
+ * `'standard'` for `session/update`; otherwise the vendor method's own name,
+ * because an agent with several of them mirrors between specific pairs.
+ */
+export type AcpSessionNotificationSource = string;
+
+export interface AcpVendorSessionNotifications {
+  readonly methods: readonly string[];
+  parse(method: string, params: unknown): AcpSessionNotification | null;
+  /**
+   * Whether an update should be delivered, for an agent that mirrors it.
+   *
+   * Some Grok releases send the same update twice — once as `session/update`
+   * and once under their own method — and delivering both prints every sentence
+   * twice and commits it twice. Built per connection rather than shared: two
+   * processes are two conversations, and a shared filter would drop one's update
+   * because the other had just sent the same words.
+   */
+  createDeduplicator?(): (
+    notification: AcpSessionNotification,
+    source: AcpSessionNotificationSource,
+  ) => boolean;
+}
+
 export interface AcpClientConnectionOptions {
   clientCapabilities?: Partial<AcpClientCapabilities>;
   clientInfo?: AcpImplementation | null;
   delegate?: AcpClientConnectionDelegate;
   methodOverrides?: AcpMethodOverrides;
   transport: AcpJsonRpcTransport;
+  vendorSessionNotifications?: AcpVendorSessionNotifications;
 }
 
 export class AcpClientConnection {
@@ -99,6 +136,8 @@ export class AcpClientConnection {
   private readonly methodCache = new Map<AcpLogicalMethod, string>();
   private readonly sessionNotificationListeners = new Set<SessionNotificationListener>();
   private readonly unsubscribeHandlers: Array<() => void> = [];
+
+  private readonly deduplicate = this.options.vendorSessionNotifications?.createDeduplicator?.();
 
   constructor(private readonly options: AcpClientConnectionOptions) {
     this.registerServerHandlers();
@@ -230,8 +269,23 @@ export class AcpClientConnection {
 
     subscribeNotification(
       ACP_SERVER_NOTIFICATION_ALIASES.sessionUpdate,
-      async (params) => this.dispatchSessionNotification(params as AcpSessionNotification),
+      async (params) => this.dispatchSessionNotification(
+        params as AcpSessionNotification,
+        'standard',
+      ),
     );
+
+    const vendor = this.options.vendorSessionNotifications;
+    if (vendor) {
+      for (const method of vendor.methods) {
+        this.unsubscribeHandlers.push(transport.onNotification(method, async (params) => {
+          const notification = vendor.parse(method, params);
+          if (notification) {
+            await this.dispatchSessionNotification(notification, method);
+          }
+        }));
+      }
+    }
 
     if (delegate?.requestPermission) {
       const requestPermission = delegate.requestPermission;
@@ -290,7 +344,13 @@ export class AcpClientConnection {
     }
   }
 
-  private async dispatchSessionNotification(notification: AcpSessionNotification): Promise<void> {
+  private async dispatchSessionNotification(
+    notification: AcpSessionNotification,
+    source: AcpSessionNotificationSource = 'standard',
+  ): Promise<void> {
+    if (this.deduplicate && !this.deduplicate(notification, source)) {
+      return;
+    }
     if (this.options.delegate?.onSessionNotification) {
       await this.options.delegate.onSessionNotification(notification);
     }

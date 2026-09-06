@@ -61,15 +61,4 @@ describe('KimicodeCommandCatalog', () => {
     ]);
   });
 
-  it('uses slash triggers for the shared dropdown', () => {
-    const catalog = new KimicodeCommandCatalog();
-
-    expect(catalog.getDropdownConfig()).toEqual({
-      providerId: 'kimicode',
-      triggerChars: ['/'],
-      builtInPrefix: '/',
-      skillPrefix: '/skill:',
-      commandPrefix: '/',
-    });
-  });
 });

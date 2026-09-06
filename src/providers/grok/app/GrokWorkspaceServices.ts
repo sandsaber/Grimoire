@@ -1,20 +1,20 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
-import type {
-  ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
-  ProviderWorkspaceRegistration,
-  ProviderWorkspaceServices,
-} from '../../../core/providers/types';
+import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderWorkspaceRegistration,
+} from '../../../providers/shared/providerHostContracts';
+import type {
+  ProviderModelCatalog,
+  ProviderWorkspaceServices,
+} from '../../../providers/shared/providerHostContracts';
 import { getVaultPath } from '../../../utils/path';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GrokAgentMentionProvider } from '../agents/GrokAgentMentionProvider';
 import { GrokCommandCatalog } from '../commands/GrokCommandCatalog';
-import { GrokChatRuntime } from '../runtime/GrokChatRuntime';
-import { GrokCliResolver } from '../runtime/GrokCliResolver';
+import { grokCliResolver } from '../runtime/GrokCliResolver';
 import { discoverGrokModelsFromCli } from '../runtime/GrokModelDiscovery';
 import {
   applyGrokNativeModelCatalog,
@@ -26,7 +26,7 @@ import { getGrokProviderSettings } from '../settings';
 import { GrokAgentStorage } from '../storage/GrokAgentStorage';
 import { grokSettingsTabRenderer } from '../ui/GrokSettingsTab';
 import { grokPlanUsageStore } from './GrokPlanUsageStore';
-import { GrokRuntimeCommandLoader } from './GrokRuntimeCommandLoader';
+import { createGrokRuntimeCommandLoader } from './GrokRuntimeCommandLoader';
 
 export interface GrokWorkspaceServices extends ProviderWorkspaceServices {
   agentStorage: GrokAgentStorage;
@@ -37,14 +37,8 @@ export interface GrokWorkspaceServices extends ProviderWorkspaceServices {
   mcpServerManager: McpServerManager;
 }
 
-const grokTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'commands';
-  },
-};
-
 function createGrokModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
-  let pendingRefresh: Promise<boolean> | null = null;
+  let pendingRefresh: Promise<ProviderCatalogRefreshOutcome> | null = null;
 
   return {
     isAvailable(settings) {
@@ -76,7 +70,7 @@ function createGrokModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
 async function refreshGrokModelCatalog(
   plugin: GrimoirePlugin,
   settings: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<ProviderCatalogRefreshOutcome> {
   const before = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
   plugin.recordDebugLog?.({
     data: {
@@ -102,19 +96,17 @@ async function refreshGrokModelCatalog(
   }
 
   let changed = applyGrokNativeModelCatalog(settings, catalog);
+  // Two different questions, and only the second one is what a surface reports.
+  // A catalog that came back identical to the one on screen still came back.
+  let answered = catalog.models.length > 0;
   if (catalog.models.length === 0) {
-    const runtime = new GrokChatRuntime(plugin);
-    try {
-      runtime.syncConversationState({
-        providerState: {},
-        sessionId: null,
-      });
-      const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-      const after = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
-      changed = loaded && before !== after;
-    } finally {
-      runtime.cleanup();
-    }
+    // The managed home had no catalog to read, so the models are asked for the
+    // only other way there is: one isolated session, opened and closed. What
+    // the legacy runtime did here was exactly that.
+    const loaded = await plugin.getGrokExecution().metadata.discoverMetadata();
+    const after = JSON.stringify(getGrokProviderSettings(settings).discoveredModels);
+    changed = loaded && before !== after;
+    answered = loaded;
   }
 
   if (changed) {
@@ -134,7 +126,7 @@ async function refreshGrokModelCatalog(
     level: changed ? 'info' : 'debug',
     scope: 'provider.grok',
   });
-  return changed;
+  return answered ? 'refreshed' : 'failed';
 }
 
 export async function createGrokWorkspaceServices(
@@ -152,14 +144,13 @@ export async function createGrokWorkspaceServices(
     agentStorage,
     agentMentionProvider,
     commandCatalog: new GrokCommandCatalog(vaultAdapter),
-    cliResolver: new GrokCliResolver(),
+    cliResolver: grokCliResolver(),
     modelCatalog: createGrokModelCatalog(plugin),
     mcpStorage,
     mcpServerManager,
     usageProvider: grokPlanUsageStore,
-    runtimeCommandLoader: new GrokRuntimeCommandLoader(),
+    runtimeCommandLoader: createGrokRuntimeCommandLoader(plugin),
     settingsTabRenderer: grokSettingsTabRenderer,
-    tabWarmupPolicy: grokTabWarmupPolicy,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
     },
@@ -167,16 +158,12 @@ export async function createGrokWorkspaceServices(
 }
 
 export const grokWorkspaceRegistration: ProviderWorkspaceRegistration<GrokWorkspaceServices> = {
-  workspaceCapabilities: {
-    skills: { inventory: 'managed', manager: 'managed' },
-    commands: { inventory: 'readonly', manager: 'managed', runtimeCommandDiscovery: 'active-session-only' },
-    agents: { inventory: 'managed', manager: 'managed' },
-    mcp: { inventory: 'managed', manager: 'managed' },
-    environment: { inventory: 'managed', manager: 'managed' },
-  },
   initialize: async ({ plugin, vaultAdapter }) => createGrokWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetGrokWorkspaceServices(): GrokWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('grok') as GrokWorkspaceServices | null;
+export function maybeGetGrokWorkspaceServices(
+  plugin: GrimoirePlugin,
+): GrokWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('grok') as GrokWorkspaceServices | null ?? null;
 }

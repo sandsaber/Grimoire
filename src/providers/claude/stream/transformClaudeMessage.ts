@@ -28,18 +28,29 @@ function getToolInput(input: unknown): Record<string, unknown> {
   return input as Record<string, unknown>;
 }
 
+/**
+ * A tool call, and whose it is.
+ *
+ * **One chunk type either way now.** A subagent's call used to be its own
+ * variant of the neutral union — the same fields plus this id — so the column
+ * had to know that a subagent's tool call is a different kind of thing from a
+ * tool call. It is the same thing, belonging to something else, and the
+ * ownership is a field.
+ */
 function emitToolUse(parentToolUseId: string | null, fields: ToolUseFields): StreamChunk {
-  if (parentToolUseId === null) {
-    return { type: 'tool_use', ...fields };
-  }
-  return { type: 'subagent_tool_use', subagentId: parentToolUseId, ...fields };
+  return {
+    type: 'tool_use',
+    ...fields,
+    ...(parentToolUseId === null ? {} : { subagentId: parentToolUseId }),
+  };
 }
 
 function emitToolResult(parentToolUseId: string | null, fields: ToolResultFields): StreamChunk {
-  if (parentToolUseId === null) {
-    return { type: 'tool_result', ...fields };
-  }
-  return { type: 'subagent_tool_result', subagentId: parentToolUseId, ...fields };
+  return {
+    type: 'tool_result',
+    ...fields,
+    ...(parentToolUseId === null ? {} : { subagentId: parentToolUseId }),
+  };
 }
 
 /**
@@ -57,7 +68,10 @@ function* emitTaskPlan(
   parentToolUseId: string | null,
   todos: TodoItem[] | null,
 ): Generator<StreamChunk> {
-  if (parentToolUseId !== null || !todos) return;
+  // `null` is "no plan to say anything about"; an **empty array** is "the plan
+  // is now empty", which has to be published or the task the user just deleted
+  // stays on screen.
+  if (parentToolUseId !== null || todos === null) return;
   yield { type: 'tool_use', id: CLAUDE_TASK_PLAN_TOOL_ID, name: TOOL_TODO_WRITE, input: { todos } };
   yield { type: 'tool_result', id: CLAUDE_TASK_PLAN_TOOL_ID, content: 'Plan updated', isError: false };
 }
@@ -505,11 +519,27 @@ export function* transformSDKMessage(
       }
       const resultContent = message.message?.content;
       if (options?.taskPlanState && message.tool_use_result !== undefined && Array.isArray(resultContent)) {
-        for (const block of resultContent) {
-          if (typeof block === 'string' || block.type !== 'tool_result' || !block.tool_use_id) continue;
+        // **One payload, so one block.** `tool_use_result` is a single object
+        // on the message while the content array can carry several results —
+        // Claude batches parallel tool results into one user message. Handing
+        // that payload to every id filed a `TaskCreate` answer under whichever
+        // call happened to come second, and consumed the pending create on the
+        // way. With more than one result here, nothing can say which id the
+        // payload belongs to, so nothing is recorded.
+        const resultBlocks = resultContent.filter((block: unknown) => (
+          typeof block !== 'string'
+          && (block as { type?: string }).type === 'tool_result'
+          && Boolean((block as { tool_use_id?: string }).tool_use_id)
+        ));
+        const only = resultBlocks.length === 1 ? resultBlocks[0] : undefined;
+        if (only) {
           yield* emitTaskPlan(
             parentToolUseId,
-            recordTaskToolResult(options.taskPlanState, block.tool_use_id, message.tool_use_result),
+            recordTaskToolResult(
+              options.taskPlanState,
+              (only as { tool_use_id: string }).tool_use_id,
+              message.tool_use_result,
+            ),
           );
         }
       }

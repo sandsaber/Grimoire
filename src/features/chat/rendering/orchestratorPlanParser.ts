@@ -1,4 +1,5 @@
 import type { OrchestratorPlanTaskContent } from '../../../core/types';
+import { isRecord } from '../../../utils/records';
 
 export type OrchestratorTask = OrchestratorPlanTaskContent;
 
@@ -104,6 +105,3 @@ function nonEmptyString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}

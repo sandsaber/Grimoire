@@ -1,0 +1,4853 @@
+{
+  "schemaVersion": 1,
+  "providerId": "grok",
+  "kind": "wire-recording",
+  "recordedAgainst": "grok 1.0.5",
+  "transport": "stdio JSON-RPC 2.0 (`grok agent stdio`)",
+  "cases": [
+    "initialize",
+    "session/new",
+    "session/prompt"
+  ],
+  "sessionUpdatesObserved": [
+    "agent_message_chunk",
+    "agent_thought_chunk",
+    "available_commands_update",
+    "model_changed",
+    "response_completed",
+    "turn_completed",
+    "user_message_chunk"
+  ],
+  "serverMethodsObserved": [
+    "_x.ai/announcements/update",
+    "_x.ai/mcp/init_progress",
+    "_x.ai/mcp/server_status",
+    "_x.ai/mcp/servers_updated",
+    "_x.ai/models/update",
+    "_x.ai/queue/changed",
+    "_x.ai/session/prompt_complete",
+    "_x.ai/session_notification",
+    "_x.ai/sessions/changed",
+    "_x.ai/settings/update",
+    "session/update"
+  ],
+  "exchange": [
+    {
+      "seq": 1,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 2,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": false,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "resume": {},
+              "close": {}
+            },
+            "auth": {},
+            "_meta": {
+              "x.ai/fs_notify": true,
+              "x.ai/hooks": {
+                "blockingEvents": [
+                  "pre_tool_use",
+                  "stop",
+                  "subagent_stop"
+                ],
+                "decisions": [
+                  "deny",
+                  "block"
+                ],
+                "stopSignals": [
+                  "continue",
+                  "stopReason",
+                  "additionalContext"
+                ]
+              },
+              "x.ai/capabilities": {
+                "toolOverrides": {
+                  "x_keyword_search": true,
+                  "x_semantic_search": true,
+                  "x_user_search": false,
+                  "x_thread_fetch": false
+                }
+              }
+            }
+          },
+          "authMethods": [
+            {
+              "id": "cached_token",
+              "name": "cached_token",
+              "description": "Cached token from ~/.grok/auth.json"
+            },
+            {
+              "id": "grok.com",
+              "name": "Grok",
+              "description": "Sign in with Grok"
+            }
+          ],
+          "_meta": {
+            "grokShell": true,
+            "defaultAuthMethodId": "cached_token",
+            "x.ai/mcp/sdk": true,
+            "x.ai/pluginDirs": true,
+            "currentWorkingDirectory": "<tmp>",
+            "agentVersion": "1.0.5",
+            "agentId": "78fe37c1-3dad-5bea-8cdd-96815f724646",
+            "agentInstanceId": "6977bdff-b8ff-476a-bb78-159c6e01aa4e",
+            "hostname": "M5MinionL",
+            "modelState": {
+              "currentModelId": "grok-4.6",
+              "availableModels": [
+                {
+                  "modelId": "grok-4.6",
+                  "name": "Grok 4.6",
+                  "description": "SpaceXAI's latest frontier model",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "xhigh",
+                        "value": "xhigh",
+                        "label": "Extra High Effort",
+                        "description": "Highest effort and reasoning level",
+                        "default": false
+                      },
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Higher implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                },
+                {
+                  "modelId": "grok-4.5",
+                  "name": "Grok 4.5",
+                  "_meta": {
+                    "totalContextTokens": 500000,
+                    "agentType": "grok-build-plan",
+                    "supportsReasoningEffort": true,
+                    "reasoningEffort": "high",
+                    "reasoningEfforts": [
+                      {
+                        "id": "high",
+                        "value": "high",
+                        "label": "High Effort",
+                        "description": "Highest implementation quality with extensive reasoning",
+                        "default": true
+                      },
+                      {
+                        "id": "medium",
+                        "value": "medium",
+                        "label": "Medium Effort",
+                        "description": "Balanced effort with standard implementation and testing",
+                        "default": false
+                      },
+                      {
+                        "id": "low",
+                        "value": "low",
+                        "label": "Low Effort",
+                        "description": "Quick, fast implementations",
+                        "default": false
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "mcpServers": [],
+            "mcpApps": false,
+            "metadata": null,
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [args] | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              }
+            ],
+            "cancelRewind": true,
+            "sessionRecap": true,
+            "voiceMode": true
+          }
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/new",
+        "params": {
+          "cwd": "<tmp>",
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/servers_updated",
+        "params": {
+          "mcpServers": [
+            {
+              "name": "zread",
+              "source": "local",
+              "type": "http",
+              "url": "https://api.z.ai/api/mcp/zread/mcp"
+            },
+            {
+              "name": "zai-mcp-server",
+              "source": "local",
+              "type": "stdio",
+              "command": "npx",
+              "args": [
+                "-y",
+                "@z_ai/mcp-server"
+              ],
+              "env": [
+                {
+                  "name": "Z_AI_API_KEY",
+                  "value": "<redacted>"
+                },
+                {
+                  "name": "Z_AI_MODE",
+                  "value": "ZAI"
+                }
+              ]
+            },
+            {
+              "name": "web-search-prime",
+              "source": "local",
+              "type": "http",
+              "url": "https://api.z.ai/api/mcp/web_search_prime/mcp"
+            },
+            {
+              "name": "web-reader",
+              "source": "local",
+              "type": "http",
+              "url": "https://api.z.ai/api/mcp/web_reader/mcp"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/init_progress",
+        "params": {
+          "total": 4,
+          "connected": 0,
+          "sessionId": "<session-id>"
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "hooks-trust",
+                "description": "Trust this project for hook execution",
+                "input": null
+              },
+              {
+                "name": "hooks-list",
+                "description": "Show hooks loaded in this session",
+                "input": null
+              },
+              {
+                "name": "hooks-add",
+                "description": "Add a custom hook file or directory",
+                "input": {
+                  "hint": "path to hook file or directory"
+                }
+              },
+              {
+                "name": "hooks-remove",
+                "description": "Remove a custom hook file or directory path",
+                "input": {
+                  "hint": "path to hook file or directory"
+                }
+              },
+              {
+                "name": "hooks-untrust",
+                "description": "Remove trust for the current project",
+                "input": null
+              },
+              {
+                "name": "plugins",
+                "description": "Manage plugins (list, reload, trust, add, remove)",
+                "input": {
+                  "hint": "list | reload | trust <path> | add <path> | remove <path>"
+                }
+              },
+              {
+                "name": "reload-plugins",
+                "description": "Reload plugins from disk (alias for /plugins reload)",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [args] | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              },
+              {
+                "name": "user:brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/brainstorming/SKILL.md",
+                  "bareName": "brainstorming",
+                  "qualifiedName": "user:brainstorming"
+                }
+              },
+              {
+                "name": "user:dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/dispatching-parallel-agents/SKILL.md",
+                  "bareName": "dispatching-parallel-agents",
+                  "qualifiedName": "user:dispatching-parallel-agents"
+                }
+              },
+              {
+                "name": "user:executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/executing-plans/SKILL.md",
+                  "bareName": "executing-plans",
+                  "qualifiedName": "user:executing-plans"
+                }
+              },
+              {
+                "name": "find-skills",
+                "description": "<elided 303 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/find-skills/SKILL.md",
+                  "bareName": "find-skills",
+                  "qualifiedName": "user:find-skills"
+                }
+              },
+              {
+                "name": "user:finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/finishing-a-development-branch/SKILL.md",
+                  "bareName": "finishing-a-development-branch",
+                  "qualifiedName": "user:finishing-a-development-branch"
+                }
+              },
+              {
+                "name": "meta-cognition-parallel",
+                "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, \u4e09\u5c42\u5206\u6790, parallel analysis, \u5e76\u884c\u5143\u8ba4\u77e5",
+                "input": {
+                  "hint": "<rust_question>"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/meta-cognition-parallel/SKILL.md",
+                  "bareName": "meta-cognition-parallel",
+                  "qualifiedName": "user:meta-cognition-parallel"
+                }
+              },
+              {
+                "name": "user:receiving-code-review",
+                "description": "<elided 234 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/receiving-code-review/SKILL.md",
+                  "bareName": "receiving-code-review",
+                  "qualifiedName": "user:receiving-code-review"
+                }
+              },
+              {
+                "name": "user:requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/requesting-code-review/SKILL.md",
+                  "bareName": "requesting-code-review",
+                  "qualifiedName": "user:requesting-code-review"
+                }
+              },
+              {
+                "name": "rust-call-graph",
+                "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, \u8c03\u7528\u56fe, \u8c03\u7528\u5173\u7cfb, \u8c01\u8c03\u7528\u4e86, \u8c03\u7528\u4e86\u8c01",
+                "input": {
+                  "hint": "<function_name> [--depth N] [--direction in|out|both]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-call-graph/SKILL.md",
+                  "bareName": "rust-call-graph",
+                  "qualifiedName": "user:rust-call-graph"
+                }
+              },
+              {
+                "name": "rust-code-navigator",
+                "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, \u8df3\u8f6c\u5b9a\u4e49, \u67e5\u627e\u5f15\u7528, \u5b9a\u4e49\u5728\u54ea, \u8c01\u7528\u4e86\u8fd9\u4e2a",
+                "input": {
+                  "hint": "<symbol> [in file.rs:line]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-code-navigator/SKILL.md",
+                  "bareName": "rust-code-navigator",
+                  "qualifiedName": "user:rust-code-navigator"
+                }
+              },
+              {
+                "name": "rust-daily",
+                "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust \u65e5\u62a5, Rust \u5468\u62a5, Rust \u65b0\u95fb, Rust \u52a8\u6001",
+                "input": {
+                  "hint": "[today|week|month]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-daily/SKILL.md",
+                  "bareName": "rust-daily",
+                  "qualifiedName": "user:rust-daily"
+                }
+              },
+              {
+                "name": "rust-deps-visualizer",
+                "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, \u4f9d\u8d56\u56fe, \u4f9d\u8d56\u53ef\u89c6\u5316, \u663e\u793a\u4f9d\u8d56",
+                "input": {
+                  "hint": "[--depth N] [--features]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-deps-visualizer/SKILL.md",
+                  "bareName": "rust-deps-visualizer",
+                  "qualifiedName": "user:rust-deps-visualizer"
+                }
+              },
+              {
+                "name": "rust-learner",
+                "description": "<elided 387 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-learner/SKILL.md",
+                  "bareName": "rust-learner",
+                  "qualifiedName": "user:rust-learner"
+                }
+              },
+              {
+                "name": "rust-refactor-helper",
+                "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, \u91cd\u6784, \u91cd\u547d\u540d, \u63d0\u53d6\u51fd\u6570, \u5b89\u5168\u91cd\u6784",
+                "input": {
+                  "hint": "<action> <target> [--dry-run]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-refactor-helper/SKILL.md",
+                  "bareName": "rust-refactor-helper",
+                  "qualifiedName": "user:rust-refactor-helper"
+                }
+              },
+              {
+                "name": "rust-router",
+                "description": "<elided 853 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-router/SKILL.md",
+                  "bareName": "rust-router",
+                  "qualifiedName": "user:rust-router"
+                }
+              },
+              {
+                "name": "rust-symbol-analyzer",
+                "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, \u7b26\u53f7\u5206\u6790, \u9879\u76ee\u7ed3\u6784, \u5217\u51fa\u6240\u6709, \u6709\u54ea\u4e9bstruct",
+                "input": {
+                  "hint": "[file.rs] [--type struct|trait|fn|mod]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-symbol-analyzer/SKILL.md",
+                  "bareName": "rust-symbol-analyzer",
+                  "qualifiedName": "user:rust-symbol-analyzer"
+                }
+              },
+              {
+                "name": "rust-trait-explorer",
+                "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait \u5b9e\u73b0, \u8c01\u5b9e\u73b0\u4e86, \u5b9e\u73b0\u4e86\u54ea\u4e9btrait",
+                "input": {
+                  "hint": "<TraitName|StructName>"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-trait-explorer/SKILL.md",
+                  "bareName": "rust-trait-explorer",
+                  "qualifiedName": "user:rust-trait-explorer"
+                }
+              },
+              {
+                "name": "user:subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/subagent-driven-development/SKILL.md",
+                  "bareName": "subagent-driven-development",
+                  "qualifiedName": "user:subagent-driven-development"
+                }
+              },
+              {
+                "name": "user:systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/systematic-debugging/SKILL.md",
+                  "bareName": "systematic-debugging",
+                  "qualifiedName": "user:systematic-debugging"
+                }
+              },
+              {
+                "name": "user:test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/test-driven-development/SKILL.md",
+                  "bareName": "test-driven-development",
+                  "qualifiedName": "user:test-driven-development"
+                }
+              },
+              {
+                "name": "unsafe-checker",
+                "description": "<elided 339 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/unsafe-checker/SKILL.md",
+                  "bareName": "unsafe-checker",
+                  "qualifiedName": "user:unsafe-checker"
+                }
+              },
+              {
+                "name": "user:using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/using-git-worktrees/SKILL.md",
+                  "bareName": "using-git-worktrees",
+                  "qualifiedName": "user:using-git-worktrees"
+                }
+              },
+              {
+                "name": "user:using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/using-superpowers/SKILL.md",
+                  "bareName": "using-superpowers",
+                  "qualifiedName": "user:using-superpowers"
+                }
+              },
+              {
+                "name": "user:verification-before-completion",
+                "description": "<elided 225 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/verification-before-completion/SKILL.md",
+                  "bareName": "verification-before-completion",
+                  "qualifiedName": "user:verification-before-completion"
+                }
+              },
+              {
+                "name": "user:writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/writing-plans/SKILL.md",
+                  "bareName": "writing-plans",
+                  "qualifiedName": "user:writing-plans"
+                }
+              },
+              {
+                "name": "user:writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/writing-skills/SKILL.md",
+                  "bareName": "writing-skills",
+                  "qualifiedName": "user:writing-skills"
+                }
+              },
+              {
+                "name": "karpathy-guidelines",
+                "description": "<elided 553 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/skills/karpathy-guidelines/SKILL.md",
+                  "bareName": "karpathy-guidelines",
+                  "qualifiedName": "user:karpathy-guidelines"
+                }
+              },
+              {
+                "name": "build-with-ai",
+                "description": "Build AI apps on SpaceXAI (XAI_API_KEY + api.x.ai)",
+                "input": {
+                  "hint": "<what you're building>"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/build-with-ai/SKILL.md",
+                  "bareName": "build-with-ai",
+                  "qualifiedName": "bundled:build-with-ai"
+                }
+              },
+              {
+                "name": "bundled:code-review",
+                "description": "Run an extremely strict maintainability review for abstraction quality, giant files, and spaghetti-condition growth. Use for a deep code quality audit or an especially harsh maintainability review.",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/code-review/SKILL.md",
+                  "bareName": "code-review",
+                  "qualifiedName": "bundled:code-review"
+                }
+              },
+              {
+                "name": "create-skill",
+                "description": "Create a new Grok skill",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-skill/SKILL.md",
+                  "bareName": "create-skill",
+                  "qualifiedName": "bundled:create-skill"
+                }
+              },
+              {
+                "name": "create-workflow",
+                "description": "Author a new multi-agent workflow",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-workflow/SKILL.md",
+                  "bareName": "create-workflow",
+                  "qualifiedName": "bundled:create-workflow"
+                }
+              },
+              {
+                "name": "design",
+                "description": "Run the full design-doc-writer and design-doc-reviewer loop until consensus. Produces a polished design document with a PR plan.",
+                "input": {
+                  "hint": "<description of what to design>"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/design/SKILL.md",
+                  "bareName": "design",
+                  "qualifiedName": "bundled:design"
+                }
+              },
+              {
+                "name": "execute-plan",
+                "description": "<elided 291 chars>",
+                "input": {
+                  "hint": "<design-doc-path> [--effort N] [--concurrency N] [--dry-run] [--resume <PLAN_ID>] [--instructions \"...\"] [--no-graphite] [--auto-pr]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/execute-plan/SKILL.md",
+                  "bareName": "execute-plan",
+                  "qualifiedName": "bundled:execute-plan"
+                }
+              },
+              {
+                "name": "bundled:imagine",
+                "description": "Prompting and workflow guidance for Imagine image tools",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/imagine/SKILL.md",
+                  "bareName": "imagine",
+                  "qualifiedName": "bundled:imagine"
+                }
+              },
+              {
+                "name": "implement",
+                "description": "<elided 313 chars>",
+                "input": {
+                  "hint": "[--effort N] <description of what to implement>"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/implement/SKILL.md",
+                  "bareName": "implement",
+                  "qualifiedName": "bundled:implement"
+                }
+              },
+              {
+                "name": "pr-babysit",
+                "description": "Monitor PRs, fix CI failures, address review comments, resolve merge conflicts, and restack stacks. Supports independent PRs, Graphite stacks, and GitHub stacked PRs (gh-stack).",
+                "input": {
+                  "hint": "add <number> | remove <number> | list | check"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/pr-babysit/SKILL.md",
+                  "bareName": "pr-babysit",
+                  "qualifiedName": "bundled:pr-babysit"
+                }
+              },
+              {
+                "name": "resume-claude",
+                "description": "Continue from a recent Claude Code session",
+                "input": {
+                  "hint": "[words describing the session | session id]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-claude/SKILL.md",
+                  "bareName": "resume-claude",
+                  "qualifiedName": "bundled:resume-claude"
+                }
+              },
+              {
+                "name": "resume-codex",
+                "description": "Continue from a recent Codex session",
+                "input": {
+                  "hint": "[words describing the session | session id]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-codex/SKILL.md",
+                  "bareName": "resume-codex",
+                  "qualifiedName": "bundled:resume-codex"
+                }
+              },
+              {
+                "name": "resume-cursor",
+                "description": "Continue from a recent Cursor session",
+                "input": {
+                  "hint": "[words describing the session | session id]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-cursor/SKILL.md",
+                  "bareName": "resume-cursor",
+                  "qualifiedName": "bundled:resume-cursor"
+                }
+              },
+              {
+                "name": "review",
+                "description": "<elided 262 chars>",
+                "input": {
+                  "hint": "[--local | --branch <name> | --pr <number-or-url> | <auto-detect>]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/review/SKILL.md",
+                  "bareName": "review",
+                  "qualifiedName": "bundled:review"
+                }
+              },
+              {
+                "name": "skill-design-principles",
+                "description": "Concise, high-signal principles for writing and editing skills well. Use whenever authoring or editing a skill.",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/skill-design-principles/SKILL.md",
+                  "bareName": "skill-design-principles",
+                  "qualifiedName": "bundled:skill-design-principles"
+                }
+              },
+              {
+                "name": "new-sdk-app",
+                "description": "Create and setup a new Claude Agent SDK application",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/agent-sdk-dev/commands/new-sdk-app.md",
+                  "bareName": "new-sdk-app",
+                  "qualifiedName": "agent-sdk-dev:new-sdk-app",
+                  "pluginName": "agent-sdk-dev"
+                }
+              },
+              {
+                "name": "claude-automation-recommender",
+                "description": "<elided 354 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
+                  "bareName": "claude-automation-recommender",
+                  "qualifiedName": "claude-code-setup:claude-automation-recommender",
+                  "pluginName": "claude-code-setup"
+                }
+              },
+              {
+                "name": "claude-md-improver",
+                "description": "<elided 338 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
+                  "bareName": "claude-md-improver",
+                  "qualifiedName": "claude-md-management:claude-md-improver",
+                  "pluginName": "claude-md-management"
+                }
+              },
+              {
+                "name": "revise-claude-md",
+                "description": "Update CLAUDE.md with learnings from this session",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/commands/revise-claude-md.md",
+                  "bareName": "revise-claude-md",
+                  "qualifiedName": "claude-md-management:revise-claude-md",
+                  "pluginName": "claude-md-management"
+                }
+              },
+              {
+                "name": "code-review:code-review",
+                "description": "Code review a pull request",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/code-review.md",
+                  "bareName": "code-review",
+                  "qualifiedName": "code-review:code-review",
+                  "pluginName": "code-review"
+                }
+              },
+              {
+                "name": "feature-dev",
+                "description": "Guided feature development with codebase understanding and architecture focus",
+                "input": {
+                  "hint": "Optional feature description"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/feature-dev/commands/feature-dev.md",
+                  "bareName": "feature-dev",
+                  "qualifiedName": "feature-dev:feature-dev",
+                  "pluginName": "feature-dev"
+                }
+              },
+              {
+                "name": "frontend-design",
+                "description": "<elided 204 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design/skills/frontend-design/SKILL.md",
+                  "bareName": "frontend-design",
+                  "qualifiedName": "frontend-design:frontend-design",
+                  "pluginName": "frontend-design"
+                }
+              },
+              {
+                "name": "cancel-ralph",
+                "description": "Cancel active Ralph Loop",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/cancel-ralph.md",
+                  "bareName": "cancel-ralph",
+                  "qualifiedName": "ralph-loop:cancel-ralph",
+                  "pluginName": "ralph-loop"
+                }
+              },
+              {
+                "name": "ralph-loop:help",
+                "description": "Explain Ralph Loop plugin and available commands",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/help.md",
+                  "bareName": "help",
+                  "qualifiedName": "ralph-loop:help",
+                  "pluginName": "ralph-loop"
+                }
+              },
+              {
+                "name": "ralph-loop",
+                "description": "Start Ralph Loop in current session",
+                "input": {
+                  "hint": "PROMPT [--max-iterations N] [--completion-promise TEXT]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/ralph-loop.md",
+                  "bareName": "ralph-loop",
+                  "qualifiedName": "ralph-loop:ralph-loop",
+                  "pluginName": "ralph-loop"
+                }
+              },
+              {
+                "name": "superpowers:brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
+                  "bareName": "brainstorming",
+                  "qualifiedName": "superpowers:brainstorming",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/dispatching-parallel-agents/SKILL.md",
+                  "bareName": "dispatching-parallel-agents",
+                  "qualifiedName": "superpowers:dispatching-parallel-agents",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/executing-plans/SKILL.md",
+                  "bareName": "executing-plans",
+                  "qualifiedName": "superpowers:executing-plans",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/finishing-a-development-branch/SKILL.md",
+                  "bareName": "finishing-a-development-branch",
+                  "qualifiedName": "superpowers:finishing-a-development-branch",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:receiving-code-review",
+                "description": "<elided 234 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/receiving-code-review/SKILL.md",
+                  "bareName": "receiving-code-review",
+                  "qualifiedName": "superpowers:receiving-code-review",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
+                  "bareName": "requesting-code-review",
+                  "qualifiedName": "superpowers:requesting-code-review",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/subagent-driven-development/SKILL.md",
+                  "bareName": "subagent-driven-development",
+                  "qualifiedName": "superpowers:subagent-driven-development",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+                  "bareName": "systematic-debugging",
+                  "qualifiedName": "superpowers:systematic-debugging",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+                  "bareName": "test-driven-development",
+                  "qualifiedName": "superpowers:test-driven-development",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-git-worktrees/SKILL.md",
+                  "bareName": "using-git-worktrees",
+                  "qualifiedName": "superpowers:using-git-worktrees",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+                  "bareName": "using-superpowers",
+                  "qualifiedName": "superpowers:using-superpowers",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:verification-before-completion",
+                "description": "<elided 225 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+                  "bareName": "verification-before-completion",
+                  "qualifiedName": "superpowers:verification-before-completion",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-plans/SKILL.md",
+                  "bareName": "writing-plans",
+                  "qualifiedName": "superpowers:writing-plans",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-skills/SKILL.md",
+                  "bareName": "writing-skills",
+                  "qualifiedName": "superpowers:writing-skills",
+                  "pluginName": "superpowers"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "web_search",
+                "web_fetch",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 1516,
+            "eventId": "<session-id>-0",
+            "agentTimestampMs": 1787227408415,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 81
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "hooks-trust",
+                "description": "Trust this project for hook execution",
+                "input": null
+              },
+              {
+                "name": "hooks-list",
+                "description": "Show hooks loaded in this session",
+                "input": null
+              },
+              {
+                "name": "hooks-add",
+                "description": "Add a custom hook file or directory",
+                "input": {
+                  "hint": "path to hook file or directory"
+                }
+              },
+              {
+                "name": "hooks-remove",
+                "description": "Remove a custom hook file or directory path",
+                "input": {
+                  "hint": "path to hook file or directory"
+                }
+              },
+              {
+                "name": "hooks-untrust",
+                "description": "Remove trust for the current project",
+                "input": null
+              },
+              {
+                "name": "plugins",
+                "description": "Manage plugins (list, reload, trust, add, remove)",
+                "input": {
+                  "hint": "list | reload | trust <path> | add <path> | remove <path>"
+                }
+              },
+              {
+                "name": "reload-plugins",
+                "description": "Reload plugins from disk (alias for /plugins reload)",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [args] | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              },
+              {
+                "name": "user:brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/brainstorming/SKILL.md",
+                  "bareName": "brainstorming",
+                  "qualifiedName": "user:brainstorming"
+                }
+              },
+              {
+                "name": "user:dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/dispatching-parallel-agents/SKILL.md",
+                  "bareName": "dispatching-parallel-agents",
+                  "qualifiedName": "user:dispatching-parallel-agents"
+                }
+              },
+              {
+                "name": "user:executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/executing-plans/SKILL.md",
+                  "bareName": "executing-plans",
+                  "qualifiedName": "user:executing-plans"
+                }
+              },
+              {
+                "name": "find-skills",
+                "description": "<elided 303 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/find-skills/SKILL.md",
+                  "bareName": "find-skills",
+                  "qualifiedName": "user:find-skills"
+                }
+              },
+              {
+                "name": "user:finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/finishing-a-development-branch/SKILL.md",
+                  "bareName": "finishing-a-development-branch",
+                  "qualifiedName": "user:finishing-a-development-branch"
+                }
+              },
+              {
+                "name": "meta-cognition-parallel",
+                "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, \u4e09\u5c42\u5206\u6790, parallel analysis, \u5e76\u884c\u5143\u8ba4\u77e5",
+                "input": {
+                  "hint": "<rust_question>"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/meta-cognition-parallel/SKILL.md",
+                  "bareName": "meta-cognition-parallel",
+                  "qualifiedName": "user:meta-cognition-parallel"
+                }
+              },
+              {
+                "name": "user:receiving-code-review",
+                "description": "<elided 234 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/receiving-code-review/SKILL.md",
+                  "bareName": "receiving-code-review",
+                  "qualifiedName": "user:receiving-code-review"
+                }
+              },
+              {
+                "name": "user:requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/requesting-code-review/SKILL.md",
+                  "bareName": "requesting-code-review",
+                  "qualifiedName": "user:requesting-code-review"
+                }
+              },
+              {
+                "name": "rust-call-graph",
+                "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, \u8c03\u7528\u56fe, \u8c03\u7528\u5173\u7cfb, \u8c01\u8c03\u7528\u4e86, \u8c03\u7528\u4e86\u8c01",
+                "input": {
+                  "hint": "<function_name> [--depth N] [--direction in|out|both]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-call-graph/SKILL.md",
+                  "bareName": "rust-call-graph",
+                  "qualifiedName": "user:rust-call-graph"
+                }
+              },
+              {
+                "name": "rust-code-navigator",
+                "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, \u8df3\u8f6c\u5b9a\u4e49, \u67e5\u627e\u5f15\u7528, \u5b9a\u4e49\u5728\u54ea, \u8c01\u7528\u4e86\u8fd9\u4e2a",
+                "input": {
+                  "hint": "<symbol> [in file.rs:line]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-code-navigator/SKILL.md",
+                  "bareName": "rust-code-navigator",
+                  "qualifiedName": "user:rust-code-navigator"
+                }
+              },
+              {
+                "name": "rust-daily",
+                "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust \u65e5\u62a5, Rust \u5468\u62a5, Rust \u65b0\u95fb, Rust \u52a8\u6001",
+                "input": {
+                  "hint": "[today|week|month]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-daily/SKILL.md",
+                  "bareName": "rust-daily",
+                  "qualifiedName": "user:rust-daily"
+                }
+              },
+              {
+                "name": "rust-deps-visualizer",
+                "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, \u4f9d\u8d56\u56fe, \u4f9d\u8d56\u53ef\u89c6\u5316, \u663e\u793a\u4f9d\u8d56",
+                "input": {
+                  "hint": "[--depth N] [--features]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-deps-visualizer/SKILL.md",
+                  "bareName": "rust-deps-visualizer",
+                  "qualifiedName": "user:rust-deps-visualizer"
+                }
+              },
+              {
+                "name": "rust-learner",
+                "description": "<elided 387 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-learner/SKILL.md",
+                  "bareName": "rust-learner",
+                  "qualifiedName": "user:rust-learner"
+                }
+              },
+              {
+                "name": "rust-refactor-helper",
+                "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, \u91cd\u6784, \u91cd\u547d\u540d, \u63d0\u53d6\u51fd\u6570, \u5b89\u5168\u91cd\u6784",
+                "input": {
+                  "hint": "<action> <target> [--dry-run]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-refactor-helper/SKILL.md",
+                  "bareName": "rust-refactor-helper",
+                  "qualifiedName": "user:rust-refactor-helper"
+                }
+              },
+              {
+                "name": "rust-router",
+                "description": "<elided 853 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-router/SKILL.md",
+                  "bareName": "rust-router",
+                  "qualifiedName": "user:rust-router"
+                }
+              },
+              {
+                "name": "rust-symbol-analyzer",
+                "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, \u7b26\u53f7\u5206\u6790, \u9879\u76ee\u7ed3\u6784, \u5217\u51fa\u6240\u6709, \u6709\u54ea\u4e9bstruct",
+                "input": {
+                  "hint": "[file.rs] [--type struct|trait|fn|mod]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-symbol-analyzer/SKILL.md",
+                  "bareName": "rust-symbol-analyzer",
+                  "qualifiedName": "user:rust-symbol-analyzer"
+                }
+              },
+              {
+                "name": "rust-trait-explorer",
+                "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait \u5b9e\u73b0, \u8c01\u5b9e\u73b0\u4e86, \u5b9e\u73b0\u4e86\u54ea\u4e9btrait",
+                "input": {
+                  "hint": "<TraitName|StructName>"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-trait-explorer/SKILL.md",
+                  "bareName": "rust-trait-explorer",
+                  "qualifiedName": "user:rust-trait-explorer"
+                }
+              },
+              {
+                "name": "user:subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/subagent-driven-development/SKILL.md",
+                  "bareName": "subagent-driven-development",
+                  "qualifiedName": "user:subagent-driven-development"
+                }
+              },
+              {
+                "name": "user:systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/systematic-debugging/SKILL.md",
+                  "bareName": "systematic-debugging",
+                  "qualifiedName": "user:systematic-debugging"
+                }
+              },
+              {
+                "name": "user:test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/test-driven-development/SKILL.md",
+                  "bareName": "test-driven-development",
+                  "qualifiedName": "user:test-driven-development"
+                }
+              },
+              {
+                "name": "unsafe-checker",
+                "description": "<elided 339 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/unsafe-checker/SKILL.md",
+                  "bareName": "unsafe-checker",
+                  "qualifiedName": "user:unsafe-checker"
+                }
+              },
+              {
+                "name": "user:using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/using-git-worktrees/SKILL.md",
+                  "bareName": "using-git-worktrees",
+                  "qualifiedName": "user:using-git-worktrees"
+                }
+              },
+              {
+                "name": "user:using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/using-superpowers/SKILL.md",
+                  "bareName": "using-superpowers",
+                  "qualifiedName": "user:using-superpowers"
+                }
+              },
+              {
+                "name": "user:verification-before-completion",
+                "description": "<elided 225 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/verification-before-completion/SKILL.md",
+                  "bareName": "verification-before-completion",
+                  "qualifiedName": "user:verification-before-completion"
+                }
+              },
+              {
+                "name": "user:writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/writing-plans/SKILL.md",
+                  "bareName": "writing-plans",
+                  "qualifiedName": "user:writing-plans"
+                }
+              },
+              {
+                "name": "user:writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/writing-skills/SKILL.md",
+                  "bareName": "writing-skills",
+                  "qualifiedName": "user:writing-skills"
+                }
+              },
+              {
+                "name": "karpathy-guidelines",
+                "description": "<elided 553 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/skills/karpathy-guidelines/SKILL.md",
+                  "bareName": "karpathy-guidelines",
+                  "qualifiedName": "user:karpathy-guidelines"
+                }
+              },
+              {
+                "name": "build-with-ai",
+                "description": "Build AI apps on SpaceXAI (XAI_API_KEY + api.x.ai)",
+                "input": {
+                  "hint": "<what you're building>"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/build-with-ai/SKILL.md",
+                  "bareName": "build-with-ai",
+                  "qualifiedName": "bundled:build-with-ai"
+                }
+              },
+              {
+                "name": "bundled:code-review",
+                "description": "Run an extremely strict maintainability review for abstraction quality, giant files, and spaghetti-condition growth. Use for a deep code quality audit or an especially harsh maintainability review.",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/code-review/SKILL.md",
+                  "bareName": "code-review",
+                  "qualifiedName": "bundled:code-review"
+                }
+              },
+              {
+                "name": "create-skill",
+                "description": "Create a new Grok skill",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-skill/SKILL.md",
+                  "bareName": "create-skill",
+                  "qualifiedName": "bundled:create-skill"
+                }
+              },
+              {
+                "name": "create-workflow",
+                "description": "Author a new multi-agent workflow",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-workflow/SKILL.md",
+                  "bareName": "create-workflow",
+                  "qualifiedName": "bundled:create-workflow"
+                }
+              },
+              {
+                "name": "design",
+                "description": "Run the full design-doc-writer and design-doc-reviewer loop until consensus. Produces a polished design document with a PR plan.",
+                "input": {
+                  "hint": "<description of what to design>"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/design/SKILL.md",
+                  "bareName": "design",
+                  "qualifiedName": "bundled:design"
+                }
+              },
+              {
+                "name": "execute-plan",
+                "description": "<elided 291 chars>",
+                "input": {
+                  "hint": "<design-doc-path> [--effort N] [--concurrency N] [--dry-run] [--resume <PLAN_ID>] [--instructions \"...\"] [--no-graphite] [--auto-pr]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/execute-plan/SKILL.md",
+                  "bareName": "execute-plan",
+                  "qualifiedName": "bundled:execute-plan"
+                }
+              },
+              {
+                "name": "bundled:imagine",
+                "description": "Prompting and workflow guidance for Imagine image tools",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/imagine/SKILL.md",
+                  "bareName": "imagine",
+                  "qualifiedName": "bundled:imagine"
+                }
+              },
+              {
+                "name": "implement",
+                "description": "<elided 313 chars>",
+                "input": {
+                  "hint": "[--effort N] <description of what to implement>"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/implement/SKILL.md",
+                  "bareName": "implement",
+                  "qualifiedName": "bundled:implement"
+                }
+              },
+              {
+                "name": "pr-babysit",
+                "description": "Monitor PRs, fix CI failures, address review comments, resolve merge conflicts, and restack stacks. Supports independent PRs, Graphite stacks, and GitHub stacked PRs (gh-stack).",
+                "input": {
+                  "hint": "add <number> | remove <number> | list | check"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/pr-babysit/SKILL.md",
+                  "bareName": "pr-babysit",
+                  "qualifiedName": "bundled:pr-babysit"
+                }
+              },
+              {
+                "name": "resume-claude",
+                "description": "Continue from a recent Claude Code session",
+                "input": {
+                  "hint": "[words describing the session | session id]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-claude/SKILL.md",
+                  "bareName": "resume-claude",
+                  "qualifiedName": "bundled:resume-claude"
+                }
+              },
+              {
+                "name": "resume-codex",
+                "description": "Continue from a recent Codex session",
+                "input": {
+                  "hint": "[words describing the session | session id]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-codex/SKILL.md",
+                  "bareName": "resume-codex",
+                  "qualifiedName": "bundled:resume-codex"
+                }
+              },
+              {
+                "name": "resume-cursor",
+                "description": "Continue from a recent Cursor session",
+                "input": {
+                  "hint": "[words describing the session | session id]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-cursor/SKILL.md",
+                  "bareName": "resume-cursor",
+                  "qualifiedName": "bundled:resume-cursor"
+                }
+              },
+              {
+                "name": "review",
+                "description": "<elided 262 chars>",
+                "input": {
+                  "hint": "[--local | --branch <name> | --pr <number-or-url> | <auto-detect>]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/review/SKILL.md",
+                  "bareName": "review",
+                  "qualifiedName": "bundled:review"
+                }
+              },
+              {
+                "name": "skill-design-principles",
+                "description": "Concise, high-signal principles for writing and editing skills well. Use whenever authoring or editing a skill.",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/skill-design-principles/SKILL.md",
+                  "bareName": "skill-design-principles",
+                  "qualifiedName": "bundled:skill-design-principles"
+                }
+              },
+              {
+                "name": "new-sdk-app",
+                "description": "Create and setup a new Claude Agent SDK application",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/agent-sdk-dev/commands/new-sdk-app.md",
+                  "bareName": "new-sdk-app",
+                  "qualifiedName": "agent-sdk-dev:new-sdk-app",
+                  "pluginName": "agent-sdk-dev"
+                }
+              },
+              {
+                "name": "claude-automation-recommender",
+                "description": "<elided 354 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
+                  "bareName": "claude-automation-recommender",
+                  "qualifiedName": "claude-code-setup:claude-automation-recommender",
+                  "pluginName": "claude-code-setup"
+                }
+              },
+              {
+                "name": "claude-md-improver",
+                "description": "<elided 338 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
+                  "bareName": "claude-md-improver",
+                  "qualifiedName": "claude-md-management:claude-md-improver",
+                  "pluginName": "claude-md-management"
+                }
+              },
+              {
+                "name": "revise-claude-md",
+                "description": "Update CLAUDE.md with learnings from this session",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/commands/revise-claude-md.md",
+                  "bareName": "revise-claude-md",
+                  "qualifiedName": "claude-md-management:revise-claude-md",
+                  "pluginName": "claude-md-management"
+                }
+              },
+              {
+                "name": "code-review:code-review",
+                "description": "Code review a pull request",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/code-review.md",
+                  "bareName": "code-review",
+                  "qualifiedName": "code-review:code-review",
+                  "pluginName": "code-review"
+                }
+              },
+              {
+                "name": "feature-dev",
+                "description": "Guided feature development with codebase understanding and architecture focus",
+                "input": {
+                  "hint": "Optional feature description"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/feature-dev/commands/feature-dev.md",
+                  "bareName": "feature-dev",
+                  "qualifiedName": "feature-dev:feature-dev",
+                  "pluginName": "feature-dev"
+                }
+              },
+              {
+                "name": "frontend-design",
+                "description": "<elided 204 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design/skills/frontend-design/SKILL.md",
+                  "bareName": "frontend-design",
+                  "qualifiedName": "frontend-design:frontend-design",
+                  "pluginName": "frontend-design"
+                }
+              },
+              {
+                "name": "cancel-ralph",
+                "description": "Cancel active Ralph Loop",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/cancel-ralph.md",
+                  "bareName": "cancel-ralph",
+                  "qualifiedName": "ralph-loop:cancel-ralph",
+                  "pluginName": "ralph-loop"
+                }
+              },
+              {
+                "name": "ralph-loop:help",
+                "description": "Explain Ralph Loop plugin and available commands",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/help.md",
+                  "bareName": "help",
+                  "qualifiedName": "ralph-loop:help",
+                  "pluginName": "ralph-loop"
+                }
+              },
+              {
+                "name": "ralph-loop",
+                "description": "Start Ralph Loop in current session",
+                "input": {
+                  "hint": "PROMPT [--max-iterations N] [--completion-promise TEXT]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/ralph-loop.md",
+                  "bareName": "ralph-loop",
+                  "qualifiedName": "ralph-loop:ralph-loop",
+                  "pluginName": "ralph-loop"
+                }
+              },
+              {
+                "name": "superpowers:brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
+                  "bareName": "brainstorming",
+                  "qualifiedName": "superpowers:brainstorming",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/dispatching-parallel-agents/SKILL.md",
+                  "bareName": "dispatching-parallel-agents",
+                  "qualifiedName": "superpowers:dispatching-parallel-agents",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/executing-plans/SKILL.md",
+                  "bareName": "executing-plans",
+                  "qualifiedName": "superpowers:executing-plans",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/finishing-a-development-branch/SKILL.md",
+                  "bareName": "finishing-a-development-branch",
+                  "qualifiedName": "superpowers:finishing-a-development-branch",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:receiving-code-review",
+                "description": "<elided 234 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/receiving-code-review/SKILL.md",
+                  "bareName": "receiving-code-review",
+                  "qualifiedName": "superpowers:receiving-code-review",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
+                  "bareName": "requesting-code-review",
+                  "qualifiedName": "superpowers:requesting-code-review",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/subagent-driven-development/SKILL.md",
+                  "bareName": "subagent-driven-development",
+                  "qualifiedName": "superpowers:subagent-driven-development",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+                  "bareName": "systematic-debugging",
+                  "qualifiedName": "superpowers:systematic-debugging",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+                  "bareName": "test-driven-development",
+                  "qualifiedName": "superpowers:test-driven-development",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-git-worktrees/SKILL.md",
+                  "bareName": "using-git-worktrees",
+                  "qualifiedName": "superpowers:using-git-worktrees",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+                  "bareName": "using-superpowers",
+                  "qualifiedName": "superpowers:using-superpowers",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:verification-before-completion",
+                "description": "<elided 225 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+                  "bareName": "verification-before-completion",
+                  "qualifiedName": "superpowers:verification-before-completion",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-plans/SKILL.md",
+                  "bareName": "writing-plans",
+                  "qualifiedName": "superpowers:writing-plans",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-skills/SKILL.md",
+                  "bareName": "writing-skills",
+                  "qualifiedName": "superpowers:writing-skills",
+                  "pluginName": "superpowers"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "web_search",
+                "web_fetch",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 9143,
+            "eventId": "<session-id>-1",
+            "agentTimestampMs": 1787227408429,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 81
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "model_changed",
+            "model_id": "grok-4.6",
+            "reasoning_effort": "high"
+          }
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "sessionId": "<session-id>",
+          "models": {
+            "currentModelId": "grok-4.6",
+            "availableModels": [
+              {
+                "modelId": "grok-4.6",
+                "name": "Grok 4.6",
+                "description": "SpaceXAI's latest frontier model",
+                "_meta": {
+                  "totalContextTokens": 500000,
+                  "agentType": "grok-build-plan",
+                  "supportsReasoningEffort": true,
+                  "reasoningEffort": "high",
+                  "reasoningEfforts": [
+                    {
+                      "id": "xhigh",
+                      "value": "xhigh",
+                      "label": "Extra High Effort",
+                      "description": "Highest effort and reasoning level",
+                      "default": false
+                    },
+                    {
+                      "id": "high",
+                      "value": "high",
+                      "label": "High Effort",
+                      "description": "Higher implementation quality with extensive reasoning",
+                      "default": true
+                    },
+                    {
+                      "id": "medium",
+                      "value": "medium",
+                      "label": "Medium Effort",
+                      "description": "Balanced effort with standard implementation and testing",
+                      "default": false
+                    },
+                    {
+                      "id": "low",
+                      "value": "low",
+                      "label": "Low Effort",
+                      "description": "Quick, fast implementations",
+                      "default": false
+                    }
+                  ]
+                }
+              },
+              {
+                "modelId": "grok-4.5",
+                "name": "Grok 4.5",
+                "_meta": {
+                  "totalContextTokens": 500000,
+                  "agentType": "grok-build-plan",
+                  "supportsReasoningEffort": true,
+                  "reasoningEffort": "high",
+                  "reasoningEfforts": [
+                    {
+                      "id": "high",
+                      "value": "high",
+                      "label": "High Effort",
+                      "description": "Highest implementation quality with extensive reasoning",
+                      "default": true
+                    },
+                    {
+                      "id": "medium",
+                      "value": "medium",
+                      "label": "Medium Effort",
+                      "description": "Balanced effort with standard implementation and testing",
+                      "default": false
+                    },
+                    {
+                      "id": "low",
+                      "value": "low",
+                      "label": "Low Effort",
+                      "description": "Quick, fast implementations",
+                      "default": false
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "_meta": {
+            "currentWorkingDirectory": "<tmp>",
+            "codebaseIndexed": [],
+            "isGitRepo": false,
+            "gitRoot": null,
+            "showNonGitWarning": false,
+            "feedbackEnabled": true,
+            "x.ai/sessionConfig": {
+              "options": [
+                {
+                  "id": "grok-4.6",
+                  "category": "model",
+                  "label": "Grok 4.6",
+                  "selected": true
+                },
+                {
+                  "id": "grok-4.5",
+                  "category": "model",
+                  "label": "Grok 4.5",
+                  "selected": false
+                },
+                {
+                  "id": "xhigh",
+                  "category": "mode",
+                  "label": "Extra High Effort",
+                  "description": "Highest effort and reasoning level",
+                  "selected": false
+                },
+                {
+                  "id": "high",
+                  "category": "mode",
+                  "label": "High Effort",
+                  "description": "Higher implementation quality with extensive reasoning",
+                  "selected": true
+                },
+                {
+                  "id": "medium",
+                  "category": "mode",
+                  "label": "Medium Effort",
+                  "description": "Balanced effort with standard implementation and testing",
+                  "selected": false
+                },
+                {
+                  "id": "low",
+                  "category": "mode",
+                  "label": "Low Effort",
+                  "description": "Quick, fast implementations",
+                  "selected": false
+                }
+              ]
+            },
+            "x.ai/sessionDetail": {
+              "sessionId": "<session-id>",
+              "kind": "build",
+              "cwd": "<tmp>",
+              "currentModelId": "grok-4.6"
+            },
+            "x.ai/schedulerBackgroundLoops": true
+          }
+        }
+      }
+    },
+    {
+      "seq": 10,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "<session-id>",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "Reply with exactly: OK"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 11,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "<session-id>",
+              "title": null,
+              "cwd": "<tmp>",
+              "isWorktree": false,
+              "modelId": "grok-4.6",
+              "reasoningEffort": "high",
+              "yolo": true,
+              "activity": "working",
+              "resident": true,
+              "lastChangeUnixMs": 1787227408431,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "seq": 12,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "<session-id>",
+          "entries": [
+            {
+              "id": "<uuid>",
+              "version": 0,
+              "kind": "prompt",
+              "text": "Reply with exactly: OK",
+              "position": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 13,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "<session-id>",
+          "entries": [],
+          "runningPromptId": "3074f748-a65c-47b1-be19-ae943ac533fb",
+          "runningText": "Reply with exactly: OK",
+          "runningKind": "prompt"
+        }
+      }
+    },
+    {
+      "seq": 14,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "user_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "Reply with exactly: OK"
+            },
+            "_meta": {
+              "modelId": "grok-4.6",
+              "promptIndex": 0
+            }
+          },
+          "_meta": {
+            "eventId": "<session-id>-2",
+            "agentTimestampMs": 1787227408433
+          }
+        }
+      }
+    },
+    {
+      "seq": 15,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/models/update",
+        "params": {
+          "currentModelId": "grok-4.6",
+          "availableModels": [
+            {
+              "modelId": "grok-4.6",
+              "name": "Grok 4.6",
+              "description": "SpaceXAI's latest frontier model",
+              "_meta": {
+                "totalContextTokens": 500000,
+                "agentType": "grok-build-plan",
+                "supportsReasoningEffort": true,
+                "reasoningEffort": "high",
+                "reasoningEfforts": [
+                  {
+                    "id": "xhigh",
+                    "value": "xhigh",
+                    "label": "Extra High Effort",
+                    "description": "Highest effort and reasoning level",
+                    "default": false
+                  },
+                  {
+                    "id": "high",
+                    "value": "high",
+                    "label": "High Effort",
+                    "description": "Higher implementation quality with extensive reasoning",
+                    "default": true
+                  },
+                  {
+                    "id": "medium",
+                    "value": "medium",
+                    "label": "Medium Effort",
+                    "description": "Balanced effort with standard implementation and testing",
+                    "default": false
+                  },
+                  {
+                    "id": "low",
+                    "value": "low",
+                    "label": "Low Effort",
+                    "description": "Quick, fast implementations",
+                    "default": false
+                  }
+                ]
+              }
+            },
+            {
+              "modelId": "grok-4.5",
+              "name": "Grok 4.5",
+              "_meta": {
+                "totalContextTokens": 500000,
+                "agentType": "grok-build-plan",
+                "supportsReasoningEffort": true,
+                "reasoningEffort": "high",
+                "reasoningEfforts": [
+                  {
+                    "id": "high",
+                    "value": "high",
+                    "label": "High Effort",
+                    "description": "Highest implementation quality with extensive reasoning",
+                    "default": true
+                  },
+                  {
+                    "id": "medium",
+                    "value": "medium",
+                    "label": "Medium Effort",
+                    "description": "Balanced effort with standard implementation and testing",
+                    "default": false
+                  },
+                  {
+                    "id": "low",
+                    "value": "low",
+                    "label": "Low Effort",
+                    "description": "Quick, fast implementations",
+                    "default": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 16,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/settings/update",
+        "params": {
+          "show_resolved_model": false,
+          "sharing_enabled": false,
+          "privacy_notice_rollout": true,
+          "privacy_banner_reshow_days": 0,
+          "session_picker_grouped": null,
+          "tips": [
+            "Use @ to attach files like @src/main.rs.",
+            "Use @! for hidden or ignored files: @!.github/workflows.",
+            "Press Ctrl+O to toggle auto-approve mode.",
+            "Use Shift+Tab to cycle between modes like Plan mode.",
+            "Run /compact [context] when chat gets long.",
+            "Press Ctrl+B to background a running terminal command.",
+            "Start Grok in a fresh worktree with `-w`; add `-r <session-id>` to resume an existing session there.",
+            "Use Ctrl+Enter to interject messages. Or just Enter to queue messages.",
+            "Run /dashboard (or Ctrl+\\) to see and manage all your agents in one place.",
+            "Try out workflows using /workflows."
+          ],
+          "slash_command_tags": {
+            "workflows": "new"
+          },
+          "announcements": [
+            {
+              "id": "team",
+              "message": "Select 'Grok 4.6' under /model.",
+              "severity": "info",
+              "title": "Grok 4.6 is here!",
+              "cta": null,
+              "updated_at": null,
+              "expires_at": null,
+              "dismissible": null,
+              "persistent": null
+            }
+          ],
+          "campaigns": [
+            {
+              "id": "grok-4.6-launch",
+              "models": {
+                "default": "grok-4.6"
+              }
+            }
+          ],
+          "gate_message": null,
+          "gate_url": null,
+          "gate_label": null,
+          "allow_access": true,
+          "consent_gate": null,
+          "subscription_tier_display": "X Premium+",
+          "auto_permission_mode_enabled": null,
+          "permission_mode": null,
+          "group_tool_verbs": null,
+          "collapsed_edit_blocks": null,
+          "subscription_watch_interval_secs": 60
+        }
+      }
+    },
+    {
+      "seq": 17,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/announcements/update",
+        "params": {
+          "gen": 1787227408,
+          "announcements": [
+            {
+              "id": "team",
+              "message": "Select 'Grok 4.6' under /model.",
+              "severity": "info",
+              "title": "Grok 4.6 is here!",
+              "cta": null,
+              "updated_at": null,
+              "expires_at": null,
+              "dismissible": null,
+              "persistent": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 18,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/settings/update",
+        "params": {
+          "show_resolved_model": false,
+          "sharing_enabled": false,
+          "privacy_notice_rollout": true,
+          "privacy_banner_reshow_days": 0,
+          "session_picker_grouped": null,
+          "tips": [
+            "Use @ to attach files like @src/main.rs.",
+            "Use @! for hidden or ignored files: @!.github/workflows.",
+            "Press Ctrl+O to toggle auto-approve mode.",
+            "Use Shift+Tab to cycle between modes like Plan mode.",
+            "Run /compact [context] when chat gets long.",
+            "Press Ctrl+B to background a running terminal command.",
+            "Start Grok in a fresh worktree with `-w`; add `-r <session-id>` to resume an existing session there.",
+            "Use Ctrl+Enter to interject messages. Or just Enter to queue messages.",
+            "Run /dashboard (or Ctrl+\\) to see and manage all your agents in one place.",
+            "Try out workflows using /workflows."
+          ],
+          "slash_command_tags": {
+            "workflows": "new"
+          },
+          "announcements": [
+            {
+              "id": "team",
+              "message": "Select 'Grok 4.6' under /model.",
+              "severity": "info",
+              "title": "Grok 4.6 is here!",
+              "cta": null,
+              "updated_at": null,
+              "expires_at": null,
+              "dismissible": null,
+              "persistent": null
+            }
+          ],
+          "campaigns": [
+            {
+              "id": "grok-4.6-launch",
+              "models": {
+                "default": "grok-4.6"
+              }
+            }
+          ],
+          "gate_message": null,
+          "gate_url": null,
+          "gate_label": null,
+          "allow_access": true,
+          "consent_gate": null,
+          "subscription_tier_display": "X Premium+",
+          "auto_permission_mode_enabled": null,
+          "permission_mode": null,
+          "group_tool_verbs": null,
+          "collapsed_edit_blocks": null,
+          "subscription_watch_interval_secs": 60
+        }
+      }
+    },
+    {
+      "seq": 19,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/announcements/update",
+        "params": {
+          "gen": 1787227409,
+          "announcements": [
+            {
+              "id": "team",
+              "message": "Select 'Grok 4.6' under /model.",
+              "severity": "info",
+              "title": "Grok 4.6 is here!",
+              "cta": null,
+              "updated_at": null,
+              "expires_at": null,
+              "dismissible": null,
+              "persistent": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 20,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/init_progress",
+        "params": {
+          "total": 4,
+          "connected": 1,
+          "sessionId": "<session-id>"
+        }
+      }
+    },
+    {
+      "seq": 21,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/server_status",
+        "params": {
+          "sessionId": "<session-id>",
+          "name": "zai-mcp-server",
+          "source": "local",
+          "status": "ready",
+          "reason": "initialized",
+          "tools": null
+        }
+      }
+    },
+    {
+      "seq": 22,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/models/update",
+        "params": {
+          "currentModelId": "grok-4.6",
+          "availableModels": [
+            {
+              "modelId": "grok-4.6",
+              "name": "Grok 4.6",
+              "description": "SpaceXAI's latest frontier model",
+              "_meta": {
+                "totalContextTokens": 500000,
+                "agentType": "grok-build-plan",
+                "supportsReasoningEffort": true,
+                "reasoningEffort": "high",
+                "reasoningEfforts": [
+                  {
+                    "id": "xhigh",
+                    "value": "xhigh",
+                    "label": "Extra High Effort",
+                    "description": "Highest effort and reasoning level",
+                    "default": false
+                  },
+                  {
+                    "id": "high",
+                    "value": "high",
+                    "label": "High Effort",
+                    "description": "Higher implementation quality with extensive reasoning",
+                    "default": true
+                  },
+                  {
+                    "id": "medium",
+                    "value": "medium",
+                    "label": "Medium Effort",
+                    "description": "Balanced effort with standard implementation and testing",
+                    "default": false
+                  },
+                  {
+                    "id": "low",
+                    "value": "low",
+                    "label": "Low Effort",
+                    "description": "Quick, fast implementations",
+                    "default": false
+                  }
+                ]
+              }
+            },
+            {
+              "modelId": "grok-4.5",
+              "name": "Grok 4.5",
+              "_meta": {
+                "totalContextTokens": 500000,
+                "agentType": "grok-build-plan",
+                "supportsReasoningEffort": true,
+                "reasoningEffort": "high",
+                "reasoningEfforts": [
+                  {
+                    "id": "high",
+                    "value": "high",
+                    "label": "High Effort",
+                    "description": "Highest implementation quality with extensive reasoning",
+                    "default": true
+                  },
+                  {
+                    "id": "medium",
+                    "value": "medium",
+                    "label": "Medium Effort",
+                    "description": "Balanced effort with standard implementation and testing",
+                    "default": false
+                  },
+                  {
+                    "id": "low",
+                    "value": "low",
+                    "label": "Low Effort",
+                    "description": "Quick, fast implementations",
+                    "default": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 23,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/server_status",
+        "params": {
+          "sessionId": "<session-id>",
+          "name": "web-reader",
+          "source": "local",
+          "status": "ready",
+          "reason": "initialized",
+          "tools": null
+        }
+      }
+    },
+    {
+      "seq": 24,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/announcements/update",
+        "params": {
+          "gen": 1787227410,
+          "announcements": [
+            {
+              "id": "team",
+              "message": "Select 'Grok 4.6' under /model.",
+              "severity": "info",
+              "title": "Grok 4.6 is here!",
+              "cta": null,
+              "updated_at": null,
+              "expires_at": null,
+              "dismissible": null,
+              "persistent": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 25,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "The"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-3",
+            "agentTimestampMs": 1787227410673,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 1
+          }
+        }
+      }
+    },
+    {
+      "seq": 26,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " user"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-4",
+            "agentTimestampMs": 1787227410673,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 2
+          }
+        }
+      }
+    },
+    {
+      "seq": 27,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " wants"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-5",
+            "agentTimestampMs": 1787227410673,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 3
+          }
+        }
+      }
+    },
+    {
+      "seq": 28,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " me"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-6",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 4
+          }
+        }
+      }
+    },
+    {
+      "seq": 29,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " to"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-7",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 5
+          }
+        }
+      }
+    },
+    {
+      "seq": 30,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " reply"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-8",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 6
+          }
+        }
+      }
+    },
+    {
+      "seq": 31,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " with"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-9",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 7
+          }
+        }
+      }
+    },
+    {
+      "seq": 32,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " exactly"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-10",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 8
+          }
+        }
+      }
+    },
+    {
+      "seq": 33,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " \""
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-11",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 9
+          }
+        }
+      }
+    },
+    {
+      "seq": 34,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "OK"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-12",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 10
+          }
+        }
+      }
+    },
+    {
+      "seq": 35,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "\"."
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-13",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 11
+          }
+        }
+      }
+    },
+    {
+      "seq": 36,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " This"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-14",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 12
+          }
+        }
+      }
+    },
+    {
+      "seq": 37,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " is"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-15",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 13
+          }
+        }
+      }
+    },
+    {
+      "seq": 38,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " a"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-16",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 14
+          }
+        }
+      }
+    },
+    {
+      "seq": 39,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " simple"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-17",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 15
+          }
+        }
+      }
+    },
+    {
+      "seq": 40,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " request"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-18",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 16
+          }
+        }
+      }
+    },
+    {
+      "seq": 41,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " -"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-19",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 17
+          }
+        }
+      }
+    },
+    {
+      "seq": 42,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " I"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-20",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 18
+          }
+        }
+      }
+    },
+    {
+      "seq": 43,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " should"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-21",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 19
+          }
+        }
+      }
+    },
+    {
+      "seq": 44,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " just"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-22",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 20
+          }
+        }
+      }
+    },
+    {
+      "seq": 45,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " reply"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-23",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 21
+          }
+        }
+      }
+    },
+    {
+      "seq": 46,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " with"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-24",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 22
+          }
+        }
+      }
+    },
+    {
+      "seq": 47,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " exactly"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-25",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 23
+          }
+        }
+      }
+    },
+    {
+      "seq": 48,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " that"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-26",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 24
+          }
+        }
+      }
+    },
+    {
+      "seq": 49,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " and"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-27",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 25
+          }
+        }
+      }
+    },
+    {
+      "seq": 50,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " nothing"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-28",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 26
+          }
+        }
+      }
+    },
+    {
+      "seq": 51,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " else"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-29",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 27
+          }
+        }
+      }
+    },
+    {
+      "seq": 52,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "."
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-30",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentThoughtChunk",
+            "chunkId": 28
+          }
+        }
+      }
+    },
+    {
+      "seq": 53,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "OK"
+            }
+          },
+          "_meta": {
+            "totalTokens": 9760,
+            "eventId": "<session-id>-31",
+            "agentTimestampMs": 1787227410674,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AgentMessageChunk",
+            "chunkId": 29
+          }
+        }
+      }
+    },
+    {
+      "seq": 54,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/server_status",
+        "params": {
+          "sessionId": "<session-id>",
+          "name": "zread",
+          "source": "local",
+          "status": "ready",
+          "reason": "initialized",
+          "tools": null
+        }
+      }
+    },
+    {
+      "seq": 55,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "compact",
+                "description": "Compress conversation history to save context window",
+                "input": {
+                  "hint": "optional context about what to preserve"
+                }
+              },
+              {
+                "name": "always-approve",
+                "description": "Toggle always-approve mode (skip all permission prompts)",
+                "input": {
+                  "hint": "on|off"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage and session stats",
+                "input": null
+              },
+              {
+                "name": "hooks-trust",
+                "description": "Trust this project for hook execution",
+                "input": null
+              },
+              {
+                "name": "hooks-list",
+                "description": "Show hooks loaded in this session",
+                "input": null
+              },
+              {
+                "name": "hooks-add",
+                "description": "Add a custom hook file or directory",
+                "input": {
+                  "hint": "path to hook file or directory"
+                }
+              },
+              {
+                "name": "hooks-remove",
+                "description": "Remove a custom hook file or directory path",
+                "input": {
+                  "hint": "path to hook file or directory"
+                }
+              },
+              {
+                "name": "hooks-untrust",
+                "description": "Remove trust for the current project",
+                "input": null
+              },
+              {
+                "name": "plugins",
+                "description": "Manage plugins (list, reload, trust, add, remove)",
+                "input": {
+                  "hint": "list | reload | trust <path> | add <path> | remove <path>"
+                }
+              },
+              {
+                "name": "reload-plugins",
+                "description": "Reload plugins from disk (alias for /plugins reload)",
+                "input": null
+              },
+              {
+                "name": "session-info",
+                "description": "Show session details (model, turns, context usage)",
+                "input": null
+              },
+              {
+                "name": "feedback",
+                "description": "Send feedback about the current session",
+                "input": {
+                  "hint": "feedback text"
+                }
+              },
+              {
+                "name": "deep-research",
+                "description": "Research with bounded parallel agents, cross-check evidence, and write a cited report",
+                "input": {
+                  "hint": "<query>"
+                }
+              },
+              {
+                "name": "workflow",
+                "description": "Launch a saved workflow, or manage a run (pause, resume, stop, save)",
+                "input": {
+                  "hint": "<name> [args] | pause|resume|stop|save [name]"
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set, manage, or check an autonomous goal",
+                "input": {
+                  "hint": "<objective> [--budget <tokens>] | status | pause | resume | clear"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt on a recurring interval",
+                "input": {
+                  "hint": "[interval] <prompt>"
+                }
+              },
+              {
+                "name": "user:brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/brainstorming/SKILL.md",
+                  "bareName": "brainstorming",
+                  "qualifiedName": "user:brainstorming"
+                }
+              },
+              {
+                "name": "user:dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/dispatching-parallel-agents/SKILL.md",
+                  "bareName": "dispatching-parallel-agents",
+                  "qualifiedName": "user:dispatching-parallel-agents"
+                }
+              },
+              {
+                "name": "user:executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/executing-plans/SKILL.md",
+                  "bareName": "executing-plans",
+                  "qualifiedName": "user:executing-plans"
+                }
+              },
+              {
+                "name": "find-skills",
+                "description": "<elided 303 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/find-skills/SKILL.md",
+                  "bareName": "find-skills",
+                  "qualifiedName": "user:find-skills"
+                }
+              },
+              {
+                "name": "user:finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/finishing-a-development-branch/SKILL.md",
+                  "bareName": "finishing-a-development-branch",
+                  "qualifiedName": "user:finishing-a-development-branch"
+                }
+              },
+              {
+                "name": "meta-cognition-parallel",
+                "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, \u4e09\u5c42\u5206\u6790, parallel analysis, \u5e76\u884c\u5143\u8ba4\u77e5",
+                "input": {
+                  "hint": "<rust_question>"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/meta-cognition-parallel/SKILL.md",
+                  "bareName": "meta-cognition-parallel",
+                  "qualifiedName": "user:meta-cognition-parallel"
+                }
+              },
+              {
+                "name": "user:receiving-code-review",
+                "description": "<elided 234 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/receiving-code-review/SKILL.md",
+                  "bareName": "receiving-code-review",
+                  "qualifiedName": "user:receiving-code-review"
+                }
+              },
+              {
+                "name": "user:requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/requesting-code-review/SKILL.md",
+                  "bareName": "requesting-code-review",
+                  "qualifiedName": "user:requesting-code-review"
+                }
+              },
+              {
+                "name": "rust-call-graph",
+                "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, \u8c03\u7528\u56fe, \u8c03\u7528\u5173\u7cfb, \u8c01\u8c03\u7528\u4e86, \u8c03\u7528\u4e86\u8c01",
+                "input": {
+                  "hint": "<function_name> [--depth N] [--direction in|out|both]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-call-graph/SKILL.md",
+                  "bareName": "rust-call-graph",
+                  "qualifiedName": "user:rust-call-graph"
+                }
+              },
+              {
+                "name": "rust-code-navigator",
+                "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, \u8df3\u8f6c\u5b9a\u4e49, \u67e5\u627e\u5f15\u7528, \u5b9a\u4e49\u5728\u54ea, \u8c01\u7528\u4e86\u8fd9\u4e2a",
+                "input": {
+                  "hint": "<symbol> [in file.rs:line]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-code-navigator/SKILL.md",
+                  "bareName": "rust-code-navigator",
+                  "qualifiedName": "user:rust-code-navigator"
+                }
+              },
+              {
+                "name": "rust-daily",
+                "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust \u65e5\u62a5, Rust \u5468\u62a5, Rust \u65b0\u95fb, Rust \u52a8\u6001",
+                "input": {
+                  "hint": "[today|week|month]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-daily/SKILL.md",
+                  "bareName": "rust-daily",
+                  "qualifiedName": "user:rust-daily"
+                }
+              },
+              {
+                "name": "rust-deps-visualizer",
+                "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, \u4f9d\u8d56\u56fe, \u4f9d\u8d56\u53ef\u89c6\u5316, \u663e\u793a\u4f9d\u8d56",
+                "input": {
+                  "hint": "[--depth N] [--features]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-deps-visualizer/SKILL.md",
+                  "bareName": "rust-deps-visualizer",
+                  "qualifiedName": "user:rust-deps-visualizer"
+                }
+              },
+              {
+                "name": "rust-learner",
+                "description": "<elided 387 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-learner/SKILL.md",
+                  "bareName": "rust-learner",
+                  "qualifiedName": "user:rust-learner"
+                }
+              },
+              {
+                "name": "rust-refactor-helper",
+                "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, \u91cd\u6784, \u91cd\u547d\u540d, \u63d0\u53d6\u51fd\u6570, \u5b89\u5168\u91cd\u6784",
+                "input": {
+                  "hint": "<action> <target> [--dry-run]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-refactor-helper/SKILL.md",
+                  "bareName": "rust-refactor-helper",
+                  "qualifiedName": "user:rust-refactor-helper"
+                }
+              },
+              {
+                "name": "rust-router",
+                "description": "<elided 853 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-router/SKILL.md",
+                  "bareName": "rust-router",
+                  "qualifiedName": "user:rust-router"
+                }
+              },
+              {
+                "name": "rust-symbol-analyzer",
+                "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, \u7b26\u53f7\u5206\u6790, \u9879\u76ee\u7ed3\u6784, \u5217\u51fa\u6240\u6709, \u6709\u54ea\u4e9bstruct",
+                "input": {
+                  "hint": "[file.rs] [--type struct|trait|fn|mod]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-symbol-analyzer/SKILL.md",
+                  "bareName": "rust-symbol-analyzer",
+                  "qualifiedName": "user:rust-symbol-analyzer"
+                }
+              },
+              {
+                "name": "rust-trait-explorer",
+                "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait \u5b9e\u73b0, \u8c01\u5b9e\u73b0\u4e86, \u5b9e\u73b0\u4e86\u54ea\u4e9btrait",
+                "input": {
+                  "hint": "<TraitName|StructName>"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/rust-trait-explorer/SKILL.md",
+                  "bareName": "rust-trait-explorer",
+                  "qualifiedName": "user:rust-trait-explorer"
+                }
+              },
+              {
+                "name": "user:subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/subagent-driven-development/SKILL.md",
+                  "bareName": "subagent-driven-development",
+                  "qualifiedName": "user:subagent-driven-development"
+                }
+              },
+              {
+                "name": "user:systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/systematic-debugging/SKILL.md",
+                  "bareName": "systematic-debugging",
+                  "qualifiedName": "user:systematic-debugging"
+                }
+              },
+              {
+                "name": "user:test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/test-driven-development/SKILL.md",
+                  "bareName": "test-driven-development",
+                  "qualifiedName": "user:test-driven-development"
+                }
+              },
+              {
+                "name": "unsafe-checker",
+                "description": "<elided 339 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/unsafe-checker/SKILL.md",
+                  "bareName": "unsafe-checker",
+                  "qualifiedName": "user:unsafe-checker"
+                }
+              },
+              {
+                "name": "user:using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/using-git-worktrees/SKILL.md",
+                  "bareName": "using-git-worktrees",
+                  "qualifiedName": "user:using-git-worktrees"
+                }
+              },
+              {
+                "name": "user:using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/using-superpowers/SKILL.md",
+                  "bareName": "using-superpowers",
+                  "qualifiedName": "user:using-superpowers"
+                }
+              },
+              {
+                "name": "user:verification-before-completion",
+                "description": "<elided 225 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/verification-before-completion/SKILL.md",
+                  "bareName": "verification-before-completion",
+                  "qualifiedName": "user:verification-before-completion"
+                }
+              },
+              {
+                "name": "user:writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/writing-plans/SKILL.md",
+                  "bareName": "writing-plans",
+                  "qualifiedName": "user:writing-plans"
+                }
+              },
+              {
+                "name": "user:writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.agents/skills/writing-skills/SKILL.md",
+                  "bareName": "writing-skills",
+                  "qualifiedName": "user:writing-skills"
+                }
+              },
+              {
+                "name": "karpathy-guidelines",
+                "description": "<elided 553 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/skills/karpathy-guidelines/SKILL.md",
+                  "bareName": "karpathy-guidelines",
+                  "qualifiedName": "user:karpathy-guidelines"
+                }
+              },
+              {
+                "name": "build-with-ai",
+                "description": "Build AI apps on SpaceXAI (XAI_API_KEY + api.x.ai)",
+                "input": {
+                  "hint": "<what you're building>"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/build-with-ai/SKILL.md",
+                  "bareName": "build-with-ai",
+                  "qualifiedName": "bundled:build-with-ai"
+                }
+              },
+              {
+                "name": "bundled:code-review",
+                "description": "Run an extremely strict maintainability review for abstraction quality, giant files, and spaghetti-condition growth. Use for a deep code quality audit or an especially harsh maintainability review.",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/code-review/SKILL.md",
+                  "bareName": "code-review",
+                  "qualifiedName": "bundled:code-review"
+                }
+              },
+              {
+                "name": "create-skill",
+                "description": "Create a new Grok skill",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-skill/SKILL.md",
+                  "bareName": "create-skill",
+                  "qualifiedName": "bundled:create-skill"
+                }
+              },
+              {
+                "name": "create-workflow",
+                "description": "Author a new multi-agent workflow",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/create-workflow/SKILL.md",
+                  "bareName": "create-workflow",
+                  "qualifiedName": "bundled:create-workflow"
+                }
+              },
+              {
+                "name": "design",
+                "description": "Run the full design-doc-writer and design-doc-reviewer loop until consensus. Produces a polished design document with a PR plan.",
+                "input": {
+                  "hint": "<description of what to design>"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/design/SKILL.md",
+                  "bareName": "design",
+                  "qualifiedName": "bundled:design"
+                }
+              },
+              {
+                "name": "execute-plan",
+                "description": "<elided 291 chars>",
+                "input": {
+                  "hint": "<design-doc-path> [--effort N] [--concurrency N] [--dry-run] [--resume <PLAN_ID>] [--instructions \"...\"] [--no-graphite] [--auto-pr]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/execute-plan/SKILL.md",
+                  "bareName": "execute-plan",
+                  "qualifiedName": "bundled:execute-plan"
+                }
+              },
+              {
+                "name": "bundled:imagine",
+                "description": "Prompting and workflow guidance for Imagine image tools",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/imagine/SKILL.md",
+                  "bareName": "imagine",
+                  "qualifiedName": "bundled:imagine"
+                }
+              },
+              {
+                "name": "implement",
+                "description": "<elided 313 chars>",
+                "input": {
+                  "hint": "[--effort N] <description of what to implement>"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/implement/SKILL.md",
+                  "bareName": "implement",
+                  "qualifiedName": "bundled:implement"
+                }
+              },
+              {
+                "name": "pr-babysit",
+                "description": "Monitor PRs, fix CI failures, address review comments, resolve merge conflicts, and restack stacks. Supports independent PRs, Graphite stacks, and GitHub stacked PRs (gh-stack).",
+                "input": {
+                  "hint": "add <number> | remove <number> | list | check"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/pr-babysit/SKILL.md",
+                  "bareName": "pr-babysit",
+                  "qualifiedName": "bundled:pr-babysit"
+                }
+              },
+              {
+                "name": "resume-claude",
+                "description": "Continue from a recent Claude Code session",
+                "input": {
+                  "hint": "[words describing the session | session id]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-claude/SKILL.md",
+                  "bareName": "resume-claude",
+                  "qualifiedName": "bundled:resume-claude"
+                }
+              },
+              {
+                "name": "resume-codex",
+                "description": "Continue from a recent Codex session",
+                "input": {
+                  "hint": "[words describing the session | session id]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-codex/SKILL.md",
+                  "bareName": "resume-codex",
+                  "qualifiedName": "bundled:resume-codex"
+                }
+              },
+              {
+                "name": "resume-cursor",
+                "description": "Continue from a recent Cursor session",
+                "input": {
+                  "hint": "[words describing the session | session id]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/resume-cursor/SKILL.md",
+                  "bareName": "resume-cursor",
+                  "qualifiedName": "bundled:resume-cursor"
+                }
+              },
+              {
+                "name": "review",
+                "description": "<elided 262 chars>",
+                "input": {
+                  "hint": "[--local | --branch <name> | --pr <number-or-url> | <auto-detect>]"
+                },
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/review/SKILL.md",
+                  "bareName": "review",
+                  "qualifiedName": "bundled:review"
+                }
+              },
+              {
+                "name": "skill-design-principles",
+                "description": "Concise, high-signal principles for writing and editing skills well. Use whenever authoring or editing a skill.",
+                "input": null,
+                "_meta": {
+                  "scope": "bundled",
+                  "path": "/home/grimoire/.grok/bundled/skills/skill-design-principles/SKILL.md",
+                  "bareName": "skill-design-principles",
+                  "qualifiedName": "bundled:skill-design-principles"
+                }
+              },
+              {
+                "name": "new-sdk-app",
+                "description": "Create and setup a new Claude Agent SDK application",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/agent-sdk-dev/commands/new-sdk-app.md",
+                  "bareName": "new-sdk-app",
+                  "qualifiedName": "agent-sdk-dev:new-sdk-app",
+                  "pluginName": "agent-sdk-dev"
+                }
+              },
+              {
+                "name": "claude-automation-recommender",
+                "description": "<elided 354 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
+                  "bareName": "claude-automation-recommender",
+                  "qualifiedName": "claude-code-setup:claude-automation-recommender",
+                  "pluginName": "claude-code-setup"
+                }
+              },
+              {
+                "name": "claude-md-improver",
+                "description": "<elided 338 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
+                  "bareName": "claude-md-improver",
+                  "qualifiedName": "claude-md-management:claude-md-improver",
+                  "pluginName": "claude-md-management"
+                }
+              },
+              {
+                "name": "revise-claude-md",
+                "description": "Update CLAUDE.md with learnings from this session",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/claude-md-management/commands/revise-claude-md.md",
+                  "bareName": "revise-claude-md",
+                  "qualifiedName": "claude-md-management:revise-claude-md",
+                  "pluginName": "claude-md-management"
+                }
+              },
+              {
+                "name": "code-review:code-review",
+                "description": "Code review a pull request",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/code-review/commands/code-review.md",
+                  "bareName": "code-review",
+                  "qualifiedName": "code-review:code-review",
+                  "pluginName": "code-review"
+                }
+              },
+              {
+                "name": "feature-dev",
+                "description": "Guided feature development with codebase understanding and architecture focus",
+                "input": {
+                  "hint": "Optional feature description"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/feature-dev/commands/feature-dev.md",
+                  "bareName": "feature-dev",
+                  "qualifiedName": "feature-dev:feature-dev",
+                  "pluginName": "feature-dev"
+                }
+              },
+              {
+                "name": "frontend-design",
+                "description": "<elided 204 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design/skills/frontend-design/SKILL.md",
+                  "bareName": "frontend-design",
+                  "qualifiedName": "frontend-design:frontend-design",
+                  "pluginName": "frontend-design"
+                }
+              },
+              {
+                "name": "cancel-ralph",
+                "description": "Cancel active Ralph Loop",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/cancel-ralph.md",
+                  "bareName": "cancel-ralph",
+                  "qualifiedName": "ralph-loop:cancel-ralph",
+                  "pluginName": "ralph-loop"
+                }
+              },
+              {
+                "name": "ralph-loop:help",
+                "description": "Explain Ralph Loop plugin and available commands",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/help.md",
+                  "bareName": "help",
+                  "qualifiedName": "ralph-loop:help",
+                  "pluginName": "ralph-loop"
+                }
+              },
+              {
+                "name": "ralph-loop",
+                "description": "Start Ralph Loop in current session",
+                "input": {
+                  "hint": "PROMPT [--max-iterations N] [--completion-promise TEXT]"
+                },
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/marketplaces/claude-plugins-official/plugins/ralph-loop/commands/ralph-loop.md",
+                  "bareName": "ralph-loop",
+                  "qualifiedName": "ralph-loop:ralph-loop",
+                  "pluginName": "ralph-loop"
+                }
+              },
+              {
+                "name": "superpowers:brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/brainstorming/SKILL.md",
+                  "bareName": "brainstorming",
+                  "qualifiedName": "superpowers:brainstorming",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/dispatching-parallel-agents/SKILL.md",
+                  "bareName": "dispatching-parallel-agents",
+                  "qualifiedName": "superpowers:dispatching-parallel-agents",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/executing-plans/SKILL.md",
+                  "bareName": "executing-plans",
+                  "qualifiedName": "superpowers:executing-plans",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/finishing-a-development-branch/SKILL.md",
+                  "bareName": "finishing-a-development-branch",
+                  "qualifiedName": "superpowers:finishing-a-development-branch",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:receiving-code-review",
+                "description": "<elided 234 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/receiving-code-review/SKILL.md",
+                  "bareName": "receiving-code-review",
+                  "qualifiedName": "superpowers:receiving-code-review",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/requesting-code-review/SKILL.md",
+                  "bareName": "requesting-code-review",
+                  "qualifiedName": "superpowers:requesting-code-review",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/subagent-driven-development/SKILL.md",
+                  "bareName": "subagent-driven-development",
+                  "qualifiedName": "superpowers:subagent-driven-development",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/systematic-debugging/SKILL.md",
+                  "bareName": "systematic-debugging",
+                  "qualifiedName": "superpowers:systematic-debugging",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/test-driven-development/SKILL.md",
+                  "bareName": "test-driven-development",
+                  "qualifiedName": "superpowers:test-driven-development",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-git-worktrees/SKILL.md",
+                  "bareName": "using-git-worktrees",
+                  "qualifiedName": "superpowers:using-git-worktrees",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/using-superpowers/SKILL.md",
+                  "bareName": "using-superpowers",
+                  "qualifiedName": "superpowers:using-superpowers",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:verification-before-completion",
+                "description": "<elided 225 chars>",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/verification-before-completion/SKILL.md",
+                  "bareName": "verification-before-completion",
+                  "qualifiedName": "superpowers:verification-before-completion",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-plans/SKILL.md",
+                  "bareName": "writing-plans",
+                  "qualifiedName": "superpowers:writing-plans",
+                  "pluginName": "superpowers"
+                }
+              },
+              {
+                "name": "superpowers:writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
+                "input": null,
+                "_meta": {
+                  "scope": "user",
+                  "path": "/home/grimoire/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/skills/writing-skills/SKILL.md",
+                  "bareName": "writing-skills",
+                  "qualifiedName": "superpowers:writing-skills",
+                  "pluginName": "superpowers"
+                }
+              }
+            ],
+            "_meta": {
+              "tools": [
+                "run_terminal_command",
+                "read_file",
+                "search_replace",
+                "list_dir",
+                "grep",
+                "kill_command_or_subagent",
+                "todo_write",
+                "get_command_or_subagent_output",
+                "spawn_subagent",
+                "scheduler_create",
+                "scheduler_delete",
+                "scheduler_list",
+                "monitor",
+                "search_tool",
+                "use_tool",
+                "workflow",
+                "enter_plan_mode",
+                "exit_plan_mode",
+                "ask_user_question",
+                "web_search",
+                "web_fetch",
+                "image_gen",
+                "image_edit",
+                "image_to_video",
+                "reference_to_video",
+                "write"
+              ]
+            }
+          },
+          "_meta": {
+            "totalTokens": 20454,
+            "eventId": "<session-id>-32",
+            "agentTimestampMs": 1787227410777,
+            "promptId": "<uuid>",
+            "streamStartMs": 1787227409303,
+            "turnStartMs": 1787227408707,
+            "updateType": "AvailableCommandsUpdate",
+            "updateParams": {
+              "commandsCount": 81
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 56,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "response_completed",
+            "usage": {
+              "input_tokens": 14530,
+              "output_tokens": 36,
+              "cache_read_input_tokens": 5888,
+              "cache_creation_input_tokens": 0,
+              "reasoning_tokens": 31
+            },
+            "signature": "<elided 208 chars>"
+          }
+        }
+      }
+    },
+    {
+      "seq": 57,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/queue/changed",
+        "params": {
+          "sessionId": "<session-id>",
+          "entries": []
+        }
+      }
+    },
+    {
+      "seq": 58,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session_notification",
+        "params": {
+          "sessionId": "<session-id>",
+          "update": {
+            "sessionUpdate": "turn_completed",
+            "prompt_id": "<uuid>",
+            "stop_reason": "end_turn",
+            "usage": {
+              "inputTokens": 20418,
+              "outputTokens": 36,
+              "totalTokens": 20454,
+              "cachedReadTokens": 5888,
+              "cacheCreationTokens": 0,
+              "reasoningTokens": 31,
+              "modelCalls": 1,
+              "apiDurationMs": 2069,
+              "costUsdTicks": 54774000,
+              "modelUsage": {
+                "grok-4.6-build": {
+                  "inputTokens": 20418,
+                  "outputTokens": 36,
+                  "totalTokens": 20454,
+                  "cachedReadTokens": 5888,
+                  "cacheCreationTokens": 0,
+                  "reasoningTokens": 31,
+                  "modelCalls": 1,
+                  "apiDurationMs": 2069,
+                  "costUsdTicks": 54774000
+                }
+              },
+              "numTurns": 1
+            }
+          },
+          "_meta": {
+            "eventId": "<session-id>-33",
+            "agentTimestampMs": 1787227410784
+          }
+        }
+      }
+    },
+    {
+      "seq": 59,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/session/prompt_complete",
+        "params": {
+          "sessionId": "<session-id>",
+          "promptId": "<uuid>",
+          "stopReason": "end_turn",
+          "agentResult": null
+        }
+      }
+    },
+    {
+      "seq": 60,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/sessions/changed",
+        "params": {
+          "upserted": [
+            {
+              "sessionId": "<session-id>",
+              "title": null,
+              "cwd": "<tmp>",
+              "isWorktree": false,
+              "modelId": "grok-4.6",
+              "reasoningEffort": "high",
+              "yolo": true,
+              "activity": "idle",
+              "resident": true,
+              "lastChangeUnixMs": 1787227410784,
+              "origin": {
+                "kind": "local"
+              }
+            }
+          ],
+          "removed": []
+        }
+      }
+    },
+    {
+      "seq": 61,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "stopReason": "end_turn",
+          "_meta": {
+            "sessionId": "<session-id>",
+            "requestId": "<uuid>",
+            "promptId": "<uuid>",
+            "totalTokens": 20454,
+            "modelId": "grok-4.6",
+            "inputTokens": 20418,
+            "outputTokens": 36,
+            "cachedReadTokens": 5888,
+            "reasoningTokens": 31,
+            "usage": {
+              "inputTokens": 20418,
+              "outputTokens": 36,
+              "totalTokens": 20454,
+              "cachedReadTokens": 5888,
+              "cacheCreationTokens": 0,
+              "reasoningTokens": 31,
+              "modelCalls": 1,
+              "apiDurationMs": 2069,
+              "costUsdTicks": 54774000,
+              "modelUsage": {
+                "grok-4.6-build": {
+                  "inputTokens": 20418,
+                  "outputTokens": 36,
+                  "totalTokens": 20454,
+                  "cachedReadTokens": 5888,
+                  "cacheCreationTokens": 0,
+                  "reasoningTokens": 31,
+                  "modelCalls": 1,
+                  "apiDurationMs": 2069,
+                  "costUsdTicks": 54774000
+                }
+              },
+              "numTurns": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 62,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/init_progress",
+        "params": {
+          "total": 4,
+          "connected": 2,
+          "sessionId": "<session-id>"
+        }
+      }
+    },
+    {
+      "seq": 63,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/server_status",
+        "params": {
+          "sessionId": "<session-id>",
+          "name": "web-search-prime",
+          "source": "local",
+          "status": "ready",
+          "reason": "initialized",
+          "tools": null
+        }
+      }
+    }
+  ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content."
+}

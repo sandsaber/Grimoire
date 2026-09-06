@@ -1,6 +1,9 @@
 import type { App, Component } from 'obsidian';
 import { MarkdownRenderer, Menu, Notice, setIcon, setTooltip, TFile } from 'obsidian';
 
+import { asActivatable } from '@/shared/components/activatable';
+
+import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
 import { DEFAULT_CHAT_PROVIDER_ID, type ProviderCapabilities } from '../../../core/providers/types';
 import type { ChatRewindMode } from '../../../core/runtime/types';
 import {
@@ -364,7 +367,8 @@ export class MessageRenderer {
    */
   renderMessages(
     messages: ChatMessage[],
-    getGreeting: () => string
+    getGreeting: () => string,
+    hydration?: ProviderHistoryHydration,
   ): HTMLElement {
     this.messagesEl.empty();
     this.liveMessageEls.clear();
@@ -374,12 +378,34 @@ export class MessageRenderer {
     const newWelcomeEl = this.messagesEl.createDiv({ cls: 'grimoire-welcome' });
     newWelcomeEl.createDiv({ cls: 'grimoire-welcome-greeting', text: getGreeting() });
 
+    // Above the transcript, which is where the missing turns would have been.
+    // Part of the conversation rather than a toast, because a conversation
+    // reopened tomorrow is missing exactly as much as it is today.
+    this.renderHydrationNotice(hydration);
+
     for (let i = 0; i < messages.length; i++) {
       this.renderStoredMessage(messages[i], messages, i);
     }
 
     this.scrollToBottom();
     return newWelcomeEl;
+  }
+
+  /**
+   * Says why a transcript is shorter than the conversation it belongs to.
+   *
+   * Nothing is shown for a conversation that loaded, or for one that never had
+   * a provider-side history — an empty new chat must not be captioned. The
+   * three that are shown are the ones where the user is looking at less than
+   * was said, which until now was silent.
+   */
+  private renderHydrationNotice(hydration?: ProviderHistoryHydration): void {
+    const text = hydrationNoticeText(hydration);
+    if (!text) {
+      return;
+    }
+    const noticeEl = this.messagesEl.createDiv({ cls: 'grimoire-history-notice' });
+    noticeEl.createSpan({ cls: 'grimoire-history-notice-text', text });
   }
 
   renderStoredMessage(msg: ChatMessage, allMessages?: ChatMessage[], index?: number): void {
@@ -945,6 +971,12 @@ export class MessageRenderer {
 
     const closeBtn = modal.createDiv({ cls: 'grimoire-image-modal-close' });
     closeBtn.setText('\u00D7');
+    // A multiplication sign is a shape, not a name: without one this control
+    // announces as nothing and cannot be reached without a mouse.
+    asActivatable(closeBtn, {
+      label: t('chat.ui.messages.closeImage'),
+      onActivate: () => close(),
+    });
 
     // See the same handler in ImageContext: the stack decides which viewer
     // closes, and consuming the key here keeps it from also cancelling the
@@ -966,7 +998,6 @@ export class MessageRenderer {
       overlay.remove();
     };
 
-    closeBtn.addEventListener('click', close);
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close();
     });
@@ -1056,7 +1087,11 @@ export class MessageRenderer {
               text: match[1],
             });
             wrapper.appendChild(label);
-            label.addEventListener('click', () => {
+            // The label reads as the language and acts as a copy button, so the
+            // word on it is not the name of what it does.
+            asActivatable(label, {
+              label: t('chat.ui.messages.copyCode'),
+              onActivate: () => {
               runRendererAction(async () => {
                 const originalLabel = match[1];
                 if (!originalLabel) return;
@@ -1069,6 +1104,7 @@ export class MessageRenderer {
                   // Clipboard API may fail in non-secure contexts
                 }
               });
+              },
             });
           }
         }
@@ -1392,4 +1428,24 @@ export class MessageRenderer {
     }
   }
 
+}
+
+/**
+ * What a conversation says about the history it could not load.
+ *
+ * Three of the six outcomes are worth a row, and the other three are not:
+ * `complete` loaded, `absent` never had a provider-side history to lose — a new
+ * chat is not missing anything — and `recovered` means the gap was closed.
+ */
+function hydrationNoticeText(hydration?: ProviderHistoryHydration): string | null {
+  switch (hydration?.outcome) {
+    case 'stale':
+      return t('chat.ui.messages.historyUnavailable');
+    case 'partial':
+      return t('chat.ui.messages.historyPartial');
+    case 'corrupt':
+      return t('chat.ui.messages.historyUnreadable');
+    default:
+      return null;
+  }
 }

@@ -2,14 +2,16 @@ import * as path from 'node:path';
 
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 
-import type { ProviderCommandCatalog, ProviderCommandDropdownConfig } from '../../../core/providers/commands/ProviderCommandCatalog';
+import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
 import {
   VaultSkillCommandCatalog,
   type VaultSkillStorageAdapter,
 } from '../../../core/providers/commands/VaultSkillCommandCatalog';
+import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type { SlashCommand } from '../../../core/types';
+import { isRecord } from '../../../utils/records';
 
 export const GEMINI_COMMANDS_PATH = '.gemini/commands';
 const GEMINI_COMMAND_PERSISTENCE_PREFIX = 'gemini-command';
@@ -19,14 +21,6 @@ type GeminiCommandAdapter = VaultSkillStorageAdapter & Pick<VaultFileAdapter, 'l
 interface GeminiCommandLocation {
   relativePath: string;
 }
-
-const DROPDOWN_CONFIG: ProviderCommandDropdownConfig = {
-  providerId: 'gemini',
-  triggerChars: ['/'],
-  builtInPrefix: '/',
-  skillPrefix: '/',
-  commandPrefix: '/',
-};
 
 export class GeminiCommandCatalog implements ProviderCommandCatalog {
   private readonly skills: VaultSkillCommandCatalog;
@@ -108,16 +102,14 @@ export class GeminiCommandCatalog implements ProviderCommandCatalog {
     await this.adapter.delete(locationPath(location));
   }
 
-  getDropdownConfig(): ProviderCommandDropdownConfig {
-    return DROPDOWN_CONFIG;
-  }
-
-  getDefaultVaultStoragePath(): string | null {
+  defaultVaultStoragePath(): string | null {
     return '.gemini/skills';
   }
 
-  async refresh(): Promise<void> {
-    // Vault resources are read fresh for each request.
+  async refresh(): Promise<ProviderCatalogRefreshOutcome> {
+    // Vault resources are read fresh for each request, so there is nothing to
+    // reach and nothing that can fail.
+    return 'refreshed';
   }
 
   private async listCommands(): Promise<ProviderCommandEntry[]> {
@@ -218,6 +210,3 @@ function isSafeCommandRelativePath(value: string): boolean {
     && value.split('/').every((segment) => segment && segment !== '.' && segment !== '..');
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}

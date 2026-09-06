@@ -2,6 +2,18 @@
 
 This file tracks future provider integrations and the implementation sequence for agents working on Grimoire. It is not a promise that every listed provider is ready to ship; each provider still needs current runtime discovery before code is written.
 
+> **Architecture.** A provider is **declared once** in `src/providers/BuiltInProviderCatalog.ts`
+> and implements an **execution backend** that the kernel drives, presented to chat surfaces by
+> `ExecutionChatRuntimeAdapter`; its workspace slots come from
+> `ApplicationRuntime.workspaceFor(providerId)`. What the kernel guarantees a surface, and what a
+> backend must therefore provide, is in
+> [`provider-execution-adapter-contract.md`](provider-execution-adapter-contract.md); what the kernel
+> may write to a vault is in
+> [`provider-execution-persistence-decisions.md`](provider-execution-persistence-decisions.md).
+>
+> The checklist below is the **shape**, not the wiring: what a provider must decide and record
+> before code is written.
+
 ## Provider Implementation Checklist
 
 1. Capture the current CLI/runtime behavior first.
@@ -11,25 +23,30 @@ This file tracks future provider integrations and the implementation sequence fo
    - Use `src/providers/acp/` only for protocol-generic ACP behavior shared by at least two providers.
    - Keep provider-specific launch specs, settings, history parsing, model discovery, and UI config inside `src/providers/<provider>/`.
 3. Add the provider-owned contracts together.
-   - `registration.ts`
+   - a `*ProviderModule.ts` declaration, and its row in `BuiltInProviderCatalog`
    - `capabilities.ts`
-   - `settings.ts`
+   - `settings.ts`, with its codec on the module
    - `models.ts` or model discovery state
    - `ui/*ChatUIConfig.ts`
-   - runtime and launch environment
+   - an execution backend and its composition, under `execution/`
+   - a content presenter, where the provider says anything the surface must draw
    - workspace services
    - plan usage provider, even if the initial implementation only returns `null`
 4. Keep storage boundaries explicit.
    - Use provider-native files only when preserving CLI compatibility.
    - Use `.grimoire/<provider>/` for Grimoire-owned data.
-   - Do not add legacy migrations unless a migration milestone explicitly asks for them.
+   - Do not add legacy migrations unless a release explicitly asks for them.
 5. Add focused tests before broad release work.
-   - Provider registration and default enablement
-   - Settings projection and normalization
-   - Runtime launch spec and cancellation
-   - Stream/tool normalization
-   - History hydration
-   - Usage/cost indicator behavior
+   - the catalog declaration and default enablement
+   - settings projection and normalization
+   - launch spec and cancellation
+   - stream/tool normalization
+   - history hydration
+   - usage/cost indicator behavior
+   - **the wiring, not only the module.** A provider's helper can be complete,
+     tested and called by nothing: assert on what the backend is launched with
+     and what chunks a tab receives, which is the one thing a module test cannot
+     say. Every wiring defect found so far had green module tests.
 
 ## Current Integration Notes
 

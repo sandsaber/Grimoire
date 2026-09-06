@@ -446,13 +446,6 @@ describe('types.ts', () => {
       if (chunk.type === 'notice') expect(chunk.content).toBe('Command blocked: rm -rf');
     });
 
-    it('should accept done type', () => {
-      const chunk: StreamChunk = {
-        type: 'done',
-      };
-
-      expect(chunk.type).toBe('done');
-    });
   });
 
   describe('Conversation type', () => {

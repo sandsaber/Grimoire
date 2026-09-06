@@ -2,7 +2,6 @@ import { existsSync, readFileSync, realpathSync } from 'fs';
 import { tmpdir } from 'os';
 import { isAbsolute, sep } from 'path';
 
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { ProviderTaskResultInterpreter } from '../../../core/providers/types';
 import { TOOL_TASK } from '../../../core/tools/toolNames';
 import { extractToolResultContent } from '../../../core/tools/toolResultContent';
@@ -10,6 +9,7 @@ import type {
   SubagentInfo,
   ToolCallInfo,
 } from '../../../core/types';
+import { isRecord } from '../../../utils/records';
 import { extractFinalResultFromSubagentJsonl } from '../../../utils/subagentJsonl';
 import {
   addSubagentToolCall,
@@ -36,10 +36,6 @@ export type HandleTaskResult =
 export type RenderPendingResult =
   | { mode: 'sync'; subagentState: SubagentState }
   | { mode: 'async'; info: SubagentInfo; domState: AsyncSubagentState };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function parseJsonRecord(value: string): Record<string, unknown> | null {
   try {
@@ -76,11 +72,17 @@ export class SubagentManager {
   private onStateChange: SubagentStateChangeCallback;
   private taskResultInterpreter: ProviderTaskResultInterpreter;
 
+  /**
+   * @param taskResultInterpreter how *this tab's* provider reads a subagent
+   *   result. Required, because the default it used to carry was one named
+   *   provider's — so a construction that skipped the rebind would read every
+   *   other provider's results through Claude's interpreter and be wrong
+   *   quietly. A caller that has no provider yet has no interpreter, and should
+   *   say so rather than borrow one.
+   */
   constructor(
     onStateChange: SubagentStateChangeCallback,
-    // Interim default for unit tests / pre-bind construction. Tabs always
-    // rebind this via setTaskResultInterpreter to the active provider.
-    taskResultInterpreter: ProviderTaskResultInterpreter = ProviderRegistry.getTaskResultInterpreter('claude'),
+    taskResultInterpreter: ProviderTaskResultInterpreter,
   ) {
     this.onStateChange = onStateChange;
     this.taskResultInterpreter = taskResultInterpreter;
@@ -484,36 +486,19 @@ export class SubagentManager {
     this.onStateChange(subagent);
   }
 
-  // ============================================
-  // Hook State
-  // ============================================
-
-  public hasRunningSubagents(): boolean {
-    const isTerminal = (subagent: SubagentInfo | undefined): boolean =>
-      subagent?.asyncStatus === 'completed' ||
-      subagent?.asyncStatus === 'error' ||
-      subagent?.asyncStatus === 'orphaned';
-
-    let hasRunning = false;
-
-    for (const [taskToolId, subagent] of this.pendingAsyncSubagents) {
-      if (isTerminal(subagent)) {
-        this.pendingAsyncSubagents.delete(taskToolId);
-      } else {
-        hasRunning = true;
-      }
-    }
-
-    for (const [agentId, subagent] of this.activeAsyncSubagents) {
-      if (isTerminal(subagent)) {
-        this.activeAsyncSubagents.delete(agentId);
-      } else {
-        hasRunning = true;
-      }
-    }
-
-    return hasRunning;
-  }
+  // **This is where "does this tab have a subagent running" used to live**, and
+  // the answer is the durable records' now — `durableAgentsRunning` in
+  // `tabDurableSubagents.ts`. It was here because a record write is
+  // asynchronous while the question's answer was typed as immediate, so the tab
+  // had to keep its own live map and union the two; the hook body was always
+  // `async`, and once its type admitted that, the records could be waited for
+  // and read alone. This manager keeps its rendering, which is what M5 said it
+  // would.
+  //
+  // It also pruned terminal entries from the two async maps as it went. Both
+  // terminal paths above delete their own entry, and `clear()` empties both on
+  // a conversation switch, so the sweep was a second answer to a question the
+  // transitions already answer.
 
   // ============================================
   // Lifecycle
@@ -532,29 +517,6 @@ export class SubagentManager {
     this.pendingTasks.clear();
   }
 
-  public orphanAllActive(): SubagentInfo[] {
-    const orphaned: SubagentInfo[] = [];
-
-    for (const subagent of this.pendingAsyncSubagents.values()) {
-      this.markOrphaned(subagent);
-      orphaned.push(subagent);
-    }
-
-    for (const subagent of this.activeAsyncSubagents.values()) {
-      if (subagent.asyncStatus === 'running') {
-        this.markOrphaned(subagent);
-        orphaned.push(subagent);
-      }
-    }
-
-    this.pendingAsyncSubagents.clear();
-    this.activeAsyncSubagents.clear();
-    this.taskIdToAgentId.clear();
-    this.outputToolIdToAgentId.clear();
-
-    return orphaned;
-  }
-
   public clear(): void {
     this.syncSubagents.clear();
     this.pendingTasks.clear();
@@ -569,14 +531,6 @@ export class SubagentManager {
   // Private: State Transitions
   // ============================================
 
-  private markOrphaned(subagent: SubagentInfo): void {
-    subagent.asyncStatus = 'orphaned';
-    subagent.status = 'error';
-    subagent.result = 'Conversation ended before task completed';
-    subagent.completedAt = Date.now();
-    this.updateAsyncDomState(subagent);
-    this.onStateChange(subagent);
-  }
 
   private transitionToError(subagent: SubagentInfo, taskToolId: string, errorResult: string): void {
     subagent.asyncStatus = 'error';

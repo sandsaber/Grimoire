@@ -302,7 +302,7 @@ describe('FileContextManager', () => {
   it('renders attached files as wrapped context rows with separate title and path', () => {
     const contextMemoryEl = createMockEl();
     const app = createMockApp({
-      files: ['Книги/Book/Черновик/Арка 1/Глава 3 — Вариант A.md'],
+      files: ['Books/Book/Draft/Arc 1/Chapter 3 — Variant A.md'],
     });
     const manager = new FileContextManager(
       app,
@@ -313,7 +313,7 @@ describe('FileContextManager', () => {
       contextMemoryEl,
     );
 
-    inputEl.value = '@Вариант';
+    inputEl.value = '@Variant';
     inputEl.selectionStart = 8;
     inputEl.selectionEnd = 8;
     manager.handleInputChange();
@@ -328,8 +328,8 @@ describe('FileContextManager', () => {
     expect(row?.tagName).toBe('DIV');
     expect(row?.getAttribute('role')).toBe('button');
     expect(row?.getAttribute('tabindex')).toBe('0');
-    expect(title?.textContent).toBe('Глава 3 — Вариант A.md');
-    expect(path?.textContent).toBe('Книги/Book/Черновик/Арка 1/Глава 3 — Вариант A.md');
+    expect(title?.textContent).toBe('Chapter 3 — Variant A.md');
+    expect(path?.textContent).toBe('Books/Book/Draft/Arc 1/Chapter 3 — Variant A.md');
 
     manager.destroy();
   });

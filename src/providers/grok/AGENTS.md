@@ -25,3 +25,12 @@
 
 - On `session/load` failure, decide with `isAcpSessionGone`. Grok Build answers a session it no longer has with a bare `-32603 Path not found` (`FS_NOT_FOUND`), which no error-text rule can tell apart from an auth or configuration failure - but it advertises `sessionCapabilities.list` and answers `session/list`, so the listing is the reliable answer. A session the agent no longer lists is soft-failed into a fresh one; anything else - transport, authentication, configuration, or an agent that cannot list - propagates with the binding intact. Preserve session and workspace paths.
 - A dropped session is recorded in `providerState.sessionDropped` and read back on load, because the in-memory flag is consumed by the first save. Never replay the transcript into a replacement session: history bootstrap is for a cold resume that never held a session id.
+
+- **The decision is wired; the notice is not.** `ManagedAcpExecutionBackend` asks
+  `isAcpSessionGone` on every failed `session/load`, so a refusal whose words say nothing
+  is settled by asking the agent through `session/list`, and a session it no longer lists
+  soft-fails into a fresh one. `isMissingSessionError` overrides that decision and takes
+  the whole probe, so a provider adds what its own CLI says and defers to the shared
+  question for everything else. What is still missing here is the surface: this
+  provider implements no `sessionDropped` port, so a conversation whose session was
+  replaced resumes without the notice. OpenCode and MiMoCode are wired; this one is not.

@@ -1,4 +1,4 @@
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
+import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
 import type { ProviderConversationHistoryService } from '../../../core/providers/types';
 import { isSubagentToolName, TOOL_TASK } from '../../../core/tools/toolNames';
 import type {
@@ -27,16 +27,6 @@ function chooseRicherResult(sdkResult?: string, cachedResult?: string): string |
   if (cachedText.length === 0) return sdkResult;
 
   return sdkText.length >= cachedText.length ? sdkResult : cachedResult;
-}
-
-function getClaudeConfigDirContext(vaultPath: string): ClaudeConfigDirContext {
-  const services = ProviderWorkspaceRegistry.getServices('claude') as {
-    getClaudeConfigDir?: () => string;
-  } | null;
-  const configDir = services?.getClaudeConfigDir?.();
-  return configDir
-    ? { environment: { CLAUDE_CONFIG_DIR: configDir }, vaultPath }
-    : { vaultPath };
 }
 
 function chooseRicherToolCalls(
@@ -365,6 +355,29 @@ function sanitizeProviderState(
 export class ClaudeConversationHistoryService implements ProviderConversationHistoryService {
   private hydratedConversationIds = new Set<string>();
 
+  /**
+   * Where Claude keeps its transcripts, when the host knows.
+   *
+   * **Handed in rather than looked up.** This read the workspace registry for
+   * it, which made a file whose whole job is parsing Claude's own history
+   * depend on a global — and on a *cycle*: the workspace services reach this
+   * service, so importing them back left the class `undefined` at module init
+   * and took every suite that touched Claude with it. The directory resolves
+   * from the plugin's configured environment, which the module context has and
+   * this does not, so the context passes an accessor.
+   *
+   * Absent for the instance built at module scope, whose callers ask nothing
+   * that needs it.
+   */
+  constructor(private readonly resolveConfigDir?: () => string | undefined) {}
+
+  private configDirContext(vaultPath: string): ClaudeConfigDirContext {
+    const configDir = this.resolveConfigDir?.();
+    return configDir
+      ? { environment: { CLAUDE_CONFIG_DIR: configDir }, vaultPath }
+      : { vaultPath };
+  }
+
   isPendingForkConversation(conversation: Conversation): boolean {
     const state = getClaudeState(conversation.providerState);
     return !!state.forkSource
@@ -409,9 +422,13 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
   async hydrateConversationHistory(
     conversation: Conversation,
     vaultPath: string | null,
-  ): Promise<void> {
-    if (!vaultPath || this.hydratedConversationIds.has(conversation.id)) {
-      return;
+  ): Promise<ProviderHistoryHydration> {
+    if (this.hydratedConversationIds.has(conversation.id)) {
+      return { outcome: 'complete' };
+    }
+    if (!vaultPath) {
+      // Nowhere to look. The conversation shows what its own metadata holds.
+      return { outcome: 'absent' };
     }
 
     const state = getClaudeState(conversation.providerState);
@@ -424,7 +441,7 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
         ].filter((id): id is string => !!id);
 
     if (allSessionIds.length === 0) {
-      return;
+      return { outcome: 'absent' };
     }
 
     const allSdkMessages: ChatMessage[] = [];
@@ -439,7 +456,7 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
     const locations = await locateSDKSessions(
       vaultPath,
       allSessionIds,
-      getClaudeConfigDirContext(vaultPath),
+      this.configDirContext(vaultPath),
     );
     const resolvedSessionPaths = new Map<string, string>();
 
@@ -482,7 +499,10 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
     const allSessionsMissing = missingSessionCount === allSessionIds.length;
     const hasLoadErrors = errorCount > 0 && successCount === 0 && !allSessionsMissing;
     if (hasLoadErrors) {
-      return;
+      // Every session this conversation names failed to read, and none of them
+      // was simply absent. Nothing is merged, and the conversation is left
+      // showing whatever its metadata holds — which until now it did silently.
+      return { outcome: 'corrupt', reason: 'sessionsUnreadable' };
     }
 
     const filteredSdkMessages = allSdkMessages.filter(msg => !msg.isRebuiltContext);
@@ -504,6 +524,17 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
 
     conversation.messages = merged;
     this.hydratedConversationIds.add(conversation.id);
+
+    // The three counters this method already kept, finally said out loud. A
+    // conversation whose sessions the SDK no longer has is `stale`; one that
+    // lost some of a resumed chain is `partial`.
+    if (allSessionsMissing) {
+      return { outcome: 'stale', reason: 'sessionsNotFound' };
+    }
+    if (missingSessionCount > 0 || errorCount > 0) {
+      return { outcome: 'partial', reason: 'someSessionsUnavailable' };
+    }
+    return { outcome: 'complete' };
   }
 
   async deleteConversationSession(
@@ -516,6 +547,6 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
       return;
     }
 
-    await deleteSDKSession(vaultPath, sessionId, getClaudeConfigDirContext(vaultPath));
+    await deleteSDKSession(vaultPath, sessionId, this.configDirContext(vaultPath));
   }
 }

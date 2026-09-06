@@ -1,22 +1,22 @@
 /* Clickable file links that open files in Obsidian */
 .grimoire-file-link {
-  color: var(--text-accent);
+  color: var(--grimoire-accent-text);
   text-decoration: none;
   cursor: pointer;
-  border-radius: 3px;
-  transition: color 0.15s ease;
+  border-radius: var(--grimoire-radius-1);
+  transition: color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-file-link:hover {
-  color: var(--text-accent-hover);
+  color: var(--grimoire-accent-hover);
   text-decoration: underline;
 }
 
 /* File link inside inline code */
 code .grimoire-file-link {
-  color: var(--text-accent);
+  color: var(--grimoire-accent-text);
 }
 
 code .grimoire-file-link:hover {
-  color: var(--text-accent-hover);
+  color: var(--grimoire-accent-hover);
 }

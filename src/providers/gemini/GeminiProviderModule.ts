@@ -1,0 +1,476 @@
+import type {
+  ProviderAgentMention,
+  ProviderCapabilityDescriptor,
+  ProviderChatUiContribution,
+  ProviderCommandsPort,
+  ProviderHistoryHydration,
+  ProviderMcpPort,
+  ProviderModelDescriptor,
+  ProviderModelRefreshOptions,
+  ProviderModule,
+  ProviderSettingsCodec,
+  ProviderUsageSnapshot,
+  ProviderWorkspaceSlots,
+} from '@/core/providers/ProviderModule';
+
+import { isRecord } from '../../utils/records';
+import { chatUiContributionFor } from '../shared/chatUiContribution';
+import { settingsReconciliationFor } from '../shared/settingsReconciliation';
+import { geminiSettingsReconciler } from './env/GeminiSettingsReconciler';
+import {
+  GEMINI_EXECUTION_DESCRIPTOR,
+  GeminiExecutionBackend,
+  type GeminiExecutionBackendContext,
+} from './execution/GeminiExecutionBackend';
+import { GeminiConversationHistoryService } from './history/GeminiConversationHistoryService';
+import { geminiCliResolver } from './runtime/GeminiCliResolver';
+import {
+  DEFAULT_GEMINI_PROVIDER_SETTINGS,
+  type GeminiProviderSettings,
+  normalizeGeminiModelAliases,
+  normalizeGeminiVisibleModels,
+  type PersistedGeminiProviderSettings,
+} from './settings';
+import { geminiChatUIConfig } from './ui/GeminiChatUIConfig';
+
+/**
+ * Gemini CLI's contribution to the provider catalog.
+ *
+ * The eighth module and the fifth on the managed-ACP transport, and the first
+ * of them written for a provider that had none: Gemini reached the kernel
+ * without ever having a `ProviderModule`, so this is the file the composition
+ * needs before it can name a backend id, a capability record or a history
+ * contribution.
+ *
+ * **Flipped.** `registration.ts` points `createRuntime` at the composition built
+ * from this, and `GeminiChatRuntime` is gone.
+ *
+ * Derived from Grok's rather than from the OpenCode family's, which is the
+ * measured answer and not a preference: this CLI configures a session through
+ * `session/set_model` and `session/set_mode` where the family uses
+ * `session/set_config_option`, and the recorded `session/new`
+ * (`gemini 0.55.1`) answers with `models` and `modes` and **no** config
+ * options at all.
+ *
+ * Four things separate it from every sibling on this transport, each read off
+ * `capabilities.ts` or the recording rather than inherited:
+ *
+ * - **no native transcript.** `supportsNativeHistory: false`. There is no
+ *   session log to hydrate a conversation from and none to read an answer back
+ *   from, which is why the result sink has no recovery port and why history
+ *   ownership below is Grimoire's projection rather than the provider's;
+ * - **no reasoning control.** `reasoningControl: 'none'`, and the session
+ *   carries no config option a thinking level could be set through;
+ * - **its modes are the CLI's own** — `default`, `autoEdit`, `yolo`, `plan` —
+ *   and none of them is one of Grimoire's three. `modes.ts` translates both
+ *   ways; `autoEdit` maps to Safe, because it auto-approves an edit and still
+ *   asks before a command;
+ * - **a flag, not a subcommand.** `gemini --acp`, where the four before it take
+ *   `acp` as a verb.
+ *
+ * The settings split the codec has to respect is the family's:
+ * `GeminiProviderSettings` extends the persisted shape with `availableModes`
+ * and `discoveredModels`, which are **discovery state, not settings**. Encoding
+ * them would write cached CLI output into the settings file and make a stale
+ * catalogue outlive the process that produced it.
+ */
+
+const KNOWN_SETTINGS_FIELDS = new Set([
+  'cliPath',
+  'cliPathsByHost',
+  'discoveredModelsFingerprint',
+  'enabled',
+  'environmentHash',
+  'environmentVariables',
+  'modelAliases',
+  'selectedMode',
+  'visibleModels',
+]);
+
+export interface GeminiWorkspaceContext {
+  commandsPort(): ProviderCommandsPort;
+  listAgentMentions(): Promise<readonly ProviderAgentMention[]>;
+  refreshAgentMentions(): Promise<void>;
+  listModels(): Promise<readonly ProviderModelDescriptor[]>;
+  refreshModels(
+    options?: ProviderModelRefreshOptions,
+  ): Promise<readonly ProviderModelDescriptor[]>;
+  cachedPlanUsage(): ProviderUsageSnapshot | null;
+  refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
+  mcpPort(): ProviderMcpPort;
+  renderSettingsTab(host: unknown): void;
+  hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
+  deleteConversationSession(conversationId: string): Promise<void>;
+  resolveSessionId(conversationId: string): string | null;
+  isPendingFork(conversationId: string): boolean;
+  /**
+   * Whether this conversation's saved session was replaced by a fresh one,
+   * or `null` when this runtime is not bound to that conversation.
+   */
+  readSessionDropped(conversationId: string): boolean | null;
+  dispose(): Promise<void>;
+}
+
+export type GeminiWorkspace = ProviderWorkspaceSlots;
+
+
+const geminiCapabilities: ProviderCapabilityDescriptor = {
+  providerId: 'gemini',
+  process: {
+    topology: 'managed-acp-subprocess',
+    concurrency: 'serial-runs',
+  },
+  session: {
+    // `agentCapabilities.loadSession` is true in the recording, and the legacy
+    // runtime resumes through `session/load`.
+    resume: 'native',
+    // And nothing more than the binding: this CLI hydrates no transcript for
+    // Grimoire to read, which `capabilities.ts` states as
+    // `supportsNativeHistory: false`.
+    transcriptHydration: 'unsupported',
+  },
+  history: { ownership: 'grimoire-projection' },
+  commands: {
+    // The vault's own `.gemini/commands/**/*.toml`, read by
+    // `GeminiCommandCatalog`. The session announces its own commands too — the
+    // recording captures `available_commands_update` carrying twenty of them —
+    // and Grimoire drops every one, because `supportsProviderCommands: false`
+    // and the workspace registration declares `runtimeCommandDiscovery: 'none'`.
+    //
+    // These two statements do not project onto one boolean, which is what M3
+    // found: `chatSurface` says what Grimoire puts in the chat input, while the
+    // live `supportsProviderCommands` gates loading the *provider's session*
+    // commands. For every other provider the two agree; Gemini is why the
+    // descriptor grew `sessionCommands` instead of choosing which of the two to
+    // be wrong about.
+    discovery: 'static',
+    chatSurface: 'grimoire',
+    sessionCommands: 'unsupported',
+  },
+  mcp: {
+    // Grimoire owns `.grimoire/mcp/gemini.json` and injects those servers into
+    // the ACP session. The chat tab's per-run selector is a separate question,
+    // and for this provider it is off — the distinction the live
+    // `supportsMcpTools` boolean cannot express.
+    ownership: 'grimoire',
+    sessionConfiguration: 'grimoire',
+    perRunSelection: 'unsupported',
+  },
+  agents: {
+    definitions: 'provider-files',
+    // Empty on purpose, and the same claim `gemini-execution.json` records:
+    // `.gemini/agents/*.md` definitions exist, but no subagent lifecycle
+    // reaches Grimoire through ACP, so naming a spawn origin would promise the
+    // UI an agent it can never observe.
+    spawnOrigin: [],
+    stableIdentity: false,
+    progressObservation: 'none',
+    resultExtraction: false,
+    cancellation: false,
+    statusQuery: false,
+    reattachment: false,
+  },
+  input: {
+    imageAttachments: 'native',
+    instructionMode: 'native',
+  },
+  interactions: {
+    approvals: 'native',
+    questions: 'native',
+    planMode: 'native',
+  },
+  conversation: {
+    fork: 'unsupported',
+    rewind: 'unsupported',
+    steering: 'unsupported',
+    // The CLI's own, and nothing Grimoire reaches: it compresses its context
+    // when the window fills, and the twenty commands the recorded session
+    // announces contain no compression command to invoke.
+    compaction: 'native',
+  },
+  security: { enforcement: 'native' },
+  reasoningControl: { kind: 'none' },
+  workspace: {
+    skills: { inventory: 'managed', manager: 'managed' },
+    commands: { inventory: 'managed', manager: 'managed', runtimeCommandDiscovery: 'none' },
+    agents: { inventory: 'managed', manager: 'managed' },
+    mcp: { inventory: 'managed', manager: 'managed' },
+    environment: { inventory: 'managed', manager: 'managed' },
+  },
+};
+
+/**
+ * The live config, grouped — never a second implementation of it.
+ *
+ * What stood here was a hand-written model presentation answering three of
+ * the row's twenty questions against decoded settings, while the config the
+ * chat surface already asks answered all twenty against the app's. Two
+ * inventories of which models this provider owns, and no test that could see
+ * them disagree.
+ */
+const geminiChatUi: ProviderChatUiContribution = chatUiContributionFor(
+  geminiChatUIConfig,
+  geminiCapabilities.reasoningControl,
+);
+
+const geminiHistory = new GeminiConversationHistoryService();
+
+export const geminiSettingsCodec: ProviderSettingsCodec<GeminiProviderSettings> = {
+  providerId: 'gemini',
+  schemaVersion: 1,
+
+  defaults: createDefaultSettings,
+
+  decode(input) {
+    const record = isRecord(input) ? input : {};
+    const issues = isRecord(input) ? validateKnownSettings(record) : ['settings must be an object'];
+    const preservedUnknown = Object.fromEntries(
+      Object.entries(record).filter(([key]) => !KNOWN_SETTINGS_FIELDS.has(key)),
+    );
+    const value = decodeSettings(record);
+    return issues.length === 0
+      ? { ok: true, value, preservedUnknown }
+      : { ok: false, fallback: value, issues, preservedUnknown };
+  },
+
+  encode(value, preservedUnknown = {}) {
+    // Deliberately omits `availableModes` and `discoveredModels`: they are
+    // discovery state refreshed from the CLI, and writing them here would make
+    // a stale catalogue outlive the process that produced it. The persisted
+    // interface draws the same line.
+    const persisted: PersistedGeminiProviderSettings = {
+      // Persisted with the rest: the fingerprint is what tells the next
+      // load whether the catalogue it is holding was discovered under the
+      // same key, and a fingerprint that does not outlive the process
+      // makes every start rediscover.
+      discoveredModelsFingerprint: value.discoveredModelsFingerprint,
+      cliPath: value.cliPath.trim(),
+      cliPathsByHost: normalizeStringMap(value.cliPathsByHost),
+      enabled: value.enabled,
+      environmentHash: value.environmentHash,
+      environmentVariables: value.environmentVariables,
+      modelAliases: normalizeGeminiModelAliases(value.modelAliases),
+      selectedMode: value.selectedMode.trim(),
+      visibleModels: [...normalizeGeminiVisibleModels(value.visibleModels)],
+    };
+    return { ...preservedUnknown, ...persisted };
+  },
+
+  isEnabled: settings => settings.enabled,
+  withEnabled: (settings, enabled) => ({ ...settings, enabled }),
+
+  runtimeInputKeys: [
+    'environmentVariables',
+    'environmentHash',
+    'cliPath',
+    'cliPathsByHost',
+  ],
+
+  environmentKeyPrefixes: ['GEMINI_', 'GOOGLE_', 'VERTEX_'],
+
+  ...settingsReconciliationFor(geminiSettingsReconciler),
+};
+
+export const geminiProviderModule: ProviderModule<
+GeminiWorkspaceContext,
+GeminiExecutionBackendContext,
+GeminiProviderSettings
+> = {
+  manifest: {
+    id: 'gemini',
+    // What is legacy here is the CLI, not this adapter: Google replaced Gemini
+    // CLI with Antigravity, and `registration.ts` has said so since before the
+    // migration. The name is product copy, so it is copied rather than tidied.
+    displayName: 'Gemini CLI (Legacy)',
+    order: 80,
+  },
+
+  settings: geminiSettingsCodec,
+
+  workspace: {
+    providerId: 'gemini',
+    async initialize(context): Promise<GeminiWorkspace> {
+      return {
+        transcripts: {
+          deleteSession: (conversation, vaultPath) => (
+            geminiHistory.deleteConversationSession(conversation, vaultPath)
+          ),
+          hydrate: (conversation, vaultPath) => (
+            geminiHistory.hydrateConversationHistory(conversation, vaultPath)
+          ),
+        },
+        commands: context.commandsPort(),
+        // No `runtimeCommands` slot, which is this provider's own absence: the
+        // session's announced commands are dropped, so a tab asked for them
+        // would be answered with a list nothing produced.
+        agentMentions: {
+          list: () => context.listAgentMentions(),
+          refresh: () => context.refreshAgentMentions(),
+        },
+        models: {
+          list: () => context.listModels(),
+          refresh: options => context.refreshModels(options),
+        },
+        usage: {
+          cached: () => context.cachedPlanUsage(),
+          refresh: () => context.refreshPlanUsage(),
+        },
+        mcp: context.mcpPort(),
+        settingsPresentation: { render: host => context.renderSettingsTab(host) },
+      };
+    },
+    dispose: async () => {
+      // The managed subprocess is owned by the execution backend, not by the
+      // workspace: a flip must not leave two owners for one process.
+    },
+  },
+
+  execution: {
+    descriptor: GEMINI_EXECUTION_DESCRIPTOR,
+    create: async context => new GeminiExecutionBackend(context),
+  },
+
+
+  capabilities: geminiCapabilities,
+
+  declarations: {
+    warmup: 'runtime',
+    providerId: 'gemini',
+    chatUI: geminiChatUi,
+    commandDropdown: {
+      triggerChars: ['/'],
+      builtInPrefix: '/',
+      skillPrefix: '/',
+      commandPrefix: '/',
+    },
+    cli: { resolve: settings => geminiCliResolver().resolveFromSettings(settings) },
+    conversationState: {
+      forkState: (sessionId, resumeAt, state) => (
+        geminiHistory.buildForkProviderState(sessionId, resumeAt, state)
+      ),
+      isPendingFork: conversation => geminiHistory.isPendingForkConversation(conversation),
+      resolveSessionId: conversation => geminiHistory.resolveSessionIdForConversation(conversation),
+      ...(geminiHistory.buildPersistedProviderState
+        ? { persistedState: conversation => geminiHistory.buildPersistedProviderState?.(conversation) }
+        : {}),
+    },
+  },
+
+  runtimePorts: context => ({
+    providerId: 'gemini',
+    history: {
+      hydrate: conversationId => context.hydrateConversation(conversationId),
+      deleteSession: conversationId => context.deleteConversationSession(conversationId),
+      resolveSessionId: conversationId => context.resolveSessionId(conversationId),
+      isPendingFork: conversationId => context.isPendingFork(conversationId),
+      // The session id, and one marker beside it. Every sibling on this
+      // transport also saves where its session lives — a database path, a
+      // managed home — because a session id alone resolves to nothing there.
+      // Gemini writes no such state, so `GeminiProviderState` has exactly the
+      // one field a replaced session needs.
+      buildSessionPatch: input => {
+        const sessionDropped = context.readSessionDropped(input.conversationId);
+        return {
+          sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
+          // Written whole whenever this runtime serves the conversation, and
+          // omitted entirely when it does not: the surface replaces
+          // `providerState` rather than merging it, so an omitted opinion would
+          // leave a stale drop marker standing with no way to clear it.
+          ...(sessionDropped === null
+            ? {}
+            : { providerState: sessionDropped ? { sessionDropped: true } : {} }),
+        };
+      },
+    },
+  }),
+};
+
+function createDefaultSettings(): GeminiProviderSettings {
+  return {
+    ...DEFAULT_GEMINI_PROVIDER_SETTINGS,
+    cliPathsByHost: {},
+    modelAliases: {},
+    visibleModels: [],
+    availableModes: [],
+    discoveredModels: [],
+  };
+}
+
+function decodeSettings(record: Readonly<Record<string, unknown>>): GeminiProviderSettings {
+  const defaults = createDefaultSettings();
+  return {
+    discoveredModelsFingerprint: typeof record.discoveredModelsFingerprint === 'string'
+      ? record.discoveredModelsFingerprint
+      : defaults.discoveredModelsFingerprint,
+    cliPath: typeof record.cliPath === 'string' ? record.cliPath.trim() : defaults.cliPath,
+    cliPathsByHost: normalizeStringMap(record.cliPathsByHost),
+    enabled: typeof record.enabled === 'boolean' ? record.enabled : defaults.enabled,
+    environmentHash: typeof record.environmentHash === 'string'
+      ? record.environmentHash
+      : defaults.environmentHash,
+    environmentVariables: typeof record.environmentVariables === 'string'
+      ? record.environmentVariables
+      : defaults.environmentVariables,
+    modelAliases: normalizeGeminiModelAliases(record.modelAliases),
+    selectedMode: typeof record.selectedMode === 'string'
+      ? record.selectedMode.trim()
+      : defaults.selectedMode,
+    visibleModels: normalizeGeminiVisibleModels(record.visibleModels),
+    availableModes: [],
+    discoveredModels: [],
+  };
+}
+
+function validateKnownSettings(record: Readonly<Record<string, unknown>>): string[] {
+  const issues: string[] = [];
+  requireType(record, 'enabled', value => typeof value === 'boolean', issues);
+  for (const field of [
+    'cliPath',
+    'environmentHash',
+    'environmentVariables',
+    'selectedMode',
+  ]) {
+    requireType(record, field, value => typeof value === 'string', issues);
+  }
+  for (const field of ['cliPathsByHost', 'modelAliases']) {
+    requireType(record, field, isRecord, issues);
+  }
+  requireType(record, 'visibleModels', Array.isArray, issues);
+  if (isRecord(record.cliPathsByHost)
+    && Object.values(record.cliPathsByHost).some(value => typeof value !== 'string')) {
+    issues.push('cliPathsByHost contains an invalid path');
+  }
+  if (Array.isArray(record.visibleModels)
+    && record.visibleModels.some(value => typeof value !== 'string')) {
+    issues.push('visibleModels contains an invalid model');
+  }
+  if ('discoveredModels' in record || 'availableModes' in record) {
+    // Not merely unknown: these are discovery state that an older build wrote
+    // into the settings file, and reading them back would resurrect a stale
+    // catalogue. Reported so the caller can drop them rather than preserve them.
+    issues.push('discovery state must not be stored in settings');
+  }
+  return issues;
+}
+
+function requireType(
+  record: Readonly<Record<string, unknown>>,
+  field: string,
+  validate: (value: unknown) => boolean,
+  issues: string[],
+): void {
+  if (field in record && !validate(record[field])) {
+    issues.push(`${field} has an invalid type`);
+  }
+}
+
+function normalizeStringMap(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([host, entry]) => host.trim() !== '' && typeof entry === 'string')
+      .map(([host, entry]) => [host, (entry as string).trim()]),
+  );
+}

@@ -2,6 +2,7 @@ import { extractFirstParagraph } from '../../../utils/slashCommand';
 import { dumpYamlFrontmatter, loadYamlFrontmatter } from '../../../utils/yamlFrontmatter';
 import type { VaultFileAdapter } from '../../storage/VaultFileAdapter';
 import type { SlashCommand } from '../../types';
+import type { ProviderCatalogRefreshOutcome } from '../ProviderModelCatalogRefreshCache';
 import type { ProviderId } from '../types';
 import type {
   ProviderCommandCatalog,
@@ -277,16 +278,14 @@ export class VaultSkillCommandCatalog implements ProviderCommandCatalog {
     await this.deleteLocation(root, location);
   }
 
-  getDropdownConfig(): ProviderCommandDropdownConfig {
-    return { providerId: this.options.providerId, ...this.options.dropdown };
-  }
-
-  getDefaultVaultStoragePath(): string | null {
+  defaultVaultStoragePath(): string | null {
     return this.options.roots.find((root) => root.editable !== false)?.path ?? null;
   }
 
-  async refresh(): Promise<void> {
+  async refresh(): Promise<ProviderCatalogRefreshOutcome> {
     // Vault entries are read fresh on every request. Runtime entries update through setRuntimeCommands().
+    // Nothing to reach and nothing to fail, so the answer is always the same one.
+    return 'refreshed';
   }
 
   private async loadEntry(

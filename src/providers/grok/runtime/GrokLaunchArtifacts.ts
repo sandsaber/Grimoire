@@ -71,11 +71,41 @@ export async function prepareGrokLaunchArtifacts(
 }
 
 /**
+ * What an auxiliary Grok turn is launched as.
+ *
+ * The two profiles the three auxiliary purposes divide into, and the difference
+ * is reading files: an inline edit reads the note around what it is editing,
+ * while a title and a refinement are given everything they need in the prompt.
+ *
+ * It lives beside the artifacts rather than beside a runner because for this
+ * provider **the launch is the policy**. The OpenCode forks write an agent
+ * definition whose permissions deny writing and set the session to it; Grok has
+ * no such definition — what an auxiliary turn may do is the `permission_mode`
+ * this file writes into the managed config, so the mapping belongs where the
+ * config is written.
+ */
+export type GrokAuxiliaryProfile = 'passive' | 'readonly';
+
+/**
+ * The permission mode each profile launches under.
+ *
+ * `ask` rather than a deny-everything mode for the reading profile because Grok
+ * has no deny-everything mode: `ask` sends the decision to the client, which
+ * refuses it. `plan` for the profile that needs no tools at all, which is what
+ * the CLI offers for a turn that should only think.
+ */
+export function resolveGrokAuxiliaryPermissionMode(
+  profile: GrokAuxiliaryProfile,
+): GrokPermissionMode {
+  return profile === 'readonly' ? 'ask' : 'plan';
+}
+
+/**
  * `[ui]` keys Grimoire decides for a launch and writes into managed_config.toml.
  *
  * Grok resolves the user config layer above the managed one, so a copied config.toml
  * carrying these would decide the auxiliary process's permission mode instead of
- * `resolveGrokAuxPermissionMode`, which deliberately keeps auxiliaries at `plan`/`ask`.
+ * `resolveGrokAuxiliaryPermissionMode`, which deliberately keeps auxiliaries at `plan`/`ask`.
  */
 const GRIMOIRE_OWNED_UI_KEYS = ['permission_mode', 'yolo'] as const;
 

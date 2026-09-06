@@ -1,25 +1,24 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
-import type {
-  ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
-  ProviderWorkspaceRegistration,
-  ProviderWorkspaceServices,
-} from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderWorkspaceRegistration,
+} from '../../../providers/shared/providerHostContracts';
+import type {
+  ProviderModelCatalog,
+  ProviderWorkspaceServices,
+} from '../../../providers/shared/providerHostContracts';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { MimocodeAgentMentionProvider } from '../agents/MimocodeAgentMentionProvider';
 import { MimocodeCommandCatalog } from '../commands/MimocodeCommandCatalog';
-import { MimocodeChatRuntime } from '../runtime/MimocodeChatRuntime';
-import { MimocodeCliResolver } from '../runtime/MimocodeCliResolver';
+import { mimocodeCliResolver } from '../runtime/MimocodeCliResolver';
 import { getMimocodeProviderSettings } from '../settings';
 import { MimocodeAgentStorage } from '../storage/MimocodeAgentStorage';
 import { mimocodeSettingsTabRenderer } from '../ui/MimocodeSettingsTab';
 import { mimocodePlanUsageStore } from './MimocodePlanUsageStore';
-import { MimocodeRuntimeCommandLoader } from './MimocodeRuntimeCommandLoader';
+import { createMimocodeRuntimeCommandLoader } from './MimocodeRuntimeCommandLoader';
 
 export interface MimocodeWorkspaceServices extends ProviderWorkspaceServices {
   agentStorage: MimocodeAgentStorage;
@@ -30,13 +29,6 @@ export interface MimocodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpServerManager: McpServerManager;
 }
 
-const MIMOCODE_METADATA_WARMUP_DB = ':memory:';
-
-const mimocodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'commands';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -67,7 +59,7 @@ function createMimocodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
           level: 'debug',
           scope: 'provider.mimocode',
         });
-        return false;
+        return 'skipped';
       }
 
       return refreshCache.refresh({
@@ -75,19 +67,14 @@ function createMimocodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
         force,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
         load: async () => {
-          const before = JSON.stringify(currentSettings.discoveredModels);
-          const runtime = new MimocodeChatRuntime(plugin);
-          try {
-            runtime.syncConversationState({
-              providerState: { databasePath: MIMOCODE_METADATA_WARMUP_DB },
-              sessionId: null,
-            });
-            const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-            const after = JSON.stringify(getMimocodeProviderSettings(settings).discoveredModels);
-            return loaded && before !== after;
-          } finally {
-            runtime.cleanup();
-          }
+          // One isolated session, opened and closed: what the legacy runtime
+          // was doing here was opening a session and reading its reply.
+          //
+          // Its answer is whether the agent said anything, which is the question
+          // the surface asks. Whether the *list* changed is a different one, and
+          // a refresh that returns the same models did not fail.
+          const loaded = await plugin.getMimocodeExecution().metadata.discoverMetadata();
+          return loaded ? 'refreshed' : 'failed';
         },
       });
     },
@@ -118,14 +105,13 @@ export async function createMimocodeWorkspaceServices(
     agentStorage,
     agentMentionProvider,
     commandCatalog: new MimocodeCommandCatalog(vaultAdapter),
-    cliResolver: new MimocodeCliResolver(),
+    cliResolver: mimocodeCliResolver(),
     modelCatalog: createMimocodeModelCatalog(plugin),
     mcpStorage,
     mcpServerManager,
     usageProvider: mimocodePlanUsageStore,
-    runtimeCommandLoader: new MimocodeRuntimeCommandLoader(),
+    runtimeCommandLoader: createMimocodeRuntimeCommandLoader(plugin),
     settingsTabRenderer: mimocodeSettingsTabRenderer,
-    tabWarmupPolicy: mimocodeTabWarmupPolicy,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
     },
@@ -133,16 +119,12 @@ export async function createMimocodeWorkspaceServices(
 }
 
 export const mimocodeWorkspaceRegistration: ProviderWorkspaceRegistration<MimocodeWorkspaceServices> = {
-  workspaceCapabilities: {
-    skills: { inventory: 'managed', manager: 'managed' },
-    commands: { inventory: 'readonly', manager: 'managed', runtimeCommandDiscovery: 'ephemeral' },
-    agents: { inventory: 'managed', manager: 'managed' },
-    mcp: { inventory: 'managed', manager: 'managed' },
-    environment: { inventory: 'managed', manager: 'managed' },
-  },
   initialize: async ({ plugin, vaultAdapter }) => createMimocodeWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetMimocodeWorkspaceServices(): MimocodeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('mimocode') as MimocodeWorkspaceServices | null;
+export function maybeGetMimocodeWorkspaceServices(
+  plugin: GrimoirePlugin,
+): MimocodeWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('mimocode') as MimocodeWorkspaceServices | null ?? null;
 }

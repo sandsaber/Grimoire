@@ -1,11 +1,21 @@
+import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
 import type { ProviderConversationHistoryService } from '../../../core/providers/types';
 import type { Conversation } from '../../../core/types';
 
 export class GeminiConversationHistoryService implements ProviderConversationHistoryService {
+  /**
+   * Nothing to load: this provider keeps no transcript Grimoire can read back.
+   *
+   * `absent` rather than `complete`, and the difference is what the surface can
+   * say: the conversation shows the messages its own metadata holds, and there
+   * was never a provider-side history to be missing.
+   */
   async hydrateConversationHistory(
     _conversation: Conversation,
     _vaultPath: string | null,
-  ): Promise<void> {}
+  ): Promise<ProviderHistoryHydration> {
+    return { outcome: 'absent' };
+  }
 
   async deleteConversationSession(
     _conversation: Conversation,

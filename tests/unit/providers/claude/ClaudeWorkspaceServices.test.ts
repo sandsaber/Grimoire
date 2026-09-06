@@ -16,11 +16,16 @@ const sdkMock = sdkModule as unknown as {
 
 function createVaultAdapter() {
   return {
+    // Identity of the backing store, which the durable writer behind session
+    // metadata serializes per path against.
+    coordinationKey: {},
     delete: jest.fn(),
     ensureFolder: jest.fn().mockResolvedValue(undefined),
     exists: jest.fn().mockResolvedValue(false),
     listFiles: jest.fn().mockResolvedValue([]),
+    listFilesRecursive: jest.fn().mockResolvedValue([]),
     read: jest.fn(),
+    rename: jest.fn().mockResolvedValue(undefined),
     write: jest.fn(),
   };
 }
@@ -193,7 +198,7 @@ describe('createClaudeWorkspaceServices', () => {
       settings,
     });
 
-    expect(changed).toBe(true);
+    expect(changed).toBe('refreshed');
     expect(requestUrl).toHaveBeenCalledWith({
       url: 'https://api.anthropic.com/v1/models?limit=1000',
       headers: {
@@ -235,7 +240,7 @@ describe('createClaudeWorkspaceServices', () => {
       settings,
     });
 
-    expect(changed).toBe(false);
+    expect(changed).toBe('failed');
     expect(requestUrl).not.toHaveBeenCalled();
     expect(getClaudeProviderSettings(settings).discoveredModels).toEqual([]);
     expect(plugin.saveSettings).not.toHaveBeenCalled();

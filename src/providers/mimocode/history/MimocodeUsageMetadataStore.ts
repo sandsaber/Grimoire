@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 
-import type { ProviderCostValue } from '../../../core/providers/ProviderSpendUsageStore';
+import type { ProviderCostValue } from '../../../providers/shared/ProviderSpendUsageStore';
 import { readAcpSqliteRows } from '../../acp/history/AcpSqliteReader';
 import { resolveExistingMimocodeDatabasePath } from '../runtime/MimocodePaths';
 import type { MimocodeProviderState } from '../types';

@@ -16,6 +16,10 @@ import type {
 
 export type AcpNormalizedUpdate =
   | {
+    /** An update this normalizer has no meaning for; the caller decides. */
+    type: 'unsupported';
+  }
+  | {
     content: AcpContentBlock;
     messageId?: string | null;
     role: 'assistant' | 'thinking' | 'user';
@@ -70,14 +74,10 @@ export interface AcpToolCallSnapshot {
 type MessageRole = 'assistant' | 'thinking' | 'user';
 
 // Sentinel key for anonymous (messageId-less) streams so we only emit one start per role.
-const ANONYMOUS_MESSAGE_KEY = '\u0000anonymous';
-
 export class AcpSessionUpdateNormalizer {
-  private readonly seenMessages = new Map<MessageRole, Set<string>>();
   private readonly toolCalls = new Map<string, AcpToolCallSnapshot>();
 
   reset(): void {
-    this.seenMessages.clear();
     this.toolCalls.clear();
   }
 
@@ -111,6 +111,12 @@ export class AcpSessionUpdateNormalizer {
         };
       case 'usage_update':
         return { type: 'usage', usage: update };
+      default:
+        // Not unreachable, whatever the union says: the vendor channel carries
+        // updates ACP does not define — Grok's three are why it exists — and
+        // falling off the end returned `undefined` from a signature that
+        // promises a value, which the presenter then read `.type` off.
+        return { type: 'unsupported' };
     }
   }
 
@@ -120,18 +126,15 @@ export class AcpSessionUpdateNormalizer {
   ): Extract<AcpNormalizedUpdate, { type: 'message_chunk' }> {
     const streamChunks: StreamChunk[] = [];
 
-    if (role === 'user' && this.claimMessageStart('user', update.messageId)) {
-      streamChunks.push({
-        content: extractPrimaryText(update.content),
-        itemId: update.messageId ?? undefined,
-        type: 'user_message_start',
-      });
-    } else if (role === 'assistant' && this.claimMessageStart('assistant', update.messageId)) {
-      streamChunks.push({
-        itemId: update.messageId ?? undefined,
-        type: 'assistant_message_start',
-      });
-    }
+    // **No message-start chunk, and no claim behind one.** Framing reached no
+    // surface: the tab binding filters the content channel with
+    // `isChatContent`, and a turn's shape is what the projection states. The
+    // claim existed to fire that chunk exactly once per message id, and the
+    // defect it guarded — a provider reusing an id across turns, so the second
+    // answer joins the first one's bubble — is not reachable on this path,
+    // because the projection derives a turn's assistant message id from its
+    // *run* (`assistant-${runId}`). The message id a presenter needs is on
+    // `messageId` below.
 
     const text = renderAcpContentBlock(update.content);
     if (text && role === 'thinking') {
@@ -253,21 +256,6 @@ export class AcpSessionUpdateNormalizer {
     };
   }
 
-  // A message-start chunk must fire exactly once per (role, messageId). Anonymous streams
-  // share a single slot per role so repeated chunks without an id do not restart the message.
-  private claimMessageStart(role: 'assistant' | 'user', messageId?: string | null): boolean {
-    const key = messageId ?? ANONYMOUS_MESSAGE_KEY;
-    let seen = this.seenMessages.get(role);
-    if (!seen) {
-      seen = new Set();
-      this.seenMessages.set(role, seen);
-    }
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  }
 }
 
 function mapAcpCommandToSlashCommand(command: AcpAvailableCommand): SlashCommand {
@@ -323,18 +311,6 @@ function renderToolCallContent(content: AcpToolCallContent): string {
 
 function defaultToolResultText(status: AcpToolCallStatus): string {
   return status === 'failed' ? 'Tool failed' : 'Tool completed';
-}
-
-// User-visible preview text for the first chunk of a user message. Non-textual blocks
-// show nothing here because they round-trip through the message content itself.
-function extractPrimaryText(content: AcpContentBlock): string {
-  if (content.type === 'text') {
-    return content.text;
-  }
-  if (content.type === 'resource' && 'text' in content.resource) {
-    return content.resource.text;
-  }
-  return '';
 }
 
 export function renderAcpContentBlock(content: AcpContentBlock): string {

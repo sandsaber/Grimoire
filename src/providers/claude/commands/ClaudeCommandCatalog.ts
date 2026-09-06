@@ -1,9 +1,9 @@
 import type { DebugLogEvent } from '../../../core/debug/DebugLogService';
 import type {
   ProviderCommandCatalog,
-  ProviderCommandDropdownConfig,
 } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
+import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
 import type { SlashCommand } from '../../../core/types';
 import { isSkill } from '../../../utils/slashCommand';
 import { CLAUDE_EMPTY_DISCOVERY_RETRY_MS } from '../cli/claudeCatalogCache';
@@ -327,22 +327,12 @@ export class ClaudeCommandCatalog implements ProviderCommandCatalog {
     }
   }
 
-  getDropdownConfig(): ProviderCommandDropdownConfig {
-    return {
-      providerId: 'claude',
-      triggerChars: ['/'],
-      builtInPrefix: '/',
-      skillPrefix: '/',
-      commandPrefix: '/',
-    };
-  }
-
   /**
    * The escape hatch behind the refresh button in provider settings. This is the
    * one place that deliberately spends a probe: it drops the cache, forgets a
    * throttled empty window and rediscovers the list from the SDK.
    */
-  async refresh(): Promise<void> {
+  async refresh(): Promise<ProviderCatalogRefreshOutcome> {
     this.emptyProbeAtByFingerprint.clear();
     // The old list is kept until a probe actually returns one. Dropping it
     // first would mean a refresh attempted against a broken or logged-out CLI
@@ -358,6 +348,12 @@ export class ClaudeCommandCatalog implements ProviderCommandCatalog {
     if (this.sdkCommands.length === 0) {
       this.sdkCommands = previousCommands;
       this.sdkCommandsFromCache = previousFromCache;
+      // Restoring the old list is what keeps the dropdown usable, and it is
+      // also exactly why a surface cannot read success off the list's length:
+      // what is there is what was there before the probe found nothing.
+      return 'failed';
     }
+
+    return 'refreshed';
   }
 }

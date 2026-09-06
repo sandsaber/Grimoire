@@ -6,8 +6,7 @@ import { Notice, Platform, setIcon } from 'obsidian';
 import os from 'os';
 import path from 'path';
 
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
+import { ProviderCatalog } from '@/core/providers/ProviderCatalog';
 import { ChatState } from '@/features/chat/state/ChatState';
 import {
   activateTab,
@@ -51,16 +50,21 @@ class MockResizeObserver {
 }
 window.ResizeObserver = MockResizeObserver;
 
-// Mock provider runtime used by ProviderRegistry
-jest.mock('@/providers/claude/runtime/ClaudeChatRuntime', () => ({
-  ClaudeChatRuntime: jest.fn().mockImplementation(() => ({
-    ensureReady: jest.fn().mockResolvedValue(true),
-    cleanup: jest.fn(),
-    isReady: jest.fn().mockReturnValue(false),
-    syncConversationState: jest.fn(),
-    onReadyStateChange: jest.fn((listener: (ready: boolean) => void) => {
-      listener(false);
-      return () => {};
+// The provider runtime a Claude tab is built with. Since the
+// flip that is the composition over the kernel, which a tab test has no plugin
+// to construct — so the composition is the mock rather than the deleted
+// `ClaudeChatRuntime` it replaced.
+jest.mock('@/providers/claude/execution/ClaudeExecutionComposition', () => ({
+  ClaudeExecution: jest.fn().mockImplementation(() => ({
+    createRuntime: () => ({
+      ensureReady: jest.fn().mockResolvedValue(true),
+      cleanup: jest.fn(),
+      isReady: jest.fn().mockReturnValue(false),
+      syncConversationState: jest.fn(),
+      onReadyStateChange: jest.fn((listener: (ready: boolean) => void) => {
+        listener(false);
+        return () => {};
+      }),
     }),
   })),
 }));
@@ -93,6 +97,7 @@ const createMockSlashCommandDropdown = () => ({
   isVisible: jest.fn().mockReturnValue(false),
   hide: jest.fn(),
   resetSdkSkillsCache: jest.fn(),
+  setProviderCatalog: jest.fn(),
   setHiddenCommands: jest.fn(),
   setEnabled: jest.fn(),
   destroy: jest.fn(),
@@ -118,6 +123,7 @@ const createMockStatusPanel = () => ({
   mount: jest.fn(),
   remount: jest.fn(),
   updateTodos: jest.fn(),
+  updateBackgroundAgents: jest.fn(),
   destroy: jest.fn(),
 });
 
@@ -143,7 +149,7 @@ const createMockModeSelector = () => ({
   renderOptions: jest.fn(),
 });
 
-const createMockClaudeChatRuntime = (overrides?: {
+const createMockClaudeRuntime = (overrides?: {
   ensureReady?: jest.Mock;
   syncConversationState?: jest.Mock;
   onReadyStateChange?: jest.Mock;
@@ -414,29 +420,82 @@ jest.mock('@/features/chat/services/SubagentManager', () => ({
   })),
 }));
 
-jest.mock('@/providers/claude/auxiliary/ClaudeInstructionRefineService', () => ({
-  InstructionRefineService: jest.fn().mockImplementation(() => ({
-    cancel: jest.fn(),
-    resetConversation: jest.fn(),
-  })),
-}));
-
-jest.mock('@/providers/claude/auxiliary/ClaudeTitleGenerationService', () => ({
-  TitleGenerationService: jest.fn().mockImplementation(() => ({
-    cancel: jest.fn(),
-  })),
-}));
-
 // Mock path util
 jest.mock('@/utils/path', () => ({
   getVaultPath: jest.fn().mockReturnValue('/test/vault'),
 }));
 
 // Helper to create mock plugin
+/** The runtime a tab gets when a case has no opinion about which one. */
+const defaultRuntime = () => ({
+  ensureReady: jest.fn().mockResolvedValue(true),
+  cleanup: jest.fn(),
+  isReady: jest.fn().mockReturnValue(false),
+  syncConversationState: jest.fn(),
+  onReadyStateChange: jest.fn((listener: (ready: boolean) => void) => {
+    listener(false);
+    return () => {};
+  }),
+});
+
+/** What `createRuntimeFor` answers, and what it has answered so far. */
+const createdRuntimes = {
+  queued: [] as unknown[],
+  calls: [] as string[],
+  /** Set by a case that needs to observe the moment a runtime is asked for. */
+  onCreate: undefined as (() => void) | undefined,
+  next(providerId: string): unknown {
+    this.calls.push(providerId);
+    this.onCreate?.();
+    return this.queued.length > 0 ? this.queued.shift() : defaultRuntime();
+  },
+  /** Between cases: a queued runtime left over would be handed to the next. */
+  reset(): void {
+    this.queued = [];
+    this.calls = [];
+    this.onCreate = undefined;
+  },
+};
+
+
 function createMockPlugin(overrides: Record<string, any> = {}): any {
   const claudeAgentMentionProvider = { searchAgents: jest.fn().mockReturnValue([]) };
   const codexAgentMentionProvider = { searchAgents: jest.fn().mockReturnValue([]) };
+  // Auxiliary services come from the application's owner now, not from three
+  // registry factories over the plugin.
+  const auxiliary = {
+    inlineEditService: jest.fn(() => ({ cancel: jest.fn(), resetConversation: jest.fn() })),
+    instructionRefineService: jest.fn(() => ({ cancel: jest.fn(), resetConversation: jest.fn() })),
+    titleGenerationService: jest.fn(() => ({ cancel: jest.fn() })),
+    titleServiceFor: jest.fn(() => ({ cancel: jest.fn() })),
+  };
   return {
+    auxiliary,
+    // A tab's runtime comes from the application's composition for the provider
+    // now, not from a registration the registry looked up. `createRuntimeFor`
+    // is overridden per case where a case cares which runtime it gets.
+    createdRuntimes,
+    getApplicationRuntimeOrNull: () => ({
+      auxiliary,
+      createRuntimeFor: (providerId: string) => createdRuntimes.next(providerId),
+      // A provider's workspace services come off the composition root now, not
+      // a static registry, so the plugin double answers for them too.
+      workspaceServicesFor: (providerId: string) => stubbedWorkspaceServices[providerId] ?? null,
+    }),
+    // Since the Claude flip a tab's runtime comes from the plugin's execution
+    // composition rather than from a constructor the registration calls.
+    getClaudeExecution: () => ({
+      createRuntime: () => ({
+        ensureReady: jest.fn().mockResolvedValue(true),
+        cleanup: jest.fn(),
+        isReady: jest.fn().mockReturnValue(false),
+        syncConversationState: jest.fn(),
+        onReadyStateChange: jest.fn((listener: (ready: boolean) => void) => {
+          listener(false);
+          return () => {};
+        }),
+      }),
+    }),
     app: {
       vault: {
         adapter: { basePath: '/test/vault' },
@@ -511,14 +570,14 @@ function createMockOptions(overrides: Partial<TestTabCreateOptions> = {}): TestT
   } as TestTabCreateOptions;
 
   const plugin = options.plugin as any;
-  ProviderWorkspaceRegistry.setServices('claude', {
+  stubbedWorkspaceServices.claude = {
     mcpManager: plugin.mcpManager,
     mcpServerManager: plugin.mcpManager,
     agentMentionProvider: plugin.agentManager,
-  } as any);
-  ProviderWorkspaceRegistry.setServices('codex', {
+  };
+  stubbedWorkspaceServices.codex = {
     agentMentionProvider: plugin.codexAgentMentionProvider,
-  });
+  };
 
   return options;
 }
@@ -532,6 +591,8 @@ async function flushMicrotasks(times = 8): Promise<void> {
     await Promise.resolve();
   }
 }
+
+const stubbedWorkspaceServices: Record<string, unknown> = {};
 
 describe('Tab - Creation', () => {
   describe('createTab', () => {
@@ -819,7 +880,7 @@ describe('Tab - Service Initialization', () => {
       const options = createMockOptions();
       const tab = createTab(options);
       tab.serviceInitialized = true;
-      tab.service = createMockClaudeChatRuntime() as any;
+      tab.service = createMockClaudeRuntime() as any;
 
       await initializeTabService(tab, options.plugin, options.mcpManager);
 
@@ -827,7 +888,7 @@ describe('Tab - Service Initialization', () => {
       expect(tab.service).toEqual(expect.objectContaining({ providerId: 'claude' }));
     });
 
-    it('should create ClaudeChatRuntime on first initialization', async () => {
+    it('should create the Claude runtime on first initialization', async () => {
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -838,9 +899,8 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('should create the runtime for the conversation provider', async () => {
-      const createChatRuntimeSpy = jest.spyOn(ProviderRegistry, 'createChatRuntime');
-      const mockRuntime = createMockClaudeChatRuntime({ providerId: 'codex' });
-      createChatRuntimeSpy.mockReturnValue(mockRuntime as any);
+      const mockRuntime = createMockClaudeRuntime({ providerId: 'codex' });
+      createdRuntimes.queued.push(mockRuntime);
 
       const conversation = {
         id: 'conv-codex',
@@ -863,17 +923,15 @@ describe('Tab - Service Initialization', () => {
 
       await initializeTabService(tab, plugin, createMockMcpManager());
 
-      expect(createChatRuntimeSpy).toHaveBeenCalledWith(expect.objectContaining({
-        plugin,
-        providerId: 'codex',
-      }));
+      // The provider, without the plugin: the composition is asked directly
+      // now, so there is no options bag with a plugin in it to assert.
+      expect(createdRuntimes.calls).toContain('codex');
     });
 
     it('should recreate the runtime when the conversation provider changes', async () => {
-      const createChatRuntimeSpy = jest.spyOn(ProviderRegistry, 'createChatRuntime');
-      const oldService = createMockClaudeChatRuntime({ providerId: 'claude' });
-      const newService = createMockClaudeChatRuntime({ providerId: 'codex' });
-      createChatRuntimeSpy.mockReturnValue(newService as any);
+      const oldService = createMockClaudeRuntime({ providerId: 'claude' });
+      const newService = createMockClaudeRuntime({ providerId: 'codex' });
+      createdRuntimes.queued.push(newService);
 
       const conversation = {
         id: 'conv-codex',
@@ -899,19 +957,16 @@ describe('Tab - Service Initialization', () => {
       await initializeTabService(tab, plugin, createMockMcpManager());
 
       expect(oldService.cleanup).toHaveBeenCalled();
-      expect(createChatRuntimeSpy).toHaveBeenCalledWith(expect.objectContaining({
-        plugin,
-        providerId: 'codex',
-      }));
+      // The provider, without the plugin: the composition is asked directly
+      // now, so there is no options bag with a plugin in it to assert.
+      expect(createdRuntimes.calls).toContain('codex');
       expect(tab.service).toBe(newService);
     });
 
     it('should NOT call ensureReady for blank tabs (lazy start)', async () => {
       const mockEnsureReady = jest.fn().mockResolvedValue(true);
-      const runtimeModule = jest.requireMock('@/providers/claude/runtime/ClaudeChatRuntime');
-      runtimeModule.ClaudeChatRuntime.mockImplementationOnce(() => createMockClaudeChatRuntime({ ensureReady: mockEnsureReady }));
-
       const options = createMockOptions();
+      createdRuntimes.queued.push(createMockClaudeRuntime({ ensureReady: mockEnsureReady }));
       const tab = createTab(options);
 
       await initializeTabService(tab, options.plugin, options.mcpManager);
@@ -924,10 +979,6 @@ describe('Tab - Service Initialization', () => {
 
     it('should sync existing conversations with saved external contexts', async () => {
       const mockSyncConversationState = jest.fn();
-      const runtimeModule = jest.requireMock('@/providers/claude/runtime/ClaudeChatRuntime');
-      runtimeModule.ClaudeChatRuntime.mockImplementationOnce(() => createMockClaudeChatRuntime({
-        syncConversationState: mockSyncConversationState,
-      }));
 
       const conversation = {
         id: 'conv-1',
@@ -943,34 +994,32 @@ describe('Tab - Service Initialization', () => {
       const plugin = createMockPlugin();
       plugin.settings.persistentExternalContextPaths = ['/persistent/path'];
       plugin.getConversationById = jest.fn().mockResolvedValue(conversation);
+      createdRuntimes.queued.push(createMockClaudeRuntime({
+        syncConversationState: mockSyncConversationState,
+      }));
 
       const options = createMockOptions({ plugin, conversation });
       const tab = createTab(options);
 
       await initializeTabService(tab, options.plugin, options.mcpManager);
 
-      expect(mockSyncConversationState).toHaveBeenCalledWith(conversation, ['/saved/path']);
+      // The conversation, and only the conversation: the saved paths were a
+      // second argument the adapter never took, and the turn reads them off the
+      // external-context selector. The conversation still carries them, which
+      // is what this asserts.
+      expect(mockSyncConversationState).toHaveBeenCalledWith(
+        expect.objectContaining({ externalContextPaths: ['/saved/path'] }),
+      );
     });
 
     it('should initialize toolbar config for the tab provider', () => {
-      const getChatUIConfigSpy = jest.spyOn(ProviderRegistry, 'getChatUIConfig');
-      const getCapabilitiesSpy = jest.spyOn(ProviderRegistry, 'getCapabilities');
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-      getChatUIConfigSpy.mockReturnValue({
-        getModelOptions: jest.fn().mockReturnValue([]),
-        ownsModel: jest.fn().mockReturnValue(false),
-        isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-        getReasoningOptions: jest.fn().mockReturnValue([]),
-        getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-        getContextWindowSize: jest.fn().mockReturnValue(200000),
-        isDefaultModel: jest.fn().mockReturnValue(true),
-        applyModelDefaults: jest.fn(),
-        normalizeModelVariant: jest.fn((model: string) => model),
-        getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-      });
-      getCapabilitiesSpy.mockReturnValue({
+      // The chat UI is asked for by declaration now, so the spy is the
+      // catalog's and it calls through: what is being checked is which
+      // provider the toolbar asks about, and a stubbed return would only
+      // prove the stub was returned.
+      const declarationsSpy = jest.spyOn(ProviderCatalog.prototype, 'declarations');
+      const getCapabilitiesSpy = jest.spyOn(ProviderCatalog.prototype, 'capabilities');
+        getCapabilitiesSpy.mockReturnValue({
         providerId: 'codex',
         supportsPersistentRuntime: true,
         supportsNativeHistory: true,
@@ -1003,24 +1052,26 @@ describe('Tab - Service Initialization', () => {
       const toolbarCallbacks = toolbarModule.createInputToolbar.mock.calls.at(-1)?.[1];
       expect(toolbarCallbacks).toBeDefined();
 
-      toolbarCallbacks.getUIConfig();
+      // Cleared immediately before the call, so the assertion below reads the
+      // toolbar's own question rather than any of the catalog lookups the tab
+      // made while it was being built.
+      declarationsSpy.mockClear();
+      getCapabilitiesSpy.mockClear();
+      toolbarCallbacks.getChatUI();
       toolbarCallbacks.getCapabilities();
 
-      expect(getChatUIConfigSpy).toHaveBeenCalledWith('codex');
+      expect(declarationsSpy).toHaveBeenCalledWith('codex');
       expect(getCapabilitiesSpy).toHaveBeenCalledWith('codex');
     });
 
     it('resolves the agent mention service through the provider-specific lookup', () => {
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-
-      const codexAgentMentionProvider = { searchAgents: jest.fn().mockReturnValue([]) };
-      const getAgentMentionProviderSpy = jest.spyOn(ProviderWorkspaceRegistry, 'getAgentMentionProvider')
-        .mockReturnValue(codexAgentMentionProvider);
-      const plugin = createMockPlugin({
-        codexAgentMentionProvider,
-      });
+  
+      const list = jest.fn(async () => [
+        { id: 'reviewer', label: 'Reviewer', source: 'vault' as const },
+      ]);
+      const workspaceFor = jest.fn(async () => ({ agentMentions: { list, refresh: jest.fn() } }));
+      const plugin = createMockPlugin();
+      plugin.getApplicationRuntimeOrNull = () => ({ workspaceFor });
       const tab = createTab(createMockOptions({
         plugin,
         conversation: {
@@ -1036,15 +1087,18 @@ describe('Tab - Service Initialization', () => {
 
       initializeTabUI(tab, plugin);
 
-      expect(getAgentMentionProviderSpy).toHaveBeenCalledWith('codex');
-      expect(mockFileContextManager.setAgentService).toHaveBeenCalledWith(codexAgentMentionProvider);
+      // The service is the host's now, filtering a list the provider supplies —
+      // and it is the *same* object across renders, because the dropdown
+      // compares by identity to decide whether to close the list a user is
+      // typing into.
+      const service = mockFileContextManager.setAgentService.mock.calls.at(-1)?.[0];
+      expect(service).not.toBeNull();
+      initializeTabUI(tab, plugin);
+      expect(mockFileContextManager.setAgentService).toHaveBeenLastCalledWith(service);
     });
 
     it('falls back blank Codex draft to Claude when Codex is disabled', () => {
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-
+  
       const plugin = createMockPlugin();
       const tab = createTab(createMockOptions({ plugin }));
       initializeTabUI(tab, plugin);
@@ -1054,7 +1108,7 @@ describe('Tab - Service Initialization', () => {
       tab.providerId = 'codex';
       tab.lifecycleState = 'blank';
 
-      const staleService = createMockClaudeChatRuntime({ providerId: 'codex' });
+      const staleService = createMockClaudeRuntime({ providerId: 'codex' });
       tab.service = staleService as any;
       tab.serviceInitialized = true;
 
@@ -1072,13 +1126,10 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('rebinds provider-scoped helper services when a newly enabled provider takes over the draft model', () => {
-      const createInstructionRefineServiceSpy = jest.spyOn(ProviderRegistry, 'createInstructionRefineService')
-        .mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      const createTitleGenerationServiceSpy = jest.spyOn(ProviderRegistry, 'createTitleGenerationService')
-        .mockReturnValue({ cancel: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-
+  
       const plugin = createMockPlugin();
+      const createInstructionRefineServiceSpy = plugin.auxiliary.instructionRefineService;
+      const createTitleGenerationServiceSpy = plugin.auxiliary.titleGenerationService;
       plugin.settings.settingsProvider = 'claude';
       plugin.settings.model = DEFAULT_CODEX_PRIMARY_MODEL;
       plugin.settings.providerConfigs = {
@@ -1106,8 +1157,10 @@ describe('Tab - Service Initialization', () => {
       onProviderAvailabilityChanged(tab, plugin);
 
       expect(tab.providerId).toBe('codex');
-      expect(createInstructionRefineServiceSpy).toHaveBeenLastCalledWith(plugin, 'codex');
-      expect(createTitleGenerationServiceSpy).not.toHaveBeenCalledWith(plugin, 'codex');
+      expect(createInstructionRefineServiceSpy).toHaveBeenLastCalledWith('codex');
+      // The title service is built once and routes per title, so a provider
+      // change must not rebind it.
+      expect(createTitleGenerationServiceSpy).toHaveBeenCalledTimes(1);
     });
 
     it('surfaces provider-scoped model settings for inactive-provider tabs and saves back to that provider snapshot', async () => {
@@ -1283,10 +1336,7 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('resets to blank state when the new-conversation callback fires', () => {
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-
+  
       const plugin = createMockPlugin();
       const tab = createTab(createMockOptions({ plugin }));
       initializeTabUI(tab, plugin);
@@ -1311,10 +1361,7 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('preserves codex provider on new session when tab was codex', () => {
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-
+  
       const plugin = createMockPlugin();
       plugin.settings.savedProviderModel = { claude: 'claude-sonnet-4-5', codex: DEFAULT_CODEX_PRIMARY_MODEL };
       const tab = createTab(createMockOptions({ plugin }));
@@ -1337,17 +1384,14 @@ describe('Tab - Service Initialization', () => {
     });
 
     it('cleans up the active runtime when resetting to a new blank session', () => {
-      jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-      jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-
+  
       const plugin = createMockPlugin();
       plugin.settings.savedProviderModel = { claude: 'claude-sonnet-4-5', codex: DEFAULT_CODEX_PRIMARY_MODEL };
       const tab = createTab(createMockOptions({ plugin }));
       initializeTabUI(tab, plugin);
       initializeTabControllers(tab, plugin, {} as any);
 
-      const staleService = createMockClaudeChatRuntime({ providerId: 'codex' });
+      const staleService = createMockClaudeRuntime({ providerId: 'codex' });
       tab.lifecycleState = 'bound_active';
       tab.conversationId = 'conv-1';
       tab.providerId = 'codex';
@@ -1558,10 +1602,8 @@ describe('Tab - Destruction', () => {
       const unsubscribeFn = jest.fn();
       const mockOnReadyStateChange = jest.fn(() => unsubscribeFn);
 
-      const runtimeModule = jest.requireMock('@/providers/claude/runtime/ClaudeChatRuntime');
-      runtimeModule.ClaudeChatRuntime.mockImplementationOnce(() => createMockClaudeChatRuntime({ onReadyStateChange: mockOnReadyStateChange }));
-
       const options = createMockOptions();
+      createdRuntimes.queued.push(createMockClaudeRuntime({ onReadyStateChange: mockOnReadyStateChange }));
       const tab = createTab(options);
       initializeTabUI(tab, options.plugin);
 
@@ -1599,7 +1641,13 @@ describe('Tab - Destruction', () => {
       expect(removeSpy).toHaveBeenCalled();
     });
 
-    it('should cleanup subagents', async () => {
+    it('drops its own maps without abandoning the work they described', async () => {
+      // **Closing a tab used to mark every running background agent
+      // `orphaned`** — a status meaning "nobody is watching this any more",
+      // which was true and was all anyone ever learned about it. The records
+      // outlive the tab now and the status panel draws them from the vault, so
+      // reopening the conversation shows the agent still running and how it
+      // ended. The maps still go: they belong to this tab.
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -1609,8 +1657,8 @@ describe('Tab - Destruction', () => {
 
       await destroyTab(tab);
 
-      expect(orphanAllActive).toHaveBeenCalled();
       expect(clear).toHaveBeenCalled();
+      expect(orphanAllActive).not.toHaveBeenCalled();
     });
 
     it('should cleanup UI components', async () => {
@@ -1700,20 +1748,15 @@ describe('Tab - Service Callbacks', () => {
         resetStreamingState: jest.fn(),
       } as any;
 
-      const service = {
-        setApprovalCallback: jest.fn(),
-        setApprovalDismisser: jest.fn(),
-        setAskUserQuestionCallback: jest.fn(),
-        setExitPlanModeCallback: jest.fn(),
-        setSubagentHookProvider: jest.fn(),
-        setAutoTurnCallback: jest.fn(),
-        setPermissionModeSyncCallback: jest.fn(),
-      };
+      // One installation, not seven setters: the interaction callbacks came off
+      // the frozen `ChatRuntime` with the seam deletion, and a double that
+      // still carried the setters would be installed on by nothing.
+      const service = { installInteractions: jest.fn() };
       tab.service = service as any;
 
       setupServiceCallbacks(tab, plugin);
 
-      const autoTurnCallback = service.setAutoTurnCallback.mock.calls[0][0];
+      const autoTurnCallback = service.installInteractions.mock.calls[0][0].autoTurn;
       return { tab, addMessageSpy, addMessage, handleStreamChunk, scrollToBottom, autoTurnCallback, plugin, service };
     }
 
@@ -1787,9 +1830,20 @@ describe('Tab - Service Callbacks', () => {
       expect(scrollToBottom).not.toHaveBeenCalled();
     });
 
+    it('leaves a runtime that cannot take an installation alone', () => {
+      // **The narrowing has to be a guard, not a cast.** `tab.service` is typed
+      // as the frozen `ChatRuntime`, which no longer carries these — so the
+      // installer is found by shape, and a runtime without one is a tab with no
+      // interactions rather than a crash while the tab opens.
+      const { tab, plugin } = setupAutoTurnTest();
+      tab.service = { isReady: () => true } as never;
+
+      expect(() => setupServiceCallbacks(tab, plugin)).not.toThrow();
+    });
+
     it('keeps Auto-approve when an ACP provider syncs full_access', () => {
       const { tab, plugin, service } = setupAutoTurnTest();
-      const syncPermissionMode = service.setPermissionModeSyncCallback.mock.calls[0][0];
+      const syncPermissionMode = service.installInteractions.mock.calls[0][0].permissionModeSync;
 
       expect(getTabPermissionMode(tab, plugin)).toBe('full_access');
       syncPermissionMode('full_access');
@@ -1847,6 +1901,7 @@ describe('Tab - Title', () => {
 
 describe('Tab - UI Initialization', () => {
   beforeEach(() => {
+    createdRuntimes.reset();
     jest.clearAllMocks();
   });
 
@@ -1866,7 +1921,9 @@ describe('Tab - UI Initialization', () => {
 
       initializeTabUI(tab, options.plugin);
 
-      expect(mockFileContextManager.setMcpManager).toHaveBeenCalledWith((options.plugin as any).mcpManager);
+      // The same live view, for the mention dropdown behind the file context.
+      const view = mockFileContextManager.setMcpManager.mock.calls[0][0];
+      expect(typeof view.getContextSavingServers).toBe('function');
     });
 
     it('should create ImageContextManager', () => {
@@ -2133,13 +2190,25 @@ describe('Tab - UI Initialization', () => {
       getEnhancedPathSpy.mockRestore();
     });
 
-    it('should wire MCP server selector to MCP service', () => {
+    it('wires the MCP server selector to a view that reads the workspace when asked', () => {
+      // **It used to be handed the manager itself.** The widget keeps whatever
+      // it is given and asks it while drawing, so what it needs is something
+      // that resolves the provider's workspace on each call — a snapshot taken
+      // here is stale by the time the composer prunes against it, and the
+      // manager is a provider service the feature layer should not hold.
       const options = createMockOptions();
+      const servers = [{ name: 'docs', enabled: true }];
+      (options.plugin as any).getApplicationRuntimeOrNull = () => ({
+        builtWorkspaceFor: () => ({ mcp: { servers: () => servers } }),
+      });
       const tab = createTab(options);
 
       initializeTabUI(tab, options.plugin);
 
-      expect(mockMcpServerSelector.setMcpManager).toHaveBeenCalledWith((options.plugin as any).mcpManager);
+      const view = mockMcpServerSelector.setMcpManager.mock.calls[0][0];
+      expect(view.getServers()).toEqual(servers);
+      servers.push({ name: 'later', enabled: true });
+      expect(view.getServers()).toHaveLength(2);
     });
 
     it('should wire external context selector onChange', () => {
@@ -2960,7 +3029,7 @@ describe('Tab - UI Callback Wiring', () => {
     });
 
     it('should update context meter for Codex tabs on usage change', () => {
-      const getCapabilitiesSpy = jest.spyOn(ProviderRegistry, 'getCapabilities');
+      const getCapabilitiesSpy = jest.spyOn(ProviderCatalog.prototype, 'capabilities');
       getCapabilitiesSpy.mockReturnValue({
         providerId: 'codex',
         supportsPersistentRuntime: true,
@@ -3147,7 +3216,7 @@ describe('Tab - Service Initialization Error Handling', () => {
 
     // Mark as already initialized
     tab.serviceInitialized = true;
-    const originalService = createMockClaudeChatRuntime() as any;
+    const originalService = createMockClaudeRuntime() as any;
     tab.service = originalService;
 
     await initializeTabService(tab, options.plugin, options.mcpManager);
@@ -3430,7 +3499,15 @@ describe('Tab - Controller Configuration', () => {
       callbacks.onConversationLoaded();
       callbacks.onConversationSwitched();
 
-      expect(mockSlashCommandDropdown.resetSdkSkillsCache).toHaveBeenCalledTimes(3);
+      // Either branch clears it, and which one runs is now a question about the
+      // provider's declaration rather than about whether its workspace has been
+      // built: `setProviderCatalog` empties the same three fields
+      // `resetSdkSkillsCache` does, before installing the new entry source. So
+      // the assertion counts the clearing, not the path.
+      const cleared = mockSlashCommandDropdown.resetSdkSkillsCache.mock.calls.length
+        + mockSlashCommandDropdown.setProviderCatalog.mock.calls.length;
+
+      expect(cleared).toBe(3);
     });
   });
 });
@@ -3936,7 +4013,6 @@ describe('Tab - handleForkAll (via /fork command)', () => {
 
 describe('Tab - Blank Tab Model Selector', () => {
   afterEach(() => {
-    ProviderWorkspaceRegistry.clear();
     jest.restoreAllMocks();
   });
 
@@ -3945,14 +4021,17 @@ describe('Tab - Blank Tab Model Selector', () => {
       { value: 'haiku', label: 'Haiku' },
       { value: 'sonnet', label: 'Sonnet' },
     ];
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['claude']);
-    jest.spyOn(ProviderRegistry, 'getProviderDisplayName').mockImplementation((providerId) => (
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['claude']);
+    jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'claude' ? 'Claude' : 'Codex'
     ));
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: () => providerId === 'claude' ? claudeModels : [],
-      getProviderIcon: jest.fn().mockReturnValue(null),
-    } as any));
+    const codexModels: typeof claudeModels = [];
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        icon: () => null,
+        models: { options: () => (providerId === 'claude' ? claudeModels : codexModels) },
+      },
+    } as never));
 
     const result = getBlankTabModelOptions({ codexEnabled: false });
     expect(result).toEqual(claudeModels.map(m => ({ ...m, group: 'Claude', providerId: 'claude' })));
@@ -3967,14 +4046,16 @@ describe('Tab - Blank Tab Model Selector', () => {
       { value: DEFAULT_CODEX_PRIMARY_MODEL, label: DEFAULT_CODEX_PRIMARY_MODEL_LABEL },
     ];
 
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['codex', 'claude']);
-    jest.spyOn(ProviderRegistry, 'getProviderDisplayName').mockImplementation((providerId) => (
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['codex', 'claude']);
+    jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'codex' ? 'Codex' : 'Claude'
     ));
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: () => providerId === 'codex' ? codexModels : claudeModels,
-      getProviderIcon: jest.fn().mockReturnValue(null),
-    } as any));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        icon: () => null,
+        models: { options: () => (providerId === 'claude' ? claudeModels : codexModels) },
+      },
+    } as never));
 
     const result = getBlankTabModelOptions({ codexEnabled: true });
     expect(result).toEqual([
@@ -3984,42 +4065,67 @@ describe('Tab - Blank Tab Model Selector', () => {
   });
 
   it('returns no models when every provider is disabled', () => {
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue([]);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig');
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue([]);
+    const declarations = jest.spyOn(ProviderCatalog.prototype, 'declarations');
 
     expect(getBlankTabModelOptions({})).toEqual([]);
-    expect(ProviderRegistry.getChatUIConfig).not.toHaveBeenCalled();
+    expect(declarations).not.toHaveBeenCalled();
   });
 });
 
+/**
+ * Which provider owns which model, for the declaration stubs below.
+ *
+ * These stubs answered `ownsModel: () => false`, and nothing noticed: model
+ * routing went through a registry static that read
+ * the **real** config while the toolbar read the stub. The chat-UI row put both
+ * questions on the same declaration, so a stub that disowns every model now
+ * routes every model to the settings provider. This is what the real configs
+ * answer for the ids these cases use, and nothing more.
+ */
+function stubOwnsModel(providerId: string, model: string): boolean {
+  switch (providerId) {
+    case 'codex':
+      return model.startsWith('gpt-') || /^o\d/.test(model);
+    case 'claude':
+      return ['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-');
+    case 'opencode':
+      return model.startsWith('opencode:');
+    case 'antigravity':
+      return model === 'antigravity' || model.startsWith('antigravity');
+    default:
+      return false;
+  }
+}
+
 describe('Tab - Cross-Provider Model Rejection', () => {
   it('offers all enabled provider model groups on a bound tab', () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['codex', 'claude']);
-    jest.spyOn(ProviderRegistry, 'getProviderDisplayName').mockImplementation((providerId) => (
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['codex', 'claude']);
+    jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'codex' ? 'Codex' : 'Claude'
     ));
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue(providerId === 'codex'
-        ? [{ value: DEFAULT_CODEX_PRIMARY_MODEL, label: DEFAULT_CODEX_PRIMARY_MODEL_LABEL }]
-        : [{ value: 'opus', label: 'Opus 4.8' }]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-      getProviderIcon: jest.fn().mockReturnValue(null),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: () => (providerId === 'codex'
+            ? [{ label: DEFAULT_CODEX_PRIMARY_MODEL_LABEL, value: DEFAULT_CODEX_PRIMARY_MODEL }]
+            : [{ label: 'Opus 4.8', value: 'opus' }]),
+          ownsModel: (model: string) => (
+            providerId === 'codex'
+              ? model.startsWith('gpt-') || /^o\d/.test(model)
+              : providerId === 'claude'
+                && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
+          ),
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4032,16 +4138,13 @@ describe('Tab - Cross-Provider Model Rejection', () => {
     const toolbarModule = jest.requireMock('@/features/chat/ui/InputToolbar');
     const toolbarCallbacks = toolbarModule.createInputToolbar.mock.calls.at(-1)?.[1];
 
-    expect(toolbarCallbacks.getUIConfig().getModelOptions(plugin.settings)).toEqual([
+    expect(toolbarCallbacks.getChatUI().models.options(plugin.settings)).toEqual([
       { value: DEFAULT_CODEX_PRIMARY_MODEL, label: DEFAULT_CODEX_PRIMARY_MODEL_LABEL, group: 'Codex', providerId: 'codex' },
       { value: 'opus', label: 'Opus 4.8', group: 'Claude', providerId: 'claude' },
     ]);
   });
 
   it('rejects cross-provider model change on bound tab via toolbar onModelChange', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4068,25 +4171,21 @@ describe('Tab - Cross-Provider Model Rejection', () => {
 
   it('allows same-provider model change on bound tab', async () => {
     (Notice as unknown as jest.Mock).mockClear();
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4109,9 +4208,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('makes a bound model change visible before deferred conversation persistence completes', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversation = {
       id: 'conv-1', providerId: 'claude', title: 'Chat', createdAt: 1, updatedAt: 1,
       sessionId: 'session-1', model: 'sonnet', messages: [],
@@ -4146,9 +4242,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('serializes durable model writes so the final persisted payload is the latest selection', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversation = {
       id: 'conv-1', providerId: 'claude', title: 'Chat', createdAt: 1, updatedAt: 1,
       sessionId: 'session-1', model: 'sonnet', messages: [],
@@ -4203,9 +4296,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('serializes same-provider defaults across tabs in selection order', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversations = new Map([
       ['conv-a', { id: 'conv-a', providerId: 'claude', title: 'A', createdAt: 1, updatedAt: 1, sessionId: 'a', model: 'sonnet', messages: [] }],
       ['conv-b', { id: 'conv-b', providerId: 'claude', title: 'B', createdAt: 1, updatedAt: 1, sessionId: 'b', model: 'haiku', messages: [] }],
@@ -4251,9 +4341,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('restores the preceding same-provider default when a later tab selection fails', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversations = new Map([
       ['conv-a', { id: 'conv-a', providerId: 'claude', title: 'A', createdAt: 1, updatedAt: 1, sessionId: 'a', model: 'sonnet', messages: [] }],
       ['conv-b', { id: 'conv-b', providerId: 'claude', title: 'B', createdAt: 1, updatedAt: 1, sessionId: 'b', model: 'haiku', messages: [] }],
@@ -4288,9 +4375,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('rolls a failed latest selection back to the durable conversation model after a stale selection', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversation = {
       id: 'conv-1', providerId: 'claude', title: 'Chat', createdAt: 1, updatedAt: 1,
       sessionId: 'session-1', model: 'sonnet', messages: [],
@@ -4327,9 +4411,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('uses a stale selection that finished writing as the durable rollback baseline', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversation = {
       id: 'conv-1', providerId: 'claude', title: 'Chat', createdAt: 1, updatedAt: 1,
       sessionId: 'session-1', model: 'sonnet', messages: [],
@@ -4369,9 +4450,6 @@ describe('Tab - Cross-Provider Model Rejection', () => {
   });
 
   it('does not persist a deferred selection into a conversation loaded after it began', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
     const conversations = new Map([
       ['conv-1', { id: 'conv-1', providerId: 'claude', title: 'First', createdAt: 1, updatedAt: 1, sessionId: 'one', model: 'sonnet', messages: [] }],
       ['conv-2', { id: 'conv-2', providerId: 'claude', title: 'Second', createdAt: 1, updatedAt: 1, sessionId: 'two', model: 'haiku', messages: [] }],
@@ -4432,30 +4510,25 @@ describe('Tab - Bound Conversation Model', () => {
 
 describe('Tab - Blank Tab Draft Model Change', () => {
   afterEach(() => {
-    ProviderWorkspaceRegistry.clear();
     jest.restoreAllMocks();
   });
 
   it('updates draft model and provider without creating runtime', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4479,9 +4552,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('notifies when the blank-tab draft model changes', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4502,9 +4572,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('notifies when blank-tab provider settings change before first send', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4527,13 +4594,18 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('refreshes all enabled provider model catalogs for a blank tab', async () => {
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['claude', 'codex']);
-    const claudeCatalog = { refreshModels: jest.fn().mockResolvedValue(false) };
-    const codexCatalog = { refreshModels: jest.fn().mockResolvedValue(true) };
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['claude', 'codex']);
+    const claudeCatalog = { list: jest.fn(async () => []), refresh: jest.fn(async () => []) };
+    const codexCatalog = { list: jest.fn(async () => []), refresh: jest.fn(async () => []) };
     const plugin = createMockPlugin();
+    // The catalog comes from the application's workspace lookup now, and the
+    // enabled list above is the gate the row's own `isAvailable` used to be.
+    plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceFor: async (providerId: string) => ({
+        models: providerId === 'claude' ? claudeCatalog : codexCatalog,
+      }),
+    });
     const tab = createTab(createMockOptions({ plugin }));
-    ProviderWorkspaceRegistry.setServices('claude', { modelCatalog: claudeCatalog });
-    ProviderWorkspaceRegistry.setServices('codex', { modelCatalog: codexCatalog });
 
     initializeTabUI(tab, plugin);
 
@@ -4542,26 +4614,25 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
     await toolbarCallbacks.refreshModelOptions();
 
-    expect(claudeCatalog.refreshModels).toHaveBeenCalledWith({
-      plugin,
-      settings: plugin.settings,
-    });
-    expect(codexCatalog.refreshModels).toHaveBeenCalledWith({
-      plugin,
-      settings: plugin.settings,
-    });
+    expect(claudeCatalog.refresh).toHaveBeenCalled();
+    expect(codexCatalog.refresh).toHaveBeenCalled();
     expect(mockModelSelector.updateDisplay).toHaveBeenCalled();
     expect(mockModelSelector.renderOptions).toHaveBeenCalled();
   });
 
   it('refreshes all enabled provider model catalogs for a bound tab', async () => {
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['claude', 'codex']);
-    const claudeCatalog = { refreshModels: jest.fn().mockResolvedValue(true) };
-    const codexCatalog = { refreshModels: jest.fn().mockResolvedValue(true) };
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['claude', 'codex']);
+    const claudeCatalog = { list: jest.fn(async () => []), refresh: jest.fn(async () => []) };
+    const codexCatalog = { list: jest.fn(async () => []), refresh: jest.fn(async () => []) };
     const plugin = createMockPlugin();
+    // The catalog comes from the application's workspace lookup now, and the
+    // enabled list above is the gate the row's own `isAvailable` used to be.
+    plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceFor: async (providerId: string) => ({
+        models: providerId === 'claude' ? claudeCatalog : codexCatalog,
+      }),
+    });
     const tab = createTab(createMockOptions({ plugin }));
-    ProviderWorkspaceRegistry.setServices('claude', { modelCatalog: claudeCatalog });
-    ProviderWorkspaceRegistry.setServices('codex', { modelCatalog: codexCatalog });
     tab.lifecycleState = 'bound_cold';
     tab.providerId = 'codex';
 
@@ -4572,36 +4643,26 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 
     await toolbarCallbacks.refreshModelOptions();
 
-    expect(claudeCatalog.refreshModels).toHaveBeenCalledWith({
-      plugin,
-      settings: plugin.settings,
-    });
-    expect(codexCatalog.refreshModels).toHaveBeenCalledWith({
-      plugin,
-      settings: plugin.settings,
-    });
+    expect(claudeCatalog.refresh).toHaveBeenCalled();
+    expect(codexCatalog.refresh).toHaveBeenCalled();
   });
 
   it('refreshes the service-tier toggle when the model changes on a blank tab', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4618,9 +4679,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('does not wait for provider warmup before resolving blank-tab provider changes', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4647,21 +4705,25 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('does not wait for OpenCode metadata warmup before resolving blank-tab model changes', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
-    const originalGetChatUIConfig = ProviderRegistry.getChatUIConfig.bind(ProviderRegistry);
+    const originalDeclarations = ProviderCatalog.prototype.declarations;
     let releaseMetadataWarmup!: () => void;
     const prepareModelMetadata = jest.fn().mockImplementation(() => new Promise<void>((resolve) => {
       releaseMetadataWarmup = resolve;
     }));
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: any) => {
-      const config = originalGetChatUIConfig(providerId);
-      return providerId === 'opencode'
-        ? { ...config, prepareModelMetadata }
-        : config;
-    });
+    jest.spyOn(ProviderCatalog.prototype, 'declarations')
+      .mockImplementation(function declarations(this: never, providerId: string) {
+        const real = originalDeclarations.call(this, providerId);
+        return providerId === 'opencode'
+          ? {
+            ...real,
+            chatUI: {
+              ...real.chatUI,
+              models: { ...real.chatUI.models, prepareMetadata: prepareModelMetadata },
+            },
+          }
+          : real;
+      });
 
     const plugin = createMockPlugin();
     plugin.settings.providerConfigs = {
@@ -4700,18 +4762,21 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('does not trigger provider warmup when a blank-tab model switch stays on OpenCode', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'resolveProviderForModel').mockImplementation((model: string) => {
-      if (model.startsWith('opencode:')) {
-        return 'opencode';
-      }
-      if (model.startsWith('gpt-') || /^o\d/.test(model)) {
-        return 'codex';
-      }
-      return 'claude';
-    });
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
     plugin.settings.providerConfigs = {
@@ -4758,9 +4823,6 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('preserves the saved Codex fast preference when switching away and back', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
     plugin.settings.settingsProvider = 'codex';
@@ -4798,25 +4860,21 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('swaps dropdown provider catalog on blank tab model change', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
+        },
+      },
+    } as never));
 
     const codexCatalog = {
       listDropdownEntries: jest.fn().mockResolvedValue([]),
@@ -4848,7 +4906,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
       },
     ]);
 
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: codexCatalog as any });
+    stubbedWorkspaceServices.codex = { commandCatalog: codexCatalog };
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -4884,21 +4942,21 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('updates hidden commands on blank tab model change', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockReturnValue({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => model.startsWith('gpt-') || /^o\d/.test(model)),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    });
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
+        },
+      },
+    } as never));
 
     const codexCatalog = {
       listDropdownEntries: jest.fn().mockResolvedValue([]),
@@ -4915,7 +4973,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
       refresh: jest.fn(),
     };
 
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: codexCatalog as any });
+    stubbedWorkspaceServices.codex = { commandCatalog: codexCatalog };
 
     const plugin = createMockPlugin({
       settings: {
@@ -4968,33 +5026,29 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   });
 
   it('rebinds provider helper services and clears stale runtime on blank tab provider change', async () => {
-    const createInstructionRefineServiceSpy = jest.spyOn(ProviderRegistry, 'createInstructionRefineService')
-      .mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    const createTitleGenerationServiceSpy = jest.spyOn(ProviderRegistry, 'createTitleGenerationService')
-      .mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue([]),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'codex'
-          ? model.startsWith('gpt-') || /^o\d/.test(model)
-          : providerId === 'claude' && (['haiku', 'sonnet', 'opus'].includes(model) || model.startsWith('claude-'))
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(false),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('off'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue([]),
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
+        },
+      },
+    } as never));
 
     const plugin = createMockPlugin();
+    const createInstructionRefineServiceSpy = plugin.auxiliary.instructionRefineService;
+    const createTitleGenerationServiceSpy = plugin.auxiliary.titleGenerationService;
     const tab = createTab(createMockOptions({ plugin }));
     initializeTabUI(tab, plugin);
 
-    const staleService = createMockClaudeChatRuntime({ providerId: 'codex' });
+    const staleService = createMockClaudeRuntime({ providerId: 'codex' });
     tab.service = staleService as any;
     tab.serviceInitialized = false;
 
@@ -5018,26 +5072,25 @@ describe('Tab - Blank Tab Draft Model Change', () => {
   it('keeps blank-tab model options mixed after selecting Antigravity', async () => {
     const antigravityModels = [{ value: 'antigravity', label: 'Antigravity' }];
     const claudeModels = [{ value: 'haiku', label: 'Haiku' }];
-    jest.spyOn(ProviderRegistry, 'getEnabledProviderIds').mockReturnValue(['antigravity', 'claude']);
-    jest.spyOn(ProviderRegistry, 'getProviderDisplayName').mockImplementation((providerId) => (
+    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['antigravity', 'claude']);
+    jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'antigravity' ? 'Antigravity' : 'Claude'
     ));
-    jest.spyOn(ProviderRegistry, 'getChatUIConfig').mockImplementation((providerId?: string) => ({
-      getModelOptions: jest.fn().mockReturnValue(providerId === 'antigravity' ? antigravityModels : claudeModels),
-      ownsModel: jest.fn((model: string) => (
-        providerId === 'antigravity'
-          ? model === 'antigravity'
-          : model === 'haiku'
-      )),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(true),
-      getReasoningOptions: jest.fn().mockReturnValue([]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('high'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(false),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
-      getCustomModelIds: jest.fn().mockReturnValue(new Set()),
-    }));
+    jest.spyOn(ProviderCatalog.prototype, 'declarations').mockImplementation((providerId) => ({
+      chatUI: {
+        bangBashEnabled: () => false,
+        icon: () => null,
+        models: {
+          applyDefaults: jest.fn(),
+          contextWindow: jest.fn().mockReturnValue(200000),
+          customModelIds: jest.fn().mockReturnValue(new Set()),
+          isBuiltIn: jest.fn().mockReturnValue(false),
+          normalizeVariant: jest.fn((model: string) => model),
+          options: jest.fn().mockReturnValue(providerId === 'antigravity' ? antigravityModels : claudeModels),
+          ownsModel: (model: string) => stubOwnsModel(providerId, model),
+        },
+      },
+    } as never));
     const plugin = createMockPlugin({
       settings: {
         ...createMockPlugin().settings,
@@ -5056,8 +5109,8 @@ describe('Tab - Blank Tab Draft Model Change', () => {
     await toolbarCallbacks.onModelChange('antigravity');
 
     const modelValues = toolbarCallbacks
-      .getUIConfig()
-      .getModelOptions(plugin.settings)
+      .getChatUI()
+      .models.options(plugin.settings)
       .map((option: { value: string }) => option.value);
 
     expect(modelValues).toContain('antigravity');
@@ -5069,10 +5122,7 @@ describe('Tab - Blank Tab Draft Model Change', () => {
 describe('Tab - First Send Binding', () => {
   it('derives provider from draft model on first send (Claude)', async () => {
     const mockEnsureReady = jest.fn().mockResolvedValue(true);
-    const runtimeModule = jest.requireMock('@/providers/claude/runtime/ClaudeChatRuntime');
-    runtimeModule.ClaudeChatRuntime.mockImplementationOnce(() => createMockClaudeChatRuntime({ ensureReady: mockEnsureReady }));
-    const createChatRuntimeSpy = jest.spyOn(ProviderRegistry, 'createChatRuntime')
-      .mockReturnValue(createMockClaudeChatRuntime() as any);
+    createdRuntimes.queued.push(createMockClaudeRuntime({ ensureReady: mockEnsureReady }));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -5082,16 +5132,13 @@ describe('Tab - First Send Binding', () => {
 
     await initializeTabService(tab, plugin, createMockMcpManager());
 
-    expect(createChatRuntimeSpy).toHaveBeenCalledWith(expect.objectContaining({
-      providerId: 'claude',
-    }));
+    expect(createdRuntimes.calls).toContain('claude');
     expect(tab.lifecycleState).toBe('bound_active');
     expect(tab.draftModel).toBeNull();
   });
 
   it('derives provider from draft model on first send (Codex)', async () => {
-    const createChatRuntimeSpy = jest.spyOn(ProviderRegistry, 'createChatRuntime')
-      .mockReturnValue(createMockClaudeChatRuntime({ providerId: 'codex' }) as any);
+    createdRuntimes.queued.push(createMockClaudeRuntime({ providerId: 'codex' }));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -5102,22 +5149,21 @@ describe('Tab - First Send Binding', () => {
 
     await initializeTabService(tab, plugin, createMockMcpManager());
 
-    expect(createChatRuntimeSpy).toHaveBeenCalledWith(expect.objectContaining({
-      providerId: 'codex',
-    }));
+    expect(createdRuntimes.calls).toContain('codex');
     expect(tab.lifecycleState).toBe('bound_active');
     expect(tab.draftModel).toBeNull();
   });
 
   it('applies restored draft settings before initializing a blank-tab runtime', async () => {
+    // Read off the plugin at the moment the composition is asked, rather than
+    // off an options bag the factory used to carry: the tab asks the
+    // application for a runtime now, and the settings it applied first are the
+    // plugin's own.
     let settingsAtRuntimeCreate: Record<string, unknown> | null = null;
-    jest.spyOn(ProviderRegistry, 'createChatRuntime')
-      .mockImplementation((options: any) => {
-        settingsAtRuntimeCreate = { ...options.plugin.settings };
-        return createMockClaudeChatRuntime({ providerId: 'codex' }) as any;
-      });
-
     const plugin = createMockPlugin();
+    createdRuntimes.onCreate = () => {
+      settingsAtRuntimeCreate = { ...plugin.settings };
+    };
     const tab = createTab(createMockOptions({
       plugin,
       draftModel: DEFAULT_CODEX_PRIMARY_MODEL,
@@ -5143,8 +5189,7 @@ describe('Tab - First Send Binding', () => {
   });
 
   it('keeps a blank tab unbound during runtime warmup', async () => {
-    jest.spyOn(ProviderRegistry, 'createChatRuntime')
-      .mockReturnValue(createMockClaudeChatRuntime({ providerId: 'codex' }) as any);
+    createdRuntimes.queued.push(createMockClaudeRuntime({ providerId: 'codex' }));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -5161,8 +5206,7 @@ describe('Tab - First Send Binding', () => {
   });
 
   it('binds an already-warmed blank runtime on first send initialization', async () => {
-    const createChatRuntimeSpy = jest.spyOn(ProviderRegistry, 'createChatRuntime')
-      .mockReturnValue(createMockClaudeChatRuntime({ providerId: 'codex' }) as any);
+    createdRuntimes.queued.push(createMockClaudeRuntime({ providerId: 'codex' }));
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -5172,10 +5216,10 @@ describe('Tab - First Send Binding', () => {
     tab.lifecycleState = 'blank';
 
     await initializeTabService(tab, plugin, { bindBlank: false });
-    const callsAfterWarmup = createChatRuntimeSpy.mock.calls.length;
+    const callsAfterWarmup = createdRuntimes.calls.length;
     await initializeTabService(tab, plugin);
 
-    expect(createChatRuntimeSpy).toHaveBeenCalledTimes(callsAfterWarmup);
+    expect(createdRuntimes.calls).toHaveLength(callsAfterWarmup);
     expect(tab.lifecycleState).toBe('bound_active');
     expect(tab.draftModel).toBeNull();
   });
@@ -5183,9 +5227,6 @@ describe('Tab - First Send Binding', () => {
 
 describe('Tab - History Bind Without Runtime', () => {
   it('ensureServiceForConversation binds to bound_cold without starting runtime', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));
@@ -5213,9 +5254,6 @@ describe('Tab - History Bind Without Runtime', () => {
   });
 
   it('ensureServiceForConversation updates hidden commands when the provider changes', async () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const codexCatalog = {
       listDropdownEntries: jest.fn().mockResolvedValue([]),
@@ -5247,7 +5285,7 @@ describe('Tab - History Bind Without Runtime', () => {
         insertPrefix: '$',
       },
     ]);
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: codexCatalog as any });
+    stubbedWorkspaceServices.codex = { commandCatalog: codexCatalog };
 
     const plugin = createMockPlugin({
       settings: {
@@ -5388,9 +5426,6 @@ describe('Tab - Destroy Lifecycle Transition', () => {
 
 describe('Tab - InputController getTabProviderId wiring', () => {
   it('wires getTabProviderId to InputController deps', () => {
-    jest.spyOn(ProviderRegistry, 'createInstructionRefineService').mockReturnValue({ cancel: jest.fn(), resetConversation: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'createTitleGenerationService').mockReturnValue({ cancel: jest.fn() } as any);
-    jest.spyOn(ProviderRegistry, 'getTaskResultInterpreter').mockReturnValue({} as any);
 
     const plugin = createMockPlugin();
     const tab = createTab(createMockOptions({ plugin }));

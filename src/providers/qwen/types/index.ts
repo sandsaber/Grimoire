@@ -1,15 +1,24 @@
+/**
+ * What a Qwen conversation carries beside its session id.
+ *
+ * **One field, and it exists for one reason.** This provider writes no session
+ * paths and no database — its binding is an id and nothing else, which is the
+ * difference from every sibling on this transport. But a session the agent no
+ * longer has is replaced during a dispatch, and the tab that has to say so is
+ * usually a later one; without somewhere to keep that, a reload would show a
+ * conversation quietly continuing in a session that does not remember it.
+ */
 export interface QwenProviderState {
   /**
-   * Set when a saved session failed to load and no replacement was persisted.
-   * Read back on the next load so a dropped session is not mistaken for a
-   * conversation that never had one.
+   * Set when a saved session failed to load and a fresh one was opened in its
+   * place. Read back when the conversation is next bound, so the
+   * session-restart notice survives the tab that learned it.
    */
   sessionDropped?: boolean;
-  sessionId?: string;
 }
 
-export function getQwenState(value: unknown): QwenProviderState {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value
-    : {};
+export function getQwenState(
+  providerState?: Record<string, unknown>,
+): QwenProviderState {
+  return providerState ?? {};
 }

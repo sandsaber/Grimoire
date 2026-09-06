@@ -42,7 +42,7 @@ describe('ToolCallRenderer', () => {
       const toolCall = createToolCall({
         id: 'bash-1',
         name: 'Bash',
-        input: { command: 'grep -ril "рыб" ~/vault --include="*.md"' },
+        input: { command: 'grep -ril "fish" ~/vault --include="*.md"' },
         status: 'running',
       });
       const toolCallElements = new Map<string, HTMLElement>();
@@ -53,14 +53,14 @@ describe('ToolCallRenderer', () => {
       expect(toolEl.hasClass('is-running')).toBe(true);
       expect(toolEl.querySelector('.grimoire-tool-icon-tile')).not.toBeNull();
       expect(toolEl.querySelector('.grimoire-tool-name')?.textContent).toBe('Run command');
-      expect(toolEl.querySelector('.grimoire-tool-summary')?.textContent).toBe('grep -ril "рыб" ~/vault --include="*.md"');
+      expect(toolEl.querySelector('.grimoire-tool-summary')?.textContent).toBe('grep -ril "fish" ~/vault --include="*.md"');
       expect(toolEl.querySelector('.grimoire-tool-status')?.hasClass('status-running')).toBe(true);
       expect(toolEl.querySelector('.grimoire-tool-spinner')).not.toBeNull();
 
       const captions = Array.from(toolEl.querySelectorAll('.grimoire-tool-io-caption')).map(el => el.textContent);
       const codeText = toolEl.querySelector('.grimoire-tool-io-code')?.textContent;
       expect(captions).toContain('INPUT');
-      expect(codeText).toContain('$ grep -ril "рыб" ~/vault --include="*.md"');
+      expect(codeText).toContain('$ grep -ril "fish" ~/vault --include="*.md"');
     });
 
     it('should store element in toolCallElements map', () => {
@@ -113,7 +113,7 @@ describe('ToolCallRenderer', () => {
         name: 'Glob',
         status: 'completed',
         input: { pattern: '**/*.md' },
-        result: 'Рыбалка на Волге.md\nСнасти.md\nРецепты/Уха.md',
+        result: 'Fishing on the Volga.md\nTackle.md\nRecipes/Fish soup.md',
       });
 
       const toolEl = renderStoredToolCall(parentEl, toolCall);
@@ -234,14 +234,14 @@ describe('ToolCallRenderer', () => {
         createToolCall({
           id: 'grep-1',
           name: 'Grep',
-          input: { pattern: 'рыба' },
+          input: { pattern: 'fish' },
           result: 'one.md\n',
           status: 'completed',
         }),
         createToolCall({
           id: 'grep-2',
           name: 'Grep',
-          input: { pattern: 'рыбалка' },
+          input: { pattern: 'fishing' },
           result: 'two.md\nthree.md\n',
           status: 'completed',
         }),
@@ -251,7 +251,7 @@ describe('ToolCallRenderer', () => {
 
       expect(groupEl.hasClass('grimoire-tool-group')).toBe(true);
       expect(groupEl.querySelector('.grimoire-tool-group-name')?.textContent).toBe('Searched the vault');
-      expect(groupEl.querySelector('.grimoire-tool-group-summary')?.textContent).toContain('рыба');
+      expect(groupEl.querySelector('.grimoire-tool-group-summary')?.textContent).toContain('fish');
       expect(groupEl.querySelector('.grimoire-tool-count-chip')?.textContent).toBe('2 queries');
       expect(groupEl.querySelectorAll('.grimoire-tool-sub-step')).toHaveLength(2);
 

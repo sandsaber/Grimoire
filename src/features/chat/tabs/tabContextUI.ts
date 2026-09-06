@@ -1,6 +1,6 @@
 import { Notice, setIcon, TFile } from 'obsidian';
 
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderId } from '../../../core/providers/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
@@ -90,7 +90,7 @@ export function syncContextSummary(tab: TabData, plugin: GrimoirePlugin): void {
 
   const providerId = getTabProviderId(tab, plugin);
   const settings = getTabSettingsSnapshot(tab, plugin);
-  const providerName = ProviderRegistry.getProviderDisplayName(providerId);
+  const providerName = providerCatalog().displayName(providerId);
   const reasoningLabel = getReasoningLabel(settings);
   const currentPath = tab.ui.fileContextManager?.getCurrentNotePath() ?? '';
 
@@ -138,8 +138,9 @@ export function syncContextSummary(tab: TabData, plugin: GrimoirePlugin): void {
 
 export function getModelSummaryLabel(providerId: ProviderId, settings: TabProviderSettings): string {
   const model = settings.model || '';
-  const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-  const modelInfo = uiConfig.getModelOptions(settings).find(option => option.value === model);
+  const modelInfo = providerCatalog().declarations(providerId)
+    .chatUI.models.options(settings)
+    .find(option => option.value === model);
   return modelInfo?.label ?? formatModelFallbackLabel(model);
 }
 
@@ -226,7 +227,8 @@ export function getReasoningLabel(settings: TabProviderSettings): string {
 }
 
 export function getPermissionSummary(providerId: ProviderId, permissionMode: string): string {
-  const toggle = ProviderRegistry.getChatUIConfig(providerId).getPermissionModeToggle?.() ?? null;
+  const toggle = providerCatalog().declarations(providerId)
+    .chatUI.permissionMode?.toggle() ?? null;
   if (toggle) {
     if (permissionMode === toggle.activeValue) {
       return t('chat.ui.context.autoApprove');
@@ -250,7 +252,8 @@ export function getPermissionSummary(providerId: ProviderId, permissionMode: str
 }
 
 export function getPermissionTitle(providerId: ProviderId, permissionMode: string): string {
-  const toggle = ProviderRegistry.getChatUIConfig(providerId).getPermissionModeToggle?.() ?? null;
+  const toggle = providerCatalog().declarations(providerId)
+    .chatUI.permissionMode?.toggle() ?? null;
   if (toggle) {
     if (permissionMode === toggle.activeValue) {
       return t('chat.ui.toolbar.permissionAuto');
@@ -304,7 +307,7 @@ export function initializeContextManagers(tab: TabData, plugin: GrimoirePlugin):
     dom.inputContainerEl,
     dom.contextMemoryEl
   );
-  tab.ui.fileContextManager.setMcpManager(getProviderMcpManager(getTabProviderId(tab, plugin)));
+  tab.ui.fileContextManager.setMcpManager(getProviderMcpManager(getTabProviderId(tab, plugin), plugin));
 
   const markVaultSearchDirty = (file: unknown): void => {
     if (file instanceof TFile) {

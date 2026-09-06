@@ -1,6 +1,6 @@
 import type { EditorView } from '@codemirror/view';
 
-import type { ChatRuntimeQueryOptions, ChatTurnRequest } from '../../../core/runtime/types';
+import type { ChatTurnRequest } from '../../../core/runtime/types';
 import type { TodoItem } from '../../../core/tools/todo';
 import type {
   ChatMessage,
@@ -118,9 +118,6 @@ export interface ChatStateCallbacks {
   onAttentionChanged?: (needsAttention: boolean) => void;
   onAutoScrollChanged?: (enabled: boolean) => void;
 }
-
-/** Options for query execution. */
-export type QueryOptions = ChatRuntimeQueryOptions;
 
 // Re-export types that are used across the chat feature
 export type {

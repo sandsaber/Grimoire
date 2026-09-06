@@ -1,25 +1,24 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
-import type {
-  ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
-  ProviderWorkspaceRegistration,
-  ProviderWorkspaceServices,
-} from '../../../core/providers/types';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderWorkspaceRegistration,
+} from '../../../providers/shared/providerHostContracts';
+import type {
+  ProviderModelCatalog,
+  ProviderWorkspaceServices,
+} from '../../../providers/shared/providerHostContracts';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { OpencodeAgentMentionProvider } from '../agents/OpencodeAgentMentionProvider';
 import { OpencodeCommandCatalog } from '../commands/OpencodeCommandCatalog';
-import { OpencodeChatRuntime } from '../runtime/OpencodeChatRuntime';
-import { OpencodeCliResolver } from '../runtime/OpencodeCliResolver';
+import { opencodeCliResolver } from '../runtime/OpencodeCliResolver';
 import { getOpencodeProviderSettings } from '../settings';
 import { OpencodeAgentStorage } from '../storage/OpencodeAgentStorage';
 import { opencodeSettingsTabRenderer } from '../ui/OpencodeSettingsTab';
 import { opencodePlanUsageStore } from './OpencodePlanUsageStore';
-import { OpencodeRuntimeCommandLoader } from './OpencodeRuntimeCommandLoader';
+import { createOpencodeRuntimeCommandLoader } from './OpencodeRuntimeCommandLoader';
 
 export interface OpencodeWorkspaceServices extends ProviderWorkspaceServices {
   agentStorage: OpencodeAgentStorage;
@@ -29,14 +28,6 @@ export interface OpencodeWorkspaceServices extends ProviderWorkspaceServices {
   mcpStorage: AcpMcpStorage;
   mcpServerManager: McpServerManager;
 }
-
-const OPENCODE_METADATA_WARMUP_DB = ':memory:';
-
-const opencodeTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'commands';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -67,7 +58,7 @@ function createOpencodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
           level: 'debug',
           scope: 'provider.opencode',
         });
-        return false;
+        return 'skipped';
       }
 
       return refreshCache.refresh({
@@ -75,19 +66,14 @@ function createOpencodeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalo
         force,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
         load: async () => {
-          const before = JSON.stringify(currentSettings.discoveredModels);
-          const runtime = new OpencodeChatRuntime(plugin);
-          try {
-            runtime.syncConversationState({
-              providerState: { databasePath: OPENCODE_METADATA_WARMUP_DB },
-              sessionId: null,
-            });
-            const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-            const after = JSON.stringify(getOpencodeProviderSettings(settings).discoveredModels);
-            return loaded && before !== after;
-          } finally {
-            runtime.cleanup();
-          }
+          // One isolated session, opened and closed: what the legacy runtime
+          // was doing here was opening a session and reading its reply.
+          //
+          // Its answer is whether the agent said anything, which is the question
+          // the surface asks. Whether the *list* changed is a different one, and
+          // a refresh that returns the same models did not fail.
+          const loaded = await plugin.getOpencodeExecution().metadata.discoverMetadata();
+          return loaded ? 'refreshed' : 'failed';
         },
       });
     },
@@ -118,14 +104,13 @@ export async function createOpencodeWorkspaceServices(
     agentStorage,
     agentMentionProvider,
     commandCatalog: new OpencodeCommandCatalog(vaultAdapter),
-    cliResolver: new OpencodeCliResolver(),
+    cliResolver: opencodeCliResolver(),
     modelCatalog: createOpencodeModelCatalog(plugin),
     mcpStorage,
     mcpServerManager,
     usageProvider: opencodePlanUsageStore,
-    runtimeCommandLoader: new OpencodeRuntimeCommandLoader(),
+    runtimeCommandLoader: createOpencodeRuntimeCommandLoader(plugin),
     settingsTabRenderer: opencodeSettingsTabRenderer,
-    tabWarmupPolicy: opencodeTabWarmupPolicy,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
     },
@@ -133,16 +118,12 @@ export async function createOpencodeWorkspaceServices(
 }
 
 export const opencodeWorkspaceRegistration: ProviderWorkspaceRegistration<OpencodeWorkspaceServices> = {
-  workspaceCapabilities: {
-    skills: { inventory: 'managed', manager: 'managed' },
-    commands: { inventory: 'readonly', manager: 'managed', runtimeCommandDiscovery: 'ephemeral' },
-    agents: { inventory: 'managed', manager: 'managed' },
-    mcp: { inventory: 'managed', manager: 'managed' },
-    environment: { inventory: 'managed', manager: 'managed' },
-  },
   initialize: async ({ plugin, vaultAdapter }) => createOpencodeWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetOpencodeWorkspaceServices(): OpencodeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('opencode') as OpencodeWorkspaceServices | null;
+export function maybeGetOpencodeWorkspaceServices(
+  plugin: GrimoirePlugin,
+): OpencodeWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('opencode') as OpencodeWorkspaceServices | null ?? null;
 }

@@ -27,10 +27,11 @@ import type {
   TokenUsageUpdatedNotification,
   TurnCompletedNotification,
   TurnPlanUpdatedNotification,
-  UserInput,
-  UserMessageItem,
   WebSearchItem,
 } from './codexAppServerTypes';
+
+/** How many rendered web searches a connection remembers. */
+const SEEN_WEB_SEARCH_LIMIT = 2048;
 
 type ChunkEmitter = (chunk: StreamChunk) => void;
 type TurnMetadataListener = (update: Partial<ChatTurnMetadata>) => void;
@@ -48,12 +49,39 @@ const COLLAB_AGENT_TOOL_MAP: Record<string, string> = {
   closeAgent: 'close_agent',
 };
 
+/**
+ * Every notification this turns into a chunk.
+ *
+ * Exported so the connection that delivers them can be built from it: the flip
+ * subscribed to eleven methods while this handled nineteen, and the eight it
+ * missed were the ones carrying streamed command output, patch updates, raw
+ * response items, plan updates and token usage. A list the deliverer derives
+ * cannot drift from the list the renderer switches on.
+ */
+export const CODEX_ROUTED_NOTIFICATION_METHODS = [
+  'item/agentMessage/delta',
+  'item/started',
+  'item/completed',
+  'item/reasoning/summaryTextDelta',
+  'item/reasoning/textDelta',
+  'item/reasoning/summaryPartAdded',
+  'item/plan/delta',
+  'item/commandExecution/outputDelta',
+  'item/fileChange/outputDelta',
+  'item/fileChange/patchUpdated',
+  'rawResponseItem/completed',
+  'event_msg',
+  'thread/tokenUsage/updated',
+  'turn/plan/updated',
+  'turn/completed',
+  'error',
+] as const;
+
 export class CodexNotificationRouter {
   private seenWebSearchIds = new Set<string>();
   private planUpdateCounter = 0;
   private isPlanTurn = false;
   private sawPlanDelta = false;
-  private startedUserMessageIds = new Set<string>();
   private startedAgentMessageIds = new Set<string>();
   private agentMessageDeltaIds = new Set<string>();
   private agentMessagePhases = new Map<string, AssistantTextPhase>();
@@ -120,7 +148,6 @@ export class CodexNotificationRouter {
   beginTurn(params: { isPlanTurn: boolean }): void {
     this.isPlanTurn = params.isPlanTurn;
     this.sawPlanDelta = false;
-    this.startedUserMessageIds.clear();
     this.startedAgentMessageIds.clear();
     this.agentMessageDeltaIds.clear();
     this.agentMessagePhases.clear();
@@ -136,7 +163,6 @@ export class CodexNotificationRouter {
   endTurn(): void {
     this.isPlanTurn = false;
     this.sawPlanDelta = false;
-    this.startedUserMessageIds.clear();
     this.startedAgentMessageIds.clear();
     this.agentMessageDeltaIds.clear();
     this.agentMessagePhases.clear();
@@ -244,8 +270,11 @@ export class CodexNotificationRouter {
     }
 
     switch (item.type) {
+      // Nothing is drawn from a user item. The projection carries the user's
+      // message — it is what the surface renders and what the vault stores —
+      // and the boundary chunk this used to send was filtered off the content
+      // channel before it reached anything.
       case 'userMessage':
-        this.emitUserMessageBoundary(item);
         break;
 
       case 'agentMessage':
@@ -291,9 +320,6 @@ export class CodexNotificationRouter {
 
     switch (item.type) {
       case 'userMessage':
-        if (!this.startedUserMessageIds.has(item.id)) {
-          this.emitUserMessageBoundary(item);
-        }
         break;
 
       case 'agentMessage':
@@ -653,6 +679,10 @@ export class CodexNotificationRouter {
   private emitToolUseFromWebSearch(item: WebSearchItem): void {
     if (this.seenWebSearchIds.has(item.id)) return;
     this.seenWebSearchIds.add(item.id);
+    // Bounded: this set exists to render one search once, and a router lives as
+    // long as its connection. Unbounded it holds every search id of a working
+    // day, for a question only ever asked about the recent ones.
+    trimOldestSetEntries(this.seenWebSearchIds, SEEN_WEB_SEARCH_LIMIT);
 
     this.resetAssistantSegmentText();
     this.emit({
@@ -742,19 +772,6 @@ export class CodexNotificationRouter {
     this.emit({ type: 'context_compacted' });
   }
 
-  private emitUserMessageBoundary(item: UserMessageItem): void {
-    if (this.startedUserMessageIds.has(item.id)) {
-      return;
-    }
-
-    this.startedUserMessageIds.add(item.id);
-    this.emit({
-      type: 'user_message_start',
-      itemId: item.id,
-      content: this.extractUserMessageText(item.content),
-    });
-  }
-
   private emitAgentMessageBoundary(item: AgentMessageItem): void {
     if (this.startedAgentMessageIds.has(item.id)) {
       return;
@@ -765,12 +782,10 @@ export class CodexNotificationRouter {
     if (phase) {
       this.agentMessagePhases.set(item.id, phase);
     }
+    // Marked and claimed, not emitted, for the reason above. The phase and the
+    // segment claim are both read later — by the fallback completion text and
+    // by the segment bookkeeping — so only the chunk goes.
     this.claimAssistantSegment(item.id);
-    this.emit({
-      type: 'assistant_message_start',
-      itemId: item.id,
-      ...(phase ? { phase } : {}),
-    });
   }
 
   private completeAgentMessage(item: AgentMessageItem): void {
@@ -786,13 +801,6 @@ export class CodexNotificationRouter {
       item.text,
       normalizeAssistantTextPhase(item.phase) ?? this.agentMessagePhases.get(item.id),
     );
-  }
-
-  private extractUserMessageText(content: UserInput[]): string {
-    return content
-      .map((part) => (part.type === 'text' ? part.text : ''))
-      .filter((text) => text.length > 0)
-      .join('\n\n');
   }
 
   // -- turn/plan/updated (update_plan) ----------------------------------------
@@ -858,7 +866,6 @@ export class CodexNotificationRouter {
     }
 
     this.flushPendingRawToolOutputs();
-    this.emit({ type: 'done' });
   }
 
   private onError(params: ErrorNotification): void {
@@ -1094,4 +1101,15 @@ function normalizeAgentMessageCompletionText(
     return text.slice(streamedAssistantText.length);
   }
   return text;
+}
+
+/** Keeps a de-duplication set bounded, oldest first. */
+function trimOldestSetEntries<T>(set: Set<T>, maximum: number): void {
+  while (set.size > maximum) {
+    const oldest = set.values().next().value;
+    if (oldest === undefined) {
+      return;
+    }
+    set.delete(oldest);
+  }
 }

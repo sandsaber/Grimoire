@@ -1,9 +1,11 @@
 import { Menu, Notice, setIcon, setTooltip } from 'obsidian';
 
+import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
+
 import { buildFallbackTitle } from '../../../core/prompt/fallbackTitle';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderId, TitleGenerationService } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatRewindMode } from '../../../core/runtime/types';
 import type { ChatMessage, Conversation, ConversationMeta } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
@@ -31,8 +33,8 @@ function hasStartedConversation(conversation: Conversation): boolean {
     return true;
   }
   try {
-    const historyService = ProviderRegistry.getConversationHistoryService(conversation.providerId);
-    return !!historyService.resolveSessionIdForConversation?.(conversation);
+    return !!providerCatalog().declarations(conversation.providerId)
+      .conversationState?.resolveSessionId(conversation);
   } catch {
     return !!conversation.sessionId;
   }
@@ -61,7 +63,18 @@ export interface ConversationControllerDeps {
   clearQueuedMessage: () => void;
   getTitleGenerationService: () => TitleGenerationService | null;
   getStatusPanel: () => StatusPanel | null;
-  getAgentService?: () => ChatRuntime | null;
+  getAgentService?: () => ExecutionChatRuntimeAdapter | null;
+  /**
+   * This tab's end of the projection path, where it has one.
+   *
+   * Needed for exactly one thing: stopping a turn. The kernel owns the run, so
+   * the runtime's own `cancel` acts on a run it never started and returns
+   * having done nothing.
+   */
+  getProjectionExecution?: () => {
+    cancel(): Promise<void>;
+    readonly executionSessionId: string | null;
+  } | null;
   getActiveProviderSettings?: () => Record<string, unknown>;
   getOrchestratorMode?: () => boolean;
   ensureServiceForConversation?: (conversation: Conversation | null) => Promise<void>;
@@ -101,7 +114,7 @@ export class ConversationController {
     this.callbacks = callbacks;
   }
 
-  private getAgentService(): ChatRuntime | null {
+  private getAgentService(): ExecutionChatRuntimeAdapter | null {
     return this.deps.getAgentService?.() ?? null;
   }
 
@@ -156,7 +169,17 @@ export class ConversationController {
       if (force && state.isStreaming) {
         state.cancelRequested = true;
         state.bumpStreamGeneration();
-        this.getAgentService()?.cancel();
+        // **The kernel owns the run**, so the stop goes to it. Asked of the
+        // runtime instead — which is what this did — `cancel` acts on a run it
+        // never started and returns having done nothing: starting a new
+        // conversation over a streaming turn left that turn running, writing
+        // into a conversation the tab had already left.
+        const projection = this.deps.getProjectionExecution?.() ?? null;
+        if (projection) {
+          void projection.cancel();
+        } else {
+          this.getAgentService()?.cancel();
+        }
       }
 
       // Save current conversation if it has messages
@@ -164,7 +187,11 @@ export class ConversationController {
         await this.save();
       }
 
-      subagentManager.orphanAllActive();
+      // **Leaving a conversation no longer abandons its background work.** The
+      // agents this conversation started are recorded against it, so they are
+      // still there when someone comes back — and marking them `orphaned` said
+      // only "nobody is watching", which is what leaving already means. The
+      // maps go because they are this tab's.
       subagentManager.clear();
 
       // Clear streaming state and related DOM references
@@ -189,10 +216,7 @@ export class ConversationController {
 
       // Reset agent service session (no session ID for entry point)
       // Pass persistent paths to prevent stale external contexts
-      this.getAgentService()?.syncConversationState(
-        null,
-        plugin.settings.persistentExternalContextPaths || []
-      );
+      this.getAgentService()?.syncConversationState(null);
 
       const messagesEl = this.deps.getMessagesEl();
       messagesEl.empty();
@@ -250,10 +274,7 @@ export class ConversationController {
       state.hasPendingConversationSave = false;
 
       // Pass persistent paths to prevent stale external contexts
-      this.getAgentService()?.syncConversationState(
-        null,
-        plugin.settings.persistentExternalContextPaths || []
-      );
+      this.getAgentService()?.syncConversationState(null);
 
       const fileCtx = this.deps.getFileContextManager();
       fileCtx?.resetForNewConversation();
@@ -300,7 +321,7 @@ export class ConversationController {
       this.deps.dismissPendingInlinePrompts?.();
       await this.save();
 
-      subagentManager.orphanAllActive();
+      // Switching away is leaving; see the note in `createNew` above.
       subagentManager.clear();
 
       plugin.recordDebugLog?.({
@@ -419,6 +440,15 @@ export class ConversationController {
       return;
     }
 
+    // **Rewind is keyed by execution session, and the runtime opens one of its
+    // own.** On the projection path the coordinator opens the session the turns
+    // actually run in; the runtime's own is the one a tab priming created, and
+    // it holds no runs — so a rewind against it found a session with nothing in
+    // it, on every provider, since the flip.
+    const projected = this.deps.getProjectionExecution?.() ?? null;
+    (agentService as { adoptExecutionSession?: (id: string | null) => void })
+      .adoptExecutionSession?.(projected?.executionSessionId ?? null);
+
     let result;
     try {
       result = await agentService.rewind(userMsg.userMessageId, prevAssistantUuid, mode);
@@ -484,7 +514,10 @@ export class ConversationController {
     }
 
     const agentService = this.getAgentService();
-    const sessionInvalidated = agentService?.consumeSessionInvalidation?.() ?? false;
+    // **The invalidation flag is not consumed here.** It is one-shot, and the
+    // turn's own binding closure is what has to see it: a save running first
+    // would take the flag and the barrier would write a session the provider
+    // has already refused.
 
     // Entry point with messages - create conversation lazily
     // New conversations always use SDK-native storage.
@@ -507,14 +540,14 @@ export class ConversationController {
     const mcpServerSelector = this.deps.getMcpServerSelector();
     const enabledMcpServers = mcpServerSelector ? Array.from(mcpServerSelector.getEnabledServers()) : [];
 
-    const conversation = plugin.getConversationSync(state.currentConversationId!);
-
-    const { updates: sessionUpdates } = agentService
-      ? agentService.buildSessionUpdates({ conversation, sessionInvalidated })
-      : { updates: {} };
-
     const updates: Partial<Conversation> = {
-      ...sessionUpdates,
+      // **No session binding here any more.** The conversation's provider
+      // session is written by the persistence barrier, inside the same write as
+      // the answer the turn produced — see `ChatExecutionCoordinator`. This
+      // save runs on tab switches and background saves as well as after a turn,
+      // and asking the adapter for a binding at each of those wrote the same
+      // value back repeatedly while missing the one case that mattered: a turn
+      // whose surface save was skipped.
       messages: state.messages,
       currentNote: currentNote,
       externalContextPaths: externalContextPaths.length > 0 ? externalContextPaths : undefined,
@@ -564,11 +597,8 @@ export class ConversationController {
 
     // Determine external context paths for this session.
     // Brand-new sessions use persistent paths; restored provider sessions use saved paths.
-    const externalContextPaths = hasStartedSession
-      ? conversation.externalContextPaths || []
-      : plugin.settings.persistentExternalContextPaths || [];
 
-    this.getAgentService()?.syncConversationState(conversation, externalContextPaths);
+    this.getAgentService()?.syncConversationState(conversation);
 
     const fileCtx = this.deps.getFileContextManager();
     fileCtx?.resetForLoadedConversation(hasStartedSession);
@@ -590,7 +620,11 @@ export class ConversationController {
 
     const welcomeEl = renderer.renderMessages(
       state.messages,
-      () => this.getGreeting()
+      () => this.getGreeting(),
+      // What the provider found when this conversation's history was loaded. A
+      // transcript shorter than the conversation says so here rather than
+      // looking like a conversation that was always this short.
+      plugin.getHistoryHydration(conversation.id),
     );
     this.deps.setWelcomeEl(welcomeEl);
     this.updateSessionRestartNotice();
@@ -709,6 +743,7 @@ export class ConversationController {
         autocomplete: 'off',
       },
     });
+    this.renderUnreadableConversations(container);
     const list = container.createDiv({ cls: 'grimoire-history-list' });
 
     const renderList = (rawQuery = ''): void => {
@@ -763,6 +798,40 @@ export class ConversationController {
     }
 
     options.onClose?.();
+  }
+
+  /**
+   * The conversations the vault holds and this build cannot read.
+   *
+   * Their own block, above the list and outside the search: they have no
+   * title to match, no timestamp to group by, and nothing to open. Shown at
+   * all because the file is still there — a conversation that simply vanishes
+   * from the list is indistinguishable from one the user deleted, which is the
+   * silence typed hydration removed from the transcript and this removes from
+   * the list.
+   */
+  private renderUnreadableConversations(container: HTMLElement): void {
+    const unreadable = this.deps.plugin.getUnreadableConversations?.() ?? [];
+    if (unreadable.length === 0) {
+      return;
+    }
+
+    const block = container.createDiv({ cls: 'grimoire-history-unreadable' });
+    for (const entry of unreadable) {
+      const item = block.createDiv({ cls: 'grimoire-history-unreadable-item' });
+      item.setAttribute('data-conversation-id', entry.id);
+      const title = item.createDiv({
+        cls: 'grimoire-history-unreadable-title',
+        text: t('chat.ui.history.unreadableTitle'),
+      });
+      title.setAttribute('title', entry.id);
+      item.createDiv({
+        cls: 'grimoire-history-unreadable-reason',
+        text: entry.reason === 'future'
+          ? t('chat.ui.history.unreadableFuture')
+          : t('chat.ui.history.unreadableCorrupt'),
+      });
+    }
   }
 
   private renderHistoryConversationRow(
@@ -986,9 +1055,12 @@ export class ConversationController {
   }
 
   private getHistoryProviderColor(providerId: string | undefined): string {
-    const resolvedProviderId = providerId && ProviderRegistry.isRegisteredProviderId(providerId)
+    // The product default, not one provider's colour picked out of the list: a
+    // conversation whose provider is not registered was showing Claude's dot,
+    // which reads as a claim about which provider it belongs to.
+    const resolvedProviderId = providerId && providerCatalog().has(providerId)
       ? providerId
-      : 'claude';
+      : DEFAULT_CHAT_PROVIDER_ID;
     return `var(--grimoire-provider-${resolvedProviderId})`;
   }
 

@@ -12,10 +12,7 @@ const mockRefreshAgentMentions = jest.fn().mockResolvedValue(undefined);
 const mockInvalidateProviderCommandCaches = jest.fn();
 const mockRefreshModelSelector = jest.fn();
 const mockCliResolverReset = jest.fn();
-const mockRuntimeEnsureReady = jest.fn().mockResolvedValue(false);
-const mockRuntimeSyncConversationState = jest.fn();
-const mockRuntimeCleanup = jest.fn();
-const mockRuntimeWarmModelMetadata = jest.fn().mockResolvedValue(false);
+const mockDiscoverMetadata = jest.fn().mockResolvedValue(false);
 const mockAgentStorage = {};
 const mockCreatedAgentSettings: Array<{
   app: unknown;
@@ -110,28 +107,6 @@ jest.mock('@/providers/grok/app/GrokWorkspaceServices', () => ({
     },
     refreshAgentMentions: mockRefreshAgentMentions,
   })),
-}));
-
-jest.mock('@/providers/grok/runtime/GrokChatRuntime', () => ({
-  GrokChatRuntime: class MockGrokChatRuntime {
-    constructor(readonly plugin: any) {}
-
-    syncConversationState(...args: unknown[]) {
-      return mockRuntimeSyncConversationState(...args);
-    }
-
-    ensureReady(...args: unknown[]) {
-      return mockRuntimeEnsureReady(this.plugin, ...args);
-    }
-
-    warmModelMetadata(...args: unknown[]) {
-      return mockRuntimeWarmModelMetadata(this.plugin, ...args);
-    }
-
-    cleanup() {
-      return mockRuntimeCleanup();
-    }
-  },
 }));
 
 jest.mock('@/utils/env', () => ({
@@ -379,6 +354,7 @@ function createPlugin(overrides: Record<string, unknown> = {}): any {
   };
 
   return {
+    getGrokExecution: () => ({ metadata: { discoverMetadata: mockDiscoverMetadata } }),
     settings: {
       providerConfigs: {
         grok: {
@@ -440,8 +416,7 @@ describe('GrokSettingsTab', () => {
     createdDomElements.length = 0;
     mockCreatedAgentSettings.length = 0;
     jest.clearAllMocks();
-    mockRuntimeEnsureReady.mockResolvedValue(false);
-    mockRuntimeWarmModelMetadata.mockResolvedValue(false);
+    mockDiscoverMetadata.mockResolvedValue(false);
     mockedExistsSync.mockReturnValue(false);
     mockedStatSync.mockReturnValue({ isFile: () => true } as fs.Stats);
     setLocale('en');
@@ -536,7 +511,7 @@ describe('GrokSettingsTab', () => {
   });
 
   it('loads the Grok Build model catalog when the model browser is expanded', async () => {
-    mockRuntimeEnsureReady.mockImplementation(async (plugin: any) => {
+    mockDiscoverMetadata.mockImplementation(async () => {
       plugin.settings.providerConfigs.grok.discoveredModels = [
         { label: 'DeepSeek/DeepSeek V4 Pro', rawId: 'deepseek/deepseek-v4-pro' },
       ];
@@ -566,20 +541,12 @@ describe('GrokSettingsTab', () => {
     catalogEl.open = true;
     await catalogEl.dispatchMockEvent('toggle');
 
-    expect(mockRuntimeSyncConversationState).toHaveBeenCalledWith({
-      providerState: {},
-      sessionId: null,
-    });
-    expect(mockRuntimeEnsureReady).toHaveBeenCalledWith(
-      plugin,
-      { allowSessionCreation: true },
-    );
-    expect(mockRuntimeCleanup).toHaveBeenCalledTimes(1);
+    expect(mockDiscoverMetadata).toHaveBeenCalledTimes(1);
     expect(context.refreshModelSelectors).toHaveBeenCalledTimes(1);
   });
 
   it('loads the Grok Build model catalog immediately when a fresh picker starts expanded', async () => {
-    mockRuntimeEnsureReady.mockImplementation(async (plugin: any) => {
+    mockDiscoverMetadata.mockImplementation(async () => {
       plugin.settings.providerConfigs.grok.discoveredModels = [
         { label: 'DeepSeek/DeepSeek V4 Pro', rawId: 'deepseek/deepseek-v4-pro' },
       ];
@@ -607,15 +574,7 @@ describe('GrokSettingsTab', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(mockRuntimeSyncConversationState).toHaveBeenCalledWith({
-      providerState: {},
-      sessionId: null,
-    });
-    expect(mockRuntimeEnsureReady).toHaveBeenCalledWith(
-      plugin,
-      { allowSessionCreation: true },
-    );
-    expect(mockRuntimeCleanup).toHaveBeenCalledTimes(1);
+    expect(mockDiscoverMetadata).toHaveBeenCalledTimes(1);
     expect(context.refreshModelSelectors).toHaveBeenCalledTimes(1);
   });
 
@@ -628,13 +587,11 @@ describe('GrokSettingsTab', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(mockRuntimeSyncConversationState).not.toHaveBeenCalled();
-    expect(mockRuntimeEnsureReady).not.toHaveBeenCalled();
-    expect(mockRuntimeCleanup).not.toHaveBeenCalled();
+    expect(mockDiscoverMetadata).not.toHaveBeenCalled();
   });
 
   it('warms and persists thinking metadata when a model is added to the visible list', async () => {
-    mockRuntimeWarmModelMetadata.mockResolvedValue(true);
+    mockDiscoverMetadata.mockResolvedValue(true);
     const plugin = createPlugin({
       providerConfigs: {
         grok: {
@@ -670,10 +627,9 @@ describe('GrokSettingsTab', () => {
     expect(plugin.settings.providerConfigs.grok.visibleModels).toEqual([
       'deepseek/deepseek-v4-pro',
     ]);
-    expect(mockRuntimeWarmModelMetadata).toHaveBeenCalledWith(
-      plugin,
-      'grok:deepseek/deepseek-v4-pro',
-    );
+    expect(mockDiscoverMetadata).toHaveBeenCalledWith({
+      model: 'grok:deepseek/deepseek-v4-pro',
+    });
     expect(context.refreshModelSelectors).toHaveBeenCalled();
   });
 });

@@ -2,19 +2,22 @@ import { Notice, setIcon, setTooltip } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
 
+import { asActivatable } from '@/shared/components/activatable';
+
 import type { ProjectWorkspace } from '../../../core/context/types';
-import type { McpServerManager } from '../../../core/mcp/McpServerManager';
+import type {
+  ProviderChatUiContribution,
+  ProviderModelOption,
+  ProviderModeSelector,
+  ProviderPermissionModeToggle,
+  ProviderReasoningTier,
+  ProviderServiceTierToggle,
+  ProviderUsageSnapshot,
+  ProviderUsageWindow,
+} from '../../../core/providers/ProviderModule';
 import type {
   ProviderCapabilities,
-  ProviderChatUIConfig,
   ProviderId,
-  ProviderModeSelectorConfig,
-  ProviderPermissionModeToggleConfig,
-  ProviderPlanUsage,
-  ProviderPlanUsageWindow,
-  ProviderReasoningOption,
-  ProviderServiceTierToggleConfig,
-  ProviderUIOption,
 } from '../../../core/providers/types';
 import type {
   ManagedMcpServer,
@@ -24,6 +27,7 @@ import { t } from '../../../i18n/i18n';
 import { appendCheckIcon, appendMcpIcon, createProviderIconSvg } from '../../../shared/icons';
 import { filterValidPaths, findConflictingPath, isDuplicatePath, isValidContextPath, validateContextPath } from '../../../utils/externalContext';
 import { expandHomePath, normalizePathForFilesystem } from '../../../utils/path';
+import type { ProviderMcpServerView } from '../tabs/tabSettings';
 import { localizeReasoningLevel } from '../utils/reasoningDisplay';
 
 interface ElectronOpenDialogResult {
@@ -140,15 +144,15 @@ function clampUsagePct(pct: number): number {
   return Math.max(0, Math.min(100, Math.round(pct)));
 }
 
-function isQuotaUsage(usage: ProviderPlanUsage | null | undefined): usage is ProviderPlanUsage & { windows: ProviderPlanUsageWindow[] } {
+function isQuotaUsage(usage: ProviderUsageSnapshot | null | undefined): usage is ProviderUsageSnapshot & { windows: ProviderUsageWindow[] } {
   return Array.isArray(usage?.windows);
 }
 
-function isSpendUsage(usage: ProviderPlanUsage | null | undefined): usage is ProviderPlanUsage & { spend: string } {
+function isSpendUsage(usage: ProviderUsageSnapshot | null | undefined): usage is ProviderUsageSnapshot & { spend: string } {
   return typeof usage?.spend === 'string' && usage.spend.trim().length > 0;
 }
 
-function normalizeUsageWindow(window: ProviderPlanUsageWindow): ProviderPlanUsageWindow {
+function normalizeUsageWindow(window: ProviderUsageWindow): ProviderUsageWindow {
   return {
     label: window.label,
     pct: clampUsagePct(window.pct),
@@ -157,7 +161,7 @@ function normalizeUsageWindow(window: ProviderPlanUsageWindow): ProviderPlanUsag
   };
 }
 
-function findFiveHourWindow(usage: ProviderPlanUsage | null | undefined): ProviderPlanUsageWindow | null {
+function findFiveHourWindow(usage: ProviderUsageSnapshot | null | undefined): ProviderUsageWindow | null {
   if (!isQuotaUsage(usage)) {
     return null;
   }
@@ -169,7 +173,7 @@ function findFiveHourWindow(usage: ProviderPlanUsage | null | undefined): Provid
   return isUsagePctKnown(normalized) ? normalized : null;
 }
 
-function findPrimaryQuotaWindow(usage: ProviderPlanUsage | null | undefined): ProviderPlanUsageWindow | null {
+function findPrimaryQuotaWindow(usage: ProviderUsageSnapshot | null | undefined): ProviderUsageWindow | null {
   const fiveHourWindow = findFiveHourWindow(usage);
   if (fiveHourWindow) {
     return fiveHourWindow;
@@ -205,7 +209,7 @@ function formatQuotaBadgeLabel(label: string): string {
   return trimmed.length <= 4 ? trimmed.toUpperCase() : trimmed;
 }
 
-function formatQuotaLimitDescription(window: ProviderPlanUsageWindow): string {
+function formatQuotaLimitDescription(window: ProviderUsageWindow): string {
   if (FIVE_HOUR_WINDOW_PATTERN.test(window.label)) {
     return t('chat.ui.usage.fiveHourLimit');
   }
@@ -217,19 +221,19 @@ function stripThisMonth(spend: string): string {
   return spend.replace(/\s+this\s+month\s*$/i, '').trim() || spend.trim();
 }
 
-function isUsagePctKnown(window: ProviderPlanUsageWindow): boolean {
+function isUsagePctKnown(window: ProviderUsageWindow): boolean {
   return window.pctKnown !== false;
 }
 
-function formatUsagePct(window: ProviderPlanUsageWindow): string {
+function formatUsagePct(window: ProviderUsageWindow): string {
   return isUsagePctKnown(window) ? `${window.pct}%` : '—';
 }
 
-function isUsageWindowHot(window: ProviderPlanUsageWindow): boolean {
+function isUsageWindowHot(window: ProviderUsageWindow): boolean {
   return isUsagePctKnown(window) && window.pct >= PLAN_USAGE_WARN_THRESHOLD;
 }
 
-function formatQuotaAriaLabel(plan: string, window: ProviderPlanUsageWindow): string {
+function formatQuotaAriaLabel(plan: string, window: ProviderUsageWindow): string {
   const limitDescription = formatQuotaLimitDescription(window);
   return isUsagePctKnown(window)
     ? t('chat.ui.usage.ariaWithPercent', {
@@ -269,12 +273,12 @@ export interface ToolbarCallbacks {
   onOrchestratorModeChange?: () => Promise<void>;
   getSettings: () => ToolbarSettings;
   getEnvironmentVariables?: () => string;
-  getUIConfig: () => ProviderChatUIConfig;
+  getChatUI: () => ProviderChatUiContribution;
   getCapabilities: () => ProviderCapabilities;
   refreshModelOptions?: () => Promise<void>;
   getProviderId?: () => ProviderId;
-  getProviderUsage?: (providerId: ProviderId) => ProviderPlanUsage | null;
-  refreshProviderUsage?: (providerId: ProviderId) => Promise<ProviderPlanUsage | null>;
+  getProviderUsage?: (providerId: ProviderId) => ProviderUsageSnapshot | null;
+  refreshProviderUsage?: (providerId: ProviderId) => Promise<ProviderUsageSnapshot | null>;
   onProviderUsageRefresh?: (providerId: ProviderId) => void;
   resolveProviderForModel?: (model: string) => ProviderId;
   getOrchestratorMode?: () => boolean;
@@ -293,7 +297,7 @@ export class ModelSelector {
   private modelCatalogRefreshPromise: Promise<void> | null = null;
   private modelCatalogRefreshFailed = false;
   private isRefreshingModelCatalog = false;
-  private providerUsageRefreshPromises = new Map<ProviderId, Promise<ProviderPlanUsage | null>>();
+  private providerUsageRefreshPromises = new Map<ProviderId, Promise<ProviderUsageSnapshot | null>>();
   private modelGroupOpenState = new Map<string, boolean>();
   private searchQuery = '';
   private callbacks: ToolbarCallbacks;
@@ -324,8 +328,7 @@ export class ModelSelector {
 
   private getAvailableModels() {
     const settings = this.callbacks.getSettings();
-    const uiConfig = this.callbacks.getUIConfig();
-    return uiConfig.getModelOptions({
+    return this.callbacks.getChatUI().models.options({
       ...settings,
       environmentVariables: this.callbacks.getEnvironmentVariables?.(),
     });
@@ -421,7 +424,7 @@ export class ModelSelector {
     const providerId = modelInfo
       ? this.resolveProviderIdForModel(modelInfo)
       : this.callbacks.resolveProviderForModel?.(currentModel) ?? this.callbacks.getProviderId?.() ?? null;
-    const icon = modelInfo?.providerIcon ?? this.callbacks.getUIConfig().getProviderIcon?.();
+    const icon = modelInfo?.providerIcon ?? this.callbacks.getChatUI().icon();
     if (icon) {
       this.buttonEl.appendChild(createProviderIconSvg(icon, {
         className: 'grimoire-model-button-provider-icon',
@@ -484,8 +487,8 @@ export class ModelSelector {
       return;
     }
 
-    const groups: Array<{ name: string; models: ProviderUIOption[] }> = [];
-    const groupsByName = new Map<string, ProviderUIOption[]>();
+    const groups: Array<{ name: string; models: ProviderModelOption[] }> = [];
+    const groupsByName = new Map<string, ProviderModelOption[]>();
     for (const model of filteredModels) {
       const group = model.group || t('chat.ui.model.models');
       let groupModels = groupsByName.get(group);
@@ -518,7 +521,7 @@ export class ModelSelector {
       });
 
       const providerId = this.resolveGroupProviderId(group.models);
-      const firstIcon = group.models[0]?.providerIcon ?? this.callbacks.getUIConfig().getProviderIcon?.();
+      const firstIcon = group.models[0]?.providerIcon ?? this.callbacks.getChatUI().icon();
       if (firstIcon) {
         headerEl.appendChild(createProviderIconSvg(firstIcon, {
           className: 'grimoire-model-group-provider-icon',
@@ -596,7 +599,7 @@ export class ModelSelector {
       });
   }
 
-  private resolveGroupProviderId(models: ProviderUIOption[]): ProviderId | null {
+  private resolveGroupProviderId(models: readonly ProviderModelOption[]): ProviderId | null {
     const providerIds = new Set<ProviderId>();
     for (const model of models) {
       const providerId = this.resolveProviderIdForModel(model);
@@ -607,14 +610,14 @@ export class ModelSelector {
     return providerIds.size === 1 ? [...providerIds][0] : null;
   }
 
-  private resolveProviderIdForModel(model: ProviderUIOption): ProviderId | null {
+  private resolveProviderIdForModel(model: ProviderModelOption): ProviderId | null {
     if (model.providerId) {
       return model.providerId;
     }
     return this.callbacks.resolveProviderForModel?.(model.value) ?? null;
   }
 
-  private renderPlanUsageReadout(parentEl: HTMLElement, usage: ProviderPlanUsage | null): void {
+  private renderPlanUsageReadout(parentEl: HTMLElement, usage: ProviderUsageSnapshot | null): void {
     if (!usage || !areUsageIndicatorsEnabled(this.callbacks.getSettings())) {
       return;
     }
@@ -627,7 +630,7 @@ export class ModelSelector {
     }
   }
 
-  private renderSpendPlanUsageReadout(parentEl: HTMLElement, usage: ProviderPlanUsage & { spend: string }): void {
+  private renderSpendPlanUsageReadout(parentEl: HTMLElement, usage: ProviderUsageSnapshot & { spend: string }): void {
     const readoutEl = parentEl.createDiv({
       cls: 'grimoire-plan-usage-readout grimoire-plan-usage-readout--spend',
     });
@@ -639,7 +642,7 @@ export class ModelSelector {
     }
   }
 
-  private renderQuotaPlanUsageReadout(parentEl: HTMLElement, usage: ProviderPlanUsage & { windows: ProviderPlanUsageWindow[] }): void {
+  private renderQuotaPlanUsageReadout(parentEl: HTMLElement, usage: ProviderUsageSnapshot & { windows: ProviderUsageWindow[] }): void {
     if (usage.windows.length === 0) {
       return;
     }
@@ -725,7 +728,7 @@ export class ModelSelector {
     errorEl.setText(t('chat.ui.model.loadFailed'));
   }
 
-  private filterModels(models: ProviderUIOption[]): ProviderUIOption[] {
+  private filterModels(models: readonly ProviderModelOption[]): readonly ProviderModelOption[] {
     const query = this.searchQuery.trim().toLowerCase();
     if (!query) {
       return models;
@@ -745,7 +748,7 @@ export class ModelSelector {
 
   private renderOption(
     parentEl: HTMLElement,
-    model: ProviderUIOption,
+    model: ProviderModelOption,
     index: number,
     currentModel: string,
   ): void {
@@ -757,7 +760,7 @@ export class ModelSelector {
       option.addClass('selected');
     }
 
-    const icon = model.providerIcon ?? this.callbacks.getUIConfig().getProviderIcon?.();
+    const icon = model.providerIcon ?? this.callbacks.getChatUI().icon();
     if (icon) {
       option.appendChild(createProviderIconSvg(icon, {
         className: 'grimoire-model-provider-icon',
@@ -806,7 +809,7 @@ export class PlanUsageBadge {
   private meterEl: HTMLElement | null = null;
   private fillEl: HTMLElement | null = null;
   private valueEl: HTMLElement | null = null;
-  private refreshPromise: Promise<ProviderPlanUsage | null> | null = null;
+  private refreshPromise: Promise<ProviderUsageSnapshot | null> | null = null;
   private callbacks: ToolbarCallbacks;
 
   constructor(parentEl: HTMLElement, callbacks: ToolbarCallbacks) {
@@ -872,7 +875,7 @@ export class PlanUsageBadge {
     this.container.addClass('grimoire-hidden');
   }
 
-  private renderQuotaUsage(usage: ProviderPlanUsage, window: ProviderPlanUsageWindow): void {
+  private renderQuotaUsage(usage: ProviderUsageSnapshot, window: ProviderUsageWindow): void {
     this.container.removeClass('grimoire-hidden');
     this.container.toggleClass('is-hot', isUsageWindowHot(window));
     this.labelEl?.setText(formatQuotaBadgeLabel(window.label));
@@ -884,7 +887,7 @@ export class PlanUsageBadge {
     this.container.setAttribute('aria-label', formatQuotaAriaLabel(usage.plan, window));
   }
 
-  private renderSpendUsage(usage: ProviderPlanUsage & { spend: string }): void {
+  private renderSpendUsage(usage: ProviderUsageSnapshot & { spend: string }): void {
     this.container.removeClass('grimoire-hidden');
     this.container.addClass('grimoire-plan-usage-badge--spend');
     this.labelEl?.setText('API');
@@ -909,8 +912,8 @@ export class ModeSelector {
     this.render();
   }
 
-  private getSelectorConfig(): ProviderModeSelectorConfig | null {
-    return this.callbacks.getUIConfig().getModeSelector?.(this.callbacks.getSettings()) ?? null;
+  private getSelectorConfig(): ProviderModeSelector | null {
+    return this.callbacks.getChatUI().modeSelector?.selector(this.callbacks.getSettings()) ?? null;
   }
 
   private render() {
@@ -931,8 +934,8 @@ export class ModeSelector {
 
   /** Resolves the active/inactive option pair for a two-option toggle. */
   private resolveOptionPair(
-    selectorConfig: ProviderModeSelectorConfig,
-  ): { active: ProviderUIOption; inactive: ProviderUIOption } {
+    selectorConfig: ProviderModeSelector,
+  ): { active: ProviderModelOption; inactive: ProviderModelOption } {
     const [first, second] = selectorConfig.options;
     const active = selectorConfig.activeValue
       ? selectorConfig.options.find((option) => option.value === selectorConfig.activeValue) ?? second
@@ -1033,10 +1036,10 @@ export class ThinkingBudgetSelector {
     this.effortGearsEl.empty();
 
     const currentEffort = this.callbacks.getSettings().effortLevel;
-    const uiConfig = this.callbacks.getUIConfig();
+    const reasoning = this.callbacks.getChatUI().reasoning;
     const settings = this.callbacks.getSettings();
     const model = settings.model;
-    const options = uiConfig.getReasoningOptions(model, settings);
+    const options = reasoning?.options(model, settings) ?? [];
     const currentInfo = options.find(e => e.value === currentEffort);
 
     const currentEl = this.effortGearsEl.createDiv({ cls: 'grimoire-thinking-current' });
@@ -1089,10 +1092,10 @@ export class ThinkingBudgetSelector {
     this.budgetGearsEl.empty();
 
     const currentBudget = this.callbacks.getSettings().thinkingBudget;
-    const uiConfig = this.callbacks.getUIConfig();
+    const reasoning = this.callbacks.getChatUI().reasoning;
     const settings = this.callbacks.getSettings();
     const model = settings.model;
-    const options: ProviderReasoningOption[] = uiConfig.getReasoningOptions(model, settings);
+    const options: readonly ProviderReasoningTier[] = reasoning?.options(model, settings) ?? [];
     const currentBudgetInfo = options.find(b => b.value === currentBudget);
 
     const currentEl = this.budgetGearsEl.createDiv({ cls: 'grimoire-thinking-current' });
@@ -1220,9 +1223,14 @@ export class ThinkingBudgetSelector {
 
     const settings = this.callbacks.getSettings();
     const model = settings.model;
-    const uiConfig = this.callbacks.getUIConfig();
-    const options = uiConfig.getReasoningOptions(model, settings);
-    const defaultValue = uiConfig.getDefaultReasoningValue(model, settings);
+    // A provider with no reasoning group has no control to draw. The
+    // capability check above says the same thing for the two providers that
+    // declare `reasoningControl: 'none'`; this says it from the contribution
+    // itself, so the group's absence is what hides the row rather than a
+    // second declaration agreeing with it.
+    const reasoning = this.callbacks.getChatUI().reasoning;
+    const options = reasoning?.options(model, settings) ?? [];
+    const defaultValue = reasoning?.defaultValue(model, settings) ?? '';
     const shouldHide = options.length === 0
       || (options.length === 1 && options[0]?.value === defaultValue);
 
@@ -1232,7 +1240,7 @@ export class ThinkingBudgetSelector {
       return;
     }
 
-    const adaptive = uiConfig.isAdaptiveReasoningModel(model, settings);
+    const adaptive = reasoning?.isTiered(model, settings) ?? false;
 
     if (this.effortEl) {
       this.effortEl.toggleClass('grimoire-hidden', !adaptive);
@@ -1302,9 +1310,8 @@ export class PermissionToggle {
     this.updateDisplay();
   }
 
-  private getToggleConfig(): ProviderPermissionModeToggleConfig | null {
-    const uiConfig = this.callbacks.getUIConfig();
-    return uiConfig.getPermissionModeToggle?.() ?? null;
+  private getToggleConfig(): ProviderPermissionModeToggle | null {
+    return this.callbacks.getChatUI().permissionMode?.toggle() ?? null;
   }
 
   updateDisplay() {
@@ -1410,7 +1417,7 @@ export class PermissionToggle {
 
 export function getNextPermissionMode(
   current: string,
-  toggleConfig: ProviderPermissionModeToggleConfig,
+  toggleConfig: ProviderPermissionModeToggle,
   supportsPlanMode: boolean,
 ): string {
   const planValue = toggleConfig.planValue;
@@ -1451,9 +1458,8 @@ export class ServiceTierToggle {
     });
   }
 
-  private getToggleConfig(): ProviderServiceTierToggleConfig | null {
-    const uiConfig = this.callbacks.getUIConfig();
-    return uiConfig.getServiceTierToggle?.(this.callbacks.getSettings()) ?? null;
+  private getToggleConfig(): ProviderServiceTierToggle | null {
+    return this.callbacks.getChatUI().serviceTier?.toggle(this.callbacks.getSettings()) ?? null;
   }
 
   updateDisplay() {
@@ -1823,20 +1829,22 @@ export class ExternalContextSelector {
           lockBtn.addClass('locked');
         }
         setIcon(lockBtn, isPersistent ? 'lock' : 'unlock');
-        lockBtn.setAttribute('title', isPersistent
+        const lockLabel = isPersistent
           ? t('chat.ui.externalContext.makeSessionOnly')
-          : t('chat.ui.externalContext.makePersistent'));
-        lockBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.togglePersistence(pathStr);
+          : t('chat.ui.externalContext.makePersistent');
+        lockBtn.setAttribute('title', lockLabel);
+        asActivatable(lockBtn, {
+          label: lockLabel,
+          onActivate: () => this.togglePersistence(pathStr),
         });
 
         const removeBtn = itemEl.createSpan({ cls: 'grimoire-external-context-remove' });
         setIcon(removeBtn, 'x');
-        removeBtn.setAttribute('title', t('chat.ui.externalContext.removePath'));
-        removeBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.removePath(pathStr);
+        const removeLabel = t('chat.ui.externalContext.removePath');
+        removeBtn.setAttribute('title', removeLabel);
+        asActivatable(removeBtn, {
+          label: removeLabel,
+          onActivate: () => this.removePath(pathStr),
         });
       }
     }
@@ -1909,7 +1917,7 @@ export class McpServerSelector {
   private iconEl: HTMLElement | null = null;
   private badgeEl: HTMLElement | null = null;
   private dropdownEl: HTMLElement | null = null;
-  private mcpManager: McpServerManager | null = null;
+  private mcpManager: ProviderMcpServerView | null = null;
   private enabledServers: Set<string> = new Set();
   private onChangeCallback: ((enabled: Set<string>) => void) | null = null;
   private visible = true;
@@ -1928,7 +1936,7 @@ export class McpServerSelector {
     }
   }
 
-  setMcpManager(manager: McpServerManager | null): void {
+  setMcpManager(manager: ProviderMcpServerView | null): void {
     this.mcpManager = manager;
     if (!manager && this.enabledServers.size > 0) {
       this.enabledServers.clear();

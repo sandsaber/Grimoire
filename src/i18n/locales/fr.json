@@ -19,7 +19,8 @@
     "disabled": "Désactivé",
     "platform": "Plateforme",
     "refresh": "Actualiser",
-    "rewind": "Rembobiner"
+    "rewind": "Rembobiner",
+    "close": "Fermer"
   },
   "chat": {
     "rewind": {
@@ -37,6 +38,14 @@
       "cannot": "Impossible de rembobiner : {error}",
       "unavailableStreaming": "Impossible de rembobiner pendant le streaming",
       "unavailableNoUuid": "Impossible de rembobiner : identifiants de message manquants"
+    },
+    "agents": {
+      "runningCount": "{count} en arrière-plan",
+      "finished": "Travail en arrière-plan",
+      "finishedOne": "terminé",
+      "failedOne": "en échec",
+      "runningOne": "en cours",
+      "unobservable": "en cours, progression non communiquée"
     },
     "history": {
       "deleteAll": "Tout supprimer",
@@ -77,16 +86,17 @@
     "orchestrator": {
       "planTitle": "Tâches indépendantes pour cette note",
       "planEyebrow": "Agents parallèles",
-      "planSummary": "{count} tâches indépendantes ont été préparées. Chaque tâche s’exécute dans son propre onglet et ne partage ni contexte ni résultats avec les autres.",
+      "planSummary": "{count} tâches indépendantes ont été préparées. Chacune s’exécute en arrière-plan dans sa propre conversation et ne partage ni contexte ni résultats avec les autres.",
       "badge": "Agents parallèles",
       "workerCount": "{count} sur {total} sélectionnées",
-      "spawnWorkers": "Ouvrir les onglets des agents",
+      "spawnWorkers": "Lancer le travail en arrière-plan",
       "parallel": "Indépendant",
       "toggleTask": "Inclure la tâche : {task}",
-      "workerTabsHint": "Un agent indépendant par onglet · aucun contexte partagé",
+      "workerTabsHint": "Un agent indépendant chacune · aucun contexte partagé",
       "toggleTitle": "Agents parallèles",
       "toggleAriaLabel": "Basculer les agents parallèles",
-      "toggleFailed": "Impossible de basculer les agents parallèles"
+      "toggleFailed": "Impossible de basculer les agents parallèles",
+      "dispatchFailed": "Une partie du travail en arrière-plan n’a pas pu démarrer."
     },
     "vaultSearch": {
       "toolName": "Recherche dans le coffre",
@@ -398,6 +408,9 @@
       "messages": {
         "interrupted": "Interrompu",
         "interruptedHint": "· Que doit faire Grimoire à la place ?",
+        "historyUnavailable": "Les messages antérieurs de cette conversation ne sont plus disponibles : le fournisseur ne conserve plus la session dans laquelle ils étaient enregistrés.",
+        "historyPartial": "Une partie de cette conversation n'a pas pu être chargée ; certains messages antérieurs peuvent donc manquer.",
+        "historyUnreadable": "Les messages antérieurs de cette conversation n'ont pas pu être lus ; la suite peut donc être incomplète.",
         "conversationCompacted": "Conversation compactée",
         "sessionRestarted": "Nouvelle session",
         "sessionRestartedHint": "L'agent n'a pas pu restaurer la session précédente, cette conversation se poursuit donc dans une nouvelle. Les messages ci-dessus ne sont pas dans son contexte - répétez ce qui reste nécessaire, ou repartez de zéro dans un nouvel onglet.",
@@ -407,7 +420,16 @@
         "renderFailed": "Impossible d’afficher le contenu du message.",
         "copyMessage": "Copier le message",
         "copyResponse": "Copier la réponse",
-        "awaitingYou": "En attente de vous"
+        "awaitingYou": "En attente de vous",
+        "noticeBlocked": "Bloqué",
+        "noticeLabel": "Avis",
+        "errorLabel": "Erreur",
+        "queuedPrefix": "En file d'attente",
+        "steeringPrefix": "Pilotage",
+        "newChatTitle": "Nouveau chat",
+        "closeImage": "Fermer l'image",
+        "viewFullImage": "Afficher l'image en taille réelle",
+        "copyCode": "Copier le code"
       },
       "errors": {
         "generic": "Erreur : {message}",
@@ -426,7 +448,6 @@
           "startFailed": "Échec du démarrage de {provider}. Vérifiez le chemin de la CLI et l'état de connexion.",
           "notReady": "L'environnement d'exécution de {provider} n'est pas prêt.",
           "sessionCreateFailed": "Impossible de créer une session pour {provider}.",
-          "sessionResumeFailed": "Impossible de reprendre la session {provider} précédente. Une nouvelle est démarrée ; l’historique Grimoire est conservé.",
           "emptyResponse": "{provider} s'est terminé sans renvoyer de réponse. Vérifiez les identifiants et les journaux du fournisseur, puis réessayez.",
           "requestFailed": "Échec de la requête vers {provider}",
           "antigravityDisabled": "Antigravity est désactivé. Activez-le dans les paramètres du fournisseur.",
@@ -456,6 +477,9 @@
         "searchPlaceholder": "Rechercher des discussions passées…",
         "empty": "Aucune discussion passée",
         "noMatches": "Aucun résultat",
+        "unreadableTitle": "Conversation illisible",
+        "unreadableFuture": "Écrite par une version plus récente de Grimoire.",
+        "unreadableCorrupt": "Ce fichier est endommagé et ne peut pas être ouvert.",
         "current": "Actuel",
         "openNewTab": "Ouvrir dans un nouvel onglet",
         "generatingTitle": "Génération du titre…",
@@ -970,7 +994,46 @@
       }
     },
     "hub": {
-      "general": "Général", "providers": "Fournisseurs", "workspace": "Avancé", "about": "À propos", "cliDetected": "CLI détectée", "cliNotDetected": "CLI non détectée", "geminiLegacy": "Gemini CLI (ancienne)", "providerDetails": "Paramètres de {provider}", "skills": "Compétences", "agents": "Sous-agents", "mcp": "MCP", "environment": "Environnement", "commands": "Commandes", "search": "Rechercher par nom, description, source ou fournisseur", "name": "Nom", "source": "Source", "provider": "Fournisseur", "actions": "Actions", "manage": "Gérer", "manageTitle": "Gérer {section}", "edit": "Modifier", "delete": "Supprimer", "deleteConfirm": "Supprimer « {name} » ?", "deleted": "« {name} » supprimé", "deleteFailed": "Échec de la suppression : {message}", "providerOptions": "Options avancées du fournisseur", "readonly": "Lecture seule", "available": "Disponible", "connected": "Connecté", "disabled": "Désactivé", "shared": "Partagé", "loading": "Chargement des ressources…", "unsupported": "Ce fournisseur ne prend pas en charge cette catégorie de ressources.", "none": "Aucune ressource avancée correspondante.", "aboutCopy": "Grimoire connecte des agents IA locaux dans Obsidian. La version et les notes de version sont disponibles ici.", "native": "Natif", "nativeCli": "CLI native", "nativeMcpDescription": "Prise en charge native de MCP", "runtimeCommandsPending": "Lancez une fois un chat {provider} pour charger ses commandes natives.", "releases": "Versions"
+      "general": "Général",
+      "providers": "Fournisseurs",
+      "workspace": "Avancé",
+      "about": "À propos",
+      "cliDetected": "CLI détectée",
+      "cliNotDetected": "CLI non détectée",
+      "geminiLegacy": "Gemini CLI (ancienne)",
+      "providerDetails": "Paramètres de {provider}",
+      "skills": "Compétences",
+      "agents": "Sous-agents",
+      "mcp": "MCP",
+      "environment": "Environnement",
+      "commands": "Commandes",
+      "search": "Rechercher par nom, description, source ou fournisseur",
+      "name": "Nom",
+      "source": "Source",
+      "provider": "Fournisseur",
+      "actions": "Actions",
+      "manage": "Gérer",
+      "manageTitle": "Gérer {section}",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "deleteConfirm": "Supprimer « {name} » ?",
+      "deleted": "« {name} » supprimé",
+      "deleteFailed": "Échec de la suppression : {message}",
+      "providerOptions": "Options avancées du fournisseur",
+      "readonly": "Lecture seule",
+      "available": "Disponible",
+      "connected": "Connecté",
+      "disabled": "Désactivé",
+      "shared": "Partagé",
+      "loading": "Chargement des ressources…",
+      "unsupported": "Ce fournisseur ne prend pas en charge cette catégorie de ressources.",
+      "none": "Aucune ressource avancée correspondante.",
+      "aboutCopy": "Grimoire connecte des agents IA locaux dans Obsidian. La version et les notes de version sont disponibles ici.",
+      "native": "Natif",
+      "nativeCli": "CLI native",
+      "nativeMcpDescription": "Prise en charge native de MCP",
+      "runtimeCommandsPending": "Lancez une fois un chat {provider} pour charger ses commandes natives.",
+      "releases": "Versions"
     },
     "grok": {
       "cliPath": {
@@ -1181,13 +1244,13 @@
           "name": "Résumé du raisonnement",
           "desc": "Affichez un résumé du processus de raisonnement du modèle dans le bloc de réflexion.",
           "auto": "Auto",
-          "concise": "Concise",
+          "concise": "Concis",
           "detailed": "Détaillé",
           "off": "Désactivé"
         },
         "advancedSummary": "Compétences, sous-agents, MCP et paramètres de lancement",
         "skills": {
-        "name": "Compétences Codex",
+          "name": "Compétences Codex",
           "desc": "Gérez les compétences Codex au niveau du coffre, stockées dans .codex/skills/ ou .agents/skills/. Les compétences du répertoire personnel sont exclues ici."
         },
         "hiddenSkills": {
@@ -1195,7 +1258,7 @@
           "desc": "Masquez certaines compétences Codex du menu déroulant. Saisissez les noms de compétences sans le $ initial, un par ligne."
         },
         "subagents": {
-        "name": "Sous-agents Codex",
+          "name": "Sous-agents Codex",
           "desc": "Gérez les sous-agents Codex au niveau du coffre, stockés dans .codex/agents/. Chaque fichier TOML définit un agent personnalisé."
         },
         "mcp": {
@@ -1445,8 +1508,61 @@
       }
     }
   },
-  "plugin": { "openRibbon": "Ouvrir Grimoire", "openChatView": "Ouvrir la vue de chat", "inlineEdit": "Modification en ligne", "inlineEditViewUnavailable": "La modification en ligne est indisponible : impossible d'accéder à la vue Markdown active.", "inlineEditInserted": "Inséré", "inlineEditApplied": "Modification appliquée", "newTab": "Nouvel onglet", "newSession": "Nouvelle session (dans l'onglet actuel)", "closeCurrentTab": "Fermer l'onglet actuel", "switchToTab": "Passer à l'onglet {index}", "environmentRestartFailed": "Les modifications d'environnement ont été appliquées, mais {count} onglets concernés n'ont pas pu redémarrer.", "environmentAppliedRebuild": "Variables d'environnement appliquées. Les sessions seront recréées au prochain message.", "environmentApplied": "Variables d'environnement appliquées." },
-  "shared": { "slashCommands": { "noMatches": "Aucune commande correspondante" }, "resumeConversation": { "title": "Reprendre la conversation", "empty": "Aucune conversation", "current": "Session actuelle" }, "instructionModal": { "title": "Ajouter une instruction personnalisée", "yourInput": "Votre saisie :", "processingInstruction": "Traitement de votre instruction...", "yourResponse": "Votre réponse :", "responsePlaceholder": "Fournissez plus de détails...", "refinedSnippet": "Extrait affiné :", "processing": "Traitement...", "submit": "Envoyer", "submitResponseAria": "Envoyer la réponse", "editAria": "Modifier l'instruction", "accept": "Accepter", "acceptAria": "Accepter l'instruction", "preview": "Aperçu" }, "whatsNew": { "title": "Nouveautés de Grimoire v{version}", "released": "Publié le {date}", "latestReleaseNotes": "Dernières notes de version", "fullChangelog": "Journal des modifications complet", "gotIt": "Compris" } },
-  "inlineEdit": { "rejectTitle": "Rejeter (Échap)", "acceptTitle": "Accepter (Entrée)", "editorUnavailable": "La modification en ligne est indisponible : impossible d'accéder à l'éditeur actif. Réouvrez la note.", "vaultFilesLoadFailed": "Impossible de charger les fichiers du vault. Les mentions @ peuvent être indisponibles.", "invalidFilePath": "Impossible de joindre le fichier : chemin non valide" },
-  "storage": { "tabLayoutSaveFailed": "Impossible d'enregistrer la disposition des onglets" }
+  "plugin": {
+    "openRibbon": "Ouvrir Grimoire",
+    "openChatView": "Ouvrir la vue de chat",
+    "inlineEdit": "Modification en ligne",
+    "inlineEditViewUnavailable": "La modification en ligne est indisponible : impossible d'accéder à la vue Markdown active.",
+    "inlineEditInserted": "Inséré",
+    "inlineEditApplied": "Modification appliquée",
+    "newTab": "Nouvel onglet",
+    "newSession": "Nouvelle session (dans l'onglet actuel)",
+    "closeCurrentTab": "Fermer l'onglet actuel",
+    "switchToTab": "Passer à l'onglet {index}",
+    "environmentRestartFailed": "Les modifications d'environnement ont été appliquées, mais {count} onglets concernés n'ont pas pu redémarrer.",
+    "environmentAppliedRebuild": "Variables d'environnement appliquées. Les sessions seront recréées au prochain message.",
+    "environmentApplied": "Variables d'environnement appliquées."
+  },
+  "shared": {
+    "slashCommands": {
+      "noMatches": "Aucune commande correspondante"
+    },
+    "resumeConversation": {
+      "title": "Reprendre la conversation",
+      "empty": "Aucune conversation",
+      "current": "Session actuelle"
+    },
+    "instructionModal": {
+      "title": "Ajouter une instruction personnalisée",
+      "yourInput": "Votre saisie :",
+      "processingInstruction": "Traitement de votre instruction...",
+      "yourResponse": "Votre réponse :",
+      "responsePlaceholder": "Fournissez plus de détails...",
+      "refinedSnippet": "Extrait affiné :",
+      "processing": "Traitement...",
+      "submit": "Envoyer",
+      "submitResponseAria": "Envoyer la réponse",
+      "editAria": "Modifier l'instruction",
+      "accept": "Accepter",
+      "acceptAria": "Accepter l'instruction",
+      "preview": "Aperçu"
+    },
+    "whatsNew": {
+      "title": "Nouveautés de Grimoire v{version}",
+      "released": "Publié le {date}",
+      "latestReleaseNotes": "Dernières notes de version",
+      "fullChangelog": "Journal des modifications complet",
+      "gotIt": "Compris"
+    }
+  },
+  "inlineEdit": {
+    "rejectTitle": "Rejeter (Échap)",
+    "acceptTitle": "Accepter (Entrée)",
+    "editorUnavailable": "La modification en ligne est indisponible : impossible d'accéder à l'éditeur actif. Réouvrez la note.",
+    "vaultFilesLoadFailed": "Impossible de charger les fichiers du vault. Les mentions @ peuvent être indisponibles.",
+    "invalidFilePath": "Impossible de joindre le fichier : chemin non valide"
+  },
+  "storage": {
+    "tabLayoutSaveFailed": "Impossible d'enregistrer la disposition des onglets"
+  }
 }

@@ -113,27 +113,9 @@ describe('TabBar', () => {
       expect(containerEl._children[0].getAttribute('data-provider')).toBe('opencode');
     });
 
-    it('should mark orchestrator tabs for accessible labels and styling', () => {
-      const containerEl = createMockEl();
-      const callbacks = createMockCallbacks();
-      const tabBar = new TabBar(containerEl, callbacks);
-
-      tabBar.update([createTabBarItem({ title: 'Research plan', isOrchestrator: true })]);
-
-      expect(containerEl._children[0].getAttribute('aria-label')).toBe('Parallel workers: Research plan');
-      expect(containerEl._children[0].getAttribute('data-orchestrator')).toBe('true');
-    });
-
-    it('should mark worker tabs for accessible labels and styling', () => {
-      const containerEl = createMockEl();
-      const callbacks = createMockCallbacks();
-      const tabBar = new TabBar(containerEl, callbacks);
-
-      tabBar.update([createTabBarItem({ title: 'Collect sources', isWorker: true })]);
-
-      expect(containerEl._children[0].getAttribute('aria-label')).toBe('Worker: Collect sources');
-      expect(containerEl._children[0].getAttribute('data-worker')).toBe('true');
-    });
+    // The orchestrator and worker badges were asserted here. Both are gone: a
+    // worker is a dispatched agent rather than a tab, so no tab is one and no
+    // tab owns one, and there is nothing left for a badge to distinguish.
   });
 
   describe('badge state classes', () => {

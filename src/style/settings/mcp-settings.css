@@ -1,42 +1,28 @@
 /* MCP Server Settings */
 .grimoire-mcp-settings-desc {
-  margin-bottom: 12px;
+  margin-bottom: var(--grimoire-space-5);
 }
 
 .grimoire-mcp-container {
-  margin-top: 8px;
+  margin-top: var(--grimoire-space-4);
 }
 
 .grimoire-mcp-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  padding: 0 12px;
+  margin-bottom: var(--grimoire-space-5);
+  padding: 0 var(--grimoire-space-5);
 }
 
 .grimoire-mcp-label {
   font-size: var(--font-ui-small);
   color: var(--text-muted);
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-mcp-add-container {
   position: relative;
-}
-
-.grimoire-add-mcp-btn {
-  padding: 4px 12px;
-  border-radius: 4px;
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  font-size: 12px;
-  cursor: pointer;
-  border: none;
-}
-
-.grimoire-add-mcp-btn:hover {
-  background: var(--interactive-accent-hover);
 }
 
 .grimoire-mcp-add-dropdown {
@@ -44,12 +30,12 @@
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: 4px;
+  margin-top: var(--grimoire-space-2);
   min-width: 180px;
   background-color: var(--modal-background, var(--background-primary));
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-radius: var(--grimoire-radius-2);
+  box-shadow: var(--grimoire-lift-1);
   z-index: 100;
   overflow: hidden;
 }
@@ -61,10 +47,10 @@
 .grimoire-mcp-add-option {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-4) var(--grimoire-space-5);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   color: var(--text-normal);
 }
 
@@ -84,28 +70,28 @@
 }
 
 .grimoire-mcp-empty {
-  padding: 16px;
+  padding: var(--grimoire-space-6);
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--grimoire-text-m);
   background: var(--background-secondary);
-  border-radius: 6px;
+  border-radius: var(--grimoire-radius-2);
 }
 
 .grimoire-mcp-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-mcp-item {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: var(--grimoire-space-5);
+  padding: var(--grimoire-space-5) var(--grimoire-space-6);
   background: var(--background-secondary);
-  border-radius: 8px;
-  transition: background 0.15s ease;
+  border-radius: var(--grimoire-radius-2);
+  transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-mcp-item:hover {
@@ -120,7 +106,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  margin-top: 6px;
+  margin-top: var(--grimoire-space-3);
   flex-shrink: 0;
 }
 
@@ -140,36 +126,36 @@
 .grimoire-mcp-name-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--grimoire-space-4);
   flex-wrap: wrap;
 }
 
 .grimoire-mcp-name {
-  font-weight: 400;
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-mcp-type-badge {
-  font-size: 10px;
-  padding: 2px 6px;
+  font-size: var(--grimoire-text-2xs);
+  padding: var(--grimoire-space-1) var(--grimoire-space-3);
   background: var(--background-modifier-border);
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .grimoire-mcp-context-saving-badge {
-  font-size: 11px;
-  padding: 2px 6px;
-  background: var(--interactive-accent);
+  font-size: var(--grimoire-text-xs);
+  padding: var(--grimoire-space-1) var(--grimoire-space-3);
+  background: var(--grimoire-accent);
   color: var(--text-on-accent);
-  border-radius: 4px;
-  font-weight: 400;
+  border-radius: var(--grimoire-radius-1);
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-mcp-preview {
-  font-size: 12px;
+  font-size: var(--grimoire-text-s);
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: var(--grimoire-space-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -177,7 +163,7 @@
 
 .grimoire-mcp-actions {
   display: flex;
-  gap: 4px;
+  gap: var(--grimoire-space-2);
   flex-shrink: 0;
 }
 
@@ -190,10 +176,10 @@
   padding: 0;
   border: none;
   background: transparent;
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   color: var(--text-muted);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-mcp-action-btn:hover {

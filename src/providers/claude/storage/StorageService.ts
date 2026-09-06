@@ -2,6 +2,7 @@ import type { App, Plugin } from 'obsidian';
 import { Notice } from 'obsidian';
 
 import { GrimoireSettingsStorage, type StoredGrimoireSettings } from '../../../app/settings/GrimoireSettingsStorage';
+import { VaultDurableStorage } from '../../../app/storage/VaultDurableStorage';
 import { SESSIONS_PATH, SessionStorage } from '../../../core/bootstrap/SessionStorage';
 import { GRIMOIRE_STORAGE_PATH } from '../../../core/bootstrap/StoragePaths';
 import { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
@@ -9,6 +10,7 @@ import type {
   SlashCommand,
 } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
+import { isRecord } from '../../../utils/records';
 import {
   type CCPermissions,
   type CCSettings,
@@ -21,10 +23,6 @@ import { SKILLS_PATH, SkillStorage } from './SkillStorage';
 import { COMMANDS_PATH, SlashCommandStorage } from './SlashCommandStorage';
 
 export const CLAUDE_PATH = '.claude';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function cloneJsonValue(value: unknown, depth = 0): unknown {
   if (depth > 6) {
@@ -87,7 +85,7 @@ export class StorageService {
     this.grimoireSettings = new GrimoireSettingsStorage(this.adapter);
     this.commands = new SlashCommandStorage(this.adapter);
     this.skills = new SkillStorage(this.adapter);
-    this.sessions = new SessionStorage(this.adapter);
+    this.sessions = new SessionStorage(this.adapter, new VaultDurableStorage(this.adapter));
     this.mcp = new McpStorage(this.adapter);
     this.agents = new AgentVaultStorage(this.adapter);
   }

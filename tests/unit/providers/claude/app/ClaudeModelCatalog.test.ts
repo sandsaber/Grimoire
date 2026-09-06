@@ -40,7 +40,7 @@ describe('ClaudeModelCatalog', () => {
     updateClaudeProviderSettings(settings, { environmentVariables: 'A=2' });
     resolveProbe([{ id: 'default', displayName: 'Default', source: 'sdk' }]);
 
-    await expect(refresh).resolves.toBe(false);
+    await expect(refresh).resolves.toBe('failed');
     expect(getClaudeProviderSettings(settings).discoveredModels).toEqual([]);
     expect(plugin.saveSettings).not.toHaveBeenCalled();
   });
@@ -70,7 +70,7 @@ describe('ClaudeModelCatalog', () => {
     const plugin = createPlugin(settings, jest.fn().mockRejectedValue(new Error('disk full')));
     const catalog = createClaudeModelCatalog(plugin);
 
-    await expect(catalog.refreshModels({ plugin, settings })).resolves.toBe(false);
+    await expect(catalog.refreshModels({ plugin, settings })).resolves.toBe('failed');
     expect(mockedProbe).toHaveBeenCalledTimes(1);
     expect(getClaudeProviderSettings(settings).discoveredModels).toEqual([
       { id: 'legacy', displayName: 'Legacy', source: 'api' },
@@ -89,7 +89,7 @@ describe('ClaudeModelCatalog', () => {
     // A fresh catalog stands in for a plugin reload: the in-memory attempt log
     // starts empty, but the persisted models must still suppress the probe.
     const catalog = createClaudeModelCatalog(plugin);
-    await expect(catalog.refreshModels({ plugin, settings })).resolves.toBe(false);
+    await expect(catalog.refreshModels({ plugin, settings })).resolves.toBe('skipped');
 
     expect(mockedProbe).not.toHaveBeenCalled();
   });
@@ -127,7 +127,7 @@ describe('ClaudeModelCatalog', () => {
     const catalog = createClaudeModelCatalog(plugin);
     plugin.getResolvedProviderCliPath.mockReturnValue('/claude');
 
-    await expect(catalog.refreshModels({ plugin, settings })).resolves.toBe(false);
+    await expect(catalog.refreshModels({ plugin, settings })).resolves.toBe('skipped');
 
     expect(mockedProbe).not.toHaveBeenCalled();
   });
@@ -200,10 +200,10 @@ describe('ClaudeModelCatalog', () => {
     const plugin = createPlugin(settings);
     const catalog = createClaudeModelCatalog(plugin);
 
-    await expect(catalog.refreshModels({ plugin, settings })).resolves.toBe(false);
+    await expect(catalog.refreshModels({ plugin, settings })).resolves.toBe('skipped');
     expect(mockedProbe).not.toHaveBeenCalled();
 
-    await expect(catalog.refreshModels({ force: true, plugin, settings })).resolves.toBe(true);
+    await expect(catalog.refreshModels({ force: true, plugin, settings })).resolves.toBe('refreshed');
     expect(mockedProbe).toHaveBeenCalledTimes(1);
     expect(getClaudeProviderSettings(settings).discoveredModels).toEqual([
       { id: 'sonnet', displayName: 'Sonnet', source: 'sdk' },
@@ -288,7 +288,7 @@ describe('ClaudeModelCatalog', () => {
     // force a settings write either, so the catalog is trusted exactly as
     // before. It gains a recorded baseline at its next real discovery.
     const catalog = createClaudeModelCatalog(plugin);
-    await expect(catalog.refreshModels({ plugin, settings })).resolves.toBe(false);
+    await expect(catalog.refreshModels({ plugin, settings })).resolves.toBe('skipped');
 
     expect(mockedProbe).not.toHaveBeenCalled();
     expect(plugin.saveSettings).not.toHaveBeenCalled();

@@ -3,7 +3,6 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 import type { ToolCallInfo } from '../../../core/types';
-import { extractFinalResultFromSubagentJsonl } from '../../../utils/subagentJsonl';
 import { extractToolResultContent } from '../sdk/toolResultContent';
 import type { SDKNativeMessage } from './sdkHistoryTypes';
 import {
@@ -238,27 +237,5 @@ export async function loadSubagentToolCalls(
     return buildToolCallsFromSubagentEvents(events);
   } catch {
     return [];
-  }
-}
-
-export async function loadSubagentFinalResult(
-  vaultPath: string,
-  sessionId: string,
-  agentId: string,
-): Promise<string | null> {
-  const subagentFilePath = getSubagentSidecarPath(vaultPath, sessionId, agentId);
-  if (!subagentFilePath) {
-    return null;
-  }
-
-  try {
-    if (!existsSync(subagentFilePath)) {
-      return null;
-    }
-
-    const content = await fs.readFile(subagentFilePath, 'utf-8');
-    return extractFinalResultFromSubagentJsonl(content);
-  } catch {
-    return null;
   }
 }

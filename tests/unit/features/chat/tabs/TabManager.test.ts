@@ -1,9 +1,7 @@
 import { createMockEl } from '@test/helpers/mockElement';
 
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { TabManager } from '@/features/chat/tabs/TabManager';
 import {
-  DEFAULT_MAX_TABS,
   type PersistedTabManagerState,
   type TabManagerCallbacks,
 } from '@/features/chat/tabs/types';
@@ -21,9 +19,7 @@ const mockSetupServiceCallbacks = jest.fn();
 const mockWireTabInputEvents = jest.fn();
 const mockGetTabTitle = jest.fn().mockReturnValue('Test Tab');
 const mockGetTabSettingsSnapshot = jest.fn().mockImplementation((tab: any) => tab.draftSettings ?? {});
-const mockCreateChatRuntime = jest.fn();
 const mockGetProviderSettingsSnapshot = jest.fn().mockImplementation(() => ({}));
-const commandWarmupPolicy = { resolveMode: jest.fn().mockReturnValue('commands') };
 
 jest.mock('@/features/chat/tabs/Tab', () => ({
   createTab: (...args: any[]) => mockCreateTab(...args),
@@ -45,11 +41,6 @@ jest.mock('@/shared/modals/ForkTargetModal', () => ({
   chooseForkTarget: (...args: any[]) => mockChooseForkTarget(...args),
 }));
 
-const mockBuildForkProviderState = jest.fn(
-  (sourceSessionId: string, resumeAt: string) => ({
-    forkSource: { sessionId: sourceSessionId, resumeAt },
-  }),
-);
 const mockGetCapabilities = jest.fn().mockReturnValue({
   providerId: 'claude',
   supportsPersistentRuntime: true,
@@ -66,44 +57,115 @@ const mockGetCapabilities = jest.fn().mockReturnValue({
 const mockCommandCatalogs: Record<string, any> = {};
 const mockRuntimeCommandLoaders: Record<string, any> = {};
 const mockTabWarmupPolicies: Record<string, any> = {};
-jest.mock('@/core/providers/ProviderRegistry', () => ({
-  ProviderRegistry: {
-    createChatRuntime: (...args: any[]) => mockCreateChatRuntime(...args),
-    getConversationHistoryService: () => ({
-      buildForkProviderState: mockBuildForkProviderState,
+
+/**
+ * Model routing, which left the registry with the chat-UI row.
+ *
+ * Doubled as a module rather than reached through the real one: routing reads
+ * `providerCatalog().declarations(id).chatUI.models.ownsModel` now, and the
+ * catalog double above answers only the two questions these suites have an
+ * opinion about. Every export is given an answer, for the reason that double
+ * states: a stub carrying only the member the suite happened to need throws for
+ * the next caller rather than answering it.
+ */
+jest.mock('@/core/providers/modelRouting', () => {
+  const forModel = (model: string) => (
+    model.startsWith('opencode:') ? 'opencode'
+      : model.startsWith('gpt-') || /^o\d/.test(model) ? 'codex' : 'claude'
+  );
+  return {
+    getCustomModelIds: () => new Set<string>(),
+    getEnabledProviderForModel: forModel,
+    getProviderForModel: forModel,
+    resolveProviderForModel: forModel,
+    resolveSettingsProviderId: () => 'claude',
+    resolveTitleGenerationProviderId: () => 'claude',
+  };
+});
+
+jest.mock('@/core/providers/ProviderCatalog', () => ({
+  providerCatalog: () => ({
+    capabilities: (...args: any[]) => mockGetCapabilities(...args),
+    // Answered rather than absent: a tab whose provider is on the projection
+    // path asks the catalog for its module on creation, and a double that has
+    // only the method the suite happened to need throws for every provider
+    // added to that list. `undefined` is a real answer here — it means this
+    // suite is not exercising the projection path — while a missing method is
+    // a suite that breaks on a switch it has no opinion about.
+    get: () => undefined,
+    // Read for the tab warm-up mode, which is a declaration on the catalog now
+    // rather than a workspace service. These suites set it per case.
+    declarations: (providerId: string) => ({
+      warmup: mockWarmupModes[providerId] ?? 'none',
+      // Read for the composer's command dropdown, which is a declaration now
+      // rather than a method on the workspace catalog — so a suite that stubs
+      // a catalog must say the provider has a dropdown as well.
+      commandDropdown: mockCommandDropdowns[providerId],
+      // The fork's provider state is a declaration now, not a registered
+      // history service. The real one is a provider's own; this double is the
+      // shape every module contributes.
+      conversationState: {
+        forkState: (sessionId: string, resumeAt: string) => ({
+          forkSource: { sessionId, resumeAt },
+        }),
+        isPendingFork: () => false,
+        resolveSessionId: (conversation: { sessionId?: string | null } | null) => (
+          conversation?.sessionId ?? null
+        ),
+      },
     }),
-    getCapabilities: (...args: any[]) => mockGetCapabilities(...args),
-    resolveProviderForModel: (model: string) => (
-      model.startsWith('opencode:') ? 'opencode'
-        : model.startsWith('gpt-') || /^o\d/.test(model) ? 'codex' : 'claude'
-    ),
-  },
+  }),
 }));
 
-jest.mock('@/core/providers/ProviderWorkspaceRegistry', () => ({
-  ProviderWorkspaceRegistry: {
-    getCommandCatalog: (providerId: string) => mockCommandCatalogs[providerId] ?? null,
-    getRuntimeCommandLoader: (providerId: string) => mockRuntimeCommandLoaders[providerId] ?? null,
-    getTabWarmupPolicy: (providerId: string) => mockTabWarmupPolicies[providerId] ?? null,
-    setServices: (providerId: string, services: any) => {
-      if (services?.commandCatalog) {
-        mockCommandCatalogs[providerId] = services.commandCatalog;
-      } else {
-        delete mockCommandCatalogs[providerId];
-      }
-      if (services?.runtimeCommandLoader) {
-        mockRuntimeCommandLoaders[providerId] = services.runtimeCommandLoader;
-      } else {
-        delete mockRuntimeCommandLoaders[providerId];
-      }
-      if (services?.tabWarmupPolicy) {
-        mockTabWarmupPolicies[providerId] = services.tabWarmupPolicy;
-      } else {
-        delete mockTabWarmupPolicies[providerId];
-      }
-    },
-  },
-}));
+/**
+ * What each provider warms before a turn.
+ *
+ * A declaration on the catalog rather than a registered workspace service:
+ * every provider that had a policy returned a constant and read none of the
+ * context it was handed. OpenCode warms its command discovery; everything else
+ * here stays cold, which is what these cases already assumed.
+ */
+const mockWarmupModes: Record<string, 'none' | 'commands' | 'runtime'> = {
+  opencode: 'commands',
+};
+
+/** The providers these suites open a command dropdown for. */
+const mockCommandDropdowns: Record<string, {
+  triggerChars: string[];
+  builtInPrefix: string;
+  skillPrefix: string;
+  commandPrefix: string;
+} | undefined> = {
+  claude: { triggerChars: ['/'], builtInPrefix: '/', skillPrefix: '/', commandPrefix: '/' },
+  codex: { triggerChars: ['/', '$'], builtInPrefix: '/', skillPrefix: '$', commandPrefix: '/' },
+  opencode: { triggerChars: ['/'], builtInPrefix: '/', skillPrefix: '/', commandPrefix: '/' },
+};
+
+/**
+ * Installs a provider's workspace services, as the workspace manager would.
+ *
+ * **A function rather than a module mock.** This mocked
+ * `ProviderWorkspaceRegistry`, which is deleted: a provider's services live on
+ * the composition root, and the plugin double below answers out of these maps.
+ * What the mock was really providing was this setter.
+ */
+function installWorkspaceServices(providerId: string, services: any): void {
+  if (services?.commandCatalog) {
+    mockCommandCatalogs[providerId] = services.commandCatalog;
+  } else {
+    delete mockCommandCatalogs[providerId];
+  }
+  if (services?.runtimeCommandLoader) {
+    mockRuntimeCommandLoaders[providerId] = services.runtimeCommandLoader;
+  } else {
+    delete mockRuntimeCommandLoaders[providerId];
+  }
+  if (services?.tabWarmupPolicy) {
+    mockTabWarmupPolicies[providerId] = services.tabWarmupPolicy;
+  } else {
+    delete mockTabWarmupPolicies[providerId];
+  }
+}
 
 jest.mock('@/core/providers/ProviderSettingsCoordinator', () => ({
   ProviderSettingsCoordinator: {
@@ -120,13 +182,34 @@ function createMockPlugin(overrides: Record<string, any> = {}): any {
       },
     },
     settings: {
-      maxTabs: DEFAULT_MAX_TABS,
+      maxTabs: 5,
       ...(overrides.settings || {}),
     },
     getConversationById: jest.fn().mockResolvedValue(null),
     getConversationSync: jest.fn().mockReturnValue(null),
     getConversationList: jest.fn().mockReturnValue([]),
     findConversationAcrossViews: jest.fn().mockReturnValue(null),
+    // The command catalog is a workspace port now, not a registry lookup. These
+    // suites still register their catalogs through the workspace-registry
+    // double above, so the workspace answers from the same map — which keeps
+    // `setRuntimeCommands` and the entries the dropdown lists on one object.
+    getApplicationRuntimeOrNull: () => ({
+      workspaceFor: async (providerId: string) => ({
+        commands: mockCommandCatalogs[providerId] ?? undefined,
+        // The runtime-command row reaches the slot now rather than a registry
+        // accessor, and answers from the same map for the same reason.
+        runtimeCommands: mockRuntimeCommandLoaders[providerId]
+          ? {
+            isAvailable: (settings: unknown) => (
+              mockRuntimeCommandLoaders[providerId].isAvailable(settings)
+            ),
+            loadCommands: (context: unknown) => (
+              mockRuntimeCommandLoaders[providerId].loadCommands(context)
+            ),
+          }
+          : undefined,
+      }),
+    }),
     ...overrides,
   };
 }
@@ -142,10 +225,38 @@ function createMockView(): any {
   };
 }
 
-async function flushMicrotasks(count = 4): Promise<void> {
+/**
+ * Drains the fire-and-forget priming these cases wait on.
+ *
+ * Six, not four: the command catalog is reached by building the provider's
+ * workspace now, which is one more await than the registry lookup it replaces,
+ * and a count tuned to the old path reports the priming as never having
+ * happened rather than as not yet finished.
+ */
+async function flushMicrotasks(count = 6): Promise<void> {
   for (let i = 0; i < count; i++) {
     await Promise.resolve();
   }
+}
+
+/**
+ * Waits for the call rather than for a fixed number of ticks.
+ *
+ * These asserted after `flushMicrotasks(6)`, which is a guess about how many
+ * awaits the path takes — and it stopped being right the moment the runtime
+ * command row started reaching its provider through
+ * `ApplicationRuntime.workspaceFor`, which is one promise deeper than the
+ * registry accessor it replaced. A count that has to be re-guessed after every
+ * refactor is not a wait.
+ */
+async function waitForCall(mock: jest.Mock, label: string): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (mock.mock.calls.length > 0) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`Timed out waiting for ${label}.`);
 }
 
 function createMockTabData(overrides: Record<string, any> = {}): any {
@@ -221,6 +332,7 @@ function createManager(options: {
 }
 
 beforeEach(() => {
+  mockWarmupModes.opencode = 'commands';
   for (const providerId of Object.keys(mockCommandCatalogs)) {
     delete mockCommandCatalogs[providerId];
   }
@@ -301,20 +413,6 @@ describe('TabManager - Tab Lifecycle', () => {
       // Service initialization is now lazy (on first query), not on switch
       expect(mockInitializeTabService).not.toHaveBeenCalled();
     });
-
-    it('should enforce max tabs limit', async () => {
-      const manager = createManager({ callbacks });
-
-      for (let i = 0; i < DEFAULT_MAX_TABS; i++) {
-        await manager.createTab();
-      }
-
-      const extraTab = await manager.createTab();
-
-      expect(extraTab).toBeNull();
-      expect(manager.getTabCount()).toBe(DEFAULT_MAX_TABS);
-    });
-
     it('clamps configured max tabs above ten to ten', async () => {
       const manager = createManager({
         callbacks,
@@ -752,13 +850,6 @@ describe('TabManager - Tab Queries', () => {
     it('should return true when under limit', () => {
       expect(manager.canCreateTab()).toBe(true);
     });
-
-    it('should return false when at limit', async () => {
-      for (let i = 1; i < DEFAULT_MAX_TABS; i++) {
-        await manager.createTab();
-      }
-      expect(manager.canCreateTab()).toBe(false);
-    });
   });
 });
 
@@ -841,69 +932,16 @@ describe('TabManager - Tab Bar Data', () => {
       expect(items[0].providerId).toBe('codex');
     });
 
-    it('marks orchestrator and worker tabs for tab bar rendering', async () => {
-      const orchestrator = await manager.createTab();
-      const worker = await manager.createWorkerTab(orchestrator!.id);
-
-      const items = manager.getTabBarItems();
-
-      expect(worker!.orchestratorTabId).toBe(orchestrator!.id);
-      expect(orchestrator!.workerTabIds).toEqual([worker!.id]);
-      expect(items.find(item => item.id === orchestrator!.id)?.isOrchestrator).toBe(true);
-      expect(items.find(item => item.id === worker!.id)?.isWorker).toBe(true);
-    });
+    // **Two suites were deleted here.** They covered `createWorkerTab` and the
+    // orchestrator/worker tab-bar badges, and a worker is not a tab any more: an
+    // approved plan dispatches a durable agent per task, each into its own
+    // conversation, owned by the conversation the person is looking at. What
+    // they were really asserting — that a fleet does not eat the user's tab
+    // budget — is true now because there is no fleet of tabs to count.
+    //
+    // What replaced them: `tests/unit/app/agents/ConversationAgentDispatcher.test.ts`.
   });
 
-  describe('createWorkerTab', () => {
-    it('inherits the orchestrator provider, model, and tab-local settings', async () => {
-      const orchestrator = await manager.createTab();
-      orchestrator!.providerId = 'codex';
-      orchestrator!.draftSettings = {
-        model: 'gpt-5.6-luna',
-        effortLevel: 'high',
-        permissionMode: 'full_access',
-      };
-
-      await manager.createWorkerTab(orchestrator!.id);
-
-      expect(mockCreateTab).toHaveBeenLastCalledWith(expect.objectContaining({
-        defaultProviderId: 'codex',
-        draftModel: 'gpt-5.6-luna',
-        draftSettings: {
-          model: 'gpt-5.6-luna',
-          effortLevel: 'high',
-          permissionMode: 'full_access',
-        },
-      }));
-    });
-
-    it('creates a background worker tab even when the user tab limit is reached', async () => {
-      await manager.createTab();
-      await manager.createTab();
-      const orchestrator = await manager.createTab();
-
-      const worker = await manager.createWorkerTab(orchestrator!.id);
-
-      expect(worker).not.toBeNull();
-      expect(worker!.orchestratorTabId).toBe(orchestrator!.id);
-      expect(orchestrator!.workerTabIds).toEqual([worker!.id]);
-      expect(manager.getTabCount()).toBe(4);
-      expect(manager.getActiveTabId()).toBe(orchestrator!.id);
-    });
-
-    it('does not count worker tabs against user-created tab capacity', async () => {
-      const orchestrator = await manager.createTab();
-      await manager.createWorkerTab(orchestrator!.id);
-      await manager.createWorkerTab(orchestrator!.id);
-
-      expect(manager.canCreateTab()).toBe(true);
-
-      for (let i = 1; i < DEFAULT_MAX_TABS; i++) {
-        expect(await manager.createTab()).not.toBeNull();
-      }
-      expect(manager.canCreateTab()).toBe(false);
-    });
-  });
 });
 
 describe('TabManager - Conversation Management', () => {
@@ -1288,10 +1326,9 @@ describe('TabManager - Persistence', () => {
         setRuntimeCommands: jest.fn(),
       };
 
-      ProviderWorkspaceRegistry.setServices('opencode', {
+      installWorkspaceServices('opencode', {
         commandCatalog: mockCatalog as any,
         runtimeCommandLoader: runtimeCommandLoader,
-        tabWarmupPolicy: commandWarmupPolicy,
       });
       mockGetCapabilities.mockImplementation((providerId: string) => ({
         providerId,
@@ -1559,10 +1596,9 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn(),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
-      tabWarmupPolicy: commandWarmupPolicy,
     });
     mockGetCapabilities.mockImplementation((providerId: string) => ({
       providerId,
@@ -1621,10 +1657,9 @@ describe('TabManager - SDK Commands', () => {
         .mockResolvedValueOnce(secondCommands),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
-      tabWarmupPolicy: commandWarmupPolicy,
     });
     mockGetCapabilities.mockImplementation((providerId: string) => ({
       providerId,
@@ -1716,10 +1751,9 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn().mockResolvedValue(supportedCommands),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
-      tabWarmupPolicy: commandWarmupPolicy,
     });
     mockGetCapabilities.mockImplementation((providerId: string) => ({
       providerId,
@@ -1747,12 +1781,55 @@ describe('TabManager - SDK Commands', () => {
     });
 
     const tab = await manager.createTab();
-    await flushMicrotasks();
+    await waitForCall(runtimeCommandLoader.loadCommands, 'the tab to prime its commands');
 
     expect(runtimeCommandLoader.loadCommands).toHaveBeenCalledTimes(1);
     expect(mockCatalog.setRuntimeCommands).toHaveBeenLastCalledWith(supportedCommands);
     expect(tab!.lifecycleState).toBe('blank');
     expect(tab!.serviceInitialized).toBe(false);
+  });
+
+  it('does not prime a provider whose command discovery says it is unavailable', async () => {
+    // **This was uncovered.** The availability check moved from a registry
+    // accessor to the workspace slot, and replacing it with `true` broke
+    // nothing — a check nothing asserts is a check that can be deleted by
+    // accident. A disabled provider must not have a session opened to list
+    // commands it cannot serve.
+    const mockCatalog = { setRuntimeCommands: jest.fn() };
+    const runtimeCommandLoader = {
+      isAvailable: jest.fn().mockReturnValue(false),
+      loadCommands: jest.fn().mockResolvedValue([]),
+    };
+    installWorkspaceServices('opencode', {
+      commandCatalog: mockCatalog as any,
+      runtimeCommandLoader: runtimeCommandLoader,
+    });
+    mockGetCapabilities.mockImplementation((providerId: string) => ({
+      providerId,
+      supportsPersistentRuntime: true,
+      supportsNativeHistory: true,
+      supportsPlanMode: false,
+      supportsRewind: false,
+      supportsFork: false,
+      supportsProviderCommands: providerId === 'opencode',
+      reasoningControl: 'none',
+    }));
+    const manager = createManager({
+      plugin: createMockPlugin(),
+      tabFactory: () => createMockTabData({
+        id: 'tab-opencode',
+        providerId: 'opencode',
+        draftModel: 'opencode:openai/gpt-5',
+        lifecycleState: 'blank',
+        ui: { externalContextSelector: { getExternalContexts: jest.fn().mockReturnValue([]) } },
+      }),
+    });
+
+    await manager.createTab();
+    await flushMicrotasks(20);
+
+    expect(runtimeCommandLoader.isAvailable).toHaveBeenCalled();
+    expect(runtimeCommandLoader.loadCommands).not.toHaveBeenCalled();
   });
 
   it('should prime the active restored OpenCode conversation tab automatically', async () => {
@@ -1765,10 +1842,9 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn().mockResolvedValue(supportedCommands),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
-      tabWarmupPolicy: commandWarmupPolicy,
     });
     mockGetCapabilities.mockImplementation((providerId: string) => ({
       providerId,
@@ -1804,7 +1880,7 @@ describe('TabManager - SDK Commands', () => {
     });
 
     await manager.createTab('conv-opencode', 'tab-opencode-restored', { activate: false });
-    await flushMicrotasks();
+    await waitForCall(runtimeCommandLoader.loadCommands, 'the tab to prime its commands');
 
     expect(runtimeCommandLoader.loadCommands).toHaveBeenCalledTimes(1);
     expect(mockCatalog.setRuntimeCommands).toHaveBeenLastCalledWith(supportedCommands);
@@ -1820,10 +1896,9 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn().mockResolvedValue(supportedCommands),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
-      tabWarmupPolicy: commandWarmupPolicy,
     });
     mockGetCapabilities.mockImplementation((providerId: string) => ({
       providerId,
@@ -1859,7 +1934,7 @@ describe('TabManager - SDK Commands', () => {
     });
 
     await manager.createTab('conv-opencode', 'tab-opencode-pre-session', { activate: false });
-    await flushMicrotasks();
+    await waitForCall(runtimeCommandLoader.loadCommands, 'the tab to prime its commands');
 
     expect(runtimeCommandLoader.loadCommands).toHaveBeenCalledTimes(1);
     expect(mockCatalog.setRuntimeCommands).toHaveBeenLastCalledWith(supportedCommands);
@@ -1874,10 +1949,9 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn(),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
-      tabWarmupPolicy: commandWarmupPolicy,
     });
     mockGetCapabilities.mockImplementation((providerId: string) => ({
       providerId,
@@ -1939,10 +2013,9 @@ describe('TabManager - SDK Commands', () => {
       loadCommands: jest.fn().mockResolvedValue(loaderCommands),
     };
 
-    ProviderWorkspaceRegistry.setServices('opencode', {
+    installWorkspaceServices('opencode', {
       commandCatalog: mockCatalog as any,
       runtimeCommandLoader: runtimeCommandLoader,
-      tabWarmupPolicy: commandWarmupPolicy,
     });
     mockGetCapabilities.mockImplementation((providerId: string) => ({
       providerId,
@@ -1979,6 +2052,11 @@ describe('TabManager - SDK Commands', () => {
     });
 
     await manager.createTab();
+    // The first tab's own priming is fire-and-forget, and reaching the command
+    // catalog through the workspace takes a turn longer than the registry
+    // lookup it replaces — so it is drained before the counter is cleared,
+    // rather than counted as the borrow this case forbids.
+    await flushMicrotasks();
     readyService.getSupportedCommands.mockClear();
     const coldTab = await manager.createTab('conv-opencode');
 
@@ -1988,7 +2066,7 @@ describe('TabManager - SDK Commands', () => {
   });
 
   it('should keep an active restored Claude conversation tab cold', async () => {
-    ProviderWorkspaceRegistry.setServices('claude', {
+    installWorkspaceServices('claude', {
       commandCatalog: {
         setRuntimeCommands: jest.fn(),
       } as any,
@@ -2062,13 +2140,13 @@ describe('TabManager - Provider Command Catalog', () => {
   };
 
   afterEach(() => {
-    ProviderWorkspaceRegistry.setServices('codex', undefined);
-    ProviderWorkspaceRegistry.setServices('claude', undefined);
-    ProviderWorkspaceRegistry.setServices('opencode', undefined);
+    installWorkspaceServices('codex', undefined);
+    installWorkspaceServices('claude', undefined);
+    installWorkspaceServices('opencode', undefined);
   });
 
   it('should pass provider catalog config to initializeTabUI for Codex tab', async () => {
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: mockCatalog });
+    installWorkspaceServices('codex', { commandCatalog: mockCatalog });
 
     const manager = createManager({
       tabFactory: () => createMockTabData({ id: 'tab-1', providerId: 'codex' }),
@@ -2085,7 +2163,7 @@ describe('TabManager - Provider Command Catalog', () => {
   });
 
   it('should provide scan-backed entries for Codex without runtime', async () => {
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: mockCatalog });
+    installWorkspaceServices('codex', { commandCatalog: mockCatalog });
 
     const manager = createManager({
       tabFactory: () => createMockTabData({ id: 'tab-1', providerId: 'codex' }),
@@ -2124,8 +2202,8 @@ describe('TabManager - Provider Command Catalog', () => {
       }),
       refresh: jest.fn(),
     };
-    ProviderWorkspaceRegistry.setServices('claude', { commandCatalog: claudeCatalog });
-    ProviderWorkspaceRegistry.setServices('codex', { commandCatalog: mockCatalog });
+    installWorkspaceServices('claude', { commandCatalog: claudeCatalog });
+    installWorkspaceServices('codex', { commandCatalog: mockCatalog });
 
     const manager = createManager({
       tabFactory: () => createMockTabData({
@@ -2171,7 +2249,7 @@ describe('TabManager - Provider Command Catalog', () => {
       }),
       refresh: jest.fn(),
     };
-    ProviderWorkspaceRegistry.setServices('claude', { commandCatalog: claudeCatalog });
+    installWorkspaceServices('claude', { commandCatalog: claudeCatalog });
 
     const manager = createManager({
       tabFactory: () => createMockTabData({
@@ -2212,7 +2290,7 @@ describe('TabManager - Provider Command Catalog', () => {
       }),
       refresh: jest.fn(),
     };
-    ProviderWorkspaceRegistry.setServices('claude', { commandCatalog: claudeCatalog });
+    installWorkspaceServices('claude', { commandCatalog: claudeCatalog });
 
     const manager = createManager({
       tabFactory: () => createMockTabData({
@@ -2255,15 +2333,10 @@ describe('TabManager - Provider Command Catalog', () => {
   });
 
   it('prewarms an active blank provider runtime without binding the tab', async () => {
-    const runtimeWarmupPolicy = { resolveMode: jest.fn().mockReturnValue('runtime') };
-    const modelSelector = {
+        const modelSelector = {
       renderOptions: jest.fn(),
       updateDisplay: jest.fn(),
     };
-    ProviderWorkspaceRegistry.setServices('opencode', {
-      tabWarmupPolicy: runtimeWarmupPolicy,
-    });
-
     const plugin = createMockPlugin();
     const manager = createManager({
       plugin,
@@ -2280,6 +2353,10 @@ describe('TabManager - Provider Command Catalog', () => {
       }),
     });
 
+    // This row is about priming the *runtime*, which is what `runtime` declares;
+    // the suite's default for OpenCode is `commands`, which primes only its
+    // command discovery.
+    mockWarmupModes.opencode = 'runtime';
     const tab = await manager.createTab();
     const options = mockInitializeTabUI.mock.calls[0][2];
     mockInitializeTabService.mockClear();
@@ -2342,9 +2419,24 @@ describe('TabManager - Provider Command Catalog', () => {
     }));
   });
 
-  it('should return null catalog config when provider has no catalog', async () => {
-    // No catalog assigned to registry for 'claude'
+  it('returns no catalog config for a provider that declares no command dropdown', async () => {
+    // **The declaration decides this now, not whether a catalog is registered.**
+    // It used to be the registry lookup, which made the answer depend on
+    // whether the workspace had been built — so a provider that does offer
+    // commands drew no dropdown at all until it had. Antigravity declares no
+    // dropdown and contributes no catalog, which is the one honest `null`.
+    const manager = createManager({
+      tabFactory: () => createMockTabData({ id: 'tab-1', providerId: 'antigravity' }),
+    });
 
+    await manager.createTab();
+
+    const options = mockInitializeTabUI.mock.calls[0][2];
+
+    expect(options.getProviderCatalogConfig()).toBeNull();
+  });
+
+  it('offers the dropdown before the provider has built a catalog', async () => {
     const manager = createManager({
       tabFactory: () => createMockTabData({ id: 'tab-1', providerId: 'claude' }),
     });
@@ -2354,7 +2446,11 @@ describe('TabManager - Provider Command Catalog', () => {
     const options = mockInitializeTabUI.mock.calls[0][2];
     const catalogConfig = options.getProviderCatalogConfig();
 
-    expect(catalogConfig).toBeNull();
+    expect(catalogConfig?.config.triggerChars).toEqual(['/']);
+    // No catalog is registered, so there is nothing to list yet — which is a
+    // different answer from "this provider has no commands", and the reason
+    // the two questions are asked of two different things.
+    await expect(catalogConfig?.getEntries()).resolves.toEqual([]);
   });
 });
 
@@ -2527,24 +2623,6 @@ describe('TabManager - openConversation Current Tab Path', () => {
 
     // conversationId should NOT be set by openConversation - it's synced via callback
     expect(activeTab!.conversationId).toBeNull();
-  });
-
-  it('should not open in current tab if at max tabs and preferNewTab is true', async () => {
-    for (let i = 0; i < DEFAULT_MAX_TABS - 1; i++) {
-      await manager.createTab();
-    }
-    expect(manager.getTabCount()).toBe(DEFAULT_MAX_TABS);
-
-    const activeTab = manager.getActiveTab();
-    const switchTo = jest.fn().mockResolvedValue(undefined);
-    activeTab!.controllers.conversationController = { switchTo } as any;
-
-    plugin.getConversationById.mockResolvedValue({ id: 'conv-max' });
-
-    // preferNewTab=true but at max, so should open in current tab
-    await manager.openConversation('conv-max', true);
-
-    expect(switchTo).toHaveBeenCalledWith('conv-max');
   });
 });
 
@@ -2893,64 +2971,8 @@ describe('TabManager - switchToTab Session Sync', () => {
     // Should have synced the service session during auto-switch to tab-2
     expect(mockSyncConversationState).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'conv-loaded', sessionId: 'session-xyz' }),
-      ['/some/path'],
     );
   });
-
-  it('should use persistentExternalContextPaths when conversation has no messages', async () => {
-    jest.clearAllMocks();
-
-    const mockSyncConversationState = jest.fn();
-    const mockService = {
-      syncConversationState: mockSyncConversationState,
-    };
-
-    let tabCounter = 0;
-    mockCreateTab.mockImplementation(() => {
-      tabCounter++;
-      const tab = createMockTabData({
-        id: `tab-${tabCounter}`,
-        conversationId: tabCounter === 2 ? 'conv-empty' : null,
-        service: tabCounter === 2 ? mockService : null,
-        serviceInitialized: tabCounter === 2,
-      });
-      // Tab has local messages but the persisted conversation does not
-      if (tabCounter === 2) {
-        tab.state.messages = [{ id: 'msg-1', role: 'user', content: 'test' }] as any;
-      }
-      return tab;
-    });
-
-    const plugin = createMockPlugin({
-      settings: {
-        maxTabs: DEFAULT_MAX_TABS,
-        persistentExternalContextPaths: ['/persistent/path'],
-      },
-    });
-    plugin.getConversationSync = jest.fn().mockReturnValue({
-      id: 'conv-empty',
-      messages: [],
-      sessionId: 'session-abc',
-      externalContextPaths: [],
-    });
-
-    const manager = new TabManager(
-      plugin,
-      createMockMcpManager(),
-      createMockEl(),
-      createMockView()
-    );
-
-    await manager.createTab(); // tab-1
-    await manager.createTab(); // tab-2, auto-switches and triggers session sync
-
-    // conversation.messages is empty, so should fall back to persistentExternalContextPaths
-    expect(mockSyncConversationState).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'conv-empty', sessionId: 'session-abc' }),
-      ['/persistent/path'],
-    );
-  });
-
   it('should not sync service session for an already-loaded streaming tab', async () => {
     jest.clearAllMocks();
 

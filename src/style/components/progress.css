@@ -1,16 +1,16 @@
 .grimoire-progress-block {
-  margin: 10px 0;
-  padding-inline-start: 2px;
+  margin: var(--grimoire-space-4) 0;
+  padding-inline-start: var(--grimoire-space-1);
 }
 
 .grimoire-container--chat-window .grimoire-message-content > .grimoire-progress-block {
-  margin: 2px 0;
+  margin: var(--grimoire-space-1) 0;
 }
 
 .grimoire-progress-header {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--grimoire-space-3);
   min-height: 22px;
 }
 
@@ -54,8 +54,8 @@
 }
 
 .grimoire-progress-content {
-  margin-top: 3px;
-  padding-inline-start: 22px;
+  margin-top: var(--grimoire-space-1);
+  padding-inline-start: var(--grimoire-space-7);
   color: var(--text-normal);
   font-size: var(--font-ui-small);
   line-height: 1.5;
@@ -68,22 +68,22 @@
 .grimoire-progress-items {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-top: 6px;
-  padding-inline-start: 22px;
+  gap: var(--grimoire-space-1);
+  margin-top: var(--grimoire-space-3);
+  padding-inline-start: var(--grimoire-space-7);
 }
 
 .grimoire-progress-item {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
+  gap: var(--grimoire-space-3);
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   line-height: 1.4;
 }
 
 .grimoire-progress-item-icon {
-  margin-top: 2px;
+  margin-top: var(--grimoire-space-1);
 }
 
 .grimoire-progress-item-icon svg {
@@ -103,7 +103,7 @@
 .grimoire-tool-call + .grimoire-progress-block,
 .grimoire-progress-block + .grimoire-text-block,
 .grimoire-text-block + .grimoire-progress-block {
-  margin-top: 10px;
+  margin-top: var(--grimoire-space-4);
 }
 
 .grimoire-text-block--commentary {

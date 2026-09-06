@@ -1,8 +1,8 @@
-import { type ProviderCostValue, ProviderSpendUsageStore } from '../../../core/providers/ProviderSpendUsageStore';
 import type {
   ProviderPlanUsage,
   ProviderPlanUsageContext,
-} from '../../../core/providers/types';
+} from '../../../providers/shared/providerHostContracts';
+import { type ProviderCostValue, ProviderSpendUsageStore } from '../../../providers/shared/ProviderSpendUsageStore';
 import { getGrokProviderSettings } from '../settings';
 import {
   fetchGrokCreditsUsage,

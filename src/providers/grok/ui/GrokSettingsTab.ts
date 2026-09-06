@@ -1,12 +1,14 @@
 import * as fs from 'fs';
 import { Setting } from 'obsidian';
 
-import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
 import { renderEnvironmentSettingsSection } from '../../../features/settings/ui/EnvironmentSettingsSection';
 import { McpSettingsManager } from '../../../features/settings/ui/McpSettingsManager';
 import { renderProviderDisabledNotice } from '../../../features/settings/ui/ProviderDisabledNotice';
 import { ProviderSkillSettings } from '../../../features/settings/ui/ProviderSkillSettings';
 import { t } from '../../../i18n/i18n';
+import type {
+  ProviderSettingsTabRenderer,
+} from '../../../providers/shared/providerHostContracts';
 import { sameStringList } from '../../../utils/collections';
 import { getHostnameKey } from '../../../utils/env';
 import { expandHomePath } from '../../../utils/path';
@@ -18,7 +20,6 @@ import {
   type GrokDiscoveredModel,
   splitGrokModelLabel,
 } from '../models';
-import { GrokChatRuntime } from '../runtime/GrokChatRuntime';
 import {
   getGrokProviderSettings,
   GROK_DEFAULT_ENVIRONMENT_VARIABLES,
@@ -41,7 +42,7 @@ interface EnrichedModel {
 
 export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const grokWorkspace = maybeGetGrokWorkspaceServices();
+    const grokWorkspace = maybeGetGrokWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const grokSettings = getGrokProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();
@@ -248,20 +249,16 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
     };
 
     const persistModelMetadata = async (rawId: string): Promise<void> => {
-      const runtime = new GrokChatRuntime(context.plugin);
       try {
-        runtime.syncConversationState({
-          providerState: {},
-          sessionId: null,
+        const loaded = await context.plugin.getGrokExecution().metadata.discoverMetadata({
+          model: encodeGrokModelId(rawId),
         });
-        const loaded = await runtime.warmModelMetadata(encodeGrokModelId(rawId));
         if (loaded) {
           context.refreshModelSelectors();
         }
       } catch {
-        // Metadata warmup is opportunistic; the first chat turn can still discover it.
-      } finally {
-        runtime.cleanup();
+        // Metadata warmup is opportunistic; the first chat turn can still
+        // discover it. The session closes itself on every path.
       }
     };
 
@@ -552,26 +549,20 @@ export const grokSettingsTabRenderer: ProviderSettingsTabRenderer = {
       renderAll();
 
       try {
-        const catalog = maybeGetGrokWorkspaceServices()?.modelCatalog;
+        const catalog = maybeGetGrokWorkspaceServices(context.plugin)?.modelCatalog;
         if (catalog) {
-          await catalog.refreshModels({
+          // The catalog's own answer, not the length of the persisted list: that
+          // list still holds the previous models when a refresh fails, so a
+          // failed refresh looked like a successful one.
+          modelCatalogLoadFailed = await catalog.refreshModels({
             force: true,
             plugin: context.plugin,
             settings: settingsBag,
-          });
+          }) === 'failed';
         } else {
-          const runtime = new GrokChatRuntime(context.plugin);
-          try {
-            runtime.syncConversationState({
-              providerState: {},
-              sessionId: null,
-            });
-            await runtime.ensureReady({ allowSessionCreation: true });
-          } finally {
-            runtime.cleanup();
-          }
+          modelCatalogLoadFailed = !await context.plugin.getGrokExecution()
+            .metadata.discoverMetadata();
         }
-        modelCatalogLoadFailed = getGrokProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {
           context.refreshModelSelectors();
         }

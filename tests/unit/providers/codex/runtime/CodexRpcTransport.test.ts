@@ -204,6 +204,67 @@ describe('CodexRpcTransport', () => {
     });
   });
 
+  describe('connection loss', () => {
+    it('reports process exit to connection-loss listeners', async () => {
+      const exitCb = (proc.onExit as jest.Mock).mock.calls[0][0];
+      const lost = jest.fn();
+      transport.onConnectionLost(lost);
+
+      exitCb(1, 'SIGTERM');
+
+      expect(lost).toHaveBeenCalledTimes(1);
+      expect((lost.mock.calls[0][0] as Error).message).toMatch(/exited/i);
+    });
+
+    it('stops reporting to a listener that unsubscribed', () => {
+      const exitCb = (proc.onExit as jest.Mock).mock.calls[0][0];
+      const lost = jest.fn();
+      transport.onConnectionLost(lost)();
+
+      exitCb(1, null);
+
+      expect(lost).not.toHaveBeenCalled();
+    });
+
+    it('settles pending requests when the stdin pipe breaks', async () => {
+      // The pipe is already gone, so waiting out the 30-second timeout would
+      // only delay an answer that cannot change.
+      const broken = createMockServerProcess();
+      const stdinError = new Error('write EPIPE');
+      jest.spyOn(broken.stdin, 'write').mockImplementation(((
+        _chunk: unknown,
+        ...rest: unknown[]
+      ) => {
+        // The transport writes with a callback and no encoding, so the callback
+        // is not at a fixed position.
+        const callback = rest.find(argument => typeof argument === 'function');
+        (callback as ((error?: Error | null) => void) | undefined)?.(stdinError);
+        return true;
+      }) as never);
+      const brokenTransport = new CodexRpcTransport(broken);
+      brokenTransport.start();
+      const lost = jest.fn();
+      brokenTransport.onConnectionLost(lost);
+
+      const promise = brokenTransport.request('thread/start', {}, 30_000);
+
+      await expect(promise).rejects.toThrow('write EPIPE');
+      expect(lost).toHaveBeenCalledWith(stdinError);
+    });
+
+    it('reports a lost connection once', () => {
+      const exitCb = (proc.onExit as jest.Mock).mock.calls[0][0];
+      const lost = jest.fn();
+      transport.onConnectionLost(lost);
+
+      exitCb(1, null);
+      exitCb(1, null);
+      transport.dispose();
+
+      expect(lost).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('request timeout', () => {
     it('rejects a request that times out', async () => {
       jest.useFakeTimers();

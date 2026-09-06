@@ -19,7 +19,8 @@
     "disabled": "無効",
     "platform": "プラットフォーム",
     "refresh": "更新",
-    "rewind": "巻き戻し"
+    "rewind": "巻き戻し",
+    "close": "閉じる"
   },
   "chat": {
     "rewind": {
@@ -37,6 +38,14 @@
       "cannot": "巻き戻しできません：{error}",
       "unavailableStreaming": "ストリーミング中は巻き戻しできません",
       "unavailableNoUuid": "巻き戻しできません：メッセージ識別子がありません"
+    },
+    "agents": {
+      "runningCount": "バックグラウンドで {count} 件実行中",
+      "finished": "バックグラウンド処理",
+      "finishedOne": "完了",
+      "failedOne": "失敗",
+      "runningOne": "実行中",
+      "unobservable": "実行中、進捗は報告されません"
     },
     "history": {
       "deleteAll": "すべて削除",
@@ -77,16 +86,17 @@
     "orchestrator": {
       "planTitle": "このノートの独立タスク",
       "planEyebrow": "並列ワーカー",
-      "planSummary": "{count}件の独立したタスクを準備しました。各タスクは専用のタブで実行され、他のタスクとコンテキストや結果を共有しません。",
+      "planSummary": "{count}件の独立したタスクを準備しました。各タスクは専用のチャットでバックグラウンド実行され、他のタスクとコンテキストや結果を共有しません。",
       "badge": "並列ワーカー",
       "workerCount": "{total}件中{count}件を選択",
-      "spawnWorkers": "ワーカーのタブを開く",
+      "spawnWorkers": "バックグラウンド実行を開始",
       "parallel": "独立",
       "toggleTask": "タスクを含める: {task}",
-      "workerTabsHint": "各タブに独立したワーカーが1つ · コンテキストは共有されません",
+      "workerTabsHint": "タスクごとに独立したワーカーが1つ · コンテキストは共有されません",
       "toggleTitle": "並列ワーカー",
       "toggleAriaLabel": "並列ワーカーを切り替え",
-      "toggleFailed": "並列ワーカーを切り替えられませんでした"
+      "toggleFailed": "並列ワーカーを切り替えられませんでした",
+      "dispatchFailed": "一部のバックグラウンド実行を開始できませんでした。"
     },
     "vaultSearch": {
       "toolName": "Vault検索",
@@ -398,6 +408,9 @@
       "messages": {
         "interrupted": "中断されました",
         "interruptedHint": "· 代わりにGrimoireに何をさせますか？",
+        "historyUnavailable": "この会話の以前のメッセージは利用できなくなりました。保存されていたセッションがプロバイダーに残っていません。",
+        "historyPartial": "この会話の一部を読み込めなかったため、以前のメッセージが欠けている可能性があります。",
+        "historyUnreadable": "この会話の以前のメッセージを読み取れなかったため、以降の内容は不完全な可能性があります。",
         "conversationCompacted": "会話を圧縮しました",
         "sessionRestarted": "新しいセッション",
         "sessionRestartedHint": "エージェントが前のセッションを復元できなかったため、この会話は新しいセッションで続きます。上のメッセージはそのコンテキストに含まれていません。必要な内容は伝え直すか、新しいタブで始めてください。",
@@ -407,7 +420,16 @@
         "renderFailed": "メッセージ内容をレンダリングできませんでした。",
         "copyMessage": "メッセージをコピー",
         "copyResponse": "回答をコピー",
-        "awaitingYou": "入力待ち"
+        "awaitingYou": "入力待ち",
+        "noticeBlocked": "ブロック済み",
+        "noticeLabel": "お知らせ",
+        "errorLabel": "エラー",
+        "queuedPrefix": "待機中",
+        "steeringPrefix": "誘導中",
+        "newChatTitle": "新しいチャット",
+        "closeImage": "画像を閉じる",
+        "viewFullImage": "原寸大の画像を表示",
+        "copyCode": "コードをコピー"
       },
       "errors": {
         "generic": "エラー: {message}",
@@ -426,7 +448,6 @@
           "startFailed": "{provider} を開始できませんでした。CLI のパスとログイン状態を確認してください。",
           "notReady": "{provider} ランタイムの準備ができていません。",
           "sessionCreateFailed": "{provider} のセッションを作成できませんでした。",
-          "sessionResumeFailed": "以前の {provider} セッションを再開できませんでした。新しいセッションを開始します。Grimoire の履歴は保持されます。",
           "emptyResponse": "{provider} は応答を返さずに完了しました。プロバイダーの認証情報とログを確認してから再試行してください。",
           "requestFailed": "{provider} リクエストに失敗しました",
           "antigravityDisabled": "Antigravity は無効です。プロバイダー設定で有効にしてください。",
@@ -456,6 +477,9 @@
         "searchPlaceholder": "過去のチャットを検索...",
         "empty": "過去のチャットはありません",
         "noMatches": "一致なし",
+        "unreadableTitle": "読み取れないチャット",
+        "unreadableFuture": "より新しいバージョンの Grimoire で書き込まれています。",
+        "unreadableCorrupt": "このファイルは破損しており開けません。",
         "current": "現在",
         "openNewTab": "新規タブで開く",
         "generatingTitle": "タイトルを生成中...",
@@ -970,7 +994,46 @@
       }
     },
     "hub": {
-      "general": "一般", "providers": "プロバイダー", "workspace": "詳細", "about": "情報", "cliDetected": "CLI を検出しました", "cliNotDetected": "CLI が見つかりません", "geminiLegacy": "Gemini CLI（旧版）", "providerDetails": "{provider} の設定", "skills": "スキル", "agents": "サブエージェント", "mcp": "MCP", "environment": "環境", "commands": "コマンド", "search": "名前、説明、ソース、プロバイダーを検索", "name": "名前", "source": "ソース", "provider": "プロバイダー", "actions": "操作", "manage": "管理", "manageTitle": "{section} を管理", "edit": "編集", "delete": "削除", "deleteConfirm": "「{name}」を削除しますか？", "deleted": "「{name}」を削除しました", "deleteFailed": "削除に失敗しました: {message}", "providerOptions": "プロバイダーの詳細オプション", "readonly": "読み取り専用", "available": "利用可能", "connected": "接続済み", "disabled": "無効", "shared": "共有", "loading": "リソースを読み込み中…", "unsupported": "このプロバイダーはこのリソースカテゴリをサポートしていません。", "none": "一致する詳細リソースはありません。", "aboutCopy": "Grimoire は Obsidian 内でローカル AI エージェントに接続します。バージョンとリリースノートはここにあります。", "native": "ネイティブ", "nativeCli": "ネイティブ CLI", "nativeMcpDescription": "ネイティブ MCP サポート", "runtimeCommandsPending": "{provider} のチャットを一度開始すると、ネイティブコマンドが読み込まれます。", "releases": "リリース"
+      "general": "一般",
+      "providers": "プロバイダー",
+      "workspace": "詳細",
+      "about": "情報",
+      "cliDetected": "CLI を検出しました",
+      "cliNotDetected": "CLI が見つかりません",
+      "geminiLegacy": "Gemini CLI（旧版）",
+      "providerDetails": "{provider} の設定",
+      "skills": "スキル",
+      "agents": "サブエージェント",
+      "mcp": "MCP",
+      "environment": "環境",
+      "commands": "コマンド",
+      "search": "名前、説明、ソース、プロバイダーを検索",
+      "name": "名前",
+      "source": "ソース",
+      "provider": "プロバイダー",
+      "actions": "操作",
+      "manage": "管理",
+      "manageTitle": "{section} を管理",
+      "edit": "編集",
+      "delete": "削除",
+      "deleteConfirm": "「{name}」を削除しますか？",
+      "deleted": "「{name}」を削除しました",
+      "deleteFailed": "削除に失敗しました: {message}",
+      "providerOptions": "プロバイダーの詳細オプション",
+      "readonly": "読み取り専用",
+      "available": "利用可能",
+      "connected": "接続済み",
+      "disabled": "無効",
+      "shared": "共有",
+      "loading": "リソースを読み込み中…",
+      "unsupported": "このプロバイダーはこのリソースカテゴリをサポートしていません。",
+      "none": "一致する詳細リソースはありません。",
+      "aboutCopy": "Grimoire は Obsidian 内でローカル AI エージェントに接続します。バージョンとリリースノートはここにあります。",
+      "native": "ネイティブ",
+      "nativeCli": "ネイティブ CLI",
+      "nativeMcpDescription": "ネイティブ MCP サポート",
+      "runtimeCommandsPending": "{provider} のチャットを一度開始すると、ネイティブコマンドが読み込まれます。",
+      "releases": "リリース"
     },
     "grok": {
       "cliPath": {
@@ -1445,8 +1508,61 @@
       }
     }
   },
-  "plugin": { "openRibbon": "Grimoire を開く", "openChatView": "チャットビューを開く", "inlineEdit": "インライン編集", "inlineEditViewUnavailable": "インライン編集を利用できません: アクティブな Markdown ビューにアクセスできませんでした。", "inlineEditInserted": "挿入しました", "inlineEditApplied": "編集を適用しました", "newTab": "新しいタブ", "newSession": "新しいセッション（現在のタブ）", "closeCurrentTab": "現在のタブを閉じる", "switchToTab": "タブ {index} に切り替え", "environmentRestartFailed": "環境の変更は適用されましたが、影響を受けた {count} 個のタブを再起動できませんでした。", "environmentAppliedRebuild": "環境変数を適用しました。次のメッセージでセッションを再構築します。", "environmentApplied": "環境変数を適用しました。" },
-  "shared": { "slashCommands": { "noMatches": "一致するコマンドはありません" }, "resumeConversation": { "title": "会話を再開", "empty": "会話はありません", "current": "現在のセッション" }, "instructionModal": { "title": "カスタム指示を追加", "yourInput": "入力:", "processingInstruction": "指示を処理しています...", "yourResponse": "回答:", "responsePlaceholder": "詳細を入力してください...", "refinedSnippet": "改善されたスニペット:", "processing": "処理中...", "submit": "送信", "submitResponseAria": "回答を送信", "editAria": "指示を編集", "accept": "承認", "acceptAria": "指示を承認", "preview": "プレビュー" }, "whatsNew": { "title": "Grimoire v{version} の新機能", "released": "リリース日: {date}", "latestReleaseNotes": "最新のリリースノート", "fullChangelog": "完全な変更履歴", "gotIt": "了解" } },
-  "inlineEdit": { "rejectTitle": "拒否 (Esc)", "acceptTitle": "承認 (Enter)", "editorUnavailable": "インライン編集を利用できません: アクティブなエディタにアクセスできませんでした。ノートを開き直してください。", "vaultFilesLoadFailed": "Vault ファイルを読み込めませんでした。@ メンションを利用できない場合があります。", "invalidFilePath": "ファイルを添付できませんでした: 無効なパス" },
-  "storage": { "tabLayoutSaveFailed": "タブレイアウトを保存できませんでした" }
+  "plugin": {
+    "openRibbon": "Grimoire を開く",
+    "openChatView": "チャットビューを開く",
+    "inlineEdit": "インライン編集",
+    "inlineEditViewUnavailable": "インライン編集を利用できません: アクティブな Markdown ビューにアクセスできませんでした。",
+    "inlineEditInserted": "挿入しました",
+    "inlineEditApplied": "編集を適用しました",
+    "newTab": "新しいタブ",
+    "newSession": "新しいセッション（現在のタブ）",
+    "closeCurrentTab": "現在のタブを閉じる",
+    "switchToTab": "タブ {index} に切り替え",
+    "environmentRestartFailed": "環境の変更は適用されましたが、影響を受けた {count} 個のタブを再起動できませんでした。",
+    "environmentAppliedRebuild": "環境変数を適用しました。次のメッセージでセッションを再構築します。",
+    "environmentApplied": "環境変数を適用しました。"
+  },
+  "shared": {
+    "slashCommands": {
+      "noMatches": "一致するコマンドはありません"
+    },
+    "resumeConversation": {
+      "title": "会話を再開",
+      "empty": "会話はありません",
+      "current": "現在のセッション"
+    },
+    "instructionModal": {
+      "title": "カスタム指示を追加",
+      "yourInput": "入力:",
+      "processingInstruction": "指示を処理しています...",
+      "yourResponse": "回答:",
+      "responsePlaceholder": "詳細を入力してください...",
+      "refinedSnippet": "改善されたスニペット:",
+      "processing": "処理中...",
+      "submit": "送信",
+      "submitResponseAria": "回答を送信",
+      "editAria": "指示を編集",
+      "accept": "承認",
+      "acceptAria": "指示を承認",
+      "preview": "プレビュー"
+    },
+    "whatsNew": {
+      "title": "Grimoire v{version} の新機能",
+      "released": "リリース日: {date}",
+      "latestReleaseNotes": "最新のリリースノート",
+      "fullChangelog": "完全な変更履歴",
+      "gotIt": "了解"
+    }
+  },
+  "inlineEdit": {
+    "rejectTitle": "拒否 (Esc)",
+    "acceptTitle": "承認 (Enter)",
+    "editorUnavailable": "インライン編集を利用できません: アクティブなエディタにアクセスできませんでした。ノートを開き直してください。",
+    "vaultFilesLoadFailed": "Vault ファイルを読み込めませんでした。@ メンションを利用できない場合があります。",
+    "invalidFilePath": "ファイルを添付できませんでした: 無効なパス"
+  },
+  "storage": {
+    "tabLayoutSaveFailed": "タブレイアウトを保存できませんでした"
+  }
 }

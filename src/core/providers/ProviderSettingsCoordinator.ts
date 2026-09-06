@@ -1,7 +1,13 @@
 import type { Conversation } from '../types';
 import { coercePermissionMode } from '../types/settings';
-import { ProviderRegistry } from './ProviderRegistry';
-import type { ProviderChatUIConfig, ProviderId } from './types';
+import { resolveSettingsProviderId } from './modelRouting';
+import { providerCatalog } from './ProviderCatalog';
+import type {
+  ProviderChatUiContribution,
+  ProviderReasoningPresentation,
+  ProviderSessionInvalidationScope,
+} from './ProviderModule';
+import type { ProviderId } from './types';
 
 export interface SettingsReconciliationResult {
   changed: boolean;
@@ -19,7 +25,7 @@ const PROJECTION_KEYS = new Set([
 type ProviderProjectionMap = Partial<Record<string, string>>;
 
 function getSettingsProviderId(settings: Record<string, unknown>): ProviderId {
-  return ProviderRegistry.resolveSettingsProviderId(settings);
+  return resolveSettingsProviderId(settings);
 }
 
 function ensureProjectionMap(
@@ -80,28 +86,83 @@ function mergeProviderSettings(
   }
 }
 
+/**
+ * Called only where a reasoning group exists, which is why it takes one.
+ *
+ * Both call sites are guarded by `isAdaptive` or `usesBudget`, and both of
+ * those are false when the contribution declares no reasoning — so a
+ * `ProviderChatUiContribution` here would have to answer for a case that
+ * cannot reach it.
+ */
 function normalizeReasoningValue(
-  uiConfig: ProviderChatUIConfig,
+  reasoning: ProviderReasoningPresentation,
   settings: Record<string, unknown>,
   model: string,
   value: unknown,
 ): string {
-  const allowedValues = new Set(uiConfig.getReasoningOptions(model, settings).map(option => option.value));
+  const allowedValues = new Set(reasoning.options(model, settings).map(option => option.value));
   if (typeof value === 'string' && allowedValues.has(value)) {
     return value;
   }
-  return uiConfig.getDefaultReasoningValue(model, settings);
+  return reasoning.defaultValue(model, settings);
+}
+
+/**
+ * Drops the session binding of every conversation that has one.
+ *
+ * **The host's job, and the reason the module answers a boolean.** Each
+ * provider's reconciler used to walk the conversation list itself and clear
+ * the binding on the ones whose own state field was set —
+ * a thread id for Codex, a database path for OpenCode, a session directory for
+ * Grok. Those are three spellings of one question: does this conversation have
+ * a session to lose. `providerState` is opaque here, which is exactly what
+ * makes "set at all" the provider-neutral form of it.
+ *
+ * **What comes off with the session is the provider's answer, not one rule.**
+ * Claude keeps its `providerState` — subagent transcripts and a fork source live
+ * there, and neither depends on the environment — while the five that hold a
+ * native handle to a session the old environment created lose it with the
+ * session it points at. The scope says which, and a provider that invalidates
+ * nothing declares none.
+ *
+ * The conversations that had nothing are left out of the returned list, because
+ * the caller writes one metadata file per entry.
+ */
+function clearSessionBindings(
+  conversations: readonly Conversation[],
+  scope: ProviderSessionInvalidationScope,
+): Conversation[] {
+  const clearsState = scope === 'session-and-state';
+  const invalidated: Conversation[] = [];
+  for (const conversation of conversations) {
+    const bound = clearsState
+      ? Boolean(conversation.sessionId) || conversation.providerState !== undefined
+      : Boolean(conversation.sessionId);
+    if (!bound) {
+      continue;
+    }
+    conversation.sessionId = null;
+    if (clearsState) {
+      conversation.providerState = undefined;
+    }
+    invalidated.push(conversation);
+  }
+  return invalidated;
+}
+
+function chatUiFor(providerId: ProviderId): ProviderChatUiContribution {
+  return providerCatalog().declarations(providerId).chatUI;
 }
 
 function normalizeProviderModel(
-  uiConfig: ProviderChatUIConfig,
+  chatUI: ProviderChatUiContribution,
   settings: Record<string, unknown>,
   model: string | undefined,
 ): string | undefined {
   if (!model) {
     return undefined;
   }
-  return uiConfig.normalizeModelVariant(model, settings);
+  return chatUI.models.normalizeVariant(model, settings);
 }
 
 export class ProviderSettingsCoordinator {
@@ -111,8 +172,7 @@ export class ProviderSettingsCoordinator {
   ): boolean {
     let anyChanged = false;
     for (const providerId of providerIds) {
-      const reconciler = ProviderRegistry.getSettingsReconciler(providerId);
-      if (reconciler.handleEnvironmentChange?.(settings)) {
+      if (providerCatalog().settingsReconciliation(providerId).clearDiscoveryState?.(settings)) {
         anyChanged = true;
       }
     }
@@ -127,9 +187,9 @@ export class ProviderSettingsCoordinator {
       return false;
     }
 
-    const isValid = ProviderRegistry.getRegisteredProviderIds().some((providerId) =>
-      ProviderRegistry.getChatUIConfig(providerId)
-        .getModelOptions(settings)
+    const isValid = providerCatalog().ids().some((providerId) =>
+      chatUiFor(providerId)
+        .models.options(settings)
         .some((option) => option.value === currentModel)
     );
     if (isValid) {
@@ -184,9 +244,9 @@ export class ProviderSettingsCoordinator {
     const savedServiceTier = ensureProjectionMap(settings, 'savedProviderServiceTier');
     const savedBudget = ensureProjectionMap(settings, 'savedProviderThinkingBudget');
     const savedPermissionMode = ensureProjectionMap(settings, 'savedProviderPermissionMode');
-    const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
+    const chatUI = chatUiFor(providerId);
     const normalizedModel = normalizeProviderModel(
-      uiConfig,
+      chatUI,
       settings,
       typeof settings.model === 'string' ? settings.model : undefined,
     );
@@ -200,18 +260,22 @@ export class ProviderSettingsCoordinator {
     if (typeof settings.effortLevel === 'string') {
       savedEffort[providerId] = settings.effortLevel;
     }
-    const serviceTierToggle = uiConfig.getServiceTierToggle?.(projectedSettings) ?? null;
+    const serviceTierToggle = chatUI.serviceTier?.toggle(projectedSettings) ?? null;
     if (serviceTierToggle && typeof settings.serviceTier === 'string') {
       savedServiceTier[providerId] = settings.serviceTier;
     }
+    // A provider with no reasoning group has no budget to keep. See
+    // `projectProviderState` for why the absent group answers this rather than
+    // a default standing in for the row method it replaces.
     const usesBudget = normalizedModel !== undefined
-      && !uiConfig.isAdaptiveReasoningModel(normalizedModel, projectedSettings);
+      && chatUI.reasoning !== undefined
+      && !chatUI.reasoning.isTiered(normalizedModel, projectedSettings);
     if (usesBudget && typeof settings.thinkingBudget === 'string') {
       savedBudget[providerId] = settings.thinkingBudget;
     } else {
       delete savedBudget[providerId];
     }
-    if (typeof settings.permissionMode === 'string' && uiConfig.getPermissionModeToggle?.()) {
+    if (typeof settings.permissionMode === 'string' && chatUI.permissionMode?.toggle()) {
       savedPermissionMode[providerId] = settings.permissionMode;
     }
   }
@@ -220,7 +284,7 @@ export class ProviderSettingsCoordinator {
     settings: Record<string, unknown>,
     providerId: ProviderId,
   ): void {
-    const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
+    const chatUI = chatUiFor(providerId);
     const savedModel = settings.savedProviderModel as ProviderProjectionMap | undefined;
     const savedEffort = settings.savedProviderEffort as ProviderProjectionMap | undefined;
     const savedServiceTier = settings.savedProviderServiceTier as ProviderProjectionMap | undefined;
@@ -230,16 +294,16 @@ export class ProviderSettingsCoordinator {
     const shouldPreferCurrentProjection = providerId === getSettingsProviderId(settings);
     const currentModelRaw = typeof settings.model === 'string' ? settings.model : '';
     const currentModel = shouldPreferCurrentProjection
-      ? (normalizeProviderModel(uiConfig, settings, currentModelRaw) ?? '')
+      ? (normalizeProviderModel(chatUI, settings, currentModelRaw) ?? '')
       : currentModelRaw;
     const currentEffort = typeof settings.effortLevel === 'string' ? settings.effortLevel : undefined;
     const currentServiceTier = typeof settings.serviceTier === 'string' ? settings.serviceTier : undefined;
     const currentBudget = typeof settings.thinkingBudget === 'string' ? settings.thinkingBudget : undefined;
-    const modelOptions = uiConfig.getModelOptions(settings);
+    const modelOptions = chatUI.models.options(settings);
     const isDefaultModelOfAnotherProvider = currentModel.length > 0
-      && ProviderRegistry.getRegisteredProviderIds()
+      && providerCatalog().ids()
         .filter(id => id !== providerId)
-        .some(id => ProviderRegistry.getChatUIConfig(id).isDefaultModel(currentModel));
+        .some(id => chatUiFor(id).models.isBuiltIn(currentModel));
     const canReuseCurrentModel = currentModel.length > 0
       && !isDefaultModelOfAnotherProvider
       && (
@@ -249,7 +313,7 @@ export class ProviderSettingsCoordinator {
     const fallbackModel = canReuseCurrentModel
       ? currentModel
       : (modelOptions[0]?.value ?? currentModel);
-    const savedModelValue = normalizeProviderModel(uiConfig, settings, savedModel?.[providerId]);
+    const savedModelValue = normalizeProviderModel(chatUI, settings, savedModel?.[providerId]);
     const isSavedModelValid = savedModelValue !== undefined
       && modelOptions.some(option => option.value === savedModelValue);
     const model = (isSavedModelValid ? savedModelValue : undefined) ?? fallbackModel;
@@ -257,26 +321,35 @@ export class ProviderSettingsCoordinator {
 
     if (model) {
       settings.model = model;
-      uiConfig.applyModelDefaults(model, settings);
+      chatUI.models.applyDefaults(model, settings);
     }
 
-    const serviceTierToggle = uiConfig.getServiceTierToggle?.({
+    const serviceTierToggle = chatUI.serviceTier?.toggle({
       ...settings,
       ...(model ? { model } : {}),
     }) ?? null;
 
-    const isAdaptive = Boolean(model) && uiConfig.isAdaptiveReasoningModel(model, settings);
+    // **The group's absence is the answer, not a default standing in for it.**
+    // Gemini and Antigravity declare `reasoningControl: { kind: 'none' }` and
+    // contribute no reasoning group, while their configs still answer the row's
+    // reasoning methods — and answer them differently from each other, so no
+    // single fallback reproduces both. Nothing either provider ships reads an
+    // effort level or a thinking budget, and neither draws a reasoning control:
+    // the toolbar hides it on the same declaration. So a provider with no group
+    // projects neither, which is what "no reasoning control" means.
+    const reasoning = chatUI.reasoning;
+    const isAdaptive = Boolean(model) && (reasoning?.isTiered(model, settings) ?? false);
 
     if (savedEffort?.[providerId] !== undefined) {
       settings.effortLevel = savedEffort[providerId];
     } else if (canReuseCurrentProjection && currentEffort !== undefined) {
       settings.effortLevel = currentEffort;
-    } else if (isAdaptive) {
-      settings.effortLevel = uiConfig.getDefaultReasoningValue(model, settings);
+    } else if (isAdaptive && reasoning) {
+      settings.effortLevel = reasoning.defaultValue(model, settings);
     }
 
-    if (isAdaptive) {
-      settings.effortLevel = normalizeReasoningValue(uiConfig, settings, model, settings.effortLevel);
+    if (isAdaptive && reasoning) {
+      settings.effortLevel = normalizeReasoningValue(reasoning, settings, model, settings.effortLevel);
     }
 
     if (savedServiceTier?.[providerId] !== undefined) {
@@ -287,20 +360,20 @@ export class ProviderSettingsCoordinator {
       settings.serviceTier = serviceTierToggle?.inactiveValue ?? 'default';
     }
 
-    const usesBudget = Boolean(model) && !isAdaptive;
+    const usesBudget = Boolean(model) && reasoning !== undefined && !isAdaptive;
 
-    if (usesBudget) {
+    if (usesBudget && reasoning) {
       if (savedBudget?.[providerId] !== undefined) {
         settings.thinkingBudget = savedBudget[providerId];
       } else if (canReuseCurrentProjection && currentBudget !== undefined) {
         settings.thinkingBudget = currentBudget;
       } else {
-        settings.thinkingBudget = uiConfig.getDefaultReasoningValue(model, settings);
+        settings.thinkingBudget = reasoning.defaultValue(model, settings);
       }
-      settings.thinkingBudget = normalizeReasoningValue(uiConfig, settings, model, settings.thinkingBudget);
+      settings.thinkingBudget = normalizeReasoningValue(reasoning, settings, model, settings.thinkingBudget);
     }
 
-    const permissionToggle = uiConfig.getPermissionModeToggle?.() ?? null;
+    const permissionToggle = chatUI.permissionMode?.toggle() ?? null;
     if (!permissionToggle) {
       return;
     }
@@ -312,7 +385,7 @@ export class ProviderSettingsCoordinator {
     ]);
     const currentPermissionMode = normalizeToggleValue(settings.permissionMode, allowedPermissionModes);
     const derivedPermissionMode = normalizeToggleValue(
-      uiConfig.resolvePermissionMode?.(settings),
+      chatUI.permissionMode?.resolve?.(settings),
       allowedPermissionModes,
     );
     const savedPermissionModeValue = normalizeToggleValue(
@@ -338,21 +411,20 @@ export class ProviderSettingsCoordinator {
     return this.reconcileProviders(
       settings,
       conversations,
-      ProviderRegistry.getRegisteredProviderIds(),
+      providerCatalog().ids(),
     );
   }
 
   static reconcileProviders(
     settings: Record<string, unknown>,
     conversations: Conversation[],
-    providerIds: ProviderId[],
+    providerIds: readonly ProviderId[],
   ): SettingsReconciliationResult {
     let anyChanged = false;
     const allInvalidated: Conversation[] = [];
     const settingsProvider = getSettingsProviderId(settings);
 
     for (const providerId of providerIds) {
-      const reconciler = ProviderRegistry.getSettingsReconciler(providerId);
       const providerConversations = conversations.filter(c => c.providerId === providerId);
       const targetSettings = providerId === settingsProvider
         ? settings
@@ -362,10 +434,14 @@ export class ProviderSettingsCoordinator {
         this.projectProviderState(targetSettings, providerId);
       }
 
-      const { changed, invalidatedConversations } = reconciler.reconcileModelWithEnvironment(
-        targetSettings,
-        providerConversations,
-      );
+      const reconciliation = providerCatalog().settingsReconciliation(providerId);
+      const { changed, invalidatesSessions } = reconciliation.reconcileEnvironment(targetSettings);
+      // A provider that reports an invalidation without declaring what it takes
+      // is a contract error rather than a conversation to clear: the scope is
+      // absent exactly for the providers that never invalidate.
+      const invalidatedConversations = invalidatesSessions && reconciliation.invalidates
+        ? clearSessionBindings(providerConversations, reconciliation.invalidates)
+        : [];
 
       if (changed) {
         anyChanged = true;
@@ -388,8 +464,7 @@ export class ProviderSettingsCoordinator {
     let anyChanged = false;
     const settingsProvider = getSettingsProviderId(settings);
 
-    for (const providerId of ProviderRegistry.getRegisteredProviderIds()) {
-      const reconciler = ProviderRegistry.getSettingsReconciler(providerId);
+    for (const providerId of providerCatalog().ids()) {
       const targetSettings = providerId === settingsProvider
         ? settings
         : cloneProviderSettings(settings);
@@ -398,7 +473,9 @@ export class ProviderSettingsCoordinator {
         this.projectProviderState(targetSettings, providerId);
       }
 
-      const changed = reconciler.normalizeModelVariantSettings(targetSettings);
+      const changed = providerCatalog()
+        .settingsReconciliation(providerId)
+        .normalizeModelVariants(targetSettings);
       if (changed) {
         anyChanged = true;
         this.persistProjectedProviderState(targetSettings, providerId);

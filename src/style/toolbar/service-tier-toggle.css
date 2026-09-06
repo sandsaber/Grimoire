@@ -2,7 +2,7 @@
 .grimoire-service-tier-toggle {
   display: flex;
   align-items: center;
-  padding-left: 2px;
+  padding-left: var(--grimoire-space-1);
 }
 
 .grimoire-service-tier-button {
@@ -11,11 +11,11 @@
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 4px;
+  border-radius: var(--grimoire-radius-1);
   color: var(--text-muted);
   background: transparent;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
   flex-shrink: 0;
 }
 

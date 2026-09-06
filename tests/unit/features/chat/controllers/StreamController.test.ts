@@ -114,8 +114,6 @@ function createMockDeps(): StreamControllerDeps {
   const messagesEl = createMockEl();
   const agentService = {
     getSessionId: jest.fn().mockReturnValue('session-1'),
-    loadSubagentToolCalls: jest.fn().mockResolvedValue([]),
-    loadSubagentFinalResult: jest.fn().mockResolvedValue(null),
     getCapabilities: jest.fn().mockReturnValue({
       providerId: 'claude',
       supportsPlanMode: true,
@@ -218,6 +216,51 @@ describe('StreamController - Text Content', () => {
     deps.state.resetStreamingState();
     restoreTestWindow();
     jest.useRealTimers();
+  });
+
+  describe('Turn feedback metrics', () => {
+    /**
+     * **The controller that draws the turn is what sees the output.** These
+     * metrics were kept by `InputController` and fed from its generator loop;
+     * with that loop deleted, every field but the duration was structurally
+     * empty and each successful turn logged a provider that had produced
+     * nothing — a diagnostic that reads as a defect in the thing it measures.
+     */
+    it('counts what a turn actually drew, whichever channel it arrived on', async () => {
+      const msg = createTestMessage();
+      deps.state.currentTextEl = createMockEl();
+      controller.startTurnSilenceIndicator('claude');
+
+      // Prose reaches the column through `appendText` on the projection path,
+      // and tool calls through `handleStreamChunk`. Both are the turn's output.
+      await controller.appendText('an answer');
+      await controller.handleStreamChunk(
+        { type: 'tool_use', id: 'call-1', name: 'Bash', input: {} } as never,
+        msg,
+      );
+
+      const snapshot = controller.consumeTurnFeedback();
+      expect(snapshot).toMatchObject({ textUpdates: 1, toolUses: 1 });
+      expect(snapshot?.firstActivityMs).not.toBeNull();
+    });
+
+    it('answers nothing when no turn has run since the last read', () => {
+      // Truer than a row of zeros, which is what a turn that produced nothing
+      // would report and is the thing this replaced.
+      expect(controller.consumeTurnFeedback()).toBeNull();
+    });
+
+    it('gives each turn its own count', async () => {
+      deps.state.currentTextEl = createMockEl();
+      controller.startTurnSilenceIndicator('claude');
+      await controller.appendText('first');
+      controller.consumeTurnFeedback();
+
+      controller.startTurnSilenceIndicator('claude');
+      await controller.appendText('second');
+
+      expect(controller.consumeTurnFeedback()).toMatchObject({ textUpdates: 1 });
+    });
   });
 
   describe('Text streaming', () => {
@@ -393,20 +436,6 @@ describe('StreamController - Text Content', () => {
   });
 
   describe('Error and notice handling', () => {
-    it('should show an ephemeral status indicator without appending message text', async () => {
-      const msg = createTestMessage();
-      const showThinkingIndicatorSpy = jest.spyOn(controller, 'showThinkingIndicator');
-
-      await controller.handleStreamChunk(
-        { type: 'status', content: 'Starting Antigravity...' } as any,
-        msg
-      );
-
-      expect(showThinkingIndicatorSpy).toHaveBeenCalledWith('Starting Antigravity...');
-      expect(deps.state.currentTextContent).toBe('');
-      expect(msg.contentBlocks).toEqual([]);
-    });
-
     it('should append error message on error chunk', async () => {
       const msg = createTestMessage();
       deps.state.currentTextEl = createMockEl();
@@ -443,14 +472,14 @@ describe('StreamController - Text Content', () => {
   });
 
   describe('Done chunk handling', () => {
-    it('should handle done chunk without error', async () => {
+    it('ends a turn without error', async () => {
+      // Asked as the render target asks it. This used to send a `done` chunk,
+      // which was the legacy stream's way of saying a turn had ended; the
+      // projection path calls the method, and the chunk type is deleted.
       const msg = createTestMessage();
       deps.state.currentTextEl = createMockEl();
 
-      // Should not throw
-      await expect(
-        controller.handleStreamChunk({ type: 'done' }, msg)
-      ).resolves.not.toThrow();
+      await expect(controller.finishTurn(msg)).resolves.not.toThrow();
     });
 
     it('detects an orchestrator plan on done when orchestrator mode is active', async () => {
@@ -479,7 +508,7 @@ describe('StreamController - Text Content', () => {
       deps.isOrchestratorMode = jest.fn().mockReturnValue(true);
       deps.onOrchestratorPlanDetected = jest.fn();
 
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       expect(deps.onOrchestratorPlanDetected).toHaveBeenCalledWith(
         contentEl,
@@ -511,7 +540,7 @@ describe('StreamController - Text Content', () => {
       deps.isOrchestratorMode = jest.fn().mockReturnValue(false);
       deps.onOrchestratorPlanDetected = jest.fn();
 
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       expect(deps.onOrchestratorPlanDetected).not.toHaveBeenCalled();
     });
@@ -680,7 +709,7 @@ describe('StreamController - Text Content', () => {
       expect(deps.state.currentTodos).toEqual(mockTodos);
 
       // Flush pending tools by sending a different chunk type (text or done)
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       // Now renderToolCall should have been called
       expect(renderToolCall).toHaveBeenCalled();
@@ -719,11 +748,11 @@ describe('StreamController - Text Content', () => {
       deps.state.currentContentEl = createMockEl();
 
       await controller.handleStreamChunk(
-        { type: 'tool_use', id: 'grep-1', name: 'Grep', input: { pattern: 'рыба' } },
+        { type: 'tool_use', id: 'grep-1', name: 'Grep', input: { pattern: 'fish' } },
         msg
       );
       await controller.handleStreamChunk(
-        { type: 'tool_use', id: 'grep-2', name: 'Grep', input: { pattern: 'рыбалка' } },
+        { type: 'tool_use', id: 'grep-2', name: 'Grep', input: { pattern: 'fishing' } },
         msg
       );
 
@@ -894,7 +923,7 @@ describe('StreamController - Text Content', () => {
       expect(createWriteEditBlock).not.toHaveBeenCalled();
       expect(renderToolCall).not.toHaveBeenCalled();
 
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       expect(deps.state.pendingTools.size).toBe(0);
       expect(createWriteEditBlock).toHaveBeenCalledWith(
@@ -1215,7 +1244,7 @@ describe('StreamController - Text Content', () => {
       expect(deps.state.pendingTools.size).toBe(3);
       expect(renderToolCall).not.toHaveBeenCalled();
 
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       expect(deps.state.pendingTools.size).toBe(0);
       expect(renderToolCall).toHaveBeenCalledTimes(3);
@@ -1385,7 +1414,7 @@ describe('StreamController - Text Content', () => {
       });
 
       await controller.handleStreamChunk(
-        { type: 'subagent_tool_result', id: 'read-1', subagentId: 'task-1', content: 'file content' },
+        { type: 'tool_result', id: 'read-1', subagentId: 'task-1', content: 'file content' },
         msg
       );
 
@@ -1405,7 +1434,7 @@ describe('StreamController - Text Content', () => {
       });
 
       await controller.handleStreamChunk(
-        { type: 'subagent_tool_use', id: 'grep-1', name: 'Grep', input: { pattern: 'test' }, subagentId: 'task-1' },
+        { type: 'tool_use', id: 'grep-1', name: 'Grep', input: { pattern: 'test' }, subagentId: 'task-1' },
         msg
       );
 
@@ -1422,7 +1451,7 @@ describe('StreamController - Text Content', () => {
       (deps.subagentManager.getSyncSubagent as jest.Mock).mockReturnValueOnce(undefined);
 
       await controller.handleStreamChunk(
-        { type: 'subagent_tool_use', id: 'orphan-read', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'unknown-task' },
+        { type: 'tool_use', id: 'orphan-read', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'unknown-task' },
         msg
       );
 
@@ -1697,7 +1726,7 @@ describe('StreamController - Text Content', () => {
 
       // Child chunk arrives with parentToolUseId - should trigger render
       await controller.handleStreamChunk(
-        { type: 'subagent_tool_use', id: 'read-1', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'task-1' },
+        { type: 'tool_use', id: 'read-1', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'task-1' },
         msg
       );
 
@@ -1728,7 +1757,7 @@ describe('StreamController - Text Content', () => {
 
       // Child chunk arrives - renderPendingTask returns null but shouldn't crash
       await controller.handleStreamChunk(
-        { type: 'subagent_tool_use', id: 'read-1', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'task-1' },
+        { type: 'tool_use', id: 'read-1', name: 'Read', input: { file_path: 'test.md' }, subagentId: 'task-1' },
         msg
       );
 
@@ -1960,228 +1989,6 @@ describe('StreamController - Text Content', () => {
       expect(updateToolCallResult).not.toHaveBeenCalled();
     });
 
-    it('async_subagent_result finalizes and hydrates the matching background subagent', async () => {
-      const runtime = deps.getAgentService!() as any;
-      const msg = createTestMessage();
-      deps.state.currentContentEl = createMockEl();
-      const completedSubagent = {
-        id: 'task-1',
-        description: 'Background task',
-        prompt: 'Do work',
-        mode: 'async',
-        status: 'completed',
-        toolCalls: [],
-        isExpanded: false,
-        asyncStatus: 'completed',
-        agentId: 'agent-1',
-        result: 'Notification summary',
-      };
-
-      (deps.subagentManager.handleAsyncSubagentResult as jest.Mock).mockReturnValueOnce(completedSubagent);
-      runtime.loadSubagentFinalResult.mockResolvedValueOnce('Recovered final result');
-
-      await controller.handleStreamChunk(
-        {
-          type: 'async_subagent_result',
-          agentId: 'agent-1',
-          status: 'completed',
-          result: 'Notification summary',
-        } as any,
-        msg
-      );
-
-      expect(deps.subagentManager.handleAsyncSubagentResult).toHaveBeenCalledWith(
-        'agent-1',
-        'completed',
-        'Notification summary'
-      );
-      expect(runtime.loadSubagentToolCalls).toHaveBeenCalledWith('agent-1');
-      expect(runtime.loadSubagentFinalResult).toHaveBeenCalledWith('agent-1');
-      expect(completedSubagent.result).toBe('Recovered final result');
-      expect(deps.subagentManager.refreshAsyncSubagent).toHaveBeenCalledWith(completedSubagent);
-    });
-
-    it('hydrates async subagent tool calls from sidecar during streaming completion', async () => {
-      const runtime = deps.getAgentService!() as any;
-      const msg = createTestMessage();
-      deps.state.currentContentEl = createMockEl();
-
-      const completedSubagent = {
-        id: 'task-1',
-        description: 'Background task',
-        prompt: 'Do work',
-        mode: 'async',
-        status: 'completed',
-        toolCalls: [],
-        isExpanded: false,
-        asyncStatus: 'completed',
-        agentId: 'agent-1',
-        result: 'Done',
-      };
-
-      (deps.subagentManager.isLinkedAgentOutputTool as jest.Mock).mockReturnValueOnce(true);
-      (deps.subagentManager.handleAgentOutputToolResult as jest.Mock).mockReturnValueOnce(completedSubagent);
-      runtime.loadSubagentToolCalls.mockResolvedValueOnce([
-        {
-          id: 'read-1',
-          name: 'Read',
-          input: { file_path: 'notes.md' },
-          status: 'completed',
-          result: 'content',
-          isExpanded: false,
-        },
-      ]);
-
-      await controller.handleStreamChunk(
-        { type: 'tool_result', id: 'agent-out-1', content: 'agent result' },
-        msg
-      );
-
-      expect(runtime.loadSubagentToolCalls).toHaveBeenCalledWith('agent-1');
-      expect(runtime.loadSubagentFinalResult).toHaveBeenCalledWith('agent-1');
-      expect(completedSubagent.toolCalls).toHaveLength(1);
-      expect(deps.subagentManager.refreshAsyncSubagent).toHaveBeenCalledWith(completedSubagent);
-    });
-
-    it('hydrates async subagent final result from sidecar even when tool calls already exist', async () => {
-      const runtime = deps.getAgentService!() as any;
-      const msg = createTestMessage();
-      deps.state.currentContentEl = createMockEl();
-
-      const completedSubagent = {
-        id: 'task-2',
-        description: 'Background task',
-        prompt: 'Do work',
-        mode: 'async',
-        status: 'completed',
-        toolCalls: [
-          {
-            id: 'existing-tool',
-            name: 'Read',
-            input: { file_path: 'notes.md' },
-            status: 'completed',
-            result: 'existing',
-            isExpanded: false,
-          },
-        ],
-        isExpanded: false,
-        asyncStatus: 'completed',
-        agentId: 'agent-2',
-        result: 'Short placeholder',
-      };
-
-      (deps.subagentManager.isLinkedAgentOutputTool as jest.Mock).mockReturnValueOnce(true);
-      (deps.subagentManager.handleAgentOutputToolResult as jest.Mock).mockReturnValueOnce(completedSubagent);
-      runtime.loadSubagentFinalResult.mockResolvedValueOnce('Recovered final result from sidecar');
-
-      await controller.handleStreamChunk(
-        { type: 'tool_result', id: 'agent-out-2', content: 'agent result' },
-        msg
-      );
-
-      expect(runtime.loadSubagentToolCalls).not.toHaveBeenCalled();
-      expect(runtime.loadSubagentFinalResult).toHaveBeenCalledWith('agent-2');
-      expect(completedSubagent.result).toBe('Recovered final result from sidecar');
-      expect(deps.subagentManager.refreshAsyncSubagent).toHaveBeenCalledWith(completedSubagent);
-    });
-
-    it('does not retry async subagent final result hydration when sidecar matches current result', async () => {
-      const runtime = deps.getAgentService!() as any;
-      const msg = createTestMessage();
-      deps.state.currentContentEl = createMockEl();
-
-      const completedSubagent = {
-        id: 'task-2b',
-        description: 'Background task',
-        prompt: 'Do work',
-        mode: 'async',
-        status: 'completed',
-        toolCalls: [
-          {
-            id: 'existing-tool',
-            name: 'Read',
-            input: { file_path: 'notes.md' },
-            status: 'completed',
-            result: 'existing',
-            isExpanded: false,
-          },
-        ],
-        isExpanded: false,
-        asyncStatus: 'completed',
-        agentId: 'agent-2b',
-        result: 'Already final',
-      };
-
-      (deps.subagentManager.isLinkedAgentOutputTool as jest.Mock).mockReturnValueOnce(true);
-      (deps.subagentManager.handleAgentOutputToolResult as jest.Mock).mockReturnValueOnce(completedSubagent);
-      runtime.loadSubagentFinalResult.mockResolvedValueOnce('Already final');
-
-      await controller.handleStreamChunk(
-        { type: 'tool_result', id: 'agent-out-2b', content: 'agent result' },
-        msg
-      );
-
-      expect(runtime.loadSubagentToolCalls).not.toHaveBeenCalled();
-      expect(runtime.loadSubagentFinalResult).toHaveBeenCalledTimes(1);
-      expect(deps.subagentManager.refreshAsyncSubagent).not.toHaveBeenCalled();
-
-      jest.advanceTimersByTime(3000);
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(runtime.loadSubagentFinalResult).toHaveBeenCalledTimes(1);
-    });
-
-    it('retries async subagent final result hydration when first sidecar read is stale', async () => {
-      const runtime = deps.getAgentService!() as any;
-      const msg = createTestMessage();
-      deps.state.currentContentEl = createMockEl();
-
-      const completedSubagent = {
-        id: 'task-3',
-        description: 'Background task',
-        prompt: 'Do work',
-        mode: 'async',
-        status: 'completed',
-        toolCalls: [
-          {
-            id: 'existing-tool',
-            name: 'Read',
-            input: { file_path: 'notes.md' },
-            status: 'completed',
-            result: 'existing',
-            isExpanded: false,
-          },
-        ],
-        isExpanded: false,
-        asyncStatus: 'completed',
-        agentId: 'agent-3',
-        result: 'Intermediate line',
-      };
-
-      (deps.subagentManager.isLinkedAgentOutputTool as jest.Mock).mockReturnValueOnce(true);
-      (deps.subagentManager.handleAgentOutputToolResult as jest.Mock).mockReturnValueOnce(completedSubagent);
-      runtime.loadSubagentFinalResult
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce('Recovered final result after delayed flush');
-
-      await controller.handleStreamChunk(
-        { type: 'tool_result', id: 'agent-out-3', content: 'agent result' },
-        msg
-      );
-
-      expect(runtime.loadSubagentToolCalls).not.toHaveBeenCalled();
-      expect(runtime.loadSubagentFinalResult).toHaveBeenCalledTimes(1);
-      expect(deps.subagentManager.refreshAsyncSubagent).not.toHaveBeenCalled();
-
-      jest.advanceTimersByTime(200);
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(runtime.loadSubagentFinalResult).toHaveBeenCalledTimes(2);
-      expect(completedSubagent.result).toBe('Recovered final result after delayed flush');
-      expect(deps.subagentManager.refreshAsyncSubagent).toHaveBeenCalledWith(completedSubagent);
-    });
   });
 
   describe('Tool header update on input re-dispatch', () => {
@@ -2197,7 +2004,7 @@ describe('StreamController - Text Content', () => {
       );
 
       // Flush the tool so it transitions from pending to rendered
-      await controller.handleStreamChunk({ type: 'done' }, msg);
+      await controller.finishTurn(msg);
 
       // Manually set up a rendered tool element with name + summary children
       // (the mock renderToolCall doesn't actually populate toolCallElements)

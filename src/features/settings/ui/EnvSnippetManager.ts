@@ -1,11 +1,11 @@
 import type { App } from 'obsidian';
 import { Modal, Notice, setIcon, Setting } from 'obsidian';
 
+import { getCustomModelIds } from '../../../core/providers/modelRouting';
 import {
   getEnvironmentScopeUpdates,
   resolveEnvironmentSnippetScope,
 } from '../../../core/providers/providerEnvironment';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
 import type { EnvironmentScope, EnvSnippet } from '../../../core/types';
 import { VIEW_TYPE_GRIMOIRE } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
@@ -108,7 +108,7 @@ export class EnvSnippetModal extends Modal {
       modelAliasInputs.clear();
 
       const envVars = parseEnvironmentVariables(envVarsEl.value);
-      const uniqueModelIds = ProviderRegistry.getCustomModelIds(envVars);
+      const uniqueModelIds = getCustomModelIds(envVars);
 
       if (uniqueModelIds.size === 0) {
         contextLimitsContainer.addClass('grimoire-hidden');
@@ -362,7 +362,7 @@ export class EnvSnippetManager {
     // Legacy snippets without modelAliases don't modify aliases. Snippets saved
     // with alias fields clear aliases for their own model IDs when left empty.
     if (snippet.modelAliases) {
-      const modelIds = ProviderRegistry.getCustomModelIds(parseEnvironmentVariables(snippet.envVars));
+      const modelIds = getCustomModelIds(parseEnvironmentVariables(snippet.envVars));
       const nextAliases = { ...(this.plugin.settings.customModelAliases ?? {}) };
       for (const modelId of modelIds) {
         const alias = snippet.modelAliases[modelId]?.trim();

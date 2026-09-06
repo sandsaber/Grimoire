@@ -2,10 +2,12 @@ import * as fs from 'node:fs';
 
 import { Setting } from 'obsidian';
 
-import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
 import { renderEnvironmentSettingsSection } from '../../../features/settings/ui/EnvironmentSettingsSection';
 import { renderProviderDisabledNotice } from '../../../features/settings/ui/ProviderDisabledNotice';
 import { t } from '../../../i18n/i18n';
+import type {
+  ProviderSettingsTabRenderer,
+} from '../../../providers/shared/providerHostContracts';
 import { getHostnameKey } from '../../../utils/env';
 import { expandHomePath } from '../../../utils/path';
 import { getAntigravityProviderSettings, updateAntigravityProviderSettings } from '../settings';

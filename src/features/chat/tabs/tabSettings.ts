@@ -1,17 +1,20 @@
+import type { ManagedMcpServer } from '../../../core/types/mcp';
+export { isRecord } from '../../../utils/records';
 import { getHiddenProviderCommandSet } from '../../../core/providers/commands/hiddenCommands';
 import type { ProviderCommandDropdownConfig } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
+import { resolveSettingsProviderId } from '../../../core/providers/modelRouting';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderCapabilities,
-  ProviderChatUIConfig,
   ProviderId,
   ProviderUIOption,
 } from '../../../core/providers/types';
 import type { Conversation, GrimoireSettings } from '../../../core/types';
 import type GrimoirePlugin from '../../../main';
+import { isRecord } from '../../../utils/records';
 import { getTabProviderId } from './providerResolution';
 import type { TabId, TabProviderContext } from './types';
 
@@ -96,12 +99,12 @@ export type ContextEngineRelevantSettings = GrimoireSettings & {
 export function getBlankTabModelOptions(
   settings: Record<string, unknown>,
 ): ProviderUIOption[] {
-  return ProviderRegistry.getEnabledProviderIds(settings).flatMap((providerId) => {
-    const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-    const providerIcon = uiConfig.getProviderIcon?.() ?? undefined;
-    const group = ProviderRegistry.getProviderDisplayName(providerId);
+  return providerCatalog().enabledIds(settings).flatMap((providerId) => {
+    const chatUI = providerCatalog().declarations(providerId).chatUI;
+    const providerIcon = chatUI.icon() ?? undefined;
+    const group = providerCatalog().displayName(providerId);
 
-    return uiConfig.getModelOptions(settings)
+    return chatUI.models.options(settings)
       .map(model => ({
         ...model,
         group,
@@ -109,10 +112,6 @@ export function getBlankTabModelOptions(
         ...(providerIcon ? { providerIcon } : {}),
       }));
   });
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function getRecordEntry(record: Record<string, unknown>, key: string): Record<string, unknown> | null {
@@ -128,8 +127,8 @@ export function hasStartedConversation(conversation: Conversation | null | undef
     return true;
   }
   try {
-    const historyService = ProviderRegistry.getConversationHistoryService(conversation.providerId);
-    return !!historyService.resolveSessionIdForConversation?.(conversation);
+    return !!providerCatalog().declarations(conversation.providerId)
+      .conversationState?.resolveSessionId(conversation);
   } catch {
     return !!conversation.sessionId;
   }
@@ -251,9 +250,9 @@ export function resolveBlankTabModel(
     return settings.model as string;
   }
 
-  const targetProviderId = ProviderRegistry.isEnabled(providerId, settings)
+  const targetProviderId = providerCatalog().isEnabled(settings, providerId)
     ? providerId
-    : ProviderRegistry.resolveSettingsProviderId(settings);
+    : resolveSettingsProviderId(settings);
   const snapshot = ProviderSettingsCoordinator.getProviderSettingsSnapshot(settings, targetProviderId);
   return snapshot.model as string;
 }
@@ -290,15 +289,16 @@ export function getTabCapabilities(
     return tab.service.getCapabilities();
   }
 
-  return ProviderRegistry.getCapabilities(providerId);
+  return providerCatalog().capabilities(providerId);
 }
 
 export function getTabChatUIConfig(
   tab: TabProviderContext,
   plugin: GrimoirePlugin,
   conversation?: Conversation | null,
-): ProviderChatUIConfig {
-  return ProviderRegistry.getChatUIConfig(getTabProviderId(tab, plugin, conversation));
+): ProviderChatUiContribution {
+  return providerCatalog()
+    .declarations(getTabProviderId(tab, plugin, conversation)).chatUI;
 }
 
 export function resolveLegacyConversationModel(conversation: Conversation | null | undefined): string | undefined {
@@ -387,21 +387,64 @@ export function shouldSendMessageFromEnterKey(
 
 export type ProviderCatalogInfo = {
   config: ProviderCommandDropdownConfig;
-  getEntries: () => Promise<ProviderCommandEntry[]>;
+  getEntries: () => Promise<readonly ProviderCommandEntry[]>;
 } | null;
 
-export function getRegistryProviderCatalogInfo(providerId: ProviderId): ProviderCatalogInfo {
-  const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
-  if (!catalog) {
+/**
+ * The dropdown a provider offers, without building its workspace to ask.
+ *
+ * Existence is decided by the declaration, not by whether a catalog happens to
+ * be registered: the two say the same thing, and only one of them can be
+ * answered before a workspace exists. The entries are still the catalog's, and
+ * are fetched when the dropdown opens.
+ */
+export function getRegistryProviderCatalogInfo(
+  providerId: ProviderId,
+  plugin: GrimoirePlugin,
+): ProviderCatalogInfo {
+  const dropdown = providerCatalog().declarations(providerId).commandDropdown;
+  if (!dropdown) {
     return null;
   }
 
   return {
-    config: catalog.getDropdownConfig(),
-    getEntries: () => catalog.listDropdownEntries({ includeBuiltIns: false }),
+    config: { providerId, ...dropdown },
+    getEntries: async () => (
+      (await plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))
+        ?.commands?.listDropdownEntries({ includeBuiltIns: false }) ?? []
+    ),
   };
 }
 
-export function getProviderMcpManager(providerId: ProviderId) {
-  return ProviderWorkspaceRegistry.getMcpServerManager(providerId);
+/**
+ * A live view of a provider's MCP servers, for the widgets that read them late.
+ *
+ * **Not the manager, and not a snapshot.** The composer's server selector and
+ * the mention dropdown are handed this once, when the tab is built, and ask it
+ * whenever they draw — so a snapshot is stale and the manager itself is a
+ * provider service the feature layer should not be holding. Each call resolves
+ * the provider's workspace, which is how a workspace built after the tab was,
+ * or rebuilt behind it, is the one that answers.
+ *
+ * Empty where the provider has no Grimoire-owned MCP, or has no workspace yet.
+ * That is the same answer the widgets used to get from a `null` manager: the
+ * selector prunes every enabled server that is no longer listed, which for an
+ * empty list is all of them.
+ */
+export function getProviderMcpManager(
+  providerId: ProviderId,
+  plugin: GrimoirePlugin,
+): ProviderMcpServerView {
+  const port = () => plugin.getApplicationRuntimeOrNull?.()
+    ?.builtWorkspaceFor(providerId)?.mcp;
+  return {
+    getServers: () => port()?.servers?.() ?? [],
+    getContextSavingServers: () => port()?.contextSavingServers?.() ?? [],
+  };
+}
+
+/** What the composer and the mention dropdown need of a provider's MCP servers. */
+export interface ProviderMcpServerView {
+  getServers(): readonly ManagedMcpServer[];
+  getContextSavingServers(): readonly ManagedMcpServer[];
 }

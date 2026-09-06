@@ -1,4 +1,4 @@
-import { type ProviderCostValue, ProviderSpendUsageStore } from '../../../core/providers/ProviderSpendUsageStore';
+import { type ProviderCostValue, ProviderSpendUsageStore } from '../../../providers/shared/ProviderSpendUsageStore';
 import { getMimocodeProviderSettings } from '../settings';
 
 const MIMOCODE_USAGE_NOTE = 'Pay per token across vendors · no cap set.';

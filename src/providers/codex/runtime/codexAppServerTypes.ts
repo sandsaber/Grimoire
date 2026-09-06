@@ -1,44 +1,9 @@
-// Local protocol subset for Codex app-server stdio JSON-RPC.
-// Field names match the wire format (camelCase).
-// Probed against codex-cli 0.118.0 on 2026-04-01.
 
-// ---------------------------------------------------------------------------
-// JSON-RPC base
-// ---------------------------------------------------------------------------
-
-export interface JsonRpcRequest {
-  jsonrpc: '2.0';
-  id: number;
-  method: string;
-  params?: unknown;
-}
-
-export interface JsonRpcNotification {
-  jsonrpc: '2.0';
-  method: string;
-  params?: unknown;
-}
-
-export interface JsonRpcResponse {
-  jsonrpc: '2.0';
-  id: number;
-  result?: unknown;
-  error?: JsonRpcError;
-}
 
 export interface JsonRpcError {
   code: number;
   message: string;
   data?: unknown;
-}
-
-// ---------------------------------------------------------------------------
-// Initialize
-// ---------------------------------------------------------------------------
-
-export interface InitializeParams {
-  clientInfo: { name: string; version: string };
-  capabilities: { experimentalApi?: boolean };
 }
 
 export interface InitializeResult {
@@ -289,15 +254,6 @@ export interface SkillsListEntry {
   errors: SkillErrorInfo[];
 }
 
-export interface SkillsListParams {
-  cwds?: string[];
-  forceReload?: boolean;
-  perCwdExtraUserRoots?: Array<{
-    cwd: string;
-    extraUserRoots: string[];
-  }> | null;
-}
-
 export interface SkillsListResult {
   data: SkillsListEntry[];
 }
@@ -375,38 +331,7 @@ export interface ThreadReadResult {
   thread: Thread;
 }
 
-// ---------------------------------------------------------------------------
-// thread/fork
-// ---------------------------------------------------------------------------
-
-export interface ThreadForkParams {
-  threadId: string;
-}
-
 export type ThreadForkResult = ThreadStartResult;
-
-// ---------------------------------------------------------------------------
-// thread/rollback
-// ---------------------------------------------------------------------------
-
-export interface ThreadRollbackParams {
-  threadId: string;
-  numTurns: number;
-}
-
-export interface ThreadRollbackResult {
-  thread: Thread;
-}
-
-// ---------------------------------------------------------------------------
-// thread/compact/start
-// ---------------------------------------------------------------------------
-
-export interface ThreadCompactStartParams {
-  threadId: string;
-}
-
-export type ThreadCompactStartResult = Record<string, never>;
 
 // ---------------------------------------------------------------------------
 // turn/start
@@ -455,33 +380,6 @@ export interface TurnSteerParams {
 
 export interface TurnSteerResult {
   turnId: string;
-}
-
-// ---------------------------------------------------------------------------
-// turn/interrupt
-// ---------------------------------------------------------------------------
-
-export interface TurnInterruptParams {
-  threadId: string;
-  turnId: string;
-}
-
-// ---------------------------------------------------------------------------
-// Server notifications
-// ---------------------------------------------------------------------------
-
-export interface ThreadStartedNotification {
-  thread: Thread;
-}
-
-export interface ThreadStatusChangedNotification {
-  threadId: string;
-  status: ThreadStatus;
-}
-
-export interface TurnStartedNotification {
-  threadId: string;
-  turn: Turn;
 }
 
 export interface TurnCompletedNotification {
@@ -546,13 +444,6 @@ export interface ErrorNotification {
   turnId: string;
 }
 
-export interface ReasoningSummaryPartAddedNotification {
-  threadId: string;
-  turnId: string;
-  itemId: string;
-  summaryIndex: number;
-}
-
 export interface ReasoningSummaryTextDeltaNotification {
   threadId: string;
   turnId: string;
@@ -574,13 +465,6 @@ export interface PlanDeltaNotification {
   turnId: string;
   itemId: string;
   delta: string;
-}
-
-export type RequestId = string | number;
-
-export interface ServerRequestResolvedNotification {
-  threadId: string;
-  requestId: RequestId;
 }
 
 // ---------------------------------------------------------------------------

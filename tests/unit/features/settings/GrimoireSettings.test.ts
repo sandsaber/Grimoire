@@ -5,8 +5,7 @@ import { Notice } from 'obsidian';
 
 import { readBundledChangelog } from '@/app/changelog/source';
 import { DEFAULT_GRIMOIRE_SETTINGS } from '@/app/settings/defaultSettings';
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
-import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { GrimoireSettingTab } from '@/features/settings/GrimoireSettings';
 import { setLocale, t } from '@/i18n/i18n';
 import type { Locale } from '@/i18n/types';
@@ -291,7 +290,7 @@ describe('GrimoireSettingTab settings hub', () => {
 
       (tab as any).renderProvidersHub(
         container,
-        ProviderRegistry.getRegisteredProviderIds(),
+        providerCatalog().ids(),
         createMockEl('div'),
       );
 
@@ -306,15 +305,17 @@ describe('GrimoireSettingTab settings hub', () => {
     const refreshModels = jest.fn().mockRejectedValue(
       Object.assign(new Error('spawn qwen ENOENT'), { code: 'ENOENT' }),
     );
-    jest.spyOn(ProviderWorkspaceRegistry, 'getModelCatalog').mockReturnValue({
-      isAvailable: () => true,
-      refreshModels,
+    // The catalog is reached through the application's workspace lookup now,
+    // not a static registry: the row moved with the enablement gate stated at
+    // the call site, because this one does not iterate enabled providers.
+    plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceFor: async () => ({ models: { list: async () => [], refresh: refreshModels } }),
     });
 
     await (tab as any).updateProviderEnabled('qwen', true);
 
     expect(refreshModels).toHaveBeenCalledTimes(1);
-    expect(ProviderRegistry.isEnabled('qwen', plugin.settings)).toBe(false);
+    expect(providerCatalog().isEnabled(plugin.settings, 'qwen')).toBe(false);
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
     expect(Notice).toHaveBeenCalledWith('Could not load provider models.');
   });
@@ -389,7 +390,7 @@ describe('GrimoireSettingTab settings hub', () => {
     const providerHint = settingEl.querySelector('.grimoire-settings-provider-hint');
     expect(providerHint?.textContent).toBe('Select a provider card to view its settings below.');
     expect(providerGrid).not.toBeNull();
-    expect(ProviderRegistry.getRegisteredProviderIds()).toEqual([
+    expect(providerCatalog().ids()).toEqual([
       'claude',
       'codex',
       'opencode',
@@ -409,7 +410,7 @@ describe('GrimoireSettingTab settings hub', () => {
 
     (tab as any).renderProvidersHub(
       container,
-      ProviderRegistry.getRegisteredProviderIds(),
+      providerCatalog().ids(),
       createMockEl('div'),
     );
 
@@ -452,7 +453,7 @@ describe('GrimoireSettingTab settings hub', () => {
     const tab = new GrimoireSettingTab(createSettingsApp(), plugin);
     const container = createMockEl('div');
 
-    (tab as any).renderWorkspaceHub(container, ProviderRegistry.getRegisteredProviderIds());
+    (tab as any).renderWorkspaceHub(container, providerCatalog().ids());
 
     const navigation = container.children[0];
     const sectionLabels = Array.from(
@@ -495,7 +496,7 @@ describe('GrimoireSettingTab settings hub', () => {
 
   it('uses explicit provider capabilities for every Advanced manager', () => {
     const tab = new GrimoireSettingTab(createSettingsApp(), createSettingsPlugin());
-    const providerIds = ProviderRegistry.getRegisteredProviderIds();
+    const providerIds = providerCatalog().ids();
 
     expect((tab as any).getWorkspaceManagerProviders(providerIds, 'skills')).toEqual([
       'claude',
@@ -562,18 +563,23 @@ describe('GrimoireSettingTab settings hub', () => {
       isAvailable: jest.fn().mockReturnValue(true),
       loadCommands: jest.fn().mockResolvedValue([{ name: 'review', description: 'Review the current workspace' }]),
     };
-    jest.spyOn(ProviderWorkspaceRegistry, 'getCommandCatalog')
-      .mockImplementation((providerId: any) => providerId === 'opencode' ? catalog as any : null);
-    jest.spyOn(ProviderWorkspaceRegistry, 'getRuntimeCommandLoader')
-      .mockImplementation((providerId: any) => providerId === 'opencode' ? loader : null);
+    // Both are workspace slots now, so both are stubbed in one place — which is
+    // the point of the row having moved.
+    plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceFor: async (providerId: string) => (
+        providerId === 'opencode' ? { commands: catalog, runtimeCommands: loader } : {}
+      ),
+    });
 
     const rows = await (tab as any).loadWorkspaceHubRows(['opencode'], 'commands');
 
+    // No plugin: the loader's context stopped carrying one when the provider's
+    // metadata session moved into the closure its workspace services build it
+    // with. What the host still decides is on this object.
     expect(loader.loadCommands).toHaveBeenCalledWith({
       allowSessionCreation: true,
       conversation: null,
       externalContextPaths: [],
-      plugin,
       runtime: null,
     });
     expect(catalog.setRuntimeCommands).toHaveBeenCalledWith([
@@ -599,13 +605,22 @@ describe('GrimoireSettingTab settings hub', () => {
         persistenceKey: `${providerId}-agent:review.md`,
       }]),
     }]));
-    jest.spyOn(ProviderWorkspaceRegistry, 'getServices').mockImplementation((providerId: any) => {
-      const storage = storages[providerId];
-      if (!storage) return null;
-      return {
-        agentMentionProvider: { searchAgents: jest.fn().mockReturnValue([]) },
-        agentStorage: storage,
-      } as any;
+    // Both halves come off the composition root now — the hub's two legacy rows
+    // and the mention refresh a delete triggers — so they are stubbed together
+    // rather than one on a registry and one on the runtime.
+    const refreshes = Object.fromEntries(providerIds.map(providerId => [providerId, jest.fn()]));
+    (tab as any).plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceServicesFor: (providerId: string) => {
+        const storage = storages[providerId];
+        if (!storage) return null;
+        return {
+          agentMentionProvider: { searchAgents: jest.fn().mockReturnValue([]) },
+          agentStorage: storage,
+        };
+      },
+      workspaceFor: async (providerId: string) => (
+        refreshes[providerId] ? { agentMentions: { refresh: refreshes[providerId] } } : {}
+      ),
     });
 
     const rows = await (tab as any).loadWorkspaceHubRows([...providerIds], 'agents');
@@ -622,23 +637,58 @@ describe('GrimoireSettingTab settings hub', () => {
         description: `${providerId} hidden reviewer`,
         name: 'review',
       }));
+      // Once, and only for the provider whose agent was deleted.
+      expect(refreshes[providerId]).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it('draws a provider section when its slot answers, and drops a superseded one', async () => {
+    // **The provider's settings tab is drawn a tick late now.** Obsidian's
+    // declarative settings API is synchronous and a provider's workspace is
+    // built on first use, so the section fills when the slot answers. The
+    // hazard that introduces is a reader clicking a second provider while the
+    // first is still resolving — the late draw would land in a pane they left.
+    const tab = new GrimoireSettingTab(createSettingsApp(), createSettingsPlugin());
+    const drawn: string[] = [];
+    const gates: Record<string, () => void> = {};
+    (tab as any).plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceFor: (providerId: string) => new Promise(resolve => {
+        gates[providerId] = () => resolve({
+          settingsPresentation: {
+            render: (host: { container: HTMLElement }) => {
+              drawn.push(providerId);
+              host.container.createDiv({ attr: { 'data-workspace-sections': 'commands' } });
+            },
+          },
+        });
+      }),
+    });
+
+    const container = createMockEl('div');
+    (tab as any).renderWorkspaceProviderSection(container, 'opencode', 'commands');
+    (tab as any).renderWorkspaceProviderSection(container, 'grok', 'commands');
+
+    // The first provider answers *after* the reader moved on.
+    gates.grok?.();
+    await Promise.resolve();
+    gates.opencode?.();
+    await Promise.resolve();
+
+    expect(drawn).toEqual(['grok']);
   });
 
   it('keeps Codex MCP guidance in the inventory without advertising it as managed', async () => {
     const tab = new GrimoireSettingTab(createSettingsApp(), createSettingsPlugin());
-    jest.spyOn(ProviderWorkspaceRegistry, 'getServices').mockImplementation((providerId: any) => {
-      if (providerId === 'claude') {
-        return {
-          mcpServerManager: { getServers: jest.fn().mockReturnValue([]) },
-          mcpStorage: { save: jest.fn() },
-          workspaceCapabilities: { mcp: 'managed' },
-        } as any;
-      }
-      if (providerId === 'codex') {
-        return { workspaceCapabilities: { mcp: 'native' } } as any;
-      }
-      return null;
+    (tab as any).plugin.getApplicationRuntimeOrNull = () => ({
+      workspaceServicesFor: (providerId: string) => {
+        if (providerId === 'claude') {
+          return {
+            mcpServerManager: { getServers: jest.fn().mockReturnValue([]) },
+            mcpStorage: { save: jest.fn() },
+          };
+        }
+        return null;
+      },
     });
 
     expect((tab as any).getWorkspaceManagerProviders(['claude', 'codex'], 'mcp'))
@@ -702,7 +752,7 @@ describe('GrimoireSettingTab settings hub', () => {
       readonly: false,
       status: 'available',
       deleteResource: jest.fn().mockResolvedValue(undefined),
-    }], '', ProviderRegistry.getRegisteredProviderIds(), resourceArea);
+    }], '', providerCatalog().ids(), resourceArea);
 
     expect(container.children[0].children.map((cell: any) => cell.textContent)).toEqual([
       'Name',
@@ -842,7 +892,12 @@ describe('GrimoireSettingTab settings hub', () => {
     const buttons = Array.from<any>(container.querySelectorAll('.grimoire-settings-tab'));
 
     buttons[1].dispatchEvent('click');
-    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    // Waited for rather than slept through. A tab renders behind two nested
+    // `requestAnimationFrame` calls, which the test environment polyfills as
+    // two chained macrotasks — and under a full parallel suite run those do not
+    // reliably land inside a fixed 50ms, so this failed about one run in four
+    // with the render simply not having happened yet.
+    await waitFor(() => providerRender.mock.calls.length === 1);
     buttons[0].dispatchEvent('click');
     buttons[1].dispatchEvent('click');
 
@@ -878,3 +933,12 @@ describe('GrimoireSettingTab settings hub', () => {
     expect(preventDefault).toHaveBeenCalled();
   });
 });
+
+/** Waits for a condition the surface reaches on its own schedule. */
+async function waitFor(predicate: () => boolean, attempts = 200): Promise<void> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (predicate()) return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error('Condition was not reached.');
+}

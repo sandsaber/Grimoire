@@ -1,9 +1,14 @@
-import type { RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
+/**
+ * The copy a rewind is taken against.
+ *
+ * The orchestration around it — preview, apply, restore — moved into
+ * `ClaudeExecutionBackend`, which owns the SDK query that does the rewinding.
+ * What stays here is the part that touches the vault: back up what is about to
+ * change, put it back if the change fails, and drop it when it succeeds.
+ */
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-
-import type { ChatRewindMode, ChatRewindResult } from '../../../core/runtime/types';
 
 interface BackupEntryFile {
   originalPath: string;
@@ -29,15 +34,6 @@ type BackupEntry = BackupEntryFile | BackupEntrySymlink | BackupEntryMissing;
 export interface ClaudeRewindBackup {
   restore: () => Promise<void>;
   cleanup: () => Promise<void>;
-}
-
-export interface ExecuteClaudeRewindDeps {
-  assistantMessageId: string;
-  mode: ChatRewindMode;
-  rewindFiles: (userMessageId: string, dryRun?: boolean) => Promise<RewindFilesResult>;
-  closePersistentQuery: (reason: string) => void;
-  setPendingResumeAt: (assistantMessageId: string) => void;
-  vaultPath: string | null;
 }
 
 function resolveRewindFilePath(filePath: string, vaultPath: string | null): string {
@@ -163,58 +159,4 @@ export async function createClaudeRewindBackup(
   };
 
   return { restore, cleanup };
-}
-
-export async function executeClaudeRewind(
-  userMessageId: string,
-  deps: ExecuteClaudeRewindDeps,
-): Promise<ChatRewindResult> {
-  if (deps.mode === 'conversation') {
-    deps.setPendingResumeAt(deps.assistantMessageId);
-    deps.closePersistentQuery('conversation rewind');
-    return { canRewind: true, filesChanged: [] };
-  }
-
-  const preview = await deps.rewindFiles(userMessageId, true);
-  if (!preview.canRewind) {
-    return preview;
-  }
-
-  const backup = await createClaudeRewindBackup(preview.filesChanged, deps.vaultPath);
-
-  try {
-    const result = await deps.rewindFiles(userMessageId);
-    if (!result.canRewind) {
-      await backup?.restore();
-      deps.closePersistentQuery('rewind failed');
-      return result;
-    }
-
-    deps.setPendingResumeAt(deps.assistantMessageId);
-    deps.closePersistentQuery('rewind');
-    return {
-      ...result,
-      filesChanged: preview.filesChanged,
-      insertions: preview.insertions,
-      deletions: preview.deletions,
-    };
-  } catch (error) {
-    try {
-      await backup?.restore();
-    } catch (rollbackError) {
-      deps.closePersistentQuery('rewind failed');
-      throw new Error(
-        `Rewind failed and files could not be fully restored: ${rollbackError instanceof Error ? rollbackError.message : 'Unknown error'}`,
-        { cause: rollbackError },
-      );
-    }
-
-    deps.closePersistentQuery('rewind failed');
-    throw new Error(
-      `Rewind failed but files were restored: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      { cause: error },
-    );
-  } finally {
-    await backup?.cleanup();
-  }
 }

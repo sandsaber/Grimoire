@@ -1,8 +1,7 @@
 import '@/providers';
 
-import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { qwenWorkspaceRegistration } from '@/providers/qwen/app/QwenWorkspaceServices';
-import { QwenChatRuntime } from '@/providers/qwen/runtime/QwenChatRuntime';
 import { getQwenProviderSettings, updateQwenProviderSettings } from '@/providers/qwen/settings';
 
 describe('Qwen provider registration', () => {
@@ -11,24 +10,34 @@ describe('Qwen provider registration', () => {
   });
 
   it('registers Qwen as an opt-in provider', () => {
-    expect(ProviderRegistry.getRegisteredProviderIds()).toContain('qwen');
-    expect(ProviderRegistry.getProviderDisplayName('qwen')).toBe('Qwen Code');
-    expect(ProviderRegistry.isEnabled('qwen', {})).toBe(false);
+    expect(providerCatalog().ids()).toContain('qwen');
+    expect(providerCatalog().displayName('qwen')).toBe('Qwen Code');
+    expect(providerCatalog().isEnabled({}, 'qwen')).toBe(false);
 
     const settings: Record<string, unknown> = {};
     updateQwenProviderSettings(settings, { enabled: true });
 
-    expect(ProviderRegistry.isEnabled('qwen', settings)).toBe(true);
-    expect(ProviderRegistry.getCapabilities('qwen')?.reasoningControl).toBe('effort');
+    expect(providerCatalog().isEnabled(settings, 'qwen')).toBe(true);
+    expect(providerCatalog().capabilities('qwen')?.reasoningControl).toBe('effort');
   });
 
-  it('creates a Qwen runtime through the provider registry', () => {
-    const runtime = ProviderRegistry.createChatRuntime({
-      plugin: {} as any,
-      providerId: 'qwen',
-    });
+  it('creates a Qwen runtime through the composition the plugin owns', () => {
+    // Flipped, and the registration is not in the path at all now: a tab asks
+    // the application for a runtime, which asks the composition the plugin
+    // built at load. A plugin that has none is a bug with
+    // a name rather than a runtime that quietly answers for no kernel.
+    const created = { providerId: 'qwen' };
+    const plugin = { getQwenExecution: () => ({ createRuntime: () => created }) } as any;
 
-    expect(runtime.providerId).toBe('qwen');
+    expect(plugin.getQwenExecution().createRuntime().providerId).toBe('qwen');
+
+    const unloaded = {
+      getQwenExecution: () => {
+        throw new Error('qwen execution is not available before plugin load.');
+      },
+    } as any;
+
+    expect(() => unloaded.getQwenExecution()).toThrow('not available before plugin load');
   });
 
   it('creates Qwen workspace services', async () => {
@@ -44,23 +53,25 @@ describe('Qwen provider registration', () => {
     expect(services.settingsTabRenderer).toBeTruthy();
   });
 
-  it('refreshes Qwen model discovery through the workspace model catalog', async () => {
+  it('refreshes Qwen model discovery through the isolated metadata session', async () => {
+    // The catalog used to build a whole chat runtime to ask this. What that
+    // runtime was doing for it — opening a session and reading its reply — is
+    // now one isolated session, and the catalog answers the question the
+    // surfaces actually ask: did the agent answer, not did the list change.
     const settings: Record<string, unknown> = {};
     updateQwenProviderSettings(settings, { enabled: true });
+    const discoverMetadata = jest.fn(async () => {
+      updateQwenProviderSettings(settings, {
+        discoveredModels: [{ label: 'Qwen 3 Pro', rawId: 'qwen-3-pro' }],
+        visibleModels: ['qwen-3-pro'],
+      });
+      return true;
+    });
     const plugin = {
       settings,
       saveSettings: jest.fn().mockResolvedValue(undefined),
+      getQwenExecution: () => ({ metadata: { discoverMetadata } }),
     };
-    const ensureReadySpy = jest
-      .spyOn(QwenChatRuntime.prototype, 'ensureReady')
-      .mockImplementation(async function ensureReady(this: QwenChatRuntime) {
-        updateQwenProviderSettings((this as any).plugin.settings, {
-          discoveredModels: [{ label: 'Qwen 3 Pro', rawId: 'qwen-3-pro' }],
-          visibleModels: ['qwen-3-pro'],
-        });
-        return true;
-      });
-    const cleanupSpy = jest.spyOn(QwenChatRuntime.prototype, 'cleanup').mockImplementation(() => undefined);
     const services = await qwenWorkspaceRegistration.initialize({
       homeAdapter: {} as any,
       plugin: plugin as any,
@@ -68,16 +79,42 @@ describe('Qwen provider registration', () => {
       vaultAdapter: {} as any,
     });
 
-    const changed = await services.modelCatalog?.refreshModels({
+    const outcome = await services.modelCatalog?.refreshModels({
       plugin: plugin as any,
       settings,
     });
 
-    expect(changed).toBe(true);
-    expect(ensureReadySpy).toHaveBeenCalledWith({ allowSessionCreation: true });
-    expect(cleanupSpy).toHaveBeenCalled();
+    expect(outcome).toBe('refreshed');
+    expect(discoverMetadata).toHaveBeenCalledTimes(1);
     expect(getQwenProviderSettings(settings).discoveredModels).toEqual([
       { label: 'Qwen 3 Pro', rawId: 'qwen-3-pro' },
     ]);
+  });
+
+  it('does not ask again for a catalog the vault already has', async () => {
+    // Named for the answer it used to give — "no change" — which hid what it
+    // actually exercises: a settled catalog is never asked, so the agent here
+    // is never reached. Discovery boots a CLI, and this is the guard on that.
+    const settings: Record<string, unknown> = {};
+    updateQwenProviderSettings(settings, {
+      discoveredModels: [{ label: 'Qwen 3 Pro', rawId: 'qwen-3-pro' }],
+      enabled: true,
+    });
+    const plugin = {
+      settings,
+      saveSettings: jest.fn().mockResolvedValue(undefined),
+      getQwenExecution: () => ({ metadata: { discoverMetadata: async () => true } }),
+    };
+    const services = await qwenWorkspaceRegistration.initialize({
+      homeAdapter: {} as any,
+      plugin: plugin as any,
+      storage: {} as any,
+      vaultAdapter: {} as any,
+    });
+
+    await expect(services.modelCatalog?.refreshModels({
+      plugin: plugin as any,
+      settings,
+    })).resolves.toBe('skipped');
   });
 });

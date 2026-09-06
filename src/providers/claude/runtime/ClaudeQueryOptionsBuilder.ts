@@ -81,8 +81,8 @@ export class QueryOptionsBuilder {
     if (currentConfig.settingSources !== newConfig.settingSources) return true;
     if (currentConfig.claudeCliPath !== newConfig.claudeCliPath) return true;
 
-    // Note: Permission mode is handled dynamically via setPermissionMode() in ClaudeChatRuntime.
-    // Since allowDangerouslySkipPermissions is always true, both directions work without restart.
+    // Permission mode is not in this list because it is applied to the live
+    // query instead — see `applyPermissionMode` for why that is possible at all.
 
     if (currentConfig.enableChrome !== newConfig.enableChrome) return true;
     if (currentConfig.enableAutoMode !== newConfig.enableAutoMode) return true;
@@ -240,6 +240,25 @@ export class QueryOptionsBuilder {
     return 'default';
   }
 
+  /**
+   * The mode, and the consent that lets it change later.
+   *
+   * `allowDangerouslySkipPermissions` is the SDK's consent gate for
+   * `bypassPermissions`, and it is set in every mode rather than only in the one
+   * that bypasses. That is deliberate and it is load-bearing: the CLI refuses
+   * `setPermissionMode('bypassPermissions')` on a session that was not launched
+   * with it — "because the session was not launched with
+   * --dangerously-skip-permissions" — so a query started in normal mode could
+   * never be switched to full access without restarting the process and losing
+   * the session. Setting it only where it is used would break the toolbar
+   * switch at the moment somebody used it, and nothing else would notice.
+   *
+   * What keeps that safe is on the other side: `resolveClaudeSdkPermissionMode`
+   * is the only thing that produces `bypassPermissions`, and it produces it only
+   * for `full_access` — a mode the user chooses. The one path that could have
+   * reached it otherwise was an agent's own `setMode` suggestion riding an
+   * approval, which is refused in `buildPermissionUpdates`.
+   */
   private static applyPermissionMode(
     options: Options,
     permissionMode: PermissionMode,

@@ -1,72 +1,15 @@
 import { JsonRpcErrorResponse } from '@/providers/acp/AcpJsonRpcTransport';
 import {
-  buildAcpPersistedSessionFields,
-  buildAcpSessionLoadFailureDebugEvent,
-  clearAcpManagedSessionState,
   isAcpMissingSessionError,
   isAcpSessionGone,
-  markAcpSessionLoadFailed,
 } from '@/providers/acp/acpSessionResume';
 
+/**
+ * What is left of this module after the legacy runtimes went: the one decision
+ * a failed `session/load` still needs. The wipe policy, the persist fields and
+ * the debug event were the old resume path's, and their tests went with them.
+ */
 describe('acpSessionResume', () => {
-  it('clears session bindings while optionally preserving the database path', () => {
-    const state = {
-      currentDatabasePath: '/data/opencode.db',
-      loadedSessionId: 'loaded-1',
-      sessionId: 'session-1',
-      sessionInvalidated: false,
-    };
-
-    clearAcpManagedSessionState(state, { preserveDatabasePath: true });
-    expect(state).toEqual({
-      currentDatabasePath: '/data/opencode.db',
-      loadedSessionId: null,
-      sessionId: null,
-      sessionInvalidated: false,
-    });
-
-    clearAcpManagedSessionState(state);
-    expect(state.currentDatabasePath).toBeNull();
-  });
-
-  it('marks a failed load as invalidated without dropping the database path', () => {
-    const state = {
-      currentDatabasePath: '/data/opencode.db',
-      loadedSessionId: 'loaded-1',
-      sessionId: 'session-1',
-      sessionInvalidated: false,
-    };
-
-    markAcpSessionLoadFailed(state);
-    expect(state.sessionInvalidated).toBe(true);
-    expect(state.sessionId).toBeNull();
-    expect(state.currentDatabasePath).toBe('/data/opencode.db');
-  });
-
-  it('keeps databasePath when persisting an invalidated session without a replacement id', () => {
-    expect(buildAcpPersistedSessionFields({
-      conversationDatabasePath: '/old/opencode.db',
-      currentDatabasePath: null,
-      sessionId: null,
-      sessionInvalidated: true,
-    })).toEqual({
-      databasePath: '/old/opencode.db',
-      sessionDropped: true,
-      sessionId: null,
-    });
-
-    expect(buildAcpPersistedSessionFields({
-      conversationDatabasePath: '/old/opencode.db',
-      currentDatabasePath: '/new/opencode.db',
-      sessionId: 'session-2',
-      sessionInvalidated: false,
-    })).toEqual({
-      databasePath: '/new/opencode.db',
-      sessionDropped: false,
-      sessionId: 'session-2',
-    });
-  });
-
   describe('isAcpSessionGone', () => {
     // Captured from the shipped CLIs by loading a session id they never had.
     // None of them says so in the error, which is the whole reason the listing
@@ -127,78 +70,5 @@ describe('acpSessionResume', () => {
       })).resolves.toBe(false);
       expect(listSessions).not.toHaveBeenCalled();
     });
-  });
-
-  it('carries a dropped session across saves until a replacement is persisted', () => {
-    // The first save consumes the in-memory flag, so every later save reports
-    // false; the marker has to keep the answer until a real session lands.
-    const afterDrop = buildAcpPersistedSessionFields({
-      conversationDatabasePath: '/old/opencode.db',
-      currentDatabasePath: null,
-      sessionId: null,
-      sessionInvalidated: true,
-    });
-    expect(afterDrop.sessionDropped).toBe(true);
-
-    const afterSecondSave = buildAcpPersistedSessionFields({
-      conversationDatabasePath: '/old/opencode.db',
-      conversationSessionDropped: afterDrop.sessionDropped,
-      currentDatabasePath: null,
-      sessionId: null,
-      sessionInvalidated: false,
-    });
-    expect(afterSecondSave.sessionDropped).toBe(true);
-
-    const afterReplacement = buildAcpPersistedSessionFields({
-      conversationDatabasePath: '/old/opencode.db',
-      conversationSessionDropped: true,
-      currentDatabasePath: null,
-      sessionId: 'session-2',
-      sessionInvalidated: false,
-    });
-    expect(afterReplacement.sessionDropped).toBe(false);
-    expect(afterReplacement.sessionId).toBe('session-2');
-  });
-
-  it('builds a structured debug event for session load failures', () => {
-    const event = buildAcpSessionLoadFailureDebugEvent({
-      cwd: '/vault',
-      databasePath: '/data/opencode.db',
-      error: new Error('session missing'),
-      providerId: 'opencode',
-      sessionId: 'abcdefghijklmno',
-      stderr: 'boom',
-    });
-
-    expect(event.event).toBe('session.load_failed');
-    expect(event.level).toBe('warn');
-    expect(event.scope).toBe('provider.opencode');
-    expect(event.data).toEqual(expect.objectContaining({
-      cwdLabel: '/vault',
-      errorSummary: 'session missing',
-      provider: 'opencode',
-      reason: 'session_load_failed',
-      status: 'abcdefghijkl',
-      stderrPreview: 'boom',
-    }));
-  });
-
-  it.each([
-    new JsonRpcErrorResponse('session/load', -32001, 'Session not found: session-1'),
-    new JsonRpcErrorResponse('loadSession', -32000, 'Unable to load session', {
-      reason: 'session_not_found',
-    }),
-    new JsonRpcErrorResponse('session/load', -32602, 'Invalid session id'),
-  ])('recognizes explicit missing-session JSON-RPC errors', (error) => {
-    expect(isAcpMissingSessionError(error)).toBe(true);
-  });
-
-  it.each([
-    new JsonRpcErrorResponse('session/load', -32000, 'Authentication failed'),
-    new JsonRpcErrorResponse('session/load', -32000, 'Connection timed out'),
-    new JsonRpcErrorResponse('session/new', -32001, 'Session not found'),
-    new Error('Session not found'),
-  ])('does not classify transient or unrelated failures as missing sessions', (error) => {
-    expect(isAcpMissingSessionError(error)).toBe(false);
   });
 });

@@ -17,7 +17,7 @@ describe('rename-tab.css', () => {
     expect(getRule(css, '.grimoire-rename-tab-modal')).toContain('width: min(520px, calc(100vw - 32px))');
     expect(getRule(css, '.grimoire-rename-tab-field')).toContain('position: relative');
     expect(getRule(css, '.grimoire-rename-tab-field:focus-within')).toContain(
-      'border-color: var(--interactive-accent)',
+      'border-color: var(--grimoire-accent)',
     );
     expect(getRule(css, '.grimoire-rename-tab-footer')).toContain('justify-content: space-between');
   });
@@ -30,6 +30,8 @@ describe('rename-tab.css', () => {
     const input = getRule(css, '.grimoire-rename-tab-input');
     expect(input).toContain('flex: 1 1 auto');
     expect(input).not.toContain('78px');
+    // The gap the input keeps from its controls is the system's, not a literal.
+    expect(input).toContain('padding: 0 var(--grimoire-space-2) 0 var(--grimoire-space-5)');
 
     for (const selector of ['button.grimoire-rename-tab-reset', 'button.grimoire-rename-tab-suggest']) {
       const rule = getRule(css, selector);

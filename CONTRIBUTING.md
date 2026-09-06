@@ -58,8 +58,11 @@ Claude Code, Codex, OpenCode, MiMoCode, Kimi Code, Qwen Code, Antigravity CLI, a
 - Keep protocol handling, CLI resolution, launch artifacts, mode and model
   normalization, storage, history parsing, and provider settings in
   `src/providers/<provider>/`.
-- Register provider runtimes and services through `ProviderRegistry` and
-  `ProviderWorkspaceRegistry`.
+- Declare a provider once, in `src/providers/BuiltInProviderCatalog.ts`. Both
+  provider registries are deleted: a provider's runtime comes from
+  `ApplicationRuntime.createRuntimeFor(providerId)`, its declarations and
+  capabilities from `ProviderCatalog`, and its workspace slots from
+  `ApplicationRuntime.workspaceFor(providerId)`.
 - Feature code under `src/features/` must consume provider-neutral contracts. It
   must not interpret provider-native identifiers or read provider-specific
   `Conversation.providerState` fields.

@@ -18,13 +18,12 @@ import {
   normalizeHiddenCommandList,
 } from '../../core/providers/commands/hiddenCommands';
 import type { ProviderCommandEntry } from '../../core/providers/commands/ProviderCommandEntry';
-import { ProviderRegistry } from '../../core/providers/ProviderRegistry';
+import { providerCatalog } from '../../core/providers/ProviderCatalog';
+import type { ProviderSettingsPresentationPort } from '../../core/providers/ProviderModule';
+import type { ProviderCommandsPort } from '../../core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderId,
-  ProviderSettingsTabRendererContext,
-  ProviderWorkspaceServices,
 } from '../../core/providers/types';
 import type {
   EnvironmentScope,
@@ -39,6 +38,10 @@ import {
 import { getAvailableLocales, getLocaleDisplayName, setLocale, t } from '../../i18n/i18n';
 import type { Locale, TranslationKey } from '../../i18n/types';
 import type GrimoirePlugin from '../../main';
+import type {
+  ProviderSettingsTabRendererContext,
+  ProviderWorkspaceServices,
+} from '../../providers/shared/providerHostContracts';
 import { confirmDelete } from '../../shared/modals/ConfirmModal';
 import { showWhatsNewModal } from '../../shared/modals/WhatsNewModal';
 import { formatContextLimit, parseContextLimit, parseEnvironmentVariables } from '../../utils/env';
@@ -393,6 +396,10 @@ export class GrimoireSettingTab extends PluginSettingTab {
   private activeTab: SettingsTabId = 'general';
   private activeProviderId: ProviderId | null = null;
   private activeWorkspaceProviderId: string | null = null;
+  /** Which provider-section draw is the current one; see the draw below. */
+  private workspaceRenderGeneration = 0;
+  /** The same, for the provider details pane. */
+  private providerDetailsRenderGeneration = 0;
   private activeWorkspaceSection: AdvancedSettingsSection = 'general';
   private tabScroller: SettingsTabScroller | null = null;
   private workspaceLoadToken: symbol | null = null;
@@ -465,7 +472,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
 
     setLocale(this.plugin.settings.locale as Locale);
 
-    const providerIds = this.orderProviderIds(ProviderRegistry.getRegisteredProviderIds());
+    const providerIds = this.orderProviderIds(providerCatalog().ids());
     const tabIds: SettingsTabId[] = ['general', 'providers', 'workspace', 'about'];
     if (!tabIds.includes(this.activeTab)) {
       this.activeTab = 'general';
@@ -475,7 +482,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
       this.activeProviderId = providerIds.includes(configuredProvider)
         ? configuredProvider
         : (providerIds.find((providerId) => (
-            ProviderRegistry.isEnabled(providerId, this.plugin.settings)
+            providerCatalog().isEnabled(this.plugin.settings, providerId)
           )) ?? providerIds[0] ?? null);
     }
 
@@ -611,7 +618,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
     return t(`settings.hub.${key}` as TranslationKey);
   }
 
-  private orderProviderIds(providerIds: ProviderId[]): ProviderId[] {
+  private orderProviderIds(providerIds: readonly ProviderId[]): ProviderId[] {
     const preferredOrder = [
       'claude',
       'codex',
@@ -644,7 +651,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
       return this.getHubText('geminiLegacy');
     }
     return PROVIDER_SETTING_COPY[providerId]?.name
-      ?? ProviderRegistry.getProviderDisplayName(providerId);
+      ?? providerCatalog().displayName(providerId);
   }
 
   private getProviderStatusText(providerId: ProviderId): string {
@@ -662,7 +669,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
   ): void {
     const grid = container.createDiv({ cls: 'grimoire-settings-provider-grid' });
     for (const providerId of providerIds) {
-      const enabled = ProviderRegistry.isEnabled(providerId, this.plugin.settings);
+      const enabled = providerCatalog().isEnabled(this.plugin.settings, providerId);
       const card = grid.createDiv({
         attr: {
           'aria-pressed': String(providerId === this.activeProviderId),
@@ -730,14 +737,28 @@ export class GrimoireSettingTab extends PluginSettingTab {
         this.getProviderDisplayName(this.activeProviderId),
       ))
       .setHeading();
-    const renderer = ProviderWorkspaceRegistry.getSettingsTabRenderer(this.activeProviderId);
-    if (!renderer) {
-      details.createDiv({ cls: 'grimoire-settings-hub-empty', text: this.getHubText('none') });
-      return;
-    }
-
-    renderer.render(details, this.createSettingsRendererContext(this.activeProviderId));
-    this.extractProviderAdvancedOptions(details, this.activeProviderId);
+    // Drawn when the provider's slot answers, guarded by generation for the
+    // reason the workspace section below gives: a second provider selected
+    // while the first is resolving must not fill the pane it left.
+    const providerId = this.activeProviderId;
+    const generation = ++this.providerDetailsRenderGeneration;
+    void this.plugin.getApplicationRuntimeOrNull?.()
+      ?.workspaceFor(providerId)
+      .then(workspace => {
+        if (generation !== this.providerDetailsRenderGeneration) {
+          return;
+        }
+        const presentation = workspace.settingsPresentation;
+        if (!presentation) {
+          details.createDiv({ cls: 'grimoire-settings-hub-empty', text: this.getHubText('none') });
+          return;
+        }
+        presentation.render({
+          container: details,
+          context: this.createSettingsRendererContext(providerId),
+        });
+        this.extractProviderAdvancedOptions(details, providerId);
+      });
   }
 
   private renderWorkspaceHub(container: HTMLElement, providerIds: ProviderId[]): void {
@@ -850,7 +871,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
     section: WorkspaceSection,
   ): string[] {
     const supportedProviders = providerIds.filter((providerId) => (
-      ProviderWorkspaceRegistry.getCapabilities(providerId)[section].manager === 'managed'
+      providerCatalog().workspaceCapabilities(providerId)[section]?.manager === 'managed'
     ));
     return section === 'environment'
       ? ['__shared__', ...supportedProviders]
@@ -878,7 +899,11 @@ export class GrimoireSettingTab extends PluginSettingTab {
   }
 
   private getWorkspaceServices(providerId: ProviderId): WorkspaceServicesWithStorage | null {
-    return ProviderWorkspaceRegistry.getServices(providerId);
+    // The composition root holds them. The hub reads two rows the module slots
+    // do not carry yet — a provider's agent storage and its MCP storage — which
+    // is the last thing keeping this legacy shape reachable at all.
+    return (this.plugin.getApplicationRuntimeOrNull?.()
+      ?.workspaceServicesFor(providerId) ?? null);
   }
 
   private openWorkspaceManager(
@@ -1033,8 +1058,36 @@ export class GrimoireSettingTab extends PluginSettingTab {
       });
       return;
     }
-    const renderer = ProviderWorkspaceRegistry.getSettingsTabRenderer(providerId);
-    if (!renderer) {
+    // **The provider's own tab, drawn a tick later.** Obsidian's declarative
+    // settings API is synchronous all the way down and a provider's workspace
+    // is built on first use, so the section is filled when the slot answers
+    // rather than in the call that asked for it. The generation is what makes
+    // that safe: a second provider clicked while the first was resolving would
+    // otherwise draw into a pane the reader has already left.
+    const generation = ++this.workspaceRenderGeneration;
+    void this.plugin.getApplicationRuntimeOrNull?.()
+      ?.workspaceFor(providerId)
+      .then(workspace => {
+        if (generation !== this.workspaceRenderGeneration) {
+          return;
+        }
+        this.drawWorkspaceProviderSection(
+          container,
+          providerId,
+          section,
+          workspace.settingsPresentation,
+        );
+      });
+  }
+
+  /** One provider's settings tab, once its slot is there to ask. */
+  private drawWorkspaceProviderSection(
+    container: HTMLElement,
+    providerId: string,
+    section: WorkspaceSection,
+    presentation: ProviderSettingsPresentationPort | undefined,
+  ): void {
+    if (!presentation) {
       container.createDiv({
         cls: 'grimoire-settings-hub-empty',
         text: this.getHubText('unsupported'),
@@ -1043,8 +1096,11 @@ export class GrimoireSettingTab extends PluginSettingTab {
     }
 
     const staging = container.createDiv({ cls: 'grimoire-workspace-render-staging' });
-    renderer.render(staging, this.createSettingsRendererContext(providerId, true));
-    let extracted = this.extractWorkspaceProviderSection(
+    presentation.render({
+      container: staging,
+      context: this.createSettingsRendererContext(providerId, true),
+    });
+    const extracted = this.extractWorkspaceProviderSection(
       staging,
       container,
       section,
@@ -1237,9 +1293,11 @@ export class GrimoireSettingTab extends PluginSettingTab {
     const rows: WorkspaceResourceRow[] = [];
     if (section === 'skills' || section === 'commands') {
       for (const providerId of providerIds) {
-        const capability = ProviderWorkspaceRegistry.getCapabilities(providerId)[section];
-        if (capability.inventory === 'none') continue;
-        const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
+        const capability = providerCatalog().workspaceCapabilities(providerId)[section];
+        if (!capability || capability.inventory === 'none') continue;
+        const catalog = (
+          await this.plugin.getApplicationRuntimeOrNull?.()?.workspaceFor(providerId)
+        )?.commands;
         if (!catalog) continue;
         try {
           const vaultEntries = await catalog.listVaultEntries();
@@ -1255,14 +1313,18 @@ export class GrimoireSettingTab extends PluginSettingTab {
           }
           if (section === 'commands' && providerId !== 'claude' && providerId !== 'codex') {
             const discovery = capability.runtimeCommandDiscovery ?? 'none';
-            const loader = ProviderWorkspaceRegistry.getRuntimeCommandLoader(providerId);
+            // The module's slot rather than a registry accessor keyed by an id
+            // string: the loader's context is entirely host-owned now, which is
+            // what let the row move.
+            const loader = (await this.plugin.getApplicationRuntimeOrNull?.()
+              ?.workspaceFor(providerId))?.runtimeCommands;
             if (discovery === 'ephemeral'
-              && loader?.isAvailable(this.plugin.settings)) {
+              && loader?.loadCommands
+              && loader.isAvailable?.(this.plugin.settings)) {
               const commands = await loader.loadCommands({
                 allowSessionCreation: true,
                 conversation: null,
                 externalContextPaths: [],
-                plugin: this.plugin,
                 runtime: null,
               });
               catalog.setRuntimeCommands(commands);
@@ -1347,10 +1409,10 @@ export class GrimoireSettingTab extends PluginSettingTab {
       }
     } else if (section === 'mcp') {
       for (const providerId of providerIds) {
-        const capability = ProviderWorkspaceRegistry.getCapabilities(providerId).mcp;
+        const capability = providerCatalog().workspaceCapabilities(providerId).mcp;
         const services = this.getWorkspaceServices(providerId);
         const manager = services?.mcpServerManager;
-        if (manager && capability.inventory === 'managed') {
+        if (manager && capability?.inventory === 'managed') {
           try {
             for (const server of manager.getServers()) {
               const storage = services.mcpStorage;
@@ -1392,7 +1454,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
           } catch {
             // Ignore a provider whose MCP config cannot currently be read.
           }
-        } else if (capability.manager === 'guidance') {
+        } else if (capability?.manager === 'guidance') {
           rows.push({
             key: `mcp-guidance:${providerId}`,
             section: 'mcp',
@@ -1451,7 +1513,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
     providerId: ProviderId,
     section: Extract<WorkspaceSection, 'skills' | 'commands'>,
     forceReadonly: boolean,
-    catalog: ReturnType<typeof ProviderWorkspaceRegistry.getCommandCatalog> & object,
+    catalog: ProviderCommandsPort,
   ): WorkspaceResourceRow {
     const readonly = forceReadonly
       || !entry.isEditable
@@ -1524,7 +1586,14 @@ export class GrimoireSettingTab extends PluginSettingTab {
         ? {
             deleteResource: async (): Promise<void> => {
               await storage.delete(definition);
-              await ProviderWorkspaceRegistry.refreshAgentMentions(providerId);
+              // `workspaceFor`, not `builtWorkspaceFor`: the registry this
+              // replaces was populated for every provider at load, so its
+              // accessor was never empty in a running plugin. Asking only for
+              // an already-built workspace would have skipped the refresh for
+              // any provider whose composition had not been used yet.
+              await this.plugin.getApplicationRuntimeOrNull?.()
+                ?.workspaceFor(providerId)
+                .then(workspace => workspace.agentMentions?.refresh());
             },
           }
         : {}),
@@ -1970,9 +2039,9 @@ export class GrimoireSettingTab extends PluginSettingTab {
 
           const settingsBag = this.plugin.settings as unknown as Record<string, unknown>;
           const seenValues = new Set<string>();
-          for (const providerId of ProviderRegistry.getRegisteredProviderIds()) {
-            const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-            for (const model of uiConfig.getModelOptions(settingsBag)) {
+          for (const providerId of providerCatalog().ids()) {
+            const chatUi = providerCatalog().declarations(providerId).chatUI;
+            for (const model of chatUi.models.options(settingsBag)) {
               if (!seenValues.has(model.value)) {
                 seenValues.add(model.value);
                 dropdown.addOption(model.value, model.label);
@@ -2214,20 +2283,22 @@ export class GrimoireSettingTab extends PluginSettingTab {
   }
 
   private setProviderEnabled(providerId: ProviderId, enabled: boolean): void {
-    ProviderRegistry.setEnabled(providerId, this.plugin.settings, enabled);
+    providerCatalog().setEnabled(this.plugin.settings, providerId, enabled);
   }
 
   private async refreshProviderModelCatalog(providerId: ProviderId): Promise<void> {
-    const catalog = ProviderWorkspaceRegistry.getModelCatalog(providerId);
-    if (!catalog || catalog.isAvailable?.(this.plugin.settings) === false) {
-      return;
-    }
-
-    await catalog.refreshModels({
-      force: true,
-      plugin: this.plugin,
-      settings: this.plugin.settings,
-    });
+    // No enablement gate, and the row's `isAvailable` was not one either on this
+    // path: the only caller is `updateProviderEnabled`, which reaches here only
+    // with `enabled === true` and only after `setProviderEnabled` has written
+    // it — so the condition cannot be false. `ProviderSettingsCoordinator`
+    // normalizes the *selection* between them, never enablement. A guard that
+    // cannot fail is a guard nobody can test, which is how one survives long
+    // enough to be mistaken for a rule.
+    const workspace = await this.plugin.getApplicationRuntimeOrNull?.()?.workspaceFor(providerId);
+    // `force`, because this is the user asking: enabling a provider is an
+    // explicit action, and `main`'s catalog cache exists to keep the *other*
+    // caller — a model dropdown opening — from booting a CLI on its own.
+    await workspace?.models?.refresh({ force: true });
   }
 
   private renderMaxTabsSetting(container: HTMLElement): void {
@@ -2290,13 +2361,14 @@ export class GrimoireSettingTab extends PluginSettingTab {
     const uniqueModelIds = new Set<string>();
     const providerIds = providerId
       ? [providerId]
-      : ProviderRegistry.getRegisteredProviderIds();
+      : providerCatalog().ids();
 
     for (const targetProviderId of providerIds) {
       const envVars = parseEnvironmentVariables(
         this.plugin.getActiveEnvironmentVariables(targetProviderId),
       );
-      for (const modelId of ProviderRegistry.getChatUIConfig(targetProviderId).getCustomModelIds(envVars)) {
+      const targetModels = providerCatalog().declarations(targetProviderId).chatUI.models;
+      for (const modelId of targetModels.customModelIds(envVars)) {
         uniqueModelIds.add(modelId);
       }
     }

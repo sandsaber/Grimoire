@@ -1,10 +1,8 @@
-import type GrimoirePlugin from '../../main';
 import type { CursorContext } from '../../utils/editor';
-import type { SharedAppStorage } from '../bootstrap/storage';
-import type { McpServerManager } from '../mcp/McpServerManager';
-import type { ChatRuntime } from '../runtime/ChatRuntime';
-import type { HomeFileAdapter } from '../storage/HomeFileAdapter';
-import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
+import type { ConversationListing } from '../bootstrap/SessionStorage';
+import type { ConversationMetadataField } from '../bootstrap/SessionStorage';
+import type { ConversationRepository } from '../conversations/ConversationRepository';
+import type { ExecutionChatRuntimeAdapter } from '../runtime/execution/ExecutionChatRuntimeAdapter';
 import type {
   AgentDefinition,
   Conversation,
@@ -17,7 +15,7 @@ import type {
   ToolCallInfo,
 } from '../types';
 import type { ProviderId } from '../types/provider';
-import type { ProviderCommandCatalog } from './commands/ProviderCommandCatalog';
+import type { ProviderHistoryHydration } from './ProviderModule';
 
 export type { ProviderId } from '../types/provider';
 
@@ -39,38 +37,6 @@ export interface ProviderCapabilities {
 
 /** Product default for blank tabs and missing providerId fallbacks. */
 export const DEFAULT_CHAT_PROVIDER_ID = 'codex' as const satisfies ProviderId;
-
-export interface CreateChatRuntimeOptions {
-  plugin: GrimoirePlugin;
-  providerId?: ProviderId;
-}
-
-/**
- * Chat-facing provider registration.
- *
- * This is intentionally limited to chat-facing services.
- * Shared bootstrap (defaults, storage) is in `src/core/bootstrap/`.
- * Provider-owned workspace services (CLI resolution, commands, agents,
- * MCP, settings tabs) live behind `src/providers/<id>/app/`.
- */
-export interface ProviderRegistration {
-  displayName: string;
-  blankTabOrder: number;
-  isEnabled: (settings: Record<string, unknown>) => boolean;
-  setEnabled: (settings: Record<string, unknown>, enabled: boolean) => void;
-  getPreloadedContextFiles?: () => string[];
-  capabilities: ProviderCapabilities;
-  environmentKeyPatterns?: RegExp[];
-  chatUIConfig: ProviderChatUIConfig;
-  settingsReconciler: ProviderSettingsReconciler;
-  createRuntime: (options: Omit<CreateChatRuntimeOptions, 'providerId'>) => ChatRuntime;
-  createTitleGenerationService: (plugin: GrimoirePlugin) => TitleGenerationService;
-  createInstructionRefineService: (plugin: GrimoirePlugin) => InstructionRefineService;
-  createInlineEditService: (plugin: GrimoirePlugin) => InlineEditService;
-  historyService: ProviderConversationHistoryService;
-  taskResultInterpreter: ProviderTaskResultInterpreter;
-  subagentLifecycleAdapter?: ProviderSubagentLifecycleAdapter;
-}
 
 export interface ProviderSettingsReconciler {
   handleEnvironmentChange?(settings: Record<string, unknown>): boolean;
@@ -102,9 +68,35 @@ export interface AppTabManagerState {
 /** Provider-neutral session metadata storage. */
 export interface AppSessionStorage {
   listMetadata(): Promise<SessionMetadata[]>;
+  /** The same listing, plus the conversations this build cannot read. */
+  listConversations(): Promise<ConversationListing>;
+  /** Writes a conversation the vault does not have yet. */
+  createMetadata(meta: SessionMetadata): Promise<void>;
+  /**
+   * Applies the fields this writer changed, leaving the rest as it is on disk.
+   *
+   * Named fields rather than a whole conversation, because that is the whole of
+   * what makes two writers on one conversation compose instead of the later one
+   * reverting the earlier.
+   */
+  updateMetadata(
+    conv: Conversation,
+    changed: readonly ConversationMetadataField[],
+  ): Promise<void>;
   saveMetadata(meta: SessionMetadata): Promise<void>;
   deleteMetadata(id: string): Promise<void>;
   toSessionMetadata(conv: Conversation): SessionMetadata;
+  /** The stored record as the chat surface reads it. The inverse of the above. */
+  toConversation(meta: SessionMetadata, defaultProviderId: ProviderId): Conversation;
+  /**
+   * The one record store this vault has.
+   *
+   * Exposed for the callers that write conversations directly — the execution
+   * path's persistence barrier — and it must be *this* one: the queue that
+   * serializes writes to a conversation is held on the instance, so a second
+   * store over the same vault does not serialize against it.
+   */
+  readonly records: ConversationRepository;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,17 +111,6 @@ export interface AppSessionStorage {
 export interface AppMcpStorage {
   load(): Promise<ManagedMcpServer[]>;
   save(servers: ManagedMcpServer[]): Promise<void>;
-  tryParseClipboardConfig?(text: string): unknown;
-}
-
-export interface AppCommandStorage {
-  save(command: SlashCommand): Promise<void>;
-  delete(name: string): Promise<void>;
-}
-
-export interface AppSkillStorage {
-  save(skill: SlashCommand): Promise<void>;
-  delete(name: string): Promise<void>;
 }
 
 export interface AppAgentStorage {
@@ -199,15 +180,6 @@ export interface ProviderPlanUsageWindow {
   reset: string;
 }
 
-export interface ProviderPlanUsage {
-  plan: string;
-  windows?: ProviderPlanUsageWindow[];
-  spend?: string;
-  note?: string;
-  /** Unix epoch milliseconds for the last successfully received usage snapshot. */
-  updatedAt?: number;
-}
-
 export interface ProviderPathIconSvg {
   kind?: 'path';
   viewBox: string;
@@ -222,7 +194,8 @@ export interface ProviderSvgPathChild {
 export interface ProviderSvgGroupChild {
   tag: 'g';
   attributes: Record<string, string>;
-  children: ProviderSvgPathChild[];
+  /** Readonly: an icon is data a renderer reads, never one it edits. */
+  children: readonly ProviderSvgPathChild[];
 }
 
 export type ProviderSvgChild = ProviderSvgGroupChild | ProviderSvgPathChild;
@@ -230,7 +203,7 @@ export type ProviderSvgChild = ProviderSvgGroupChild | ProviderSvgPathChild;
 export interface ProviderCompositeIconSvg {
   kind: 'composite';
   viewBox: string;
-  children: ProviderSvgChild[];
+  children: readonly ProviderSvgChild[];
 }
 
 /** SVG icon descriptor for provider branding in selectors and headers. */
@@ -270,85 +243,9 @@ export interface ProviderModeSelectorConfig {
   value: string;
 }
 
-/** Static UI configuration owned by the provider (model list, reasoning, context window). */
-export interface ProviderChatUIConfig {
-  /** Model options for the selector dropdown. Provider extracts what it needs from the settings bag. */
-  getModelOptions(settings: Record<string, unknown>): ProviderUIOption[];
-
-  /** Whether this provider owns the given model id. */
-  ownsModel(model: string, settings: Record<string, unknown>): boolean;
-
-  /** Whether the model uses adaptive reasoning (effort levels vs token budgets). */
-  isAdaptiveReasoningModel(model: string, settings: Record<string, unknown>): boolean;
-
-  /** Reasoning options for the current model (effort levels if adaptive, budgets otherwise). */
-  getReasoningOptions(model: string, settings: Record<string, unknown>): ProviderReasoningOption[];
-
-  /** Default reasoning value for the model. */
-  getDefaultReasoningValue(model: string, settings: Record<string, unknown>): string;
-
-  /** Context window size in tokens. */
-  getContextWindowSize(
-    model: string,
-    customLimits?: Record<string, number>,
-    settings?: Record<string, unknown>,
-  ): number;
-
-  /** Whether this is a built-in (default) model vs custom/env model. */
-  isDefaultModel(model: string): boolean;
-
-  /** Apply model change side effects to settings (defaults, tracking). */
-  applyModelDefaults(model: string, settings: unknown): void;
-
-  /** Optional provider hook to discover model-scoped metadata after a model is selected. */
-  prepareModelMetadata?(
-    model: string,
-    settings: Record<string, unknown>,
-    context: { plugin: GrimoirePlugin },
-  ): Promise<void>;
-
-  /** Optional hook when the toolbar changes a reasoning selection. */
-  applyReasoningSelection?(model: string, value: string, settings: unknown): void;
-
-  /** Normalize model variant based on visibility flags. Provider extracts what it needs from the settings bag. */
-  normalizeModelVariant(model: string, settings: Record<string, unknown>): string;
-
-  /** Extract custom model IDs from parsed environment variables. Used for per-model context limit UI. */
-  getCustomModelIds(envVars: Record<string, string>): Set<string>;
-
-  /** Optional permission-mode toggle descriptor. Return null when the provider exposes no permission toggle UI. */
-  getPermissionModeToggle?(): ProviderPermissionModeToggleConfig | null;
-
-  /** Optional provider-owned mapping back into the shared permission-mode contract. */
-  resolvePermissionMode?(settings: Record<string, unknown>): string | null;
-
-  /** Optional hook when the toolbar changes permission mode. */
-  applyPermissionMode?(value: string, settings: unknown): void;
-
-  /** Optional service-tier toggle descriptor. Return null when the provider exposes no fast/standard UI. */
-  getServiceTierToggle?(settings: Record<string, unknown>): ProviderServiceTierToggleConfig | null;
-
-  /** Optional provider-owned mode selector descriptor. */
-  getModeSelector?(settings: Record<string, unknown>): ProviderModeSelectorConfig | null;
-
-  /** Optional hook when the toolbar changes a provider-owned mode selection. */
-  applyModeSelection?(value: string, settings: unknown): void;
-
-  /** Whether the provider enables the shared bang-bash input mode. */
-  isBangBashEnabled?(settings: Record<string, unknown>): boolean;
-
-  /** SVG icon for the provider (shown next to model names in selectors). */
-  getProviderIcon?(): ProviderIconSvg | null;
-}
-
 // ---------------------------------------------------------------------------
 // Provider-owned boundary services
 // ---------------------------------------------------------------------------
-
-export interface ProviderCliResolver {
-  resolveFromSettings(settings: Record<string, unknown>): string | null;
-  reset(): void;
-}
 
 export interface ProviderRuntimeCommandLoaderContext {
   // Shared command discovery may need a short-lived provider session; the tab
@@ -356,8 +253,7 @@ export interface ProviderRuntimeCommandLoaderContext {
   allowSessionCreation?: boolean;
   conversation: Conversation | null;
   externalContextPaths: string[];
-  plugin: GrimoirePlugin;
-  runtime: ChatRuntime | null;
+  runtime: ExecutionChatRuntimeAdapter | null;
 }
 
 export interface ProviderRuntimeCommandLoader {
@@ -365,57 +261,8 @@ export interface ProviderRuntimeCommandLoader {
   loadCommands(context: ProviderRuntimeCommandLoaderContext): Promise<SlashCommand[]>;
 }
 
-export interface ProviderModelCatalogRefreshContext {
-  /**
-   * Re-run discovery even when the catalog is settled. Set by explicit user
-   * actions (enabling a provider, a refresh button); background refreshes from
-   * model pickers leave it unset so they never start a CLI on their own.
-   */
-  force?: boolean;
-  plugin: GrimoirePlugin;
-  settings: Record<string, unknown>;
-}
-
-export interface ProviderModelCatalog {
-  isAvailable?(settings: Record<string, unknown>): boolean;
-  refreshModels(context: ProviderModelCatalogRefreshContext): Promise<boolean>;
-}
-
-export interface ProviderPlanUsageContext {
-  plugin: GrimoirePlugin;
-  providerId: ProviderId;
-  settings: Record<string, unknown>;
-}
-
-export interface ProviderPlanUsageProvider {
-  isAvailable?(settings: Record<string, unknown>): boolean;
-  getCachedUsage(context: ProviderPlanUsageContext): ProviderPlanUsage | null;
-  refreshUsage(context: ProviderPlanUsageContext): Promise<ProviderPlanUsage | null>;
-}
-
 // `commands` warms provider-owned command discovery without fully priming the
 // bound tab runtime. `runtime` primes the real tab runtime itself.
-export type ProviderTabWarmupMode = 'none' | 'commands' | 'runtime';
-
-export type ProviderTabWarmupLifecycleState = 'blank' | 'bound_cold' | 'bound_active' | 'closing';
-
-export interface ProviderTabWarmupContext {
-  conversation: Conversation | null;
-  externalContextPaths: string[];
-  plugin: GrimoirePlugin;
-  runtime: ChatRuntime | null;
-  tab: {
-    conversationId: string | null;
-    draftModel: string | null;
-    draftSettings?: Record<string, unknown> | null;
-    lifecycleState: ProviderTabWarmupLifecycleState;
-    providerId: ProviderId;
-  };
-}
-
-export interface ProviderTabWarmupPolicy {
-  resolveMode(context: ProviderTabWarmupContext): ProviderTabWarmupMode;
-}
 
 export type ProviderWorkspaceResourceKind =
   | 'skills'
@@ -424,78 +271,20 @@ export type ProviderWorkspaceResourceKind =
   | 'mcp'
   | 'environment';
 
-export type ProviderWorkspaceInventoryAccess = 'managed' | 'readonly' | 'none';
-export type ProviderWorkspaceManagerAccess = 'managed' | 'guidance' | 'none';
-export type ProviderRuntimeCommandDiscovery = 'ephemeral' | 'active-session-only' | 'none';
-
-export interface ProviderWorkspaceResourceCapability {
-  inventory: ProviderWorkspaceInventoryAccess;
-  manager: ProviderWorkspaceManagerAccess;
-  runtimeCommandDiscovery?: ProviderRuntimeCommandDiscovery;
-}
-
-export type ProviderWorkspaceCapabilities = Record<
-  ProviderWorkspaceResourceKind,
-  ProviderWorkspaceResourceCapability
->;
-
-export interface ProviderWorkspaceServices {
-  commandCatalog?: ProviderCommandCatalog | null;
-  agentMentionProvider?: AgentMentionProvider | null;
-  cliResolver?: ProviderCliResolver | null;
-  modelCatalog?: ProviderModelCatalog | null;
-  usageProvider?: ProviderPlanUsageProvider | null;
-  runtimeCommandLoader?: ProviderRuntimeCommandLoader | null;
-  tabWarmupPolicy?: ProviderTabWarmupPolicy | null;
-  mcpStorage?: AppMcpStorage | null;
-  mcpServerManager?: McpServerManager | null;
-  settingsTabRenderer?: ProviderSettingsTabRenderer | null;
-  refreshAgentMentions?(): Promise<void>;
-}
-
-export interface ProviderSettingsTabRendererContext {
-  plugin: GrimoirePlugin;
-  suppressAutomaticDiscovery: boolean;
-  createWorkspaceSection(
-    container: HTMLElement,
-    sections: ProviderWorkspaceResourceKind[],
-  ): HTMLElement;
-  renderHiddenProviderCommandSetting(
-    container: HTMLElement,
-    providerId: ProviderId,
-    copy: { name: string; desc: string; placeholder: string },
-  ): void;
-  refreshModelSelectors(): void;
-  renderCustomContextLimits(container: HTMLElement, providerId?: ProviderId): void;
-  renderAdvancedSection(
-    container: HTMLElement,
-    opts: { count: number; summary: string },
-  ): HTMLElement;
-}
-
-export interface ProviderSettingsTabRenderer {
-  render(container: HTMLElement, context: ProviderSettingsTabRendererContext): void;
-}
-
-export interface ProviderWorkspaceInitContext {
-  plugin: GrimoirePlugin;
-  storage: SharedAppStorage;
-  vaultAdapter: VaultFileAdapter;
-  homeAdapter: HomeFileAdapter;
-}
-
-export interface ProviderWorkspaceRegistration<
-  TServices extends ProviderWorkspaceServices = ProviderWorkspaceServices,
-> {
-  workspaceCapabilities: ProviderWorkspaceCapabilities;
-  initialize(context: ProviderWorkspaceInitContext): Promise<TServices>;
-}
-
 export interface ProviderConversationHistoryService {
+  /**
+   * Loads a conversation's transcript from the provider, and says what happened.
+   *
+   * The outcome is the point. Hydration used to answer nothing at all, so a
+   * conversation whose session the provider no longer has looked exactly like a
+   * conversation with nothing in it — the user opened it, saw an empty
+   * transcript, and had no way to tell the difference. `stale` is that case
+   * named.
+   */
   hydrateConversationHistory(
     conversation: Conversation,
     vaultPath: string | null,
-  ): Promise<void>;
+  ): Promise<ProviderHistoryHydration>;
   deleteConversationSession(
     conversation: Conversation,
     vaultPath: string | null,

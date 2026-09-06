@@ -5,7 +5,7 @@ import {
   extractGrokWaitResult,
   GROK_SUBAGENT_SPAWN_TOOL,
   GROK_SUBAGENT_WAIT_TOOL,
-  normalizeGrokSubagentExtensionNotification,
+  normalizeGrokSubagentFinishedUpdate,
 } from '@/providers/grok/normalization/grokSubagentNormalization';
 
 describe('grokSubagentNormalization', () => {
@@ -112,29 +112,56 @@ describe('grokSubagentNormalization', () => {
     );
   });
 
-  it('normalizes xAI completion notifications into shared subagent results', () => {
-    expect(normalizeGrokSubagentExtensionNotification({
-      sessionId: 'session-1',
-      update: {
-        output: 'Finished report',
-        status: 'completed',
-        subagent_id: 'agent-1',
-        sessionUpdate: 'subagent_finished',
-      },
-    }, 'session-1')).toEqual({
+
+  it('reads an out-of-band subagent ending in either spelling', () => {
+    expect(normalizeGrokSubagentFinishedUpdate({
+      output: 'Finished report',
+      sessionUpdate: 'subagent_finished',
+      status: 'completed',
+      subagent_id: 'agent-1',
+    })).toEqual({
       agentId: 'agent-1',
       result: 'Finished report',
       status: 'completed',
       type: 'async_subagent_result',
     });
 
-    expect(normalizeGrokSubagentExtensionNotification({
-      sessionId: 'other-session',
-      update: {
-        status: 'completed',
-        subagent_id: 'agent-1',
-        sessionUpdate: 'subagent_finished',
-      },
-    }, 'session-1')).toBeNull();
+    // The camelCase spelling and the failure vocabulary, both of which the
+    // shipped runtime accepted. Neither is in the wire recording — no subagent
+    // ran in it — so this is the shipped behaviour restored, not a shape read
+    // off the wire, and the live harness is where it gets confirmed.
+    expect(normalizeGrokSubagentFinishedUpdate({
+      error: 'Ran out of context',
+      sessionUpdate: 'subagent_finished',
+      status: 'FAILED',
+      subagentId: 'agent-2',
+    })).toEqual({
+      agentId: 'agent-2',
+      result: 'Ran out of context',
+      status: 'error',
+      type: 'async_subagent_result',
+    });
   });
+
+  it('answers nothing for an update that is not an ending it can name', () => {
+    // Each of these reached the tab as a completed subagent when the guard was
+    // missing, which is worse than not drawing one: a subagent still running is
+    // marked finished with no result.
+    expect(normalizeGrokSubagentFinishedUpdate({
+      sessionUpdate: 'agent_message_chunk',
+      status: 'completed',
+      subagent_id: 'agent-1',
+    })).toBeNull();
+    expect(normalizeGrokSubagentFinishedUpdate({
+      sessionUpdate: 'subagent_finished',
+      status: 'completed',
+    })).toBeNull();
+    expect(normalizeGrokSubagentFinishedUpdate({
+      sessionUpdate: 'subagent_finished',
+      status: 'running',
+      subagent_id: 'agent-1',
+    })).toBeNull();
+    expect(normalizeGrokSubagentFinishedUpdate('subagent_finished')).toBeNull();
+  });
+
 });

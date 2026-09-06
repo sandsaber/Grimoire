@@ -95,6 +95,21 @@ describe('DebugLogService', () => {
 });
 
 describe('sanitizeDebugLogData', () => {
+  it('redacts a home directory on every platform it can run on', () => {
+    expect(sanitizeDebugLogData({
+      stderrPreview: [
+        'ENOENT /home/michael/Vaults/notes/.grimoire/grok/system.md',
+        '/Users/michael/Vaults/notes/main.js',
+        '/root/.config/grok/auth.json',
+        'C:\\Users\\michael\\Vaults\\notes',
+      ].join(' '),
+    })).toEqual({
+      // The error word survives; the paths do not. A log that redacts the
+      // message as well as the path is a log nobody can debug from.
+      stderrPreview: 'ENOENT [redacted-path] [redacted-path] [redacted-path] [redacted-path]',
+    });
+  });
+
   it('keeps safe metadata while redacting content-like fields', () => {
     expect(sanitizeDebugLogData({
       method: 'account/rateLimits/read',

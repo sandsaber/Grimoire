@@ -445,8 +445,8 @@ describe('MentionDropdownController', () => {
       const localCallbacks = createMockCallbacks({
         getCachedVaultFiles: jest.fn().mockReturnValue([
           {
-            name: 'Глава 2.md',
-            path: 'Книги/Тара/Арка 1/Глава 2.md',
+            name: 'Chapter 2.md',
+            path: 'Books/Tara/Arc 1/Chapter 2.md',
             stat: { mtime: 2000 },
           } as any,
         ]),
@@ -454,7 +454,7 @@ describe('MentionDropdownController', () => {
       const localInput = createMockInput();
       const localController = new MentionDropdownController(createMockEl(), localInput, localCallbacks);
 
-      localInput.value = '@Глава 2';
+      localInput.value = '@Chapter 2';
       localInput.selectionStart = localInput.value.length;
       localController.handleInputChange();
       jest.advanceTimersByTime(200);
@@ -463,7 +463,7 @@ describe('MentionDropdownController', () => {
       expect(renderOptions.items).toEqual(expect.arrayContaining([
         expect.objectContaining({
           type: 'file',
-          path: 'Книги/Тара/Арка 1/Глава 2.md',
+          path: 'Books/Tara/Arc 1/Chapter 2.md',
         }),
       ]));
 

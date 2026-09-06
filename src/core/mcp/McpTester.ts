@@ -266,6 +266,12 @@ export async function testMcpServer(server: ManagedMcpServer): Promise<McpTestRe
 
   const client = new Client({ name: 'grimoire-tester', version: '1.0.0' });
   const controller = new AbortController();
+  // The browser's timer, deliberately. This file sits under `src/core/` but its
+  // only caller is the settings UI, and Obsidian's review asks for
+  // `window.setTimeout` so a timer scheduled from a popped-out settings window
+  // belongs to the window it runs in. The rule that keeps the browser object
+  // out of core is about the execution kernel's boundary, which this is not
+  // part of.
   const timeout = window.setTimeout(() => controller.abort(), 10000);
 
   try {

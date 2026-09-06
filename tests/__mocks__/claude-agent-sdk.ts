@@ -120,6 +120,7 @@ let customMockMessages: any[] | null = null;
 let appendResultMessage = true;
 let lastOptions: Options | undefined;
 let mockSupportedCommands: Array<{ name: string; description: string; argumentHint?: string }> = [];
+let mockSupportedCommandsError: Error | null = null;
 let mockSupportedModels: unknown[] = [];
 let lastResponse: (AsyncGenerator<any> & {
   interrupt: jest.Mock;
@@ -147,6 +148,7 @@ export function resetMockMessages() {
   appendResultMessage = true;
   lastOptions = undefined;
   mockSupportedCommands = [];
+  mockSupportedCommandsError = null;
   mockSupportedModels = [];
   lastResponse = null;
   shouldThrowOnIteration = false;
@@ -158,6 +160,11 @@ export function setMockSupportedCommands(
   commands: Array<{ name: string; description: string; argumentHint?: string }>
 ) {
   mockSupportedCommands = commands;
+}
+
+/** Makes `supportedCommands()` reject, which a live CLI does when it is not authenticated. */
+export function setMockSupportedCommandsError(error: Error | null) {
+  mockSupportedCommandsError = error;
 }
 
 export function setMockSupportedModels(models: unknown[]) {
@@ -318,7 +325,9 @@ export function query({ prompt, options }: { prompt: any; options: Options }): A
   gen.setPermissionMode = jest.fn().mockResolvedValue(undefined);
   gen.applyFlagSettings = jest.fn().mockResolvedValue(undefined);
   gen.setMcpServers = jest.fn().mockResolvedValue({ added: [], removed: [], errors: {} });
-  gen.supportedCommands = jest.fn().mockResolvedValue(mockSupportedCommands);
+  gen.supportedCommands = mockSupportedCommandsError
+    ? jest.fn().mockRejectedValue(mockSupportedCommandsError)
+    : jest.fn().mockResolvedValue(mockSupportedCommands);
   gen.supportedModels = jest.fn().mockResolvedValue(mockSupportedModels);
   lastResponse = gen;
 

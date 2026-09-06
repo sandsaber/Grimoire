@@ -19,12 +19,6 @@ export interface OpencodeBaseModel {
   variants: OpencodeModelVariant[];
 }
 
-export interface OpencodeDiscoveredModelGroup {
-  models: OpencodeDiscoveredModel[];
-  providerKey: string;
-  providerLabel: string;
-}
-
 export const OPENCODE_SYNTHETIC_MODEL_ID = 'opencode';
 export const OPENCODE_DEFAULT_THINKING_LEVEL = 'default';
 
@@ -199,29 +193,6 @@ export function extractOpencodeModelVariantValue(
   return variant || null;
 }
 
-export function combineOpencodeRawModelSelection(
-  baseRawId: string | null | undefined,
-  thinkingLevel: string | null | undefined,
-  discoveredModels: OpencodeDiscoveredModel[],
-): string | null {
-  const normalizedBaseRawId = baseRawId?.trim();
-  if (!normalizedBaseRawId) {
-    return null;
-  }
-
-  const variant = thinkingLevel?.trim();
-  if (!variant || variant === OPENCODE_DEFAULT_THINKING_LEVEL) {
-    return normalizedBaseRawId;
-  }
-
-  const supportedVariants = new Set(
-    getOpencodeModelVariants(normalizedBaseRawId, discoveredModels).map((entry) => entry.value),
-  );
-  return supportedVariants.has(variant)
-    ? `${normalizedBaseRawId}/${variant}`
-    : normalizedBaseRawId;
-}
-
 export function splitOpencodeModelLabel(label: string): {
   modelLabel: string;
   providerLabel: string;
@@ -288,15 +259,6 @@ export function buildOpencodeBaseModels(
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
-export function getOpencodeModelVariants(
-  rawId: string,
-  models: OpencodeDiscoveredModel[],
-): OpencodeModelVariant[] {
-  const baseRawId = resolveOpencodeBaseModelRawId(rawId, models);
-  return buildOpencodeBaseModels(models)
-    .find((model) => model.rawId === baseRawId)?.variants ?? [];
-}
-
 function formatOpencodeThinkingLevelLabel(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -308,42 +270,6 @@ function formatOpencodeThinkingLevelLabel(value: string): string {
   }
 
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-}
-
-export function groupOpencodeDiscoveredModels(
-  models: OpencodeDiscoveredModel[],
-): OpencodeDiscoveredModelGroup[] {
-  const groups = new Map<string, OpencodeDiscoveredModelGroup>();
-  for (const model of buildOpencodeBaseModels(models)) {
-    const { providerLabel } = splitOpencodeModelLabel(model.label || model.rawId);
-    const providerKey = providerLabel.toLowerCase();
-    const existing = groups.get(providerKey);
-    if (existing) {
-      existing.models.push({
-        ...(model.description ? { description: model.description } : {}),
-        label: model.label,
-        rawId: model.rawId,
-      });
-      continue;
-    }
-
-    groups.set(providerKey, {
-      models: [{
-        ...(model.description ? { description: model.description } : {}),
-        label: model.label,
-        rawId: model.rawId,
-      }],
-      providerKey,
-      providerLabel,
-    });
-  }
-
-  return Array.from(groups.values())
-    .map((group) => ({
-      ...group,
-      models: [...group.models].sort((left, right) => left.label.localeCompare(right.label)),
-    }))
-    .sort((left, right) => left.providerLabel.localeCompare(right.providerLabel));
 }
 
 function dedupeOpencodeVariants(variants: OpencodeModelVariant[]): OpencodeModelVariant[] {

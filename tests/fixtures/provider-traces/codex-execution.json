@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "providerId": "codex",
+  "backendId": "provider-codex",
+  "topology": "persistent-daemon",
+  "concurrency": "multiplexed-sessions",
+  "resume": "native",
+  "sessionBoundary": "native-thread",
+  "runIdentity": "native-turn",
+  "resultExpectation": "required",
+  "agentObservation": "aggregate",
+  "identity": {
+    "backendGeneration": 1,
+    "executionSessionId": "es-00000000000000000000000000000001",
+    "sessionInstanceId": "si-00000000000000000000000000000001",
+    "runId": "run-11111111111111111111111111111111",
+    "nativeThreadId": "thread-1",
+    "nativeTurnId": "turn-thread-1"
+  },
+  "cases": {
+    "initializationAndNewThread": [
+      "initialize",
+      "thread/start",
+      "turn/start"
+    ],
+    "resumeAfterDaemonReplacement": [
+      "initialize",
+      "thread/resume",
+      "turn/start"
+    ],
+    "forkRollbackDispatch": [
+      "thread/fork",
+      "thread/resume",
+      "thread/rollback",
+      "turn/start"
+    ],
+    "compactAndSteer": [
+      "thread/start",
+      "thread/compact/start",
+      "turn/steer"
+    ],
+    "interruptCancellation": [
+      "thread/start",
+      "turn/start",
+      "turn/interrupt"
+    ],
+    "interactions": [
+      "interaction-opened:approval",
+      "interaction-resolved:accept",
+      "interaction-opened:question",
+      "interaction-resolved:provider-resolved"
+    ],
+    "providerFailure": [
+      "run-started",
+      "provider-content:turn/completed",
+      "terminal:failed:provider-failure"
+    ],
+    "providerInterruption": [
+      "run-started",
+      "provider-content:turn/completed",
+      "terminal:interrupted:known-process-exit"
+    ],
+    "earlyNotificationCompletion": [
+      "run-started",
+      "provider-content:item/agentMessage/delta",
+      "output-delta",
+      "provider-content:turn/completed",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ],
+    "missingCompletionRecovery": [
+      "run-started",
+      "provider-content:thread/status/changed",
+      "recovery-started",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ],
+    "nativeAgentResult": [
+      "run-started",
+      "provider-content:item/completed",
+      "provider-content:item/completed",
+      "provider-content:item/completed",
+      "provider-content:item/completed",
+      "provider-content:item/agentMessage/delta",
+      "output-delta",
+      "provider-content:turn/completed",
+      "native-agent-observed:native-agent-7",
+      "native-agent-status:native-agent-7:running",
+      "native-agent-activity:native-agent-7:input-sent",
+      "native-agent-activity:native-agent-7:wait-observed",
+      "native-agent-result:native-agent-7:projection",
+      "native-agent-status:native-agent-7:completed",
+      "native-agent-activity:native-agent-7:close-observed",
+      "native-agent-status:native-agent-7:closed",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ]
+  },
+  "agentEvidence": {
+    "definitions": "provider-files",
+    "spawnOrigin": [
+      "provider-native"
+    ],
+    "stableIdentity": true,
+    "progressObservation": "aggregate",
+    "resultExtraction": true,
+    "cancellation": false,
+    "statusQuery": false,
+    "reattachment": false,
+    "source": "parent-collaboration-events",
+    "eventCase": "nativeAgentResult",
+    "cancellationCase": null
+  },
+  "eventCases": {
+    "nativeAgentResult": [
+      "run-started",
+      "native-agent-observed:native-agent-7",
+      "native-agent-status:native-agent-7:running",
+      "native-agent-activity:native-agent-7:input-sent",
+      "native-agent-activity:native-agent-7:wait-observed",
+      "native-agent-result:native-agent-7:projection",
+      "native-agent-status:native-agent-7:completed",
+      "native-agent-activity:native-agent-7:close-observed",
+      "native-agent-status:native-agent-7:closed",
+      "result:projection",
+      "terminal:succeeded:completed"
+    ]
+  }
+}

@@ -1,17 +1,17 @@
 import { hashCatalogFingerprint } from '../../../core/providers/catalogFingerprint';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
-import type {
-  ProviderCliResolver,
-  ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
-  ProviderWorkspaceRegistration,
-  ProviderWorkspaceServices,
-} from '../../../core/providers/types';
 import type { HomeFileAdapter } from '../../../core/storage/HomeFileAdapter';
 import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
+import type {
+  ProviderWorkspaceRegistration,
+} from '../../../providers/shared/providerHostContracts';
+import type {
+  ProviderCliResolver,
+  ProviderModelCatalog,
+  ProviderWorkspaceServices,
+} from '../../../providers/shared/providerHostContracts';
 import { getVaultPath } from '../../../utils/path';
 import { CodexAgentMentionProvider } from '../agents/CodexAgentMentionProvider';
 import { CodexSkillCatalog } from '../commands/CodexSkillCatalog';
@@ -20,7 +20,7 @@ import {
   resolveCodexModelCatalogFingerprint,
 } from '../modelCatalogFingerprint';
 import { updateCodexModelDiscoveryState } from '../modelDiscoveryState';
-import { CodexCliResolver } from '../runtime/CodexCliResolver';
+import { codexCliResolver } from '../runtime/CodexCliResolver';
 import { CodexModelListingService } from '../runtime/CodexModelListingService';
 import { getCodexProviderSettings } from '../settings';
 import { CodexSkillListingService } from '../skills/CodexSkillListingService';
@@ -38,14 +38,8 @@ export interface CodexWorkspaceServices extends ProviderWorkspaceServices {
 }
 
 function createCodexCliResolver(): ProviderCliResolver {
-  return new CodexCliResolver();
+  return codexCliResolver();
 }
-
-const codexTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'runtime';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -56,7 +50,7 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
   if (initialSettings.discoveredModels.length > 0) {
     // The resolved CLI path is part of the fingerprint but is not available
     // here: this catalog is built inside createCodexWorkspaceServices, which runs
-    // inside ProviderWorkspaceRegistry.initialize(), and the registry assigns
+    // before the workspace manager publishes the services, and it assigns
     // this.services[providerId] only after that resolves - until then
     // getResolvedProviderCliPath returns null and an eager seed would be filed
     // under settings.cliPath while every later refresh looks it up under the
@@ -100,7 +94,7 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'debug',
           scope: 'provider.codex',
         });
-        return false;
+        return 'skipped';
       }
 
       if (!force && refreshCache.isFresh(fingerprint, currentSettings.discoveredModels.length > 0)) {
@@ -115,7 +109,7 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'debug',
           scope: 'provider.codex',
         });
-        return false;
+        return 'skipped';
       }
 
       return refreshCache.refresh({
@@ -140,7 +134,7 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
             level: 'debug',
             scope: 'provider.codex',
           });
-          return false;
+          return 'failed';
         }
 
         const changed = updateCodexModelDiscoveryState(settings, {
@@ -160,7 +154,9 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'info',
           scope: 'provider.codex',
         });
-        return changed;
+        // The CLI answered, so this is a refresh whatever `changed` says: a
+        // list that came back identical is a successful refresh, not a failed one.
+        return 'refreshed';
       } catch (error) {
         plugin.recordDebugLog?.({
           data: {
@@ -207,7 +203,6 @@ export async function createCodexWorkspaceServices(
     modelCatalog: createCodexModelCatalog(plugin),
     usageProvider: codexPlanUsageStore,
     settingsTabRenderer: codexSettingsTabRenderer,
-    tabWarmupPolicy: codexTabWarmupPolicy,
     refreshAgentMentions: async () => {
       await agentMentionProvider.loadAgents();
     },
@@ -215,13 +210,6 @@ export async function createCodexWorkspaceServices(
 }
 
 export const codexWorkspaceRegistration: ProviderWorkspaceRegistration<CodexWorkspaceServices> = {
-  workspaceCapabilities: {
-    skills: { inventory: 'managed', manager: 'managed' },
-    commands: { inventory: 'none', manager: 'none' },
-    agents: { inventory: 'managed', manager: 'managed' },
-    mcp: { inventory: 'none', manager: 'guidance' },
-    environment: { inventory: 'managed', manager: 'managed' },
-  },
   initialize: async ({ plugin, vaultAdapter, homeAdapter }) => createCodexWorkspaceServices(
     plugin,
     vaultAdapter,
@@ -229,10 +217,26 @@ export const codexWorkspaceRegistration: ProviderWorkspaceRegistration<CodexWork
   ),
 };
 
-export function maybeGetCodexWorkspaceServices(): CodexWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('codex') as CodexWorkspaceServices | null;
+/**
+ * This provider's services, or a throw.
+ *
+ * For the callers that cannot proceed without them and would otherwise read a
+ * half-built surface as an empty one. Takes a plugin for the same reason
+ * `maybeGet` does: the services live on the composition root now, not in a
+ * static that stood in for having one.
+ */
+export function getCodexWorkspaceServices(plugin: GrimoirePlugin): CodexWorkspaceServices {
+  const services = maybeGetCodexWorkspaceServices(plugin);
+  if (!services) {
+    throw new Error('Provider workspace "codex" is not initialized.');
+  }
+  return services;
 }
 
-export function getCodexWorkspaceServices(): CodexWorkspaceServices {
-  return ProviderWorkspaceRegistry.requireServices('codex') as CodexWorkspaceServices;
+export function maybeGetCodexWorkspaceServices(
+  plugin: GrimoirePlugin,
+): CodexWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('codex') as CodexWorkspaceServices | null ?? null;
 }
+

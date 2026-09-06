@@ -1,5 +1,6 @@
 import { addIcon, setTooltip } from 'obsidian';
 
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { TOOL_SUBAGENT } from '@/core/tools/toolNames';
 import { VIEW_TYPE_GRIMOIRE } from '@/core/types';
 import { setLocale } from '@/i18n/i18n';
@@ -16,6 +17,7 @@ jest.mock('@/shared/modals/WhatsNewModal', () => ({
 
 // Now import the plugin after mocking
 import GrimoirePlugin from '@/main';
+import { builtInWorkspaceInitializers } from '@/providers';
 
 describe('GrimoirePlugin', () => {
   let plugin: GrimoirePlugin;
@@ -251,6 +253,171 @@ describe('GrimoirePlugin', () => {
       expect(getRegisteredCommand('switch-to-tab-3').name).toBe('Перейти на вкладку 3');
     });
 
+  });
+
+  describe('creating a conversation', () => {
+    /**
+     * A vault that remembers what was written to it.
+     *
+     * The shared mock adapter answers `exists: false` and `read: ''`, which is
+     * fine for tests that only watch calls but makes every stored conversation
+     * invisible — and a collision with a conversation the vault holds is
+     * exactly what this group is about.
+     */
+    function useRememberingVault(): Map<string, string> {
+      const files = new Map<string, string>();
+      // Folders exist when something is stored under them, which is what the
+      // recursive listing checks before it descends.
+      mockApp.vault.adapter.exists.mockImplementation(async (path: string) => (
+        files.has(path) || [...files.keys()].some(stored => stored.startsWith(`${path}/`))
+      ));
+      mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
+        const stored = files.get(path);
+        if (stored === undefined) {
+          throw new Error(`File not found: ${path}`);
+        }
+        return stored;
+      });
+      mockApp.vault.adapter.write.mockImplementation(async (path: string, content: string) => {
+        files.set(path, content);
+      });
+      mockApp.vault.adapter.remove.mockImplementation(async (path: string) => {
+        files.delete(path);
+      });
+      mockApp.vault.adapter.list.mockImplementation(async (folder: string) => ({
+        files: [...files.keys()].filter(path => path.startsWith(`${folder}/`)),
+        folders: [],
+      }));
+      mockApp.vault.adapter.rename.mockImplementation(async (from: string, to: string) => {
+        const stored = files.get(from);
+        if (stored !== undefined) {
+          files.set(to, stored);
+          files.delete(from);
+        }
+      });
+      return files;
+    }
+
+    it('comes back from the vault after a reload, with what was written to it', async () => {
+      // The assertion nothing had: a conversation read back through the file
+      // listing. Since M4 the file holds a versioned envelope, and a reader
+      // that parses it directly gets `{ schemaVersion, recordId, revision,
+      // updatedAt, payload }` — which passed the shape guard, so every
+      // conversation came back with no id, no title and no messages.
+      useRememberingVault();
+      await plugin.onload();
+      const created = await plugin.createConversation({ providerId: 'claude' });
+      await plugin.renameConversation(created.id, 'Tomatoes');
+
+      const reloaded = new GrimoirePlugin(mockApp, mockManifest);
+      await reloaded.onload();
+
+      const conversation = await reloaded.getConversationById(created.id);
+      expect(conversation).toMatchObject({
+        id: created.id,
+        providerId: 'claude',
+        title: 'Tomatoes',
+      });
+      reloaded.onunload();
+    });
+
+    it('reports a conversation the vault holds and this build cannot read', async () => {
+      // The alternative was silence: a damaged record was skipped by the
+      // listing, so the file stayed on disk and the chat simply vanished —
+      // indistinguishable from one the user deleted.
+      const files = useRememberingVault();
+      files.set('.grimoire/sessions/conv-broken.meta.json', '{"schemaVersion":1,');
+      files.set(
+        '.grimoire/sessions/conv-future.meta.json',
+        JSON.stringify({
+          schemaVersion: 99,
+          recordId: 'conv-future',
+          revision: 1,
+          updatedAt: 1,
+          payload: { id: 'conv-future', title: 'Later', createdAt: 1, updatedAt: 1 },
+        }),
+      );
+
+      await plugin.onload();
+
+      expect([...plugin.getUnreadableConversations()].sort(
+        (left, right) => left.id.localeCompare(right.id),
+      )).toEqual([
+        { id: 'conv-broken', reason: 'corrupt' },
+        { id: 'conv-future', reason: 'future' },
+      ]);
+      // And neither becomes a placeholder row in the conversation list.
+      expect(plugin.getConversationList()).toEqual([]);
+    });
+
+    it('does not create over a conversation the vault already holds', async () => {
+      useRememberingVault();
+      // A conversation is keyed by the provider session id it was created
+      // from. When that id already names a chat, the new one used to be
+      // written straight over it: empty message list, default title, fresh
+      // timestamps.
+      await plugin.onload();
+      const existing = await plugin.createConversation({ sessionId: 'session-1' });
+      await plugin.updateConversation(existing.id, { title: 'Tomatoes' });
+
+      const created = await plugin.createConversation({ sessionId: 'session-1' });
+
+      expect(created.id).not.toBe(existing.id);
+      // The session is still recorded, so resuming the provider still works.
+      expect(created.sessionId).toBe('session-1');
+      expect((await plugin.getConversationById(existing.id))?.title).toBe('Tomatoes');
+    });
+  });
+
+  describe('provider workspaces', () => {
+    it('loads every other provider when one workspace initializer throws', async () => {
+      // Startup used to await each provider's initializer in one loop with no
+      // `try`, so a single throw cost every provider after it in the iteration
+      // order its command catalog, model list, CLI resolution and settings tab
+      // — and which ones those were depended on object key order.
+      // Failed through the providers' own initializer table, which is where the
+      // builder is looked up now — the registration this used to spy on held
+      // nothing else and is deleted.
+      const real = builtInWorkspaceInitializers.claude;
+      const restore = () => {
+        (builtInWorkspaceInitializers as Record<string, unknown>).claude = real;
+      };
+      (builtInWorkspaceInitializers as Record<string, unknown>).claude = () => (
+        Promise.reject(new Error('no Claude CLI on this machine'))
+      );
+      try {
+
+        await plugin.onload();
+      } finally {
+        restore();
+      }
+
+      const withoutServices = providerCatalog().ids()
+        .filter(providerId => (
+          plugin.getApplicationRuntimeOrNull()?.workspaceServicesFor(providerId) ?? null
+        ) === null);
+
+      expect(withoutServices).toEqual(['claude']);
+    });
+
+    it('withdraws every workspace at unload', async () => {
+      // The services map is static and used to outlive the plugin instance that
+      // filled it, so the next load read the previous load's services until its
+      // own initializer overwrote them.
+      await plugin.onload();
+      expect(plugin.getApplicationRuntimeOrNull()?.workspaceServicesFor('codex') ?? null).not.toBeNull();
+
+      plugin.onunload();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const stillPublished = providerCatalog().ids()
+        .filter(providerId => (
+          plugin.getApplicationRuntimeOrNull()?.workspaceServicesFor(providerId) ?? null
+        ) !== null);
+
+      expect(stillPublished).toEqual([]);
+    });
   });
 
   describe('onunload', () => {
@@ -523,14 +690,19 @@ describe('GrimoirePlugin', () => {
         providerId: 'claude',
         sessionId: 'session-123',
       });
-      const saveMetadataSpy = jest.spyOn(plugin.storage.sessions, 'saveMetadata');
-      saveMetadataSpy.mockClear();
+      const updateSpy = jest.spyOn(plugin.storage.sessions, 'updateMetadata');
+      updateSpy.mockClear();
 
       await plugin.applyEnvironmentVariables('provider:claude', 'ANTHROPIC_MODEL=claude-sonnet-4-5');
 
       const updated = await plugin.getConversationById(conv.id);
       expect(updated?.sessionId).toBeNull();
-      expect(saveMetadataSpy).toHaveBeenCalled();
+      // Only what the invalidation cleared. Writing the whole conversation here
+      // would take a message appended in another window with it.
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ id: conv.id }),
+        ['sessionId', 'providerState'],
+      );
     });
 
     it('broadcasts ensureReady with force when env changes without model change', async () => {
@@ -562,7 +734,12 @@ describe('GrimoirePlugin', () => {
       // Change env but not in a way that affects model
       await plugin.applyEnvironmentVariables('shared', 'SOME_VAR=value');
 
-      expect(mockSyncConversationState).toHaveBeenCalledWith(null, []);
+      expect(mockSyncConversationState).toHaveBeenCalledWith(null);
+      // `force` is read now: the adapter took no options at all, so a method
+      // with fewer parameters satisfied one with more and this option was
+      // dropped for every flipped provider. It re-establishes the session,
+      // which is what an environment change means for a tab that already has
+      // one opened against the old environment.
       expect(mockEnsureReady).toHaveBeenCalledWith({ force: true });
     });
 
@@ -610,9 +787,13 @@ describe('GrimoirePlugin', () => {
 
       await plugin.applyEnvironmentVariables('provider:claude', 'ANTHROPIC_MODEL=claude-sonnet-4-5');
 
+      // The live paths are no longer passed here and were never received: the
+      // adapter's `syncConversationState` takes only the conversation. They
+      // reach the turn from the same selector this used to read — the input
+      // controller asks it when a turn is built — so what moved is where the
+      // question is asked, not whether it is.
       expect(mockSyncConversationState).toHaveBeenCalledWith(
         expect.objectContaining({ id: conversation.id }),
-        ['/live/context'],
       );
       expect(mockResetSession).toHaveBeenCalledTimes(1);
       expect(mockEnsureReady).toHaveBeenCalledWith();
@@ -820,6 +1001,113 @@ describe('GrimoirePlugin', () => {
       const command = getRegisteredCommand('new-tab');
 
       expect(command.checkCallback(true)).toBe(false);
+    });
+  });
+
+  describe('what a conversation write actually writes', () => {
+    /**
+     * The seam neither half proves alone.
+     *
+     * `SessionStorage` composes two writers correctly and has its own tests for
+     * it; the plugin decides **what to tell it changed**. Reverting the plugin's
+     * half leaves both of those suites green — the whole conversation would go
+     * back to being written on every save, and only an assertion here would
+     * notice.
+     */
+    it('renames a conversation by writing the title and nothing else', async () => {
+      await plugin.onload();
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+      const update = jest.spyOn(plugin.storage.sessions, 'updateMetadata');
+      const save = jest.spyOn(plugin.storage.sessions, 'saveMetadata');
+
+      await plugin.renameConversation(conv.id, 'About tomatoes');
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ id: conv.id, title: 'About tomatoes' }),
+        ['title'],
+      );
+      // A rename that wrote the whole conversation put back whatever this
+      // window was holding — which mid-stream is the messages from before it.
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('updates a conversation by writing only the fields the caller set', async () => {
+      await plugin.onload();
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+      const update = jest.spyOn(plugin.storage.sessions, 'updateMetadata');
+      const save = jest.spyOn(plugin.storage.sessions, 'saveMetadata');
+
+      await plugin.updateConversation(conv.id, { titleGenerationStatus: 'success' });
+
+      // The callers already speak in deltas — a status, a model, the stream's
+      // message list — and this is where that used to be thrown away.
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ id: conv.id }),
+        ['titleGenerationStatus'],
+      );
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('carries every field an update did set, and nothing it did not', async () => {
+      await plugin.onload();
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+      const update = jest.spyOn(plugin.storage.sessions, 'updateMetadata');
+
+      await plugin.updateConversation(conv.id, {
+        messages: [],
+        model: 'claude-sonnet-4-5',
+        // Immutable, and stripped before the write reaches storage.
+        providerId: 'codex',
+      });
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ id: conv.id }),
+        ['model', 'messages'],
+      );
+    });
+
+    it('creates a conversation as a conversation the vault does not have', async () => {
+      await plugin.onload();
+      const create = jest.spyOn(plugin.storage.sessions, 'createMetadata');
+
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ id: conv.id }));
+    });
+  });
+
+  describe('what happened when a conversation was opened', () => {
+    it('reports what the provider said about its history', async () => {
+      await plugin.onload();
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+      // Spied on the workspace port the plugin now asks, which is the seam
+      // that carries the outcome to the surface.
+      const transcripts = (
+        await plugin.getApplicationRuntimeOrNull()?.workspaceFor('claude')
+      )?.transcripts;
+      const hydrate = jest.spyOn(transcripts!, 'hydrate')
+        .mockResolvedValue({ outcome: 'stale', reason: 'sessionsNotFound' });
+
+      await plugin.getConversationById(conv.id);
+
+      // The surface reads this to say why a transcript is short. Before it, the
+      // provider knew and nobody carried it, so an unloadable conversation
+      // looked exactly like an empty one.
+      expect(plugin.getHistoryHydration(conv.id)).toEqual({
+        outcome: 'stale',
+        reason: 'sessionsNotFound',
+      });
+      hydrate.mockRestore();
+    });
+
+    it('forgets what it found when the conversation is deleted', async () => {
+      await plugin.onload();
+      const conv = await plugin.createConversation({ providerId: 'claude' });
+      await plugin.getConversationById(conv.id);
+
+      await plugin.deleteConversation(conv.id);
+
+      expect(plugin.getHistoryHydration(conv.id)).toBeUndefined();
     });
   });
 
@@ -1205,11 +1493,19 @@ describe('GrimoirePlugin', () => {
       const loaded = await plugin.getConversationById('conv-saved-1');
       expect(loaded?.sessionId).toBeNull();
 
+      // Session metadata is replaced rather than overwritten: the content goes
+      // to a file beside the destination, which is then renamed over it, so a
+      // write torn by a crash leaves the previous transcript intact.
       const sessionWrite = (mockApp.vault.adapter.write as jest.Mock).mock.calls.find(
-        ([path]) => path === '.grimoire/sessions/conv-saved-1.meta.json'
+        ([path]) => path === '.grimoire/sessions/conv-saved-1.meta.json.pending'
       );
       expect(sessionWrite).toBeDefined();
-      const meta = JSON.parse(sessionWrite?.[1] as string);
+      expect(mockApp.vault.adapter.rename).toHaveBeenCalledWith(
+        '.grimoire/sessions/conv-saved-1.meta.json.pending',
+        '.grimoire/sessions/conv-saved-1.meta.json',
+      );
+      // The conversation travels inside a record envelope now, in the same file.
+      const meta = JSON.parse(sessionWrite?.[1] as string).payload;
       expect(meta.sessionId).toBeNull();
     });
 

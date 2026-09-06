@@ -120,7 +120,7 @@ export function renderQueueIndicator(options: QueueIndicatorOptions): void {
     if (pendingSteerMessage) {
       containerEl.createSpan({
         cls: 'grimoire-queue-indicator-text',
-        text: `⌙ Steering: ${getQueuedMessageDisplay(pendingSteerMessage)}`,
+        text: `⌙ ${t('chat.ui.messages.steeringPrefix')}: ${getQueuedMessageDisplay(pendingSteerMessage)}`,
       });
       show(containerEl);
       return;
@@ -139,7 +139,7 @@ export function renderQueueIndicator(options: QueueIndicatorOptions): void {
   if (pendingSteerMessage) {
     containerEl.createSpan({
       cls: 'grimoire-queue-indicator-text',
-      text: `⌙ Steering: ${getQueuedMessageDisplay(pendingSteerMessage)}`,
+      text: `⌙ ${t('chat.ui.messages.steeringPrefix')}: ${getQueuedMessageDisplay(pendingSteerMessage)}`,
     });
   }
 
@@ -171,7 +171,7 @@ export function renderQueueIndicator(options: QueueIndicatorOptions): void {
       cls: 'grimoire-queue-indicator-text',
       text: needsHeader
         ? getQueuedMessageDisplay(message)
-        : `⌙ Queued: ${getQueuedMessageDisplay(message)}`,
+        : `⌙ ${t('chat.ui.messages.queuedPrefix')}: ${getQueuedMessageDisplay(message)}`,
     });
 
     const actionsEl = itemEl.createDiv({ cls: 'grimoire-queue-indicator-actions' });

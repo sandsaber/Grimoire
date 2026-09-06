@@ -1,6 +1,8 @@
 import { Notice } from 'obsidian';
 import * as path from 'path';
 
+import { asActivatable } from '@/shared/components/activatable';
+
 import type { AttachmentStore } from '../../../core/attachments/AttachmentStore';
 import { prepareImageForStore } from '../../../core/attachments/prepareImage';
 import type { ImageAttachment, ImageMediaType } from '../../../core/types';
@@ -387,8 +389,9 @@ export class ImageContextManager {
       this.callbacks.onImagesChanged();
     });
 
-    thumbEl.addEventListener('click', () => {
-      this.showFullImage(image);
+    asActivatable(thumbEl, {
+      label: t('chat.ui.messages.viewFullImage'),
+      onActivate: () => this.showFullImage(image),
     });
   }
 

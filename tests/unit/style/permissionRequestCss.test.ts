@@ -15,7 +15,7 @@ describe('permission request CSS', () => {
     const row = getRule(css, '.grimoire-permission-actions > button.grimoire-permission-button');
     expect(row).toContain('height: 34px');
     expect(row).toContain('border: 0');
-    expect(row).toContain('border-radius: 4px');
+    expect(row).toContain('border-radius: var(--grimoire-radius-1)');
     expect(row).toContain('background-color: transparent');
     expect(row).toContain('box-shadow: none');
   });
@@ -25,9 +25,9 @@ describe('permission request CSS', () => {
     expect(card).toContain('border-radius: var(--grimoire-radius-3)');
     expect(card).toContain('var(--grimoire-brand) 2%');
     expect(getRule(css, '.grimoire-permission-request::before'))
-      .toContain('var(--grimoire-brand)');
+      .toContain('var(--grimoire-accent-line-strong)');
     expect(getRule(css, '.grimoire-permission-shield')).toContain('var(--grimoire-accent-soft)');
-    expect(getRule(css, '.grimoire-permission-tool')).toContain('border-radius: 999px');
+    expect(getRule(css, '.grimoire-permission-tool')).toContain('border-radius: var(--grimoire-radius-pill)');
     const target = getRule(css, '.grimoire-permission-target');
     expect(target).toContain('background: var(--grimoire-sink)');
     expect(target).toContain('box-shadow: inset 2px 0 0 var(--grimoire-accent-line)');

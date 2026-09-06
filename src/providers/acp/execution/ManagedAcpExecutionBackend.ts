@@ -1,0 +1,1633 @@
+/**
+ * The execution backend every managed-ACP provider runs on.
+ *
+ * Built for OpenCode's flip and named for it until this commit, when Grok's
+ * wire recording showed how little of it was ever OpenCode's: three lines, of
+ * which two were the descriptor. Everything else here is the protocol — the
+ * client's lifetime, the session binding and its reload, the dispatch, the
+ * recovery, the interactions and the result — and every provider-specific
+ * decision arrives through a port.
+ *
+ * What a provider still owns is its launch, its permission vocabulary, its tool
+ * normalization and what it does with the content this carries.
+ */
+import type { ExecutionBackendDescriptor } from '@/core/execution/ExecutionBackendDescriptor';
+import type {
+  ExecutionBackend,
+  ExecutionRecoveryPort,
+  ExecutionRequest,
+  ExecutionRun,
+  ExecutionSession,
+  ExecutionSessionConfig,
+  ExecutionSessionSnapshot,
+  InteractionPort,
+  InteractionRequest,
+  InteractionResolution,
+  RunRecoveryEvidence,
+  RunRecoveryQuery,
+  RunTerminalKind,
+  RunTerminalReason,
+  Unsubscribe,
+} from '@/core/execution/ExecutionContracts';
+import { ExecutionDispatchError } from '@/core/execution/ExecutionContracts';
+import { ExecutionEventQueue } from '@/core/execution/ExecutionEventQueue';
+import type {
+  ExecutionEvent,
+  ProviderExecutionEvent,
+} from '@/core/execution/ExecutionEvents';
+import type { InteractionId, SessionInstanceId } from '@/core/execution/ExecutionIds';
+import {
+  type ResultCommitOutcome,
+  type ResultCommitScheduler,
+  settleResultCommit,
+} from '@/core/execution/ResultCommit';
+import { JsonRpcErrorResponse } from '@/providers/acp/AcpJsonRpcTransport';
+import {
+  type AcpSessionGoneProbe,
+  isAcpSessionGone,
+} from '@/providers/acp/acpSessionResume';
+import { AcpSpawnError } from '@/providers/acp/AcpSpawnError';
+import type {
+  AcpContentPayload,
+  AcpTurnRefusalOrigin,
+} from '@/providers/acp/execution/AcpContentPayload';
+import type {
+  ManagedAcpClient,
+  ManagedAcpClientFactory,
+} from '@/providers/acp/execution/ManagedAcpClient';
+import { ManagedAcpTerminationUnconfirmedError } from '@/providers/acp/execution/ManagedAcpClient';
+import type {
+  AcpContentBlock,
+  AcpNewSessionRequest,
+  AcpNewSessionResponse,
+  AcpPromptResponse,
+  AcpRequestPermissionRequest,
+  AcpRequestPermissionResponse,
+  AcpSessionConfigOption,
+  AcpSessionModeState,
+  AcpSessionNotification,
+} from '@/providers/acp/types';
+
+export interface ManagedAcpExecutionInvocation {
+  readonly startupRef: string;
+  readonly restartFingerprint: string;
+  readonly cwd: string;
+  readonly prompt: readonly AcpContentBlock[];
+  readonly mcpServers: AcpNewSessionRequest['mcpServers'];
+  readonly messageId?: string;
+  readonly dynamicRef?: string;
+}
+
+export interface ManagedAcpExecutionRequestResolver {
+  resolve(requestRef: string): Promise<ManagedAcpExecutionInvocation>;
+}
+
+export interface ManagedAcpExecutionDynamicApplier {
+  apply(input: {
+    readonly client: ManagedAcpClient;
+    readonly sessionId: string;
+    readonly dynamicRef?: string;
+    readonly signal: AbortSignal;
+    /**
+     * What the session answered with when it opened, where this dispatch
+     * opened one.
+     *
+     * A turn is composed before its session exists, so a setting whose id the
+     * session names — the thinking level — cannot be resolved when the turn is
+     * queued. This is the only moment both are known.
+     */
+    readonly sessionConfigOptions?: readonly AcpSessionConfigOption[];
+    /**
+     * The modes the session named, where it named any.
+     *
+     * Beside the config options for the same reason: a turn is composed in the
+     * vault's own vocabulary, and only an id the live session offered may be
+     * sent back to it. This is the one moment both are known.
+     */
+    readonly sessionModes?: AcpSessionModeState;
+    /**
+     * The turn's own content channel, for what configuring the session made the
+     * user's request untrue.
+     *
+     * Gemini is why it exists: it advertises four modes and refuses the
+     * privileged two in a folder it has not been told to trust, so a turn can
+     * run under a permission the toolbar does not show. The refusal is not a
+     * failed turn and must not be one — it is something the person has to be
+     * told, on the turn it happened to.
+     */
+    readonly presentContent?: (payload: unknown) => void;
+  }): Promise<void>;
+}
+
+export interface ManagedAcpPreparedInteraction {
+  readonly kind: InteractionRequest['kind'];
+  readonly presentationRef: string;
+  readonly responseIds: readonly string[];
+  readonly providerResolvedResponseId: string;
+  /**
+   * The option that was chosen, and what was answered where choosing was not the
+   * whole answer.
+   *
+   * `payload` is opaque and arrives from the resolution the surface sent. An
+   * approval never has one; a question does, because ACP's own reply carries
+   * structured answers beside the option id.
+   */
+  resolve(responseId: string, payload?: unknown): Promise<AcpRequestPermissionResponse>;
+  cancel(): Promise<AcpRequestPermissionResponse>;
+}
+
+export interface ManagedAcpInteractionBridge {
+  prepare(request: AcpRequestPermissionRequest): Promise<ManagedAcpPreparedInteraction>;
+}
+
+export interface ManagedAcpExecutionResultSink {
+  storeResult(input: {
+    readonly output: string;
+    readonly nativeSessionRef: string;
+    readonly nativeRunRef?: string;
+    readonly signal: AbortSignal;
+  }): Promise<ResultCommitOutcome>;
+  /**
+   * The turn is ending; this is the provider's last look at it.
+   *
+   * Called when the prompt returns, whatever the stop reason, and before any
+   * terminal — so what it finds reaches the turn that earned it rather than the
+   * next one. Two things need it, both Grok's: no Grok turn reports a context
+   * window over ACP at all, and a cancelled turn still spent tokens whose cost
+   * is only in the session log. Hanging it off `storeResult` would lose exactly
+   * the cancelled ones, since nothing is committed for those.
+   */
+  noteTurnEnded?(input: {
+    readonly nativeSessionRef: string;
+    readonly nativeRunRef?: string;
+    readonly presentContent: (payload: unknown) => void;
+    /**
+     * The connection this turn ran on, for a provider that has to ask.
+     *
+     * Qwen is why: its context window is a method ACP does not define, so the
+     * only way to learn it is a `vendorRequest` on the live session. Handed over
+     * here rather than kept by the composition, because a backend holds **one
+     * client per execution session** and a composition serves every tab — a
+     * single remembered client is whichever one connected last, which would ask
+     * the wrong agent about a session it does not have.
+     */
+    readonly client: ManagedAcpClient;
+  }): Promise<void>;
+  /**
+   * The answer a turn produced without sending it, where the provider can find
+   * one.
+   *
+   * Grok finishes turns whose final message never reaches ACP while writing the
+   * answer to its own session log; before the legacy runtime read that back, it
+   * surfaced as an empty answer or as a credentials error. Asked only when the
+   * turn produced no output at all, so a provider that has nothing to recover
+   * declines by not declaring it.
+   */
+  recoverOutput?(input: {
+    readonly nativeSessionRef: string;
+    readonly nativeRunRef?: string;
+  }): Promise<string | null>;
+}
+
+export interface ManagedAcpClientObserver {
+  onClientReady(client: ManagedAcpClient): void;
+  onClientLost(): void;
+}
+
+/** What a caller can say about an auxiliary turn beyond which request it is. */
+export interface ManagedAcpAuxiliaryQueryOptions {
+  /** The caller's own cancellation — a closed dialog, a superseded title. */
+  readonly signal?: AbortSignal;
+  /** The answer so far, for a caller that renders one as it arrives. */
+  readonly onText?: (accumulated: string) => void;
+}
+
+export interface ManagedAcpAuxiliaryPort {
+  execute(
+    requestRef: string,
+    signal: AbortSignal,
+    onText?: (accumulated: string) => void,
+  ): Promise<string>;
+  /**
+   * Ends one auxiliary conversation, keeping the others.
+   *
+   * `AuxQueryRunner.reset()`, from the other side. Optional because a provider
+   * whose auxiliary work is cold — Claude's SDK query is — has nothing to end.
+   */
+  release?(retentionKey: string): Promise<void>;
+  /** Closes every auxiliary process this port kept. Called when the backend disposes. */
+  dispose?(): Promise<void>;
+}
+
+export type ManagedAcpExecutionScheduler = ResultCommitScheduler;
+
+export interface ManagedAcpExecutionBackendContext {
+  /**
+   * Which provider this backend is, which is the only thing about it that is
+   * not the protocol. Everything else in this file is ACP.
+   */
+  readonly descriptor: ExecutionBackendDescriptor;
+  readonly clientFactory: ManagedAcpClientFactory;
+  /**
+   * The live process, for the provider features that are not turns.
+   *
+   * Grok reads its account's billing over the same transport a turn runs on,
+   * and the composition that answers the plan indicator owns neither the
+   * process nor its lifetime. Reported after `initialize`, because a client
+   * that has not handshaken answers nothing — and withdrawn when the client
+   * goes, so a feature cannot keep asking a process that is gone.
+   */
+  readonly clientObserver?: ManagedAcpClientObserver;
+  readonly requestResolver: ManagedAcpExecutionRequestResolver;
+  readonly dynamicApplier: ManagedAcpExecutionDynamicApplier;
+  readonly interactionBridge: ManagedAcpInteractionBridge;
+  readonly resultSink: ManagedAcpExecutionResultSink;
+  readonly reconciler: ExecutionRecoveryPort;
+  readonly auxiliaryQueries: ManagedAcpAuxiliaryPort;
+  readonly scheduler: ManagedAcpExecutionScheduler;
+  readonly sessionInstanceIdFactory: () => SessionInstanceId;
+  readonly interactionIdFactory: () => InteractionId;
+  readonly now?: () => number;
+  readonly controlTimeoutMs?: number;
+  readonly resultCommitTimeoutMs: number;
+  readonly recoveryTimeoutMs: number;
+  readonly runTimeoutMs: number;
+  readonly maxResultBytes: number;
+  /**
+   * Whether a failed `session/load` means the saved session is gone.
+   *
+   * Takes the whole probe rather than the error alone, and may answer
+   * asynchronously, because the answer is not always in the text: the shared
+   * default asks the agent through `session/list` when its words say nothing.
+   * A provider overrides this only to add what its own CLI says — Grok names a
+   * missing session `FS_NOT_FOUND` — and should still defer to the default for
+   * everything else.
+   */
+  readonly isMissingSessionError?: (
+    probe: AcpSessionGoneProbe,
+  ) => boolean | Promise<boolean>;
+}
+
+interface PendingInteraction {
+  readonly interactionId: InteractionId;
+  readonly run: ManagedAcpExecutionRun;
+  readonly prepared: ManagedAcpPreparedInteraction;
+  readonly complete: (response: AcpRequestPermissionResponse) => void;
+  selectedResponseId?: string;
+  settlementTask?: Promise<void>;
+  settled: boolean;
+}
+
+export class ManagedAcpExecutionBackend
+implements ExecutionBackend, InteractionPort, ExecutionRecoveryPort {
+  readonly descriptor: ExecutionBackendDescriptor;
+  private readonly sessions = new Map<string, ManagedAcpExecutionSession>();
+  private readonly interactions = new Map<InteractionId, PendingInteraction>();
+  private readonly settledInteractions = new Map<InteractionId, string>();
+  private readonly auxiliaryControllers = new Set<AbortController>();
+  private readonly auxiliaryTasks = new Set<Promise<string>>();
+  private disposeTask?: Promise<void>;
+  private disposing = false;
+
+  constructor(protected readonly context: ManagedAcpExecutionBackendContext) {
+    this.descriptor = context.descriptor;
+  }
+
+  async createSession(config: ExecutionSessionConfig): Promise<ExecutionSession> {
+    if (this.disposing) {
+      throw new Error('Managed ACP backend is disposing.');
+    }
+    const key = String(config.executionSessionId);
+    if (this.sessions.has(key)) {
+      throw new Error('Managed ACP execution session already exists.');
+    }
+    let session: ManagedAcpExecutionSession;
+    session = new ManagedAcpExecutionSession(
+      config,
+      this.context,
+      request => this.requestPermission(request, session.activeExecutionRun),
+      run => this.cancelRunInteractions(run),
+      () => this.sessions.delete(key),
+    );
+    this.sessions.set(key, session);
+    return session;
+  }
+
+  async resolve(resolution: InteractionResolution): Promise<void> {
+    const pending = this.interactions.get(resolution.interactionId);
+    if (!pending) {
+      const settled = this.settledInteractions.get(resolution.interactionId);
+      if (settled === resolution.responseId) return;
+      if (settled) throw new Error('Managed ACP interaction already resolved differently.');
+      throw new Error('Managed ACP interaction is not pending.');
+    }
+    if (!pending.prepared.responseIds.includes(resolution.responseId)) {
+      throw new Error('Managed ACP interaction response is not allowed.');
+    }
+    await this.settlePendingInteraction(
+      pending,
+      resolution.responseId,
+      () => pending.prepared.resolve(resolution.responseId, resolution.payload),
+    );
+  }
+
+  async cancel(interactionId: InteractionId): Promise<void> {
+    const pending = this.interactions.get(interactionId);
+    if (!pending || pending.settled) return;
+    await this.settlePendingInteraction(
+      pending,
+      pending.prepared.providerResolvedResponseId,
+      () => pending.prepared.cancel(),
+    );
+  }
+
+  async reconcile(query: RunRecoveryQuery): Promise<RunRecoveryEvidence> {
+    if (query.backendId !== this.descriptor.backendId) {
+      return { kind: 'unknown', effectsPossible: false };
+    }
+    const session = this.sessions.get(String(query.executionSessionId));
+    const active = session?.activeExecutionRun;
+    if (active?.runId === query.runId && session?.isAttached(active)) {
+      return { kind: 'running', sessionInstanceId: session.sessionInstanceId };
+    }
+    return this.context.reconciler.reconcile(query);
+  }
+
+  async runAuxiliaryQuery(
+    requestRef: string,
+    options?: ManagedAcpAuxiliaryQueryOptions,
+  ): Promise<string> {
+    if (this.disposing) throw new Error('Managed ACP backend is disposing.');
+    const controller = new AbortController();
+    this.auxiliaryControllers.add(controller);
+    // The caller's cancel and the backend's shutdown both end this turn, and
+    // the query is given one signal: a dialog the user closed must stop the
+    // work, not only stop waiting for it.
+    const forwardAbort = () => controller.abort(options?.signal?.reason);
+    options?.signal?.addEventListener('abort', forwardAbort, { once: true });
+    if (options?.signal?.aborted) forwardAbort();
+    const task = Promise.resolve().then(
+      () => this.context.auxiliaryQueries.execute(requestRef, controller.signal, options?.onText),
+    );
+    this.auxiliaryTasks.add(task);
+    try {
+      return await task;
+    } finally {
+      options?.signal?.removeEventListener('abort', forwardAbort);
+      this.auxiliaryControllers.delete(controller);
+      this.auxiliaryTasks.delete(task);
+    }
+  }
+
+  /**
+   * Ends one auxiliary conversation, which is what `AuxQueryRunner.reset()` is.
+   *
+   * Not a disposal: the other auxiliary conversations and every chat session on
+   * this backend keep running. A port with nothing retained — a provider whose
+   * auxiliary work is cold — has nothing to do here.
+   */
+  async releaseAuxiliaryConversation(retentionKey: string): Promise<void> {
+    await this.context.auxiliaryQueries.release?.(retentionKey);
+  }
+
+  dispose(): Promise<void> {
+    if (this.disposeTask) return this.disposeTask;
+    this.disposing = true;
+    for (const controller of this.auxiliaryControllers) {
+      controller.abort(new Error('Managed ACP backend disposed.'));
+    }
+    this.disposeTask = (async () => {
+      const sessionResults = await Promise.allSettled(
+        [...this.sessions.values()].map(session => session.dispose()),
+      );
+      const interactionResults = await Promise.allSettled(
+        [...this.interactions.keys()].map(interactionId => this.cancel(interactionId)),
+      );
+      await Promise.allSettled([...this.auxiliaryTasks]);
+      // After the tasks, because a query still running holds the process it is
+      // running on: closing underneath it would be the shutdown racing its own
+      // work. Kept in the lifecycle results, so an auxiliary process nobody
+      // could confirm dead fails the shutdown exactly as a chat one does.
+      const auxiliaryResults = this.context.auxiliaryQueries.dispose
+        ? await Promise.allSettled([this.context.auxiliaryQueries.dispose()])
+        : [];
+      const lifecycleResults = [...sessionResults, ...interactionResults, ...auxiliaryResults];
+      const terminationFailure = lifecycleResults.some(result => (
+        result.status === 'rejected'
+        && result.reason instanceof ManagedAcpTerminationUnconfirmedError
+      ));
+      const factoryTermination = this.context.clientFactory.dispose
+        ? await this.context.clientFactory.dispose()
+        : terminationFailure ? 'unconfirmed' : 'confirmed';
+      const failure = lifecycleResults
+        .find((result): result is PromiseRejectedResult => (
+          result.status === 'rejected'
+          && !(result.reason instanceof ManagedAcpTerminationUnconfirmedError)
+        ));
+      if (factoryTermination === 'unconfirmed') {
+        throw new ManagedAcpTerminationUnconfirmedError();
+      }
+      if (failure) throw toError(failure.reason);
+      this.sessions.clear();
+    })();
+    return this.disposeTask;
+  }
+
+  private async requestPermission(
+    request: AcpRequestPermissionRequest,
+    run: ManagedAcpExecutionRun | undefined,
+  ): Promise<AcpRequestPermissionResponse> {
+    if (!run || run.isTerminal || request.sessionId !== run.nativeSessionRef) {
+      return { outcome: { outcome: 'cancelled' } };
+    }
+    const preparation = this.context.interactionBridge.prepare(request);
+    const prepared = await withTimeout(
+      preparation,
+      this.context.scheduler,
+      this.context.controlTimeoutMs ?? 2_000,
+    );
+    if (!prepared) {
+      void preparation
+        .then(latePrepared => this.discardPreparedInteraction(latePrepared), () => undefined)
+        .catch(() => undefined);
+      return { outcome: { outcome: 'cancelled' } };
+    }
+    validatePreparedInteraction(prepared);
+    if (run.isTerminal) {
+      return await withTimeout(
+        prepared.cancel(),
+        this.context.scheduler,
+        this.context.controlTimeoutMs ?? 2_000,
+      ) ?? { outcome: { outcome: 'cancelled' } };
+    }
+    const interactionId = this.context.interactionIdFactory();
+    return new Promise(resolve => {
+      const pending: PendingInteraction = {
+        interactionId,
+        run,
+        prepared,
+        complete: resolve,
+        settled: false,
+      };
+      this.interactions.set(interactionId, pending);
+      run.openInteraction(interactionId, prepared);
+    });
+  }
+
+  private async settlePendingInteraction(
+    pending: PendingInteraction,
+    responseId: string,
+    operation: () => Promise<AcpRequestPermissionResponse>,
+  ): Promise<void> {
+    if (pending.settlementTask) {
+      if (pending.selectedResponseId !== responseId) {
+        throw new Error('Managed ACP interaction is resolving another response.');
+      }
+    } else {
+      pending.selectedResponseId = responseId;
+      const task = operation().then(response => {
+        this.settleInteraction(pending, responseId, response);
+      });
+      pending.settlementTask = task;
+      void task.catch(() => {
+        if (!pending.settled && pending.settlementTask === task) {
+          pending.settlementTask = undefined;
+          pending.selectedResponseId = undefined;
+        }
+      });
+    }
+    const completed = await withTimeout(
+      pending.settlementTask.then(() => true),
+      this.context.scheduler,
+      this.context.controlTimeoutMs ?? 2_000,
+    );
+    if (completed !== true) {
+      this.failCloseInteraction(pending);
+      throw new Error('Managed ACP interaction settlement was not confirmed.');
+    }
+  }
+
+  private settleInteraction(
+    pending: PendingInteraction,
+    responseId: string,
+    response: AcpRequestPermissionResponse,
+  ): void {
+    if (pending.settled) return;
+    pending.settled = true;
+    this.interactions.delete(pending.interactionId);
+    this.settledInteractions.set(pending.interactionId, responseId);
+    trimOldestMapEntries(this.settledInteractions, 1024);
+    pending.run.resolveInteraction(pending.interactionId, responseId);
+    pending.complete(response);
+  }
+
+  private failCloseInteraction(pending: PendingInteraction): void {
+    this.settleInteraction(
+      pending,
+      pending.prepared.providerResolvedResponseId,
+      { outcome: { outcome: 'cancelled' } },
+    );
+  }
+
+  private async discardPreparedInteraction(
+    prepared: ManagedAcpPreparedInteraction,
+  ): Promise<void> {
+    await withTimeout(
+      prepared.cancel(),
+      this.context.scheduler,
+      this.context.controlTimeoutMs ?? 2_000,
+    );
+  }
+
+  private cancelRunInteractions(run: ManagedAcpExecutionRun): void {
+    for (const pending of this.interactions.values()) {
+      if (pending.run !== run || pending.settled) continue;
+      void this.cancel(pending.interactionId).catch(() => this.failCloseInteraction(pending));
+    }
+  }
+}
+
+class ManagedAcpExecutionSession implements ExecutionSession {
+  readonly sessionInstanceId: SessionInstanceId;
+  private readonly listeners = new Set<(event: ProviderExecutionEvent) => void>();
+  private client?: ManagedAcpClient;
+  private clientAbort?: AbortController;
+  private clientCloseTask?: Promise<'confirmed' | 'unconfirmed'>;
+  private clientCreationTask?: Promise<ManagedAcpClient>;
+  private clientGeneration = 0;
+  private readonly retainedClients = new Set<ManagedAcpClient>();
+  private clientCloseUnsubscribe?: Unsubscribe;
+  private notificationUnsubscribe?: Unsubscribe;
+  private restartFingerprint?: string;
+  private loadedSessionRef?: string;
+  private nativeSessionRef?: string;
+  private disposed = false;
+  private disposeTask?: Promise<void>;
+  private deliverySequence = 0;
+  private activeRun?: ManagedAcpExecutionRun;
+
+  constructor(
+    private readonly config: ExecutionSessionConfig,
+    private readonly context: ManagedAcpExecutionBackendContext,
+    private readonly permissionHandler: (
+      request: AcpRequestPermissionRequest,
+    ) => Promise<AcpRequestPermissionResponse>,
+    private readonly cancelInteractions: (run: ManagedAcpExecutionRun) => void,
+    private readonly onDisposed: () => void,
+  ) {
+    this.sessionInstanceId = context.sessionInstanceIdFactory();
+    this.nativeSessionRef = config.nativeSessionRef;
+  }
+
+  get executionSessionId() {
+    return this.config.executionSessionId;
+  }
+
+  get backendGeneration(): number {
+    return this.config.backendGeneration;
+  }
+
+  get activeExecutionRun(): ManagedAcpExecutionRun | undefined {
+    return this.activeRun;
+  }
+
+  /** The connection this session is on, where it has one. */
+  get currentClient(): ManagedAcpClient | undefined {
+    return this.client;
+  }
+
+  createRun(request: ExecutionRequest): ExecutionRun {
+    const run = new ManagedAcpExecutionRun(
+      request,
+      this,
+      this.context,
+      this.cancelInteractions,
+      () => {
+        if (this.activeRun === run) this.activeRun = undefined;
+      },
+    );
+    if (this.disposed || this.activeRun) {
+      run.rejectBeforeDispatch();
+      return run;
+    }
+    this.activeRun = run;
+    void run.start();
+    return run;
+  }
+
+  getSnapshot(): ExecutionSessionSnapshot {
+    return {
+      executionSessionId: this.config.executionSessionId,
+      sessionInstanceId: this.sessionInstanceId,
+      ...(this.nativeSessionRef ? { nativeSessionRef: this.nativeSessionRef } : {}),
+    };
+  }
+
+  subscribe(listener: (event: ProviderExecutionEvent) => void): Unsubscribe {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  isAttached(run: ManagedAcpExecutionRun): boolean {
+    return this.activeRun === run && Boolean(this.client && this.nativeSessionRef);
+  }
+
+  async prepare(run: ManagedAcpExecutionRun, invocation: ManagedAcpExecutionInvocation): Promise<void> {
+    await this.ensureClient(invocation);
+    if (run.isTerminal) return;
+    const generation = this.clientGeneration;
+    const opened = await this.openSessionBinding(run, invocation, generation);
+    if (run.isTerminal || generation !== this.clientGeneration) return;
+    if (opened) run.presentSessionConfig(opened);
+    if (!this.client || !this.nativeSessionRef) {
+      throw new ExecutionDispatchError('Managed ACP session is not ready.', true);
+    }
+    const applied = await completesWithin(
+      this.context.dynamicApplier.apply({
+        client: this.client,
+        sessionId: this.nativeSessionRef,
+        dynamicRef: invocation.dynamicRef,
+        signal: this.clientAbort?.signal ?? new AbortController().signal,
+        presentContent: payload => run.presentProviderContent(payload),
+        ...(opened?.configOptions ? { sessionConfigOptions: opened.configOptions } : {}),
+        ...(opened?.modes ? { sessionModes: opened.modes } : {}),
+      }),
+      this.context.scheduler,
+      this.context.controlTimeoutMs ?? 2_000,
+    );
+    if (run.isTerminal || generation !== this.clientGeneration) return;
+    if (!applied) {
+      throw new ExecutionDispatchError('Managed ACP dynamic configuration timed out.', true);
+    }
+  }
+
+  dispatch(run: ManagedAcpExecutionRun, invocation: ManagedAcpExecutionInvocation): void {
+    const client = this.client;
+    const sessionId = this.nativeSessionRef;
+    if (!client || !sessionId || run.isTerminal) return;
+    const attempt = run.beginDispatch(sessionId, invocation.messageId);
+    if (attempt === 1) run.emitRunStarted();
+    // Handed to the run rather than only fired: a cancel has to be able to wait
+    // for the turn it cancelled to answer, and this promise is that answer.
+    run.notePrompt(client.prompt({
+      ...(invocation.messageId ? { messageId: invocation.messageId } : {}),
+      prompt: [...invocation.prompt],
+      sessionId,
+    }).then(
+      response => run.completeFromPrompt(response, attempt),
+      error => this.recover(run, invocation, error, attempt),
+    ));
+  }
+
+  requestCancel(run: ManagedAcpExecutionRun): void {
+    if (this.activeRun !== run || !this.client || !this.nativeSessionRef) return;
+    this.client.cancel(this.nativeSessionRef);
+  }
+
+  cancelPreparation(run: ManagedAcpExecutionRun): void {
+    if (this.activeRun !== run) return;
+    this.clientGeneration += 1;
+    this.clientAbort?.abort(new Error('Managed ACP run cancelled before dispatch.'));
+    void this.closeClient().catch(() => undefined);
+  }
+
+  async reconcileRun(run: ManagedAcpExecutionRun): Promise<RunRecoveryEvidence> {
+    const evidence = await withTimeout(
+      this.context.reconciler.reconcile(run.recoveryQuery()),
+      this.context.scheduler,
+      this.context.recoveryTimeoutMs,
+    );
+    return evidence ?? { kind: 'unknown', effectsPossible: true };
+  }
+
+  private async recover(
+    run: ManagedAcpExecutionRun,
+    invocation: ManagedAcpExecutionInvocation,
+    error: unknown,
+    attempt: number,
+  ): Promise<void> {
+    if (!run.claimRecovery(attempt)) return;
+    if (error instanceof JsonRpcErrorResponse) {
+      // **The agent answered.** Everything below this treats a failed prompt as
+      // a connection that died — close the process, launch another, send the
+      // same prompt again, and reconcile to `unknown` when that fails too. For a
+      // dropped pipe that is right. For a turn the provider *refused* it is
+      // three wrongs: the vendor's own words are discarded, the prompt is
+      // charged a second time, and the tab is told "Grimoire could not establish
+      // whether this run completed."
+      //
+      // A `JsonRpcErrorResponse` is the exact discriminator, not a heuristic:
+      // the transport constructs one only when the peer sent an error response,
+      // and every transport failure it raises is a plain `Error`. Found live on
+      // Gemini with `429 You have exhausted your daily quota on this model`,
+      // where the retry spent a second request against a quota already gone.
+      //
+      // The client is left open on purpose: an agent that refused a turn is an
+      // agent that is still there, and its session is still the conversation's.
+      run.failFromProviderRejection(error);
+      return;
+    }
+    if (!run.hasDispatched) {
+      // The connection died before this turn was ever sent. Reconciling would
+      // ask a provider what became of a run it never received, and the honest
+      // answer to that is not `indeterminate` — it is that nothing ran. The
+      // client is closed below by the same path, so the next turn launches a
+      // process rather than dispatching into a dead one.
+      await this.closeClient();
+      run.rejectBeforeDispatch();
+      return;
+    }
+    if (!run.sawObservableActivity && attempt === 1) {
+      try {
+        const termination = await this.closeClient();
+        if (termination === 'unconfirmed') {
+          throw new Error('Managed ACP retry process termination was not confirmed.');
+        }
+        await this.ensureClient(invocation, true);
+        const reopened = await this.ensureSessionBinding(
+          invocation,
+          this.clientGeneration,
+          undefined,
+          outcome => run.presentSessionResume(outcome),
+        );
+        // The reconnected session answers with its own configuration, and the
+        // tab that is still open would otherwise keep the dead one's.
+        if (reopened) run.presentSessionConfig(reopened);
+        await this.context.dynamicApplier.apply({
+          client: this.client!,
+          sessionId: this.nativeSessionRef!,
+          dynamicRef: invocation.dynamicRef,
+          signal: this.clientAbort!.signal,
+          presentContent: payload => run.presentProviderContent(payload),
+          ...(reopened?.configOptions ? { sessionConfigOptions: reopened.configOptions } : {}),
+          ...(reopened?.modes ? { sessionModes: reopened.modes } : {}),
+        });
+        run.releaseRecovery();
+        this.dispatch(run, invocation);
+        return;
+      } catch {
+        // Authoritative reconciliation below owns the terminal classification.
+      }
+    }
+    await this.closeClient();
+    run.emitConnectionLost();
+    const evidence = await this.reconcileRun(run);
+    run.finishFromRecovery(evidence);
+  }
+
+  private async ensureClient(
+    invocation: ManagedAcpExecutionInvocation,
+    force = false,
+  ): Promise<void> {
+    if (this.disposed) throw new ExecutionDispatchError('Managed ACP session disposed.', true);
+    if (!force && this.client && this.restartFingerprint === invocation.restartFingerprint) return;
+    const previousTermination = await this.closeClient();
+    if (previousTermination === 'unconfirmed') {
+      throw new ExecutionDispatchError('Managed ACP process ownership is unconfirmed.', true);
+    }
+    const abort = new AbortController();
+    this.clientAbort = abort;
+    const generation = ++this.clientGeneration;
+    const creation = this.context.clientFactory.create({
+      startupRef: invocation.startupRef,
+      signal: abort.signal,
+      requestPermission: this.permissionHandler,
+    });
+    this.clientCreationTask = creation;
+    let client: ManagedAcpClient;
+    try {
+      client = await creation;
+    } catch (error) {
+      if (this.clientAbort === abort) this.clientAbort = undefined;
+      throw error;
+    } finally {
+      if (this.clientCreationTask === creation) this.clientCreationTask = undefined;
+    }
+    if (this.disposed || generation !== this.clientGeneration) {
+      abort.abort();
+      try {
+        if (await client.close() === 'unconfirmed') this.retainedClients.add(client);
+      } catch {
+        this.retainedClients.add(client);
+      }
+      throw new ExecutionDispatchError('Managed ACP startup became stale.', true);
+    }
+    this.client = client;
+    this.restartFingerprint = invocation.restartFingerprint;
+    this.loadedSessionRef = undefined;
+    this.notificationUnsubscribe = client.onSessionNotification(notification => {
+      if (generation === this.clientGeneration) this.handleNotification(notification);
+    });
+    this.clientCloseUnsubscribe = client.onConnectionLost(error => {
+      if (generation !== this.clientGeneration) return;
+      const active = this.activeRun;
+      if (active && !active.isTerminal) {
+        void this.recover(active, active.invocation, error, active.currentAttempt);
+        return;
+      }
+      // Nothing is running, so there is no run to recover — but the client is
+      // dead, and the next turn would dispatch into a closed transport, fail
+      // `invalidated`, and leave the same dead client in place for the turn
+      // after that. The conversation stays wedged until a reload. Closing here
+      // is what makes the next turn launch a process instead. The legacy path
+      // had this; the migration dropped it.
+      void this.closeClient().catch(() => undefined);
+    });
+    const initialized = await completesWithin(
+      client.initialize(),
+      this.context.scheduler,
+      this.context.controlTimeoutMs ?? 2_000,
+    );
+    if (!initialized) {
+      await this.closeClient();
+      throw new ExecutionDispatchError('Managed ACP initialize timed out.', true);
+    }
+    this.context.clientObserver?.onClientReady(client);
+  }
+
+  /**
+   * Binds the session, and answers with what it reported when it opened.
+   *
+   * Returned rather than swallowed: the models, the modes and the config
+   * options a tab's selectors are built from are in this reply and in no
+   * notification afterwards. Nothing is returned when the session the client
+   * already holds is reused, because nothing new was said about it.
+   */
+  /**
+   * The session this turn needs, and what the agent said if it would not give
+   * one.
+   *
+   * A refused session refuses the turn as completely as a refused prompt, and
+   * the reason is usually the one that matters most: an agent nobody has
+   * authenticated says so here, where the classification alone can only guess
+   * that a saved session went missing. Presented and then rethrown — the
+   * terminal is still `pre-dispatch-rejected`, because nothing ran.
+   *
+   * **A failed `session/load` is covered too, but differently**, and the
+   * difference was found by running this against a CLI nobody had logged into.
+   * What an agent says about a session it cannot load is often nothing anyone
+   * can act on — OpenCode answers `Internal error: OpenCode service failure` —
+   * and the composition's own sentence names the thing that helps, which is
+   * that starting a new chat makes a session. That was read as "the agent has
+   * nothing to say here", and it is not: `kimi acp` with no account refuses the
+   * *load* with "Authentication required", where the advice to start a new chat
+   * is wrong rather than merely thin. So the words travel with an origin, and
+   * the composition says both — see `AcpTurnRefusalOrigin`.
+   */
+  private async openSessionBinding(
+    run: ManagedAcpExecutionRun,
+    invocation: ManagedAcpExecutionInvocation,
+    generation: number,
+  ): Promise<AcpNewSessionResponse | undefined> {
+    try {
+      return await this.ensureSessionBinding(
+        invocation,
+        generation,
+        // Presented from inside, because a load failure that is not a missing
+        // session is wrapped into a dispatch error there and the agent's words
+        // do not survive the wrapping.
+        error => run.presentTurnRefusal(error.message, 'session-load'),
+        outcome => run.presentSessionResume(outcome),
+      );
+    } catch (error) {
+      if (error instanceof JsonRpcErrorResponse) {
+        run.presentTurnRefusal(error.message);
+      }
+      throw error;
+    }
+  }
+
+  private async ensureSessionBinding(
+    invocation: ManagedAcpExecutionInvocation,
+    generation: number,
+    onLoadRefusal?: (error: JsonRpcErrorResponse) => void,
+    /**
+     * What became of the saved session this dispatch tried to resume.
+     *
+     * Reported through the run rather than through the backend context: a
+     * backend serves every tab, and the conversation carrying the consequence
+     * — its history is no longer the agent's memory — is the one this run
+     * belongs to. Silent when no load was attempted, which is a conversation
+     * that never had a session to lose.
+     */
+    onResume?: (outcome: 'resumed' | 'replaced') => void,
+  ): Promise<AcpNewSessionResponse | undefined> {
+    const client = this.client;
+    if (!client) throw new ExecutionDispatchError('Managed ACP client is unavailable.', true);
+    if (this.nativeSessionRef && this.loadedSessionRef !== this.nativeSessionRef) {
+      const target = this.nativeSessionRef;
+      try {
+        const response = await client.loadSession({
+          cwd: invocation.cwd,
+          mcpServers: [...invocation.mcpServers],
+          sessionId: target,
+        });
+        // A load confirms the session by succeeding. OpenCode answers with its
+        // config options and no id at all, so requiring an echo turned every
+        // resume into "the agent returned another session" — a new session per
+        // reload, with the conversation left behind. An id that *is* echoed
+        // still has to be the one that was asked for.
+        if (response.sessionId && response.sessionId !== target) {
+          throw new ExecutionDispatchError('Managed ACP load returned another session.', true);
+        }
+        this.requireCurrentClient(client, generation);
+        this.loadedSessionRef = target;
+        onResume?.('resumed');
+        return { ...response, sessionId: target };
+      } catch (error) {
+        const missing = await (this.context.isMissingSessionError ?? isAcpSessionGone)({
+          error,
+          // The listing is only ever asked for on a load that already failed,
+          // which is what makes the extra round trip affordable. An agent
+          // without the method leaves the error text as the only evidence.
+          listSessions: async () => {
+            if (!client.listSessions) {
+              throw new Error('Managed ACP client cannot list sessions.');
+            }
+            return client.listSessions();
+          },
+          sessionId: target,
+        });
+        if (!missing) {
+          // Only where the agent itself answered. A transport that died has no
+          // words, and inventing some would be worse than the sentence the
+          // composition already has.
+          if (error instanceof JsonRpcErrorResponse) onLoadRefusal?.(error);
+          throw new ExecutionDispatchError('Managed ACP session load failed.', true);
+        }
+        // Checked on this branch too, and now it has to be: deciding the
+        // session gone can cost a `session/list` round trip, so the client and
+        // the generation are read again after an await rather than before one.
+        // The success branch above has always done this.
+        this.requireCurrentClient(client, generation);
+        this.nativeSessionRef = undefined;
+        this.loadedSessionRef = undefined;
+        onResume?.('replaced');
+      }
+    }
+    if (!this.nativeSessionRef) {
+      const response = await client.newSession({
+        cwd: invocation.cwd,
+        mcpServers: [...invocation.mcpServers],
+      });
+      if (!response.sessionId?.trim()) {
+        throw new ExecutionDispatchError('Managed ACP returned an empty session id.', true);
+      }
+      this.requireCurrentClient(client, generation);
+      this.nativeSessionRef = response.sessionId;
+      this.loadedSessionRef = response.sessionId;
+      return response;
+    }
+    return undefined;
+  }
+
+  private handleNotification(notification: AcpSessionNotification): void {
+    if (notification.sessionId !== this.nativeSessionRef) return;
+    this.activeRun?.handleNotification(notification);
+  }
+
+  private closeClient(): Promise<'confirmed' | 'unconfirmed'> {
+    if (this.clientCloseTask) return this.clientCloseTask;
+    const task = this.closeCurrentClient();
+    this.clientCloseTask = task;
+    void task.finally(() => {
+      if (this.clientCloseTask === task) this.clientCloseTask = undefined;
+    }).catch(() => undefined);
+    return task;
+  }
+
+  private async closeCurrentClient(): Promise<'confirmed' | 'unconfirmed'> {
+    if (this.client) this.context.clientObserver?.onClientLost();
+    this.notificationUnsubscribe?.();
+    this.notificationUnsubscribe = undefined;
+    this.clientCloseUnsubscribe?.();
+    this.clientCloseUnsubscribe = undefined;
+    this.clientAbort?.abort(new Error('Managed ACP client closed.'));
+    this.clientAbort = undefined;
+    const client = this.client;
+    const pendingCreation = this.clientCreationTask;
+    this.client = undefined;
+    this.restartFingerprint = undefined;
+    this.loadedSessionRef = undefined;
+    this.clientGeneration += 1;
+    const candidates = new Set(this.retainedClients);
+    this.retainedClients.clear();
+    if (client) candidates.add(client);
+    let pendingUnknown = false;
+    if (pendingCreation) {
+      const pendingClient = await withTimeout(
+        pendingCreation,
+        this.context.scheduler,
+        this.context.controlTimeoutMs ?? 2_000,
+      );
+      if (!pendingClient) {
+        pendingUnknown = true;
+      } else {
+        candidates.add(pendingClient);
+      }
+    }
+    for (const candidate of candidates) {
+      try {
+        if (await candidate.close() === 'unconfirmed') this.retainedClients.add(candidate);
+      } catch {
+        this.retainedClients.add(candidate);
+      }
+    }
+    return !pendingUnknown && this.retainedClients.size === 0 ? 'confirmed' : 'unconfirmed';
+  }
+
+  private requireCurrentClient(client: ManagedAcpClient, generation: number): void {
+    if (this.disposed
+      || this.client !== client
+      || this.clientGeneration !== generation
+      || this.clientAbort?.signal.aborted) {
+      throw new ExecutionDispatchError('Managed ACP preparation became stale.', true);
+    }
+  }
+
+  dispose(): Promise<void> {
+    if (this.disposeTask) return this.disposeTask;
+    this.disposed = true;
+    const run = this.activeRun;
+    this.disposeTask = (async () => {
+      if (run && !run.isTerminal) await run.cancel({ code: 'shutdown' });
+      const termination = await this.closeClient();
+      if (termination === 'unconfirmed') {
+        throw new ManagedAcpTerminationUnconfirmedError();
+      }
+      this.listeners.clear();
+      this.onDisposed();
+    })();
+    return this.disposeTask;
+  }
+
+  publish(event: ProviderExecutionEvent): void {
+    for (const listener of this.listeners) listener(event);
+  }
+
+  nextDeliveryId(runId: string): string {
+    return `${runId}:${++this.deliverySequence}`;
+  }
+}
+
+class ManagedAcpExecutionRun implements ExecutionRun {
+  readonly events = new ExecutionEventQueue<ProviderExecutionEvent>();
+  readonly runId;
+  invocation!: ManagedAcpExecutionInvocation;
+  private terminal = false;
+  private dispatched = false;
+  private output = '';
+  private observedProviderActivity = false;
+  private timeoutHandle?: unknown;
+  private attempt = 0;
+  private recoveringAttempt?: number;
+  private terminationTask?: Promise<void>;
+  private completionTask?: Promise<void>;
+  private terminationIntent?: 'cancel' | 'shutdown' | 'timeout' | 'output-limit';
+  private nativeRunRef?: string;
+  private sessionRef?: string;
+  private promptTask?: Promise<void>;
+  private notedTurnEnd = false;
+  private nativeStopReason?: string;
+
+  constructor(
+    private readonly request: ExecutionRequest,
+    private readonly session: ManagedAcpExecutionSession,
+    private readonly context: ManagedAcpExecutionBackendContext,
+    private readonly cancelInteractions: (run: ManagedAcpExecutionRun) => void,
+    private readonly onTerminal: () => void,
+  ) {
+    this.runId = request.runId;
+  }
+
+  get isTerminal(): boolean { return this.terminal; }
+  get sawObservableActivity(): boolean { return this.observedProviderActivity; }
+  get hasDispatched(): boolean { return this.dispatched; }
+  get currentAttempt(): number { return this.attempt; }
+  get nativeSessionRef(): string | undefined { return this.sessionRef; }
+
+  async start(): Promise<void> {
+    try {
+      const invocation = await this.context.requestResolver.resolve(this.request.requestRef);
+      if (this.terminal) return;
+      validateInvocation(invocation);
+      this.invocation = invocation;
+      await this.session.prepare(this, invocation);
+      if (this.terminal) return;
+      this.session.dispatch(this, invocation);
+    } catch (error) {
+      if (this.terminal) return;
+      if (error instanceof AcpSpawnError) {
+        // Nothing ran, so `invalidated` would be true — and useless. Every ACP
+        // provider words a pre-dispatch rejection as a session that may have
+        // gone, which for a CLI that is not installed is advice to start a new
+        // chat about the wrong problem. `spawn-failed` is the reason the
+        // local-shell and Antigravity backends already give for this.
+        this.finish('failed', 'spawn-failed');
+        return;
+      }
+      const sideEffectFree = error instanceof ExecutionDispatchError
+        ? error.sideEffectFree
+        : !this.dispatched;
+      this.finish('invalidated', sideEffectFree ? 'pre-dispatch-rejected' : 'dispatch-unknown', sideEffectFree);
+    }
+  }
+
+  beginDispatch(sessionRef: string, nativeRunRef?: string): number {
+    this.dispatched = true;
+    this.sessionRef = sessionRef;
+    this.nativeRunRef = nativeRunRef;
+    this.attempt += 1;
+    this.recoveringAttempt = undefined;
+    if (this.timeoutHandle !== undefined) this.context.scheduler.clearTimeout(this.timeoutHandle);
+    this.timeoutHandle = this.context.scheduler.setTimeout(() => {
+      void this.terminate('timeout');
+    }, this.context.runTimeoutMs);
+    return this.attempt;
+  }
+
+  emitRunStarted(): void {
+    this.emit({ kind: 'run-started' });
+  }
+
+  /**
+   * What the session answered with when it was created or loaded.
+   *
+   * Carried on the content channel like every other thing the surface is drawn
+   * from, and before the run has started, because that is when the session is
+   * opened — a transient event writes no record and advances no state machine,
+   * so it needs no run to have begun.
+   */
+  /** One payload the provider produced itself, on the same content channel. */
+  presentProviderContent(payload: unknown): void {
+    if (this.terminal) return;
+    this.emit({ kind: 'provider-content', payload });
+  }
+
+  presentSessionConfig(session: AcpNewSessionResponse): void {
+    if (this.terminal) return;
+    this.emit({
+      kind: 'provider-content',
+      payload: { kind: 'session-config', session } satisfies AcpContentPayload,
+    });
+  }
+
+  presentSessionResume(outcome: 'resumed' | 'replaced'): void {
+    if (this.terminal) return;
+    this.emit({
+      kind: 'provider-content',
+      payload: { kind: 'session-resume', outcome } satisfies AcpContentPayload,
+    });
+  }
+
+  /**
+   * Ends the turn the agent refused, in the agent's own words.
+   *
+   * The message goes out on the content channel and the terminal carries the
+   * classification, because a terminal reason is an enum with no room for a
+   * sentence. A provider that reads the payload renders the vendor's text; one
+   * that does not still gets `provider-failure` instead of a run whose outcome
+   * could not be established, which is what every flipped provider had.
+   */
+  /** What the agent said when it refused, on the channel the tab reads. */
+  presentTurnRefusal(message: string, origin?: AcpTurnRefusalOrigin): void {
+    if (this.terminal) return;
+    this.emit({
+      kind: 'provider-content',
+      payload: {
+        kind: 'turn-refused',
+        message,
+        ...(origin ? { origin } : {}),
+      } satisfies AcpContentPayload,
+    });
+  }
+
+  failFromProviderRejection(error: JsonRpcErrorResponse): void {
+    if (this.terminal) return;
+    this.presentTurnRefusal(error.message);
+    // Not side-effect free: the agent may have run tools before it refused.
+    this.finish('failed', 'provider-failure');
+  }
+
+  claimRecovery(attempt: number): boolean {
+    if (this.terminal || attempt !== this.attempt || this.recoveringAttempt === attempt) return false;
+    this.recoveringAttempt = attempt;
+    return true;
+  }
+
+  releaseRecovery(): void {
+    this.recoveringAttempt = undefined;
+  }
+
+  handleNotification(notification: AcpSessionNotification): void {
+    if (this.terminal || notification.sessionId !== this.sessionRef) return;
+    this.observedProviderActivity = true;
+    const update = notification.update;
+    const text = update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text'
+      ? update.content.text
+      : undefined;
+    if (text !== undefined) {
+      const next = `${this.output}${text}`;
+      if (Buffer.byteLength(next, 'utf8') > this.context.maxResultBytes) {
+        void this.terminate('output-limit');
+        return;
+      }
+      this.output = next;
+    }
+    // The surface's copy of the update, forwarded once and before any branch
+    // below reads it: a tool card, a plan and a context badge are drawn from
+    // the update itself, and the kernel carries it without interpreting it.
+    // After the bound above, because the content channel is a reader like any
+    // other and must see only a prefix of what will be committed.
+    this.emit({
+      kind: 'provider-content',
+      payload: { kind: 'session-update', notification } satisfies AcpContentPayload,
+    });
+    if (text !== undefined) {
+      this.emit({ kind: 'output-delta', channel: 'assistant', text });
+      return;
+    }
+    if (update.sessionUpdate === 'agent_thought_chunk') {
+      this.emit({ kind: 'thinking-activity' });
+      return;
+    }
+    if (update.sessionUpdate === 'tool_call' || update.sessionUpdate === 'tool_call_update') {
+      this.emit({ kind: 'tool-activity', toolCallId: update.toolCallId });
+    }
+  }
+
+  async completeFromPrompt(response: AcpPromptResponse, attempt: number): Promise<void> {
+    if (this.terminal || attempt !== this.attempt || this.recoveringAttempt === attempt) return;
+    // The agent's own word for how the turn ended, kept for reconciliation: a
+    // provider asked what became of a run it was told to stop can answer from
+    // this, where otherwise it has only the fact that a stop was requested.
+    this.nativeStopReason = response.stopReason;
+    // The tokens this prompt cost are in the answer and nowhere else: the
+    // window update arrives while the turn is still running and knows only how
+    // full the context is. Forwarded whatever the stop reason, because a turn
+    // that was cancelled still spent them.
+    this.emit({
+      kind: 'provider-content',
+      payload: { kind: 'prompt-result', response } satisfies AcpContentPayload,
+    });
+    await this.noteTurnEnded();
+    if (this.terminal || attempt !== this.attempt) return;
+    const responseRunRef = response.userMessageId?.trim();
+    if (responseRunRef && this.nativeRunRef && responseRunRef !== this.nativeRunRef) {
+      this.finish('indeterminate', 'effects-unknown');
+      return;
+    }
+    if (responseRunRef) this.nativeRunRef = responseRunRef;
+    if (this.terminationIntent) return;
+    if (/cancel/i.test(response.stopReason)) {
+      this.finish('interrupted', 'known-process-exit');
+      return;
+    }
+    const output = this.output.trim() || await this.recoverOutput();
+    if (this.terminal || attempt !== this.attempt) return;
+    if (!output) {
+      this.finishForMissingResult();
+      return;
+    }
+    this.completionTask = this.commitCompletion(output, attempt);
+    await this.completionTask;
+  }
+
+  /**
+   * The provider's last look at a turn, whatever became of it.
+   *
+   * Failures are swallowed: a badge that could not be filled is a badge, and
+   * the turn's own outcome is not this call's to change.
+   */
+  private async noteTurnEnded(): Promise<void> {
+    const sink = this.context.resultSink;
+    if (this.notedTurnEnd || !sink.noteTurnEnded || !this.sessionRef) return;
+    // Once per turn, whichever path gets there first. Both the prompt answering
+    // and the cancel that asked it to stop want the look, and a provider that
+    // reads a cost off its session log would otherwise count it twice.
+    const client = this.session.currentClient;
+    if (!client) return;
+    this.notedTurnEnd = true;
+    try {
+      await sink.noteTurnEnded({
+        nativeSessionRef: this.sessionRef,
+        ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
+        presentContent: payload => this.presentProviderContent(payload),
+        client,
+      });
+    } catch {
+      // See above.
+    }
+  }
+
+  /** What the provider can still find, for a turn that streamed nothing. */
+  private async recoverOutput(): Promise<string> {
+    const sink = this.context.resultSink;
+    if (!sink.recoverOutput || !this.sessionRef) return '';
+    try {
+      const recovered = (await sink.recoverOutput({
+        nativeSessionRef: this.sessionRef,
+        ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
+      }))?.trim() ?? '';
+      if (recovered) {
+        // The surface draws an answer from the deltas, never from the result
+        // reference — so a recovered answer that is only committed is a turn
+        // that succeeds with an empty bubble.
+        this.emit({ kind: 'output-delta', channel: 'assistant', text: recovered });
+      }
+      return recovered;
+    } catch {
+      // A recovery that failed is a turn with no answer, which is what it
+      // already was.
+      return '';
+    }
+  }
+
+  private async commitCompletion(output: string, attempt: number): Promise<void> {
+    const abort = new AbortController();
+    const settlement = await settleResultCommit(
+      this.context.resultSink.storeResult({
+        output,
+        nativeSessionRef: this.sessionRef!,
+        ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
+        signal: abort.signal,
+      }),
+      abort,
+      this.context.scheduler,
+      this.context.resultCommitTimeoutMs,
+    );
+    if (this.terminal || attempt !== this.attempt) return;
+    if (settlement.kind === 'committed') {
+      this.emit({ kind: 'result', result: settlement.result });
+      this.finish('succeeded', 'completed');
+    } else if (settlement.kind === 'aborted') {
+      this.finish('failed', 'provider-failure');
+    } else {
+      this.finish('indeterminate', 'effects-unknown');
+    }
+  }
+
+  emitConnectionLost(): void {
+    if (this.terminal) return;
+    this.emit({ kind: 'connection-lost' });
+    this.emit({ kind: 'recovery-started' });
+  }
+
+  finishFromRecovery(evidence: RunRecoveryEvidence): void {
+    if (this.terminal) return;
+    if (evidence.kind === 'terminal') {
+      if (evidence.terminal.resultRef) this.emit({ kind: 'result', result: evidence.terminal.resultRef });
+      this.finish(evidence.terminal.kind, evidence.terminal.reason);
+      return;
+    }
+    if (evidence.kind === 'stopped-safe') {
+      this.finish('interrupted', 'recovery-exhausted-safe');
+      return;
+    }
+    this.finish(
+      evidence.kind === 'unknown' && evidence.effectsPossible ? 'indeterminate' : 'interrupted',
+      evidence.kind === 'unknown' && evidence.effectsPossible
+        ? 'effects-unknown'
+        : 'recovery-exhausted-safe',
+    );
+  }
+
+  cancel(reason: { readonly code: 'user' | 'shutdown' | 'settings-transition' | 'parent-cancelled' } = { code: 'user' }): Promise<void> {
+    return this.terminate(reason.code === 'shutdown' ? 'shutdown' : 'cancel');
+  }
+
+  private terminate(intent: 'cancel' | 'shutdown' | 'timeout' | 'output-limit'): Promise<void> {
+    if (this.terminal) return Promise.resolve();
+    if (this.completionTask) return this.completionTask;
+    if (this.terminationTask) return this.terminationTask;
+    this.terminationIntent = intent;
+    this.terminationTask = (async () => {
+      if (!this.dispatched) {
+        this.session.cancelPreparation(this);
+        this.finish('cancelled', 'cancellation-confirmed', true);
+        return;
+      }
+      this.session.requestCancel(this);
+      // ACP answers a cancelled turn on the prompt itself, so the turn being
+      // stopped is the thing to ask. Bounded like every other control round
+      // trip: an agent that never answers must not hold the Stop button, and
+      // the reconciler below is what covers that case.
+      await this.awaitPromptSettlement();
+      if (this.terminal) return;
+      // The provider's last look at a turn it was told to stop. A cancelled
+      // turn still spent tokens and still moved the context, and those are
+      // recorded nowhere the kernel can see.
+      await this.noteTurnEnded();
+      if (this.terminal) return;
+      // Still the reconciler's answer, not the prompt's: a turn that reported
+      // itself cancelled says nothing about a process whose termination could
+      // not be proven, and those are different questions. What the prompt
+      // answered rides along in the query so a provider can use it.
+      const evidence = await this.session.reconcileRun(this);
+      if (this.terminal) return;
+      if (evidence.kind === 'terminal') {
+        if (evidence.terminal.resultRef) {
+          this.emit({ kind: 'result', result: evidence.terminal.resultRef });
+        }
+        this.finish(evidence.terminal.kind, evidence.terminal.reason);
+        return;
+      }
+      if (evidence.kind === 'stopped-safe') {
+        if (intent === 'timeout') this.finish('failed', 'timeout');
+        else if (intent === 'output-limit') this.finish('failed', 'output-limit');
+        else this.finish('cancelled', 'cancellation-confirmed');
+        return;
+      }
+      this.finish(
+        'indeterminate',
+        intent === 'shutdown'
+          ? 'shutdown-unknown'
+          : intent === 'cancel'
+            ? 'cancellation-unknown'
+            : 'effects-unknown',
+      );
+    })();
+    return this.terminationTask;
+  }
+
+  notePrompt(task: Promise<void>): void {
+    this.promptTask = task;
+    // The chain already routes both outcomes; this only keeps a handler that
+    // throws from surfacing as an unhandled rejection on the copy kept here.
+    void task.catch(() => undefined);
+  }
+
+  /** Waits, with a bound, for the turn to answer the cancel it was sent. */
+  private async awaitPromptSettlement(): Promise<void> {
+    if (!this.promptTask) return;
+    await completesWithin(
+      this.promptTask,
+      this.context.scheduler,
+      this.context.controlTimeoutMs ?? 2_000,
+    );
+  }
+
+  recoveryQuery(): RunRecoveryQuery {
+    return {
+      backendId: this.context.descriptor.backendId,
+      backendGeneration: this.session.backendGeneration,
+      executionSessionId: this.session.executionSessionId,
+      sessionInstanceId: this.session.sessionInstanceId,
+      runId: this.request.runId,
+      ...(this.sessionRef ? { nativeSessionRef: this.sessionRef } : {}),
+      ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
+      cancellationRequested: Boolean(this.terminationIntent),
+      ...(this.nativeStopReason ? { nativeStopReason: this.nativeStopReason } : {}),
+      resultExpectation: this.request.resultExpectation,
+    };
+  }
+
+  openInteraction(interactionId: InteractionId, prepared: ManagedAcpPreparedInteraction): void {
+    this.emit({
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId,
+        runId: this.request.runId,
+        kind: prepared.kind,
+        presentationRef: prepared.presentationRef,
+        responseIds: [...prepared.responseIds],
+      },
+    });
+  }
+
+  resolveInteraction(interactionId: InteractionId, responseId: string): void {
+    this.emit({ kind: 'interaction-resolved', interactionId, responseId });
+  }
+
+  rejectBeforeDispatch(): void {
+    this.finish('invalidated', 'pre-dispatch-rejected', true);
+  }
+
+  private finishForMissingResult(): void {
+    if (this.request.resultExpectation === 'required') {
+      this.finish('failed', 'missing-required-result');
+    } else {
+      this.finish('succeeded', 'completed');
+    }
+  }
+
+  private emit(event: ExecutionEvent): void {
+    const delivery: ProviderExecutionEvent = {
+      backendId: this.context.descriptor.backendId,
+      backendGeneration: this.session.backendGeneration,
+      executionSessionId: this.session.executionSessionId,
+      sessionInstanceId: this.session.sessionInstanceId,
+      deliveryId: this.session.nextDeliveryId(String(this.request.runId)),
+      occurredAt: (this.context.now ?? Date.now)(),
+      scope: {
+        kind: 'run',
+        runId: this.request.runId,
+        ...(this.nativeRunRef ? { nativeRunRef: this.nativeRunRef } : {}),
+      },
+      event,
+    };
+    this.events.push(delivery);
+    this.session.publish(delivery);
+  }
+
+  private finish(
+    terminal: RunTerminalKind,
+    reason: RunTerminalReason,
+    sideEffectFree = false,
+  ): void {
+    if (this.terminal) return;
+    this.terminal = true;
+    if (this.timeoutHandle !== undefined) this.context.scheduler.clearTimeout(this.timeoutHandle);
+    this.cancelInteractions(this);
+    this.emit({ kind: 'terminal', terminal, reason, sideEffectFree });
+    this.events.close();
+    this.onTerminal();
+  }
+}
+
+function validateInvocation(invocation: ManagedAcpExecutionInvocation): void {
+  if (!invocation.startupRef.trim() || !invocation.restartFingerprint.trim()) {
+    throw new ExecutionDispatchError('Managed ACP invocation identity is invalid.', true);
+  }
+  if (!invocation.cwd.trim() || invocation.prompt.length === 0) {
+    throw new ExecutionDispatchError('Managed ACP invocation payload is invalid.', true);
+  }
+}
+
+function validatePreparedInteraction(prepared: ManagedAcpPreparedInteraction): void {
+  if (!prepared.presentationRef.trim()
+    || prepared.responseIds.length === 0
+    || !prepared.responseIds.includes(prepared.providerResolvedResponseId)) {
+    throw new Error('Managed ACP interaction contract is invalid.');
+  }
+}
+
+function withTimeout<T>(
+  operation: Promise<T>,
+  scheduler: ManagedAcpExecutionScheduler,
+  timeoutMs: number,
+): Promise<T | undefined> {
+  return new Promise(resolve => {
+    let settled = false;
+    const handle = scheduler.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(undefined);
+    }, timeoutMs);
+    void operation.then(
+      value => {
+        if (settled) return;
+        settled = true;
+        scheduler.clearTimeout(handle);
+        resolve(value);
+      },
+      () => {
+        if (settled) return;
+        settled = true;
+        scheduler.clearTimeout(handle);
+        resolve(undefined);
+      },
+    );
+  });
+}
+
+function completesWithin(
+  operation: Promise<void>,
+  scheduler: ManagedAcpExecutionScheduler,
+  timeoutMs: number,
+): Promise<boolean> {
+  return new Promise(resolve => {
+    let settled = false;
+    const handle = scheduler.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(false);
+    }, timeoutMs);
+    void operation.then(
+      () => {
+        if (settled) return;
+        settled = true;
+        scheduler.clearTimeout(handle);
+        resolve(true);
+      },
+      () => {
+        if (settled) return;
+        settled = true;
+        scheduler.clearTimeout(handle);
+        resolve(false);
+      },
+    );
+  });
+}
+
+function trimOldestMapEntries<TKey, TValue>(map: Map<TKey, TValue>, maximum: number): void {
+  while (map.size > maximum) {
+    const oldest = map.keys().next();
+    if (oldest.done) return;
+    map.delete(oldest.value);
+  }
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}

@@ -1,24 +1,21 @@
 import { McpServerManager } from '../../../core/mcp/McpServerManager';
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
 import { ProviderModelCatalogRefreshCache } from '../../../core/providers/ProviderModelCatalogRefreshCache';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
+import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
+import type GrimoirePlugin from '../../../main';
 import type {
   ProviderCliResolver,
   ProviderModelCatalog,
-  ProviderTabWarmupPolicy,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
-} from '../../../core/providers/types';
-import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import type GrimoirePlugin from '../../../main';
+} from '../../../providers/shared/providerHostContracts';
 import { AcpMcpStorage } from '../../acp/mcp/AcpMcpStorage';
 import { GeminiCommandCatalog } from '../commands/GeminiCommandCatalog';
 import {
   buildGeminiModelCatalogFingerprint,
   resolveGeminiModelCatalogFingerprint,
 } from '../modelCatalogFingerprint';
-import { GeminiChatRuntime } from '../runtime/GeminiChatRuntime';
-import { GeminiCliResolver } from '../runtime/GeminiCliResolver';
+import { geminiCliResolver } from '../runtime/GeminiCliResolver';
 import { getGeminiProviderSettings } from '../settings';
 import { GeminiAgentStorage } from '../storage/GeminiAgentStorage';
 import { geminiSettingsTabRenderer } from '../ui/GeminiSettingsTab';
@@ -34,14 +31,8 @@ export interface GeminiWorkspaceServices extends ProviderWorkspaceServices {
 }
 
 function createGeminiCliResolver(): ProviderCliResolver {
-  return new GeminiCliResolver();
+  return geminiCliResolver();
 }
-
-const geminiTabWarmupPolicy: ProviderTabWarmupPolicy = {
-  resolveMode() {
-    return 'runtime';
-  },
-};
 
 const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -49,13 +40,12 @@ function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog 
   const initialSettings = getGeminiProviderSettings(plugin.settings ?? {});
   const refreshCache = new ProviderModelCatalogRefreshCache(MODEL_CATALOG_CACHE_TTL_MS);
   if (initialSettings.discoveredModels.length > 0) {
-    // The resolved CLI path is part of the fingerprint but is not available
-    // here: this catalog is built inside createGeminiWorkspaceServices, which runs
-    // inside ProviderWorkspaceRegistry.initialize(), and the registry assigns
-    // this.services[providerId] only after that resolves - until then
-    // getResolvedProviderCliPath returns null and an eager seed would be filed
-    // under settings.cliPath while every later refresh looks it up under the
-    // resolved path. Hold the seed back until the path is known.
+    // The resolved CLI path is part of the fingerprint and is not available
+    // here: this catalog is built inside `createGeminiWorkspaceServices`, which
+    // the workspace manager runs before it publishes the services — until then
+    // `getResolvedProviderCliPath` answers null, and an eager seed would be
+    // filed under `settings.cliPath` while every later refresh looks it up
+    // under the resolved path. Hold the seed back until the path is known.
     const initialEnvironmentVariables = plugin.getActiveEnvironmentVariables?.('gemini')
       ?? initialSettings.environmentVariables;
     if (plugin.getResolvedProviderCliPath?.('gemini') == null) {
@@ -99,7 +89,7 @@ function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog 
           level: 'debug',
           scope: 'provider.gemini',
         });
-        return false;
+        return 'skipped';
       }
 
       if (!force && refreshCache.isFresh(fingerprint, hasCachedModels)) {
@@ -114,7 +104,7 @@ function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog 
           level: 'debug',
           scope: 'provider.gemini',
         });
-        return false;
+        return 'skipped';
       }
 
       return refreshCache.refresh({
@@ -122,15 +112,15 @@ function createGeminiModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog 
         force,
         hasCachedModels,
         load: async () => {
-          const before = JSON.stringify(getGeminiProviderSettings(settings).discoveredModels);
-          const runtime = new GeminiChatRuntime(plugin);
-          try {
-            const loaded = await runtime.ensureReady({ allowSessionCreation: true });
-            const after = JSON.stringify(getGeminiProviderSettings(settings).discoveredModels);
-            return loaded && before !== after;
-          } finally {
-            runtime.cleanup();
-          }
+          // One isolated session, opened and closed. Building a whole chat
+          // runtime to get here was the only thing that runtime did for this
+          // surface: open a session and read its reply.
+          //
+          // Its answer is whether the agent said anything, which is the question
+          // the surface asks. Whether the *list* changed is a different one, and a
+          // refresh that returns the same models did not fail.
+          const loaded = await plugin.getGeminiExecution().metadata.discoverMetadata();
+          return loaded ? 'refreshed' : 'failed';
         },
       });
     },
@@ -154,21 +144,16 @@ export async function createGeminiWorkspaceServices(
     mcpServerManager,
     usageProvider: geminiPlanUsageStore,
     settingsTabRenderer: geminiSettingsTabRenderer,
-    tabWarmupPolicy: geminiTabWarmupPolicy,
   };
 }
 
 export const geminiWorkspaceRegistration: ProviderWorkspaceRegistration<GeminiWorkspaceServices> = {
-  workspaceCapabilities: {
-    skills: { inventory: 'managed', manager: 'managed' },
-    commands: { inventory: 'managed', manager: 'managed', runtimeCommandDiscovery: 'none' },
-    agents: { inventory: 'managed', manager: 'managed' },
-    mcp: { inventory: 'managed', manager: 'managed' },
-    environment: { inventory: 'managed', manager: 'managed' },
-  },
   initialize: async ({ plugin, vaultAdapter }) => createGeminiWorkspaceServices(plugin, vaultAdapter),
 };
 
-export function maybeGetGeminiWorkspaceServices(): GeminiWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('gemini') as GeminiWorkspaceServices | null;
+export function maybeGetGeminiWorkspaceServices(
+  plugin: GrimoirePlugin,
+): GeminiWorkspaceServices | null {
+  return plugin.getApplicationRuntimeOrNull?.()
+    ?.workspaceServicesFor('gemini') as GeminiWorkspaceServices | null ?? null;
 }

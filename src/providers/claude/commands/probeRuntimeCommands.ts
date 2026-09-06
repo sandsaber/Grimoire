@@ -104,6 +104,13 @@ export async function probeRuntimeCommands(plugin: GrimoirePlugin): Promise<Slas
     if (!abortController.signal.aborted) {
       throw error;
     }
+  } finally {
+    // The abort inside the loop is how a *successful* probe ends, and it is not
+    // reached when `supportedCommands()` throws — which left the throwaway
+    // session running, and this probe is billed. Aborting here covers every
+    // exit; the catch above still reads the pre-abort signal, so it can still
+    // tell our own abort from a real failure.
+    abortController.abort();
   }
 
   return commands;

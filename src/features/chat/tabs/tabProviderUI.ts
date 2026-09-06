@@ -1,12 +1,16 @@
+import { AuxiliaryExecutionOwner } from '../../../app/auxiliary/AuxiliaryExecutionOwner';
+import { ProviderAgentMentionService } from '../../../app/mentions/ProviderAgentMentionService';
 import { getEnabledProviderForModel } from '../../../core/providers/modelRouting';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
-import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
+import { NO_TASK_RESULT_INTERPRETATION } from '../../../core/providers/noTaskResultInterpretation';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
 import type {
-  ProviderChatUIConfig,
+  ProviderUsageSnapshot,
+  ProviderUsageWindow,
+} from '../../../core/providers/ProviderModule';
+import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
+import type {
   ProviderId,
-  ProviderPlanUsage,
-  ProviderPlanUsageWindow,
 } from '../../../core/providers/types';
 import { DEFAULT_CHAT_PROVIDER_ID } from '../../../core/providers/types';
 import type { Conversation } from '../../../core/types';
@@ -30,20 +34,23 @@ import {
 } from './tabSettings';
 import type { TabData } from './types';
 
-export function getProviderUsageSnapshot(plugin: GrimoirePlugin, providerId: ProviderId): ProviderPlanUsage | null {
-  const usageProvider = ProviderWorkspaceRegistry.getUsageProvider(providerId);
-  if (!usageProvider || usageProvider.isAvailable?.(plugin.settings) === false) {
-    return null;
-  }
-
-  return usageProvider.getCachedUsage({
-    plugin,
-    providerId,
-    settings: plugin.settings,
-  });
+/**
+ * The plan this provider last reported, read while a tab paints.
+ *
+ * Never builds a workspace: this is on the paint path, and the background
+ * refresh beside it is what builds one. So the first paint after a reload shows
+ * nothing and the paint after the refresh shows the plan — where the eager
+ * workspace this replaces could answer immediately.
+ */
+export function getProviderUsageSnapshot(
+  plugin: GrimoirePlugin,
+  providerId: ProviderId,
+): ProviderUsageSnapshot | null {
+  return plugin.getApplicationRuntimeOrNull()
+    ?.builtWorkspaceFor(providerId)?.usage?.cached() ?? null;
 }
 
-export function summarizeUsageWindow(window: ProviderPlanUsageWindow): Record<string, unknown> {
+export function summarizeUsageWindow(window: ProviderUsageWindow): Record<string, unknown> {
   return {
     label: window.label,
     pct: window.pct,
@@ -52,7 +59,7 @@ export function summarizeUsageWindow(window: ProviderPlanUsageWindow): Record<st
   };
 }
 
-export function summarizePlanUsage(usage: ProviderPlanUsage | null): Record<string, unknown> {
+export function summarizePlanUsage(usage: ProviderUsageSnapshot | null): Record<string, unknown> {
   if (!usage) {
     return { usageKind: 'none' };
   }
@@ -68,26 +75,16 @@ export function summarizePlanUsage(usage: ProviderPlanUsage | null): Record<stri
   };
 }
 
-export async function refreshProviderUsageSnapshot(plugin: GrimoirePlugin, providerId: ProviderId): Promise<ProviderPlanUsage | null> {
-  const usageProvider = ProviderWorkspaceRegistry.getUsageProvider(providerId);
-  if (!usageProvider) {
+export async function refreshProviderUsageSnapshot(
+  plugin: GrimoirePlugin,
+  providerId: ProviderId,
+): Promise<ProviderUsageSnapshot | null> {
+  const usage = (await plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))?.usage;
+  if (!usage) {
     plugin.recordDebugLog?.({
       data: {
         providerId,
         reason: 'missing_usage_provider',
-      },
-      event: 'refresh.skipped',
-      level: 'debug',
-      scope: 'usage',
-    });
-    return getProviderUsageSnapshot(plugin, providerId);
-  }
-
-  if (usageProvider.isAvailable?.(plugin.settings) === false) {
-    plugin.recordDebugLog?.({
-      data: {
-        providerId,
-        reason: 'provider_unavailable',
       },
       event: 'refresh.skipped',
       level: 'debug',
@@ -104,21 +101,17 @@ export async function refreshProviderUsageSnapshot(plugin: GrimoirePlugin, provi
   });
 
   try {
-    const usage = await usageProvider.refreshUsage({
-      plugin,
-      providerId,
-      settings: plugin.settings,
-    });
+    const refreshed = await usage.refresh();
     plugin.recordDebugLog?.({
       data: {
         providerId,
-        ...summarizePlanUsage(usage),
+        ...summarizePlanUsage(refreshed),
       },
-      event: usage ? 'refresh.succeeded' : 'refresh.empty',
-      level: usage ? 'info' : 'debug',
+      event: refreshed ? 'refresh.succeeded' : 'refresh.empty',
+      level: refreshed ? 'info' : 'debug',
       scope: 'usage',
     });
-    return usage;
+    return refreshed;
   } catch (error) {
     plugin.recordDebugLog?.({
       data: { providerId },
@@ -149,7 +142,7 @@ export function refreshRuntimeContextUI(tab: TabData, plugin: GrimoirePlugin): v
 
 export function recordProviderLaunchArtifacts(tab: TabData, plugin: GrimoirePlugin): void {
   const providerId = getTabProviderId(tab, plugin);
-  for (const path of ProviderRegistry.getPreloadedContextFiles(providerId)) {
+  for (const path of providerCatalog().preloadedContextFiles(providerId)) {
     tab.ui.runtimeContextActivity?.recordPreloadedFile(providerId, path);
   }
 }
@@ -166,7 +159,7 @@ export function syncSlashCommandDropdownForProvider(
   }
 
   const catalogInfo = getProviderCatalogConfig?.()
-    ?? getRegistryProviderCatalogInfo(getTabProviderId(tab, plugin, conversation));
+    ?? getRegistryProviderCatalogInfo(getTabProviderId(tab, plugin, conversation), plugin);
 
   if (catalogInfo) {
     dropdown.setProviderCatalog?.(catalogInfo.config, catalogInfo.getEntries);
@@ -286,11 +279,11 @@ export function prepareModelMetadataInBackground(
   plugin: GrimoirePlugin,
   providerId: ProviderId,
   model: string,
-  uiConfig: ProviderChatUIConfig,
+  chatUI: ProviderChatUiContribution,
 ): void {
   let metadataWarmup: Promise<void> | void;
   try {
-    metadataWarmup = uiConfig.prepareModelMetadata?.(model, plugin.settings, { plugin });
+    metadataWarmup = chatUI.models.prepareMetadata?.(model, plugin.settings, { plugin });
   } catch {
     return;
   }
@@ -317,11 +310,11 @@ export function prepareModelMetadataInBackground(
  */
 export function applyProviderUIGating(tab: TabData, plugin: GrimoirePlugin): void {
   const capabilities = getTabCapabilities(tab, plugin);
-  const uiConfig = getTabChatUIConfig(tab, plugin);
+  const chatUI = getTabChatUIConfig(tab, plugin);
   const mcpManager = capabilities.supportsMcpTools
-    ? getProviderMcpManager(capabilities.providerId)
+    ? getProviderMcpManager(capabilities.providerId, plugin)
     : null;
-  const hasPermissionToggle = Boolean(uiConfig.getPermissionModeToggle?.());
+  const hasPermissionToggle = Boolean(chatUI.permissionMode?.toggle());
 
   if (!capabilities.supportsMcpTools) {
     tab.ui.mcpServerSelector?.clearEnabled();
@@ -331,11 +324,44 @@ export function applyProviderUIGating(tab: TabData, plugin: GrimoirePlugin): voi
   tab.ui.fileContextManager?.setMcpManager(mcpManager);
 
   tab.ui.fileContextManager?.setAgentService(
-    ProviderWorkspaceRegistry.getAgentMentionProvider(capabilities.providerId),
+    agentMentionServiceFor(tab, plugin, capabilities.providerId),
   );
 
   tab.ui.imageContextManager?.setEnabled(capabilities.supportsImageAttachments);
   tab.ui.contextUsageMeter?.update(tab.state.usage);
+}
+
+/**
+ * This tab's `@agents/` list, one service per provider it has shown.
+ *
+ * Held per tab rather than rebuilt on every sync: the dropdown compares the
+ * service by identity to decide whether to close, so handing it a new object on
+ * each render would close the list the user is typing into. The load is started
+ * here, well before anything can be typed, because the dropdown filters
+ * synchronously and a workspace is built on the first question.
+ */
+function agentMentionServiceFor(
+  tab: TabData,
+  plugin: GrimoirePlugin,
+  providerId: ProviderId,
+): ProviderAgentMentionService | null {
+  const runtime = plugin.getApplicationRuntimeOrNull();
+  if (!runtime) {
+    return null;
+  }
+  const existing = tab.services.agentMentionServices.get(providerId);
+  if (existing) {
+    return existing;
+  }
+  const service = new ProviderAgentMentionService({
+    list: async () => (await runtime.workspaceFor(providerId)).agentMentions?.list() ?? [],
+    refresh: async () => {
+      await (await runtime.workspaceFor(providerId)).agentMentions?.refresh();
+    },
+  });
+  tab.services.agentMentionServices.set(providerId, service);
+  void service.load().catch(() => undefined);
+  return service;
 }
 
 export function syncTabProviderServices(
@@ -344,21 +370,41 @@ export function syncTabProviderServices(
 ): void {
   tab.services.instructionRefineService?.cancel();
   tab.services.instructionRefineService?.resetConversation();
-  tab.services.instructionRefineService = ProviderRegistry.createInstructionRefineService(plugin, tab.providerId);
+  tab.services.instructionRefineService = auxiliaryExecution(plugin, tab.providerId)
+    .instructionRefineService(tab.providerId);
   tab.services.subagentManager.setTaskResultInterpreter?.(
-    ProviderRegistry.getTaskResultInterpreter(tab.providerId)
+    providerCatalog().declarations(tab.providerId).asyncTaskResults
+    ?? NO_TASK_RESULT_INTERPRETATION
   );
 }
 
 export function ensureTitleGenerationService(tab: TabData, plugin: GrimoirePlugin): void {
   if (!tab.services.titleGenerationService) {
-    tab.services.titleGenerationService = ProviderRegistry.createTitleGenerationService(plugin);
+    tab.services.titleGenerationService = auxiliaryExecution(plugin, tab.providerId)
+      .titleGenerationService();
   }
+}
+
+/**
+ * The application's auxiliary owner, or one that reports it has none.
+ *
+ * A tab can be built before the kernel has started and survives an unload that
+ * takes the composition down, and neither is a reason to hand back a service
+ * that fails somewhere the user cannot see.
+ */
+function auxiliaryExecution(
+  plugin: GrimoirePlugin,
+  providerId: ProviderId,
+): AuxiliaryExecutionOwner {
+  return plugin.getApplicationRuntimeOrNull()?.auxiliary
+    ?? AuxiliaryExecutionOwner.unavailable(providerId);
 }
 
 export function cleanupTabRuntime(tab: TabData): void {
   if (tab.service && typeof tab.service.cleanup === 'function') {
-    tab.service.cleanup();
+    // Discarded on purpose: the contract returns void, and the async
+    // implementations report their own failures rather than rejecting.
+    void tab.service.cleanup();
   }
   tab.service = null;
   tab.serviceInitialized = false;
@@ -373,7 +419,7 @@ export function onProviderAvailabilityChanged(tab: TabData, plugin: GrimoirePlug
   if (tab.lifecycleState !== 'blank') return;
 
   const settingsSnapshot = plugin.settings as unknown as Record<string, unknown>;
-  const enabledProviderIds = ProviderRegistry.getEnabledProviderIds(settingsSnapshot);
+  const enabledProviderIds = providerCatalog().enabledIds(settingsSnapshot);
   if (enabledProviderIds.length === 0) {
     cleanupTabRuntime(tab);
     tab.ui.modelSelector?.updateDisplay();
@@ -386,13 +432,12 @@ export function onProviderAvailabilityChanged(tab: TabData, plugin: GrimoirePlug
 
   if (tab.draftModel) {
     const draftProvider = getEnabledProviderForModel(tab.draftModel, settingsSnapshot);
-    const draftProviderOwnsModel = ProviderRegistry
-      .getChatUIConfig(draftProvider)
-      .ownsModel(tab.draftModel, settingsSnapshot);
+    const draftProviderOwnsModel = providerCatalog().declarations(draftProvider)
+      .chatUI.models.ownsModel(tab.draftModel, settingsSnapshot);
     if (!enabledProviderIds.includes(draftProvider) || !draftProviderOwnsModel) {
       const fallbackProviderId = enabledProviderIds[0] ?? DEFAULT_CHAT_PROVIDER_ID;
-      const fallbackModels = ProviderRegistry.getChatUIConfig(fallbackProviderId)
-        .getModelOptions(settingsSnapshot);
+      const fallbackModels = providerCatalog().declarations(fallbackProviderId)
+        .chatUI.models.options(settingsSnapshot);
       tab.draftModel = fallbackModels[0]?.value ?? tab.draftModel;
       nextProviderId = fallbackProviderId;
     } else {
@@ -407,7 +452,7 @@ export function onProviderAvailabilityChanged(tab: TabData, plugin: GrimoirePlug
     tab.service
     && tab.service.providerId !== nextProviderId
   ) {
-    tab.service.cleanup();
+    void tab.service.cleanup();
     tab.service = null;
     tab.serviceInitialized = false;
   }

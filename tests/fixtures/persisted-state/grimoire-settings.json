@@ -1,0 +1,53 @@
+{
+  "settingsProvider": "claude",
+  "permissionMode": "safe",
+  "chatViewPlacement": "sidebar",
+  "maxTabs": 5,
+  "tabBarPosition": "top",
+  "usageIndicatorsEnabled": true,
+  "debugLoggingEnabled": false,
+  "enableAutoTitleGeneration": true,
+  "titleGenerationModel": "claude-sonnet-5",
+  "providerConfigs": {
+    "claude": {
+      "enabled": true,
+      "model": "claude-sonnet-5",
+      "providerOwnedSetting": "kept verbatim",
+      "projectSettingsSnapshot": {
+        "transient": "stripped on save by design"
+      }
+    },
+    "codex": {
+      "enabled": true,
+      "model": "gpt-5.3-codex"
+    },
+    "opencode": {
+      "enabled": false
+    },
+    "grok": {
+      "enabled": false
+    },
+    "mimocode": {
+      "enabled": false
+    },
+    "kimicode": {
+      "enabled": false
+    },
+    "antigravity": {
+      "enabled": false
+    },
+    "gemini": {
+      "enabled": false
+    },
+    "qwen": {
+      "enabled": false
+    }
+  },
+  "sharedEnvironmentVariables": {
+    "GRIMOIRE_FIXTURE": "1"
+  },
+  "envSnippets": [],
+  "customModelAliases": [],
+  "hiddenProviderCommands": {},
+  "advancedSectionsOpen": {}
+}

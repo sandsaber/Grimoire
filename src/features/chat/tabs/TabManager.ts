@@ -2,15 +2,14 @@ import { Notice } from 'obsidian';
 
 import { truncateTitleOnWordBoundary } from '../../../core/prompt/titleLength';
 import { getOpaqueProviderState } from '../../../core/providers/getOpaqueProviderState';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type { ProviderCommandsPort } from '../../../core/providers/ProviderModule';
+import type { ProviderWarmupMode } from '../../../core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
   ProviderId,
-  ProviderTabWarmupContext,
-  ProviderTabWarmupMode,
 } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatMessage, Conversation, SlashCommand } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
@@ -23,7 +22,6 @@ import {
   deactivateTab,
   destroyTab,
   type ForkContext,
-  getTabSettingsSnapshot,
   getTabTitle,
   initializeTabControllers,
   initializeTabService,
@@ -32,6 +30,7 @@ import {
   setupServiceCallbacks,
   wireTabInputEvents,
 } from './Tab';
+import { resolveTabProjectionExecution } from './tabProjectionExecution';
 import {
   type ClosedTabSnapshot,
   MAX_TAB_TITLE_LENGTH,
@@ -41,6 +40,7 @@ import {
   type TabBarItem,
   type TabData,
   type TabId,
+  type TabLifecycleState,
   type TabManagerCallbacks,
   type TabManagerInterface,
   type TabManagerViewHost,
@@ -81,9 +81,21 @@ type ProviderCommandCacheEntry = {
 type ProviderWarmupContext = {
   conversation: Conversation | null;
   externalContextPaths: string[];
-  runtime: ChatRuntime | null;
-  tab: ProviderTabWarmupContext['tab'];
-  warmupMode: ProviderTabWarmupMode;
+  runtime: ExecutionChatRuntimeAdapter | null;
+  /**
+   * The tab, as the warm-up path reads it.
+   *
+   * Declared here now rather than borrowed from a provider contribution's
+   * context type: that context was built for a policy nobody consulted, and
+   * this is the only shape still using any of it.
+   */
+  tab: {
+    conversationId: string | null;
+    draftModel: string | null;
+    lifecycleState: TabLifecycleState;
+    providerId: ProviderId;
+  };
+  warmupMode: ProviderWarmupMode;
 };
 
 type ProviderCommandContext = ProviderWarmupContext & {
@@ -110,7 +122,7 @@ export class TabManager implements TabManagerInterface {
   private callbacks: TabManagerCallbacks;
   private providerCommandWarmups = new Map<TabId, ProviderCommandWarmupEntry>();
   private providerCommandCache = new Map<TabId, ProviderCommandCacheEntry>();
-  private warmRuntimes = new WarmRuntimeLru<ChatRuntime>(MAX_WARM_PROVIDER_RUNTIMES);
+  private warmRuntimes = new WarmRuntimeLru<ExecutionChatRuntimeAdapter>(MAX_WARM_PROVIDER_RUNTIMES);
   private isRestoringState = false;
 
   /** Guard to prevent concurrent tab switches. */
@@ -140,9 +152,11 @@ export class TabManager implements TabManagerInterface {
   }
 
   private getUserTabCount(): number {
-    return Array.from(this.tabs.values())
-      .filter((tab) => tab.orchestratorTabId == null)
-      .length;
+    // Every tab is a user tab now. Worker tabs were the exception — they were
+    // spawned per task of an approved plan and bypassed the cap because one
+    // plan owned the fleet — and a worker is a dispatched agent rather than a
+    // tab, so there is nothing left to exclude.
+    return this.tabs.size;
   }
 
   private hasStartedConversation(conversation: Conversation | null | undefined): conversation is Conversation {
@@ -153,8 +167,8 @@ export class TabManager implements TabManagerInterface {
       return true;
     }
     try {
-      const historyService = ProviderRegistry.getConversationHistoryService(conversation.providerId);
-      return !!historyService.resolveSessionIdForConversation?.(conversation);
+      return !!providerCatalog().declarations(conversation.providerId)
+        .conversationState?.resolveSessionId(conversation);
     } catch {
       return !!conversation.sessionId;
     }
@@ -256,6 +270,15 @@ export class TabManager implements TabManagerInterface {
       onConversationIdChanged: (conversationId) => {
         // Sync tab.conversationId when conversation is lazily created
         tab.conversationId = conversationId;
+        // The tab is showing a different conversation now, so its projection is
+        // a different conversation's. Detaching first is what stops the old
+        // one's turn being drawn into the new one's column.
+        const execution = resolveTabProjectionExecution(tab, this.plugin);
+        if (conversationId) {
+          void execution?.open(conversationId);
+        } else {
+          execution?.detach();
+        }
         this.callbacks.onTabConversationChanged?.(tab.id, conversationId);
       },
     });
@@ -290,6 +313,11 @@ export class TabManager implements TabManagerInterface {
       () => this.getProviderCatalogConfig(tab),
     );
 
+    // After the controllers, because a tab's binding reads its renderer and its
+    // stream controller. `null` unless this tab's provider is on the projection
+    // path, which is what keeps the flip to one provider at a time.
+    resolveTabProjectionExecution(tab, this.plugin);
+
     // Wire input event handlers
     wireTabInputEvents(tab, this.plugin);
 
@@ -300,41 +328,6 @@ export class TabManager implements TabManagerInterface {
       await this.switchToTab(tab.id);
     } else if (!this.isRestoringState) {
       this.maybePrimeProviderRuntime(tab);
-    }
-
-    return tab;
-  }
-
-  /**
-   * Creates a background worker tab for an orchestrator. Worker tabs intentionally
-   * bypass the user-facing tab cap because a single approved plan owns the fleet.
-   */
-  async createWorkerTab(orchestratorTabId: TabId): Promise<TabData | null> {
-    const orchestratorTab = this.tabs.get(orchestratorTabId);
-    const providerId = orchestratorTab
-      ? getTabProviderId(orchestratorTab, this.plugin)
-      : undefined;
-    const draftSettings = orchestratorTab
-      ? getTabSettingsSnapshot(orchestratorTab, this.plugin)
-      : undefined;
-    const draftModel = typeof draftSettings?.model === 'string'
-      ? draftSettings.model
-      : undefined;
-    const tab = await this.createTab(undefined, undefined, {
-      activate: false,
-      bypassTabLimit: true,
-      ...(draftModel ? { draftModel } : {}),
-      ...(draftSettings ? { draftSettings: cloneValue(draftSettings) } : {}),
-      ...(providerId ? { providerId } : {}),
-    });
-    if (!tab) {
-      return null;
-    }
-
-    tab.orchestratorTabId = orchestratorTabId;
-    if (orchestratorTab) {
-      orchestratorTab.workerTabIds = orchestratorTab.workerTabIds ?? [];
-      orchestratorTab.workerTabIds.push(tab.id);
     }
 
     return tab;
@@ -385,12 +378,8 @@ export class TabManager implements TabManagerInterface {
         // Passive sync is only safe once local tab state has been persisted.
         const conversation = this.plugin.getConversationSync(tab.conversationId);
         if (conversation) {
-          const hasStartedSession = this.hasStartedConversation(conversation);
-          const externalContextPaths = hasStartedSession
-            ? conversation.externalContextPaths || []
-            : (this.plugin.settings.persistentExternalContextPaths || []);
 
-          tab.service.syncConversationState(conversation, externalContextPaths);
+          tab.service.syncConversationState(conversation);
         }
       } else if (!tab.conversationId && tab.state.messages.length === 0) {
         // New tab with no conversation - initialize welcome greeting
@@ -479,8 +468,6 @@ export class TabManager implements TabManagerInterface {
       draftSettings: tab.draftSettings ? cloneValue(tab.draftSettings) : null,
       titleOverride: tab.titleOverride ?? null,
       orchestratorMode: tab.orchestratorMode,
-      orchestratorTabId: tab.orchestratorTabId,
-      workerTabIds: tab.workerTabIds ? [...tab.workerTabIds] : undefined,
       inputValue: tab.dom.inputEl.value,
     };
 
@@ -503,8 +490,6 @@ export class TabManager implements TabManagerInterface {
       });
       if (!tab) continue;
 
-      tab.orchestratorTabId = snapshot.orchestratorTabId;
-      tab.workerTabIds = snapshot.workerTabIds ? [...snapshot.workerTabIds] : undefined;
       tab.dom.inputEl.value = snapshot.inputValue;
       this.moveTabToIndex(tab.id, snapshot.index);
       restored.push(tab);
@@ -668,8 +653,6 @@ export class TabManager implements TabManagerInterface {
         isStreaming: tab.state.isStreaming,
         needsAttention: tab.state.needsAttention,
         canClose: this.tabs.size > 1,
-        isOrchestrator: (tab.workerTabIds?.length ?? 0) > 0,
-        isWorker: tab.orchestratorTabId != null,
       });
     }
 
@@ -839,13 +822,13 @@ export class TabManager implements TabManagerInterface {
       ? this.buildForkTitle(context.sourceTitle, context.forkAtUserMessage)
       : undefined;
 
-    const forkProviderState = ProviderRegistry
-      .getConversationHistoryService(conversation.providerId)
-      .buildForkProviderState(
+    const forkProviderState = providerCatalog()
+      .declarations(conversation.providerId).conversationState
+      ?.forkState(
         context.sourceSessionId,
         context.resumeAt,
         context.sourceProviderState,
-      );
+      ) ?? {};
 
     await this.plugin.updateConversation(conversation.id, {
       messages: context.messages,
@@ -1019,14 +1002,19 @@ export class TabManager implements TabManagerInterface {
     }
 
     const providerId = getTabProviderId(targetTab, this.plugin);
-    const staticCapabilities = ProviderRegistry.getCapabilities(providerId);
+    const staticCapabilities = providerCatalog().capabilities(providerId);
     if (!staticCapabilities.supportsProviderCommands) {
       return [];
     }
 
-    const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
-    const runtimeCommandLoader = ProviderWorkspaceRegistry.getRuntimeCommandLoader(providerId);
+    const runtimeCommandsPort = await this.runtimeCommandsPortFor(providerId);
+    const runtimeCommandLoader = runtimeCommandsPort?.loadCommands ? runtimeCommandsPort : null;
     const context = await this.buildProviderWarmupContext(targetTab, providerId);
+    // Read after the warm-up context, not before it: building the workspace is
+    // asynchronous now, and an await placed ahead of the lifecycle checks lets
+    // another tab's runtime finish becoming ready in between — which is a
+    // different answer, not a slower one.
+    const catalog = await this.commandsPortFor(providerId);
     if (
       targetTab.lifecycleState === 'blank'
       && runtimeCommandLoader
@@ -1068,7 +1056,7 @@ export class TabManager implements TabManagerInterface {
     providerId: ProviderId,
     warmupContext?: ProviderWarmupContext,
   ): Promise<SlashCommand[]> {
-    if (!this.isProviderCommandLoaderAvailable(providerId)) {
+    if (!await this.isProviderCommandLoaderAvailable(providerId)) {
       return [];
     }
 
@@ -1113,10 +1101,21 @@ export class TabManager implements TabManagerInterface {
     void this.prewarmProviderTab(tab).catch(() => {});
   }
 
-  private isProviderCommandLoaderAvailable(providerId: ProviderId): boolean {
-    const loader = ProviderWorkspaceRegistry.getRuntimeCommandLoader(providerId);
-    if (!loader) return false;
-    return loader.isAvailable(this.plugin.settings);
+  private async isProviderCommandLoaderAvailable(providerId: ProviderId): Promise<boolean> {
+    const port = await this.runtimeCommandsPortFor(providerId);
+    return port?.isAvailable?.(this.plugin.settings) ?? false;
+  }
+
+  /**
+   * This provider's runtime-command slot, through the application.
+   *
+   * The registry accessor this replaces was the host reaching into a provider's
+   * workspace services by id. The slot carries the same two members, and the
+   * policy they are called with is the host's — which is what let them move.
+   */
+  private async runtimeCommandsPortFor(providerId: ProviderId) {
+    return (await this.plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))
+      ?.runtimeCommands;
   }
 
   private async prewarmProviderTab(tab: TabData): Promise<void> {
@@ -1157,14 +1156,14 @@ export class TabManager implements TabManagerInterface {
       return;
     }
 
-    runtime.syncConversationState(context.conversation, context.externalContextPaths);
+    runtime.syncConversationState(context.conversation);
     await runtime.ensureReady();
     this.touchWarmRuntime(tab);
     if (tab.lifecycleState === 'blank') {
       tab.ui.modelSelector?.updateDisplay();
       tab.ui.modelSelector?.renderOptions();
     }
-    if (ProviderRegistry.getCapabilities(providerId).supportsProviderCommands) {
+    if (providerCatalog().capabilities(providerId).supportsProviderCommands) {
       await this.getSdkCommands(tab.id);
     }
   }
@@ -1182,18 +1181,7 @@ export class TabManager implements TabManagerInterface {
         ? conversation?.externalContextPaths ?? []
         : this.plugin.settings.persistentExternalContextPaths ?? []);
     const runtime = tab.service?.providerId === providerId ? tab.service : null;
-    const warmupMode = this.resolveProviderTabWarmupMode({
-      conversation,
-      externalContextPaths,
-      plugin: this.plugin,
-      runtime,
-      tab: {
-        conversationId: tab.conversationId,
-        draftModel: tab.draftModel,
-        lifecycleState: tab.lifecycleState,
-        providerId,
-      },
-    });
+    const warmupMode = this.resolveProviderTabWarmupMode(providerId);
 
     return {
       conversation,
@@ -1209,8 +1197,16 @@ export class TabManager implements TabManagerInterface {
     };
   }
 
-  private resolveProviderTabWarmupMode(context: ProviderTabWarmupContext): ProviderTabWarmupMode {
-    return ProviderWorkspaceRegistry.getTabWarmupPolicy(context.tab.providerId)?.resolveMode(context) ?? 'none';
+  /**
+   * How much of this tab's provider to prime before anything is sent.
+   *
+   * **Read from the catalog's declaration, not from a workspace service.** It
+   * used to be a policy taking the conversation, the plugin, the runtime and
+   * the tab's lifecycle state — and every provider that had one returned a
+   * constant and read none of it. A declaration is what it always was.
+   */
+  private resolveProviderTabWarmupMode(providerId: ProviderId): ProviderWarmupMode {
+    return providerCatalog().declarations(providerId).warmup;
   }
 
   private buildProviderCommandContext(
@@ -1247,9 +1243,9 @@ export class TabManager implements TabManagerInterface {
     providerId: ProviderId,
     context: ProviderCommandContext,
   ): Promise<SlashCommand[]> {
-    const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
-    const loader = ProviderWorkspaceRegistry.getRuntimeCommandLoader(providerId);
-    if (!catalog || !loader) {
+    const catalog = await this.commandsPortFor(providerId);
+    const loader = await this.runtimeCommandsPortFor(providerId);
+    if (!catalog || !loader?.loadCommands) {
       return [];
     }
     const commands = await loader.loadCommands({
@@ -1258,7 +1254,6 @@ export class TabManager implements TabManagerInterface {
         && tab.id === this.activeTabId,
       conversation: context.conversation,
       externalContextPaths: context.externalContextPaths,
-      plugin: this.plugin,
       runtime: context.runtime,
     });
 
@@ -1304,7 +1299,7 @@ export class TabManager implements TabManagerInterface {
           return;
         }
 
-        runtime.cleanup();
+        void runtime.cleanup();
         tab.service = null;
         tab.serviceInitialized = false;
         if (tab.lifecycleState === 'bound_active') {
@@ -1329,16 +1324,28 @@ export class TabManager implements TabManagerInterface {
   // Provider Command Catalog
   // ============================================
 
+  /**
+   * The provider's command catalog, built on demand.
+   *
+   * Every caller is already asynchronous. The one that was not —
+   * `getProviderCatalogConfig` — needed only the dropdown's trigger characters
+   * synchronously, and those are a declaration now.
+   */
+  private async commandsPortFor(providerId: ProviderId): Promise<ProviderCommandsPort | undefined> {
+    return (await this.plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))?.commands;
+  }
+
   private getProviderCatalogConfig(tab: TabData) {
     const providerId = getTabProviderId(tab, this.plugin);
-    const catalog = ProviderWorkspaceRegistry.getCommandCatalog(providerId);
-    if (!catalog) return null;
+    const dropdown = providerCatalog().declarations(providerId).commandDropdown;
+    if (!dropdown) return null;
 
     return {
-      config: catalog.getDropdownConfig(),
+      config: { providerId, ...dropdown },
       getEntries: async () => {
         await this.getSdkCommands(tab.id);
-        return catalog.listDropdownEntries({ includeBuiltIns: false });
+        return (await this.commandsPortFor(providerId))
+          ?.listDropdownEntries({ includeBuiltIns: false }) ?? [];
       },
     };
   }
@@ -1352,13 +1359,13 @@ export class TabManager implements TabManagerInterface {
    * Used by settings managers to apply configuration changes to all tabs.
    * @param fn Function to call on each runtime.
    */
-  async broadcastToAllTabs(fn: (service: ChatRuntime) => Promise<void>): Promise<void> {
+  async broadcastToAllTabs(fn: (service: ExecutionChatRuntimeAdapter) => Promise<void>): Promise<void> {
     await this.broadcastToTabs(this.tabs.values(), fn);
   }
 
   async broadcastToProviderTabs(
     providerIds: ProviderId | ProviderId[],
-    fn: (service: ChatRuntime) => Promise<void>,
+    fn: (service: ExecutionChatRuntimeAdapter) => Promise<void>,
   ): Promise<void> {
     await this.broadcastToTabs(
       this.filterTabsByProvider(providerIds, (tab) => tab.service?.providerId ?? tab.providerId),
@@ -1368,7 +1375,7 @@ export class TabManager implements TabManagerInterface {
 
   private async broadcastToTabs(
     tabs: Iterable<TabData>,
-    fn: (service: ChatRuntime) => Promise<void>,
+    fn: (service: ExecutionChatRuntimeAdapter) => Promise<void>,
   ): Promise<void> {
     const promises: Promise<void>[] = [];
 

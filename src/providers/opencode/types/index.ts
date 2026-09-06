@@ -1,9 +1,10 @@
 export interface OpencodeProviderState {
   databasePath?: string;
   /**
-   * Set when a saved session failed to load and no replacement was persisted.
-   * Read back on the next load so a dropped session is not mistaken for a
-   * conversation that never had one.
+   * Set when the agent no longer had this conversation's saved session and a
+   * fresh one took its place. Read back on load, because the conversation is
+   * reopened by a runtime that never saw the drop — and cleared by the next
+   * resume that succeeds, which is the turn where the notice has done its job.
    */
   sessionDropped?: boolean;
 }

@@ -8,10 +8,6 @@ jest.mock('@/providers/claude/history/ClaudeHistoryStore', () => ({
   locateSDKSessions: jest.fn(),
 }));
 
-jest.mock('@/core/providers/ProviderWorkspaceRegistry', () => ({
-  ProviderWorkspaceRegistry: { getServices: jest.fn().mockReturnValue(null) },
-}));
-
 import {
   loadSDKSessionMessages,
   locateSDKSessions,

@@ -9,7 +9,6 @@ export type AcpSessionConfigValueId = string;
 export type AcpToolCallId = string;
 export type AcpPermissionOptionId = string;
 export type AcpPositionEncodingKind = 'utf-16' | 'utf-32' | 'utf-8';
-export type AcpRole = 'assistant' | 'user';
 export type AcpStopReason = string;
 
 export interface AcpImplementation {
@@ -141,8 +140,24 @@ export interface AcpSessionModeState {
   currentModeId: AcpSessionModeId;
 }
 
+/**
+ * One model a session offers, in the shape ACP actually sends it.
+ *
+ * `modelId` is the wire's name and `id` is Grimoire's, and for a long time only
+ * the second was declared. Three recordings say otherwise —
+ * `gemini 0.55.1`, `grok`, `mimo` all answer `session/new` with `modelId` — so
+ * every consumer reading `.id` was reading `undefined`: Gemini threw on
+ * `.trim()` and took the session open down with it, and its two siblings
+ * silently discovered no models at all.
+ *
+ * Both are optional and `extractAcpSessionModelState` is what resolves them into
+ * one, so a caller never has to know which name a given CLI used.
+ */
 export interface AcpModelInfo {
-  id: string;
+  /** The wire's name for it, which is what a real agent sends. */
+  modelId?: string;
+  /** Grimoire's, kept because every consumer of this type reads it. */
+  id?: string;
   name: string;
   description?: string | null;
 }
@@ -207,10 +222,15 @@ export interface AcpLoadSessionResponse {
   models?: AcpSessionModelState | null;
   modes?: AcpSessionModeState | null;
   /**
-   * Optional: `session/load` speaks about the session the client named, so an
-   * agent need not repeat its id. Grok Build 1.0.13 answers with `models` and
-   * `_meta` alone and carries the id only under `_meta.sessionId`, so a runtime
-   * that binds to this field binds to `undefined`.
+   * Optional, because a real agent omits it: `session/load` speaks about the
+   * session the client named, so an agent need not repeat its id.
+   *
+   * OpenCode 1.18.18 answers `session/load` with `configOptions` and nothing
+   * else — the load is confirmed by succeeding, not by echoing the id it was
+   * given. Grok Build 1.0.13 answers with `models` and `_meta` alone and
+   * carries the id only under `_meta.sessionId`. Declared required, it made
+   * every resume look like a load that had returned some other session, and a
+   * runtime that binds to this field binds to `undefined`.
    */
   sessionId?: AcpSessionId | null;
 }
@@ -301,6 +321,16 @@ export interface AcpUsage {
 }
 
 export interface AcpPromptResponse {
+  /**
+   * ACP's extension slot, which is where some agents put the turn's tokens.
+   *
+   * Not interpreted here — what a vendor writes under its own key is that
+   * vendor's business, and a provider reads its own. Typed because it was
+   * absent, and a field the model does not know is a field nobody looks for:
+   * Gemini answers every prompt with `_meta.quota.token_count` and its live row
+   * about usage was recorded as "no usage on the wire at all".
+   */
+  _meta?: Record<string, unknown> | null;
   stopReason: AcpStopReason;
   usage?: AcpUsage | null;
   userMessageId?: string | null;

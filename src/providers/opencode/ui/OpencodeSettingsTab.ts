@@ -1,12 +1,14 @@
 import * as fs from 'fs';
 import { Setting } from 'obsidian';
 
-import type { ProviderSettingsTabRenderer } from '../../../core/providers/types';
 import { renderEnvironmentSettingsSection } from '../../../features/settings/ui/EnvironmentSettingsSection';
 import { McpSettingsManager } from '../../../features/settings/ui/McpSettingsManager';
 import { renderProviderDisabledNotice } from '../../../features/settings/ui/ProviderDisabledNotice';
 import { ProviderSkillSettings } from '../../../features/settings/ui/ProviderSkillSettings';
 import { t } from '../../../i18n/i18n';
+import type {
+  ProviderSettingsTabRenderer,
+} from '../../../providers/shared/providerHostContracts';
 import { sameStringList } from '../../../utils/collections';
 import { getHostnameKey } from '../../../utils/env';
 import { expandHomePath } from '../../../utils/path';
@@ -14,11 +16,9 @@ import { maybeGetOpencodeWorkspaceServices } from '../app/OpencodeWorkspaceServi
 import { clearOpencodeDiscoveryState } from '../discoveryState';
 import {
   buildOpencodeBaseModels,
-  encodeOpencodeModelId,
   type OpencodeDiscoveredModel,
   splitOpencodeModelLabel,
 } from '../models';
-import { OpencodeChatRuntime } from '../runtime/OpencodeChatRuntime';
 import {
   getOpencodeProviderSettings,
   normalizeOpencodeVisibleModels,
@@ -28,7 +28,6 @@ import {
 import { OpencodeAgentSettings } from './OpencodeAgentSettings';
 
 const ALL_PROVIDERS_KEY = 'all';
-const OPENCODE_METADATA_WARMUP_DB = ':memory:';
 
 interface EnrichedModel {
   description: string;
@@ -41,7 +40,7 @@ interface EnrichedModel {
 
 export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
   render(container, context) {
-    const opencodeWorkspace = maybeGetOpencodeWorkspaceServices();
+    const opencodeWorkspace = maybeGetOpencodeWorkspaceServices(context.plugin);
     const settingsBag = context.plugin.settings as unknown as Record<string, unknown>;
     const opencodeSettings = getOpencodeProviderSettings(settingsBag);
     const hostnameKey = getHostnameKey();
@@ -251,20 +250,17 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     };
 
     const persistModelMetadata = async (rawId: string): Promise<void> => {
-      const runtime = new OpencodeChatRuntime(context.plugin);
       try {
-        runtime.syncConversationState({
-          providerState: { databasePath: OPENCODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.warmModelMetadata(encodeOpencodeModelId(rawId));
+        // Opportunistic: a metadata session that cannot open leaves the
+        // question for the first chat turn, which asks it anyway.
+        const loaded = await context.plugin.getOpencodeExecution()
+          .metadata.discoverMetadata({ rawModelId: rawId });
         if (loaded) {
           context.refreshModelSelectors();
         }
       } catch {
-        // Metadata warmup is opportunistic; the first chat turn can still discover it.
-      } finally {
-        runtime.cleanup();
+        // Including a plugin whose kernel has not started: the settings tab
+        // opens either way.
       }
     };
 
@@ -556,13 +552,8 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
       modelCatalogLoadFailed = false;
       renderAll();
 
-      const runtime = new OpencodeChatRuntime(context.plugin);
       try {
-        runtime.syncConversationState({
-          providerState: { databasePath: OPENCODE_METADATA_WARMUP_DB },
-          sessionId: null,
-        });
-        const loaded = await runtime.ensureReady({ allowSessionCreation: true });
+        const loaded = await context.plugin.getOpencodeExecution().metadata.discoverMetadata();
         modelCatalogLoadFailed = !loaded || getOpencodeProviderSettings(settingsBag).discoveredModels.length === 0;
         if (!modelCatalogLoadFailed) {
           context.refreshModelSelectors();
@@ -571,7 +562,6 @@ export const opencodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
         modelCatalogLoadFailed = true;
       } finally {
         loadingModelCatalog = false;
-        runtime.cleanup();
         renderAll();
       }
     };

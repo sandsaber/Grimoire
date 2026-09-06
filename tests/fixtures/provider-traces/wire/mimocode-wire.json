@@ -1,0 +1,913 @@
+{
+  "schemaVersion": 1,
+  "providerId": "mimocode",
+  "kind": "wire-recording",
+  "recordedAgainst": "mimo 0.1.13",
+  "transport": "stdio JSON-RPC 2.0 (`mimo acp`)",
+  "coverage": "partial",
+  "cases": [
+    "initialize",
+    "session/new",
+    "session/set_config_option",
+    "session/prompt"
+  ],
+  "sessionUpdatesObserved": [
+    "available_commands_update",
+    "usage_update"
+  ],
+  "serverMethodsObserved": [
+    "session/update"
+  ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content.",
+  "exchange": [
+    {
+      "seq": 1,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 2,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "promptCapabilities": {
+              "embeddedContext": true,
+              "image": true
+            },
+            "sessionCapabilities": {
+              "fork": {},
+              "list": {},
+              "resume": {}
+            }
+          },
+          "authMethods": [
+            {
+              "description": "Run `opencode auth login` in the terminal",
+              "name": "Login with opencode",
+              "id": "opencode-login"
+            }
+          ],
+          "agentInfo": {
+            "name": "OpenCode",
+            "version": "0.1.13"
+          }
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/new",
+        "params": {
+          "cwd": "/tmp/grimoire-mimocode-wire-QDSdEZ",
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "sessionId": "ses_-ffe5fd9eb2b92ffeA9iKMROv8",
+          "configOptions": [
+            {
+              "id": "model",
+              "name": "Model",
+              "category": "model",
+              "type": "select",
+              "currentValue": "xiaomi/mimo-v2.5-pro-ultraspeed",
+              "options": [
+                {
+                  "value": "mimo/mimo-auto",
+                  "name": "MiMo Auto (free)/MiMo Auto"
+                },
+                {
+                  "value": "mimo/mimo-auto/low",
+                  "name": "MiMo Auto (free)/MiMo Auto (low)"
+                },
+                {
+                  "value": "mimo/mimo-auto/medium",
+                  "name": "MiMo Auto (free)/MiMo Auto (medium)"
+                },
+                {
+                  "value": "mimo/mimo-auto/high",
+                  "name": "MiMo Auto (free)/MiMo Auto (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/low",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/medium",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/high",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro",
+                  "name": "Xiaomi/MiMo-V2.5-Pro"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/low",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/medium",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/high",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5",
+                  "name": "Xiaomi/MiMo-V2.5"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/low",
+                  "name": "Xiaomi/MiMo-V2.5 (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/medium",
+                  "name": "Xiaomi/MiMo-V2.5 (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/high",
+                  "name": "Xiaomi/MiMo-V2.5 (high)"
+                }
+              ]
+            },
+            {
+              "id": "mode",
+              "name": "Session Mode",
+              "category": "mode",
+              "type": "select",
+              "currentValue": "build",
+              "options": [
+                {
+                  "value": "build",
+                  "name": "build",
+                  "description": "Executes tools based on configured permissions."
+                },
+                {
+                  "value": "plan",
+                  "name": "plan",
+                  "description": "Plan mode. Disallows all edit tools."
+                },
+                {
+                  "value": "compose",
+                  "name": "compose",
+                  "description": "Compose mode (deprecated). Orchestrates workflows with built-in compose skills. For Fable/Sol-class models, use Build and run /compose-next instead."
+                }
+              ]
+            }
+          ],
+          "models": {
+            "currentModelId": "xiaomi/mimo-v2.5-pro-ultraspeed",
+            "availableModels": [
+              {
+                "modelId": "mimo/mimo-auto",
+                "name": "MiMo Auto (free)/MiMo Auto"
+              },
+              {
+                "modelId": "mimo/mimo-auto/low",
+                "name": "MiMo Auto (free)/MiMo Auto (low)"
+              },
+              {
+                "modelId": "mimo/mimo-auto/medium",
+                "name": "MiMo Auto (free)/MiMo Auto (medium)"
+              },
+              {
+                "modelId": "mimo/mimo-auto/high",
+                "name": "MiMo Auto (free)/MiMo Auto (high)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro-ultraspeed",
+                "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro-ultraspeed/low",
+                "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (low)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro-ultraspeed/medium",
+                "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (medium)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro-ultraspeed/high",
+                "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (high)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro",
+                "name": "Xiaomi/MiMo-V2.5-Pro"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro/low",
+                "name": "Xiaomi/MiMo-V2.5-Pro (low)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro/medium",
+                "name": "Xiaomi/MiMo-V2.5-Pro (medium)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5-pro/high",
+                "name": "Xiaomi/MiMo-V2.5-Pro (high)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5",
+                "name": "Xiaomi/MiMo-V2.5"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5/low",
+                "name": "Xiaomi/MiMo-V2.5 (low)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5/medium",
+                "name": "Xiaomi/MiMo-V2.5 (medium)"
+              },
+              {
+                "modelId": "xiaomi/mimo-v2.5/high",
+                "name": "Xiaomi/MiMo-V2.5 (high)"
+              }
+            ]
+          },
+          "modes": {
+            "availableModes": [
+              {
+                "id": "build",
+                "name": "build",
+                "description": "Executes tools based on configured permissions."
+              },
+              {
+                "id": "plan",
+                "name": "plan",
+                "description": "Plan mode. Disallows all edit tools."
+              },
+              {
+                "id": "compose",
+                "name": "compose",
+                "description": "Compose mode (deprecated). Orchestrates workflows with built-in compose skills. For Fable/Sol-class models, use Build and run /compose-next instead."
+              }
+            ],
+            "currentModeId": "build"
+          },
+          "_meta": {
+            "opencode": {
+              "modelId": "xiaomi/mimo-v2.5-pro-ultraspeed",
+              "variant": null,
+              "availableVariants": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "ses_-ffe5fd9eb2b92ffeA9iKMROv8",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "init",
+                "description": "guided AGENTS.md setup"
+              },
+              {
+                "name": "review",
+                "description": "review changes [commit|branch|pr], defaults to uncommitted"
+              },
+              {
+                "name": "dream",
+                "description": "manually consolidate project memory from memory files and raw trajectory"
+              },
+              {
+                "name": "distill",
+                "description": "find repeated workflows in recent work and package them into skills, subagents, or commands"
+              },
+              {
+                "name": "goal",
+                "description": "set a stop-condition goal; runs until a judge says it's met. /goal clear to abort"
+              },
+              {
+                "name": "rebuild",
+                "description": "rebuild the conversation context now from the latest checkpoint (frees context; keeps recent messages)"
+              },
+              {
+                "name": "loops",
+                "description": "list active scheduled jobs; accepts `cancel <id>` to delete one"
+              },
+              {
+                "name": "arxiv",
+                "description": "Use this skill whenever the user wants to find, read, cite, track, download, or analyze academic papers on arXiv. That includes: searching papers by topic, author, category, or arXiv ID; fet… (elided)"
+              },
+              {
+                "name": "claude-code",
+                "description": "Operate Claude Code CLI (v2.1+) via the terminal only when the user explicitly requests Claude Code or names this skill. Covers print mode (-p), interactive tmux sessions, and background (--… (elided)"
+              },
+              {
+                "name": "codex",
+                "description": "Run, configure, and troubleshoot OpenAI Codex CLI in non-interactive headless environments. Use for Codex automation in Bash or PowerShell, native Windows or WSL2, shell scripts, CI/CD, Dock… (elided)"
+              },
+              {
+                "name": "compose-next",
+                "description": "Use for multi-step feature work, bug fixes, or refactors where requirements need to settle, a feature document should carry design + tasks + delivery evidence, and the change deserves indepe… (elided)"
+              },
+              {
+                "name": "data-analytics",
+                "description": "Use this skill for quantitative product or business analysis: data quality checks, metric diagnostics, KPI design and reporting, dashboards, analytical reports, charts, notebooks, market siz… (elided)"
+              },
+              {
+                "name": "deep-research",
+                "description": "Deep research on any topic using parallel sub-agents and built-in tools only (WebSearch/WebFetch + free APIs, no keys). Use when the user asks for a thorough multi-source investigation with … (elided)"
+              },
+              {
+                "name": "design-blueprint",
+                "description": "Produces a structured design specification (DESIGN.md + structural layout + Decision Trace) before any visual artifact is built — the \"blueprint\" phase that keeps AI-generated design from fe… (elided)"
+              },
+              {
+                "name": "docx-official",
+                "description": "Use this skill whenever a Microsoft Word (.docx) file is being produced, opened, transformed, or read. That includes: drafting reports, letters, contracts, RFPs, technical documents, or any … (elided)"
+              },
+              {
+                "name": "drive-mimo",
+                "description": "Use when you need to programmatically drive another MiMoCode (mimo) process — supports both headless `mimo run` with JSON events and interactive TUI via tmux for full terminal interaction te… (elided)"
+              },
+              {
+                "name": "evolve",
+                "description": "Use when you want to modify ANY aspect of yourself — your capabilities (new/overridden tools), your behavior (hooks that intercept every tool call, LLM request, session and subagent lifecycl… (elided)"
+              },
+              {
+                "name": "frontend-design",
+                "description": "Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Use whenever the task produces or modifies anything a user will see rendered — websites… (elided)"
+              },
+              {
+                "name": "grok-build",
+                "description": "Reference and workflow guidance for the Grok Build CLI (`grok`), including interactive and headless runs, authentication, sessions, worktrees, permissions, sandboxing, MCP servers, plugins, … (elided)"
+              },
+              {
+                "name": "html-to-video-pipeline",
+                "description": "Reliable HTML-to-MP4 rendering via headless browser recording (Playwright/Puppeteer) + ffmpeg — the ordering, gotchas, and verification steps you MUST get right or the output silently rots. … (elided)"
+              },
+              {
+                "name": "learn-everything",
+                "description": "Turn an uploaded PDF, paper, book chapter, document, URL, or user-provided topic into a structured, interactive learning course. Use when the user wants to learn, study, understand, master, … (elided)"
+              },
+              {
+                "name": "loop",
+                "description": "Schedule a prompt to fire on a fixed cadence (recurring loop). Use when the user asks to \"run X every N minutes/hours/days\", \"loop X\", \"babysit Y\", \"be proactive about Y every N\", or invokes… (elided)"
+              },
+              {
+                "name": "memory-search",
+                "description": "Query the raw trajectory SQLite database directly when the built-in memory and history tools are insufficient. Use when you need structured analysis across sessions: finding repeated errors,… (elided)"
+              },
+              {
+                "name": "mimocode-docs",
+                "description": "Use whenever the user asks about MiMoCode itself: features, TUI or CLI commands, keybindings, terminal compatibility, rendering glitches, TUI lag, SSH or remote rendering, agent modes (build… (elided)"
+              },
+              {
+                "name": "modern-python-toolchain",
+                "description": "Modern Python project setup with uv, ruff, and pyright. Use when initializing a new Python project, configuring the Python environment, setting up linting/formatting, or when a project needs… (elided)"
+              },
+              {
+                "name": "pdf-official",
+                "description": "Use this skill whenever a PDF file is being produced, opened, transformed, filled, or read. That includes: extracting text or tables from an existing PDF; combining, carving, rotating, cropp… (elided)"
+              },
+              {
+                "name": "playwright",
+                "description": "Use when the task requires automating a real browser from the terminal (navigation, form filling, snapshots, screenshots, data extraction, UI-flow debugging) via `playwright-cli` or the bund… (elided)"
+              },
+              {
+                "name": "pptx-official",
+                "description": "Use this skill whenever a Microsoft PowerPoint (.pptx) file is being produced, opened, transformed, or read. That includes: authoring slide decks, pitch decks, executive readouts, training m… (elided)"
+              },
+              {
+                "name": "product-design",
+                "description": "Use this skill when Product Design is explicitly invoked or the main task is product design exploration, UX research, flow auditing or critique, visual ideation, cloning a live product surfa… (elided)"
+              },
+              {
+                "name": "research-paper-writing",
+                "description": "Write, rewrite, and polish academic papers (ML/CV/NLP style). Use when the user drafts or revises Abstract, Introduction, Related Work, Method, Experiments, or Conclusion; asks \"does this fl… (elided)"
+              },
+              {
+                "name": "sales",
+                "description": "Use this skill whenever Sales is explicitly invoked or the task involves customer meeting preparation, call follow-up, account prioritization, account signals, deal strategy, business cases,… (elided)"
+              },
+              {
+                "name": "skill-creator",
+                "description": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledg… (elided)"
+              },
+              {
+                "name": "super-research",
+                "description": "Autonomous research skill for open-ended, high-volume research work — an agent left running for a while (minutes to overnight) that produces honest, comparable, auditable evidence instead of… (elided)"
+              },
+              {
+                "name": "xlsx-official",
+                "description": "Spreadsheet toolkit. Reach for it whenever the artifact on either side of the conversation is a workbook file — .xlsx, .xlsm, .xltx, .csv, .tsv — and the user wants that artifact produced, c… (elided)"
+              },
+              {
+                "name": "compose:ask",
+                "description": "Use whenever you need a decision, clarification, or approval from the user — covers how to ask with the question tool, and how to resolve the decision yourself when no user is available (que… (elided)"
+              },
+              {
+                "name": "compose:brainstorm",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+              },
+              {
+                "name": "compose:debug",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes"
+              },
+              {
+                "name": "compose:execute",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints"
+              },
+              {
+                "name": "compose:feedback",
+                "description": "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not pe… (elided)"
+              },
+              {
+                "name": "compose:merge",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup"
+              },
+              {
+                "name": "compose:parallel",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies"
+              },
+              {
+                "name": "compose:plan",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code"
+              },
+              {
+                "name": "compose:report",
+                "description": "Use after implementation is verified and before merge — consolidates multiple spec iterations into a single final-state report, marks related specs, and records key lessons"
+              },
+              {
+                "name": "compose:review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements"
+              },
+              {
+                "name": "compose:subagent",
+                "description": "Use when executing implementation plans with independent tasks in the current session"
+              },
+              {
+                "name": "compose:tdd",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code"
+              },
+              {
+                "name": "compose:verify",
+                "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims… (elided)"
+              },
+              {
+                "name": "compose:worktree",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback"
+              },
+              {
+                "name": "karpathy-guidelines",
+                "description": "Disciplined engineering habits that keep coding work minimal, verifiable, and honest — read the code before changing it, change only what was asked, define success criteria up front, and rep… (elided)"
+              },
+              {
+                "name": "brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+              },
+              {
+                "name": "coding-guidelines",
+                "description": "Use when asking about Rust code style or best practices. Keywords: naming, formatting, comment, clippy, rustfmt, lint, code style, best practice, P.NAM, G.FMT, code review, naming convention… (elided)"
+              },
+              {
+                "name": "dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies"
+              },
+              {
+                "name": "domain-cli",
+                "description": "Use when building CLI tools. Keywords: CLI, command line, terminal, clap, structopt, argument parsing, subcommand, interactive, TUI, ratatui, crossterm, indicatif, progress bar, colored outp… (elided)"
+              },
+              {
+                "name": "domain-cloud-native",
+                "description": "Use when building cloud-native apps. Keywords: kubernetes, k8s, docker, container, grpc, tonic, microservice, service mesh, observability, tracing, metrics, health check, cloud, deployment, … (elided)"
+              },
+              {
+                "name": "domain-embedded",
+                "description": "Use when developing embedded/no_std Rust. Keywords: embedded, no_std, microcontroller, MCU, ARM, RISC-V, bare metal, firmware, HAL, PAC, RTIC, embassy, interrupt, DMA, peripheral, GPIO, SPI,… (elided)"
+              },
+              {
+                "name": "domain-fintech",
+                "description": "Use when building fintech apps. Keywords: fintech, trading, decimal, currency, financial, money, transaction, ledger, payment, exchange rate, precision, rounding, accounting, 金融, 交易系统, 货币, 支付"
+              },
+              {
+                "name": "domain-iot",
+                "description": "Use when building IoT apps. Keywords: IoT, Internet of Things, sensor, MQTT, device, edge computing, telemetry, actuator, smart home, gateway, protocol, 物联网, 传感器, 边缘计算, 智能家居"
+              },
+              {
+                "name": "domain-ml",
+                "description": "Use when building ML/AI apps in Rust. Keywords: machine learning, ML, AI, tensor, model, inference, neural network, deep learning, training, prediction, ndarray, tch-rs, burn, candle, 机器学习, 人工智能, 模型推理"
+              },
+              {
+                "name": "domain-web",
+                "description": "Use when building web services. Keywords: web server, HTTP, REST API, GraphQL, WebSocket, axum, actix, warp, rocket, tower, hyper, reqwest, middleware, router, handler, extractor, state mana… (elided)"
+              },
+              {
+                "name": "executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints"
+              },
+              {
+                "name": "find-skills",
+                "description": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilitie… (elided)"
+              },
+              {
+                "name": "finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup"
+              },
+              {
+                "name": "m01-ownership",
+                "description": "CRITICAL: Use for ownership/borrow/lifetime issues. Triggers: E0382, E0597, E0506, E0507, E0515, E0716, E0106, value moved, borrowed value does not live long enough, cannot move out of, use … (elided)"
+              },
+              {
+                "name": "m02-resource",
+                "description": "CRITICAL: Use for smart pointers and resource management. Triggers: Box, Rc, Arc, Weak, RefCell, Cell, smart pointer, heap allocation, reference counting, RAII, Drop, should I use Box or Rc,… (elided)"
+              },
+              {
+                "name": "m03-mutability",
+                "description": "CRITICAL: Use for mutability issues. Triggers: E0596, E0499, E0502, cannot borrow as mutable, already borrowed as immutable, mut, &mut, interior mutability, Cell, RefCell, Mutex, RwLock, 可变性… (elided)"
+              },
+              {
+                "name": "m04-zero-cost",
+                "description": "CRITICAL: Use for generics, traits, zero-cost abstraction. Triggers: E0277, E0308, E0599, generic, trait, impl, dyn, where, monomorphization, static dispatch, dynamic dispatch, impl Trait, t… (elided)"
+              },
+              {
+                "name": "m05-type-driven",
+                "description": "CRITICAL: Use for type-driven design. Triggers: type state, PhantomData, newtype, marker trait, builder pattern, make invalid states unrepresentable, compile-time validation, sealed trait, Z… (elided)"
+              },
+              {
+                "name": "m06-error-handling",
+                "description": "CRITICAL: Use for error handling. Triggers: Result, Option, Error, ?, unwrap, expect, panic, anyhow, thiserror, when to panic vs return Result, custom error, error propagation, 错误处理, Result … (elided)"
+              },
+              {
+                "name": "m07-concurrency",
+                "description": "CRITICAL: Use for concurrency/async. Triggers: E0277 Send Sync, cannot be sent between threads, thread, spawn, channel, mpsc, Mutex, RwLock, Atomic, async, await, Future, tokio, deadlock, ra… (elided)"
+              },
+              {
+                "name": "m09-domain",
+                "description": "CRITICAL: Use for domain modeling. Triggers: domain model, DDD, domain-driven design, entity, value object, aggregate, repository pattern, business rules, validation, invariant, 领域模型, 领域驱动设计, 业务规则"
+              },
+              {
+                "name": "m10-performance",
+                "description": "CRITICAL: Use for performance optimization. Triggers: performance, optimization, benchmark, profiling, flamegraph, criterion, slow, fast, allocation, cache, SIMD, make it faster, 性能优化, 基准测试"
+              },
+              {
+                "name": "m11-ecosystem",
+                "description": "Use when integrating crates or ecosystem questions. Keywords: E0425, E0433, E0603, crate, cargo, dependency, feature flag, workspace, which crate to use, using external C libraries, creating… (elided)"
+              },
+              {
+                "name": "m12-lifecycle",
+                "description": "Use when designing resource lifecycles. Keywords: RAII, Drop, resource lifecycle, connection pool, lazy initialization, connection pool design, resource cleanup patterns, cleanup, scope, Onc… (elided)"
+              },
+              {
+                "name": "m13-domain-error",
+                "description": "Use when designing domain error handling. Keywords: domain error, error categorization, recovery strategy, retry, fallback, domain error hierarchy, user-facing vs internal errors, error code… (elided)"
+              },
+              {
+                "name": "m14-mental-model",
+                "description": "Use when learning Rust concepts. Keywords: mental model, how to think about ownership, understanding borrow checker, visualizing memory layout, analogy, misconception, explaining ownership, … (elided)"
+              },
+              {
+                "name": "m15-anti-pattern",
+                "description": "Use when reviewing code for anti-patterns. Keywords: anti-pattern, common mistake, pitfall, code smell, bad practice, code review, is this an anti-pattern, better way to do this, common mist… (elided)"
+              },
+              {
+                "name": "meta-cognition-parallel",
+                "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, 三层分析, parallel analysis, 并行元认知"
+              },
+              {
+                "name": "receiving-code-review",
+                "description": "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not pe… (elided)"
+              },
+              {
+                "name": "requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements"
+              },
+              {
+                "name": "rust-call-graph",
+                "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, 调用图, 调用关系, 谁调用了, 调用了谁"
+              },
+              {
+                "name": "rust-code-navigator",
+                "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, 跳转定义, 查找引用, 定义在哪, 谁用了这个"
+              },
+              {
+                "name": "rust-daily",
+                "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust 日报, Rust 周报, Rust 新闻, Rust 动态\n"
+              },
+              {
+                "name": "rust-deps-visualizer",
+                "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, 依赖图, 依赖可视化, 显示依赖"
+              },
+              {
+                "name": "rust-learner",
+                "description": "Use when asking about Rust versions or crate info. Keywords: latest version, what's new, changelog, Rust 1.x, Rust release, stable, nightly, crate info, crates.io, lib.rs, docs.rs, API docum… (elided)"
+              },
+              {
+                "name": "rust-refactor-helper",
+                "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, 重构, 重命名, 提取函数, 安全重构"
+              },
+              {
+                "name": "rust-router",
+                "description": "CRITICAL: Use for ALL Rust questions including errors, design, and coding.\nHIGHEST PRIORITY for: 比较, 对比, compare, vs, versus, 区别, difference, 最佳实践, best practice,\ntokio vs, async-std vs, 比较 … (elided)"
+              },
+              {
+                "name": "rust-symbol-analyzer",
+                "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, 符号分析, 项目结构, 列出所有, 有哪些struct"
+              },
+              {
+                "name": "rust-trait-explorer",
+                "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait 实现, 谁实现了, 实现了哪些trait"
+              },
+              {
+                "name": "subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session"
+              },
+              {
+                "name": "systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes"
+              },
+              {
+                "name": "test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code"
+              },
+              {
+                "name": "unsafe-checker",
+                "description": "CRITICAL: Use for unsafe Rust code review and FFI. Triggers on: unsafe, raw pointer, FFI, extern, transmute, *mut, *const, union, #[repr(C)], libc, std::ffi, MaybeUninit, NonNull, SAFETY com… (elided)"
+              },
+              {
+                "name": "using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback"
+              },
+              {
+                "name": "using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions"
+              },
+              {
+                "name": "verification-before-completion",
+                "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims… (elided)"
+              },
+              {
+                "name": "writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code"
+              },
+              {
+                "name": "writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment"
+              },
+              {
+                "name": "imagegen",
+                "description": "Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Co… (elided)"
+              },
+              {
+                "name": "openai-docs",
+                "description": "Use for Codex models/pricing, scheduled tasks, skills, settings, setup, troubleshooting, customization, automations, and self-knowledge—including 'you,' 'your,' 'this app,' or 'this coding a… (elided)"
+              },
+              {
+                "name": "plugin-creator",
+                "description": "Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by defa… (elided)"
+              },
+              {
+                "name": "review-agent",
+                "description": "Perform a read-only, defect-first review of a specified code change and return every actionable finding. Use when another agent delegates review of uncommitted changes, a base-branch diff, a… (elided)"
+              },
+              {
+                "name": "skill-installer",
+                "description": "Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from anot… (elided)"
+              },
+              {
+                "name": "compact",
+                "description": "summarize the session to reduce context"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/set_config_option",
+        "params": {
+          "sessionId": "ses_-ffe5fd9eb2b92ffeA9iKMROv8",
+          "configId": "model",
+          "value": "xiaomi/mimo-v2.5-pro-ultraspeed"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "configOptions": [
+            {
+              "id": "model",
+              "name": "Model",
+              "category": "model",
+              "type": "select",
+              "currentValue": "xiaomi/mimo-v2.5-pro-ultraspeed",
+              "options": [
+                {
+                  "value": "mimo/mimo-auto",
+                  "name": "MiMo Auto (free)/MiMo Auto"
+                },
+                {
+                  "value": "mimo/mimo-auto/low",
+                  "name": "MiMo Auto (free)/MiMo Auto (low)"
+                },
+                {
+                  "value": "mimo/mimo-auto/medium",
+                  "name": "MiMo Auto (free)/MiMo Auto (medium)"
+                },
+                {
+                  "value": "mimo/mimo-auto/high",
+                  "name": "MiMo Auto (free)/MiMo Auto (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/low",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/medium",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro-ultraspeed/high",
+                  "name": "Xiaomi/MiMo-V2.5-Pro-UltraSpeed (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro",
+                  "name": "Xiaomi/MiMo-V2.5-Pro"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/low",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/medium",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5-pro/high",
+                  "name": "Xiaomi/MiMo-V2.5-Pro (high)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5",
+                  "name": "Xiaomi/MiMo-V2.5"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/low",
+                  "name": "Xiaomi/MiMo-V2.5 (low)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/medium",
+                  "name": "Xiaomi/MiMo-V2.5 (medium)"
+                },
+                {
+                  "value": "xiaomi/mimo-v2.5/high",
+                  "name": "Xiaomi/MiMo-V2.5 (high)"
+                }
+              ]
+            },
+            {
+              "id": "mode",
+              "name": "Session Mode",
+              "category": "mode",
+              "type": "select",
+              "currentValue": "build",
+              "options": [
+                {
+                  "value": "build",
+                  "name": "build",
+                  "description": "Executes tools based on configured permissions."
+                },
+                {
+                  "value": "plan",
+                  "name": "plan",
+                  "description": "Plan mode. Disallows all edit tools."
+                },
+                {
+                  "value": "compose",
+                  "name": "compose",
+                  "description": "Compose mode (deprecated). Orchestrates workflows with built-in compose skills. For Fable/Sol-class models, use Build and run /compose-next instead."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "ses_-ffe5fd9eb2b92ffeA9iKMROv8",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "Reply with exactly: ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "ses_-ffe5fd9eb2b92ffeA9iKMROv8",
+          "update": {
+            "sessionUpdate": "usage_update",
+            "used": 0,
+            "size": 1048576,
+            "cost": {
+              "amount": 0,
+              "currency": "USD"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 10,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "stopReason": "end_turn",
+          "usage": {
+            "totalTokens": 0,
+            "inputTokens": 0,
+            "outputTokens": 0
+          },
+          "_meta": {}
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "The turn returned without assistant content: this account cannot generate.",
+    "The handshake is evidence; the prompt traffic still needs an account that generates."
+  ]
+}

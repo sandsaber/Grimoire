@@ -6,20 +6,20 @@ import * as path from 'path';
 import {
   collectAsyncSubagentResults,
   deleteSDKSession,
-  encodeVaultPathForSDK,
   filterActiveBranch,
-  getSDKProjectsPath,
-  getSDKSessionPath,
-  isValidSessionId,
   loadSDKSessionMessages,
-  loadSubagentFinalResult,
   loadSubagentToolCalls,
   parseSDKMessageToChat,
   readSDKSession,
   resolveToolUseResultStatus,
-  type SDKNativeMessage,
-  sdkSessionExists,
 } from '@/providers/claude/history/ClaudeHistoryStore';
+import type { SDKNativeMessage } from '@/providers/claude/history/sdkHistoryTypes';
+import {
+  encodeVaultPathForSDK,
+  getSDKProjectsPath,
+  getSDKSessionPath,
+  isValidSessionId,
+} from '@/providers/claude/history/sdkSessionPaths';
 import { extractToolResultContent } from '@/providers/claude/sdk/toolResultContent';
 
 // Mock fs, fs/promises, and os modules
@@ -165,33 +165,6 @@ describe('sdkSession', () => {
     });
   });
 
-  describe('sdkSessionExists', () => {
-    it('returns true when session file exists', () => {
-      mockExistsSync.mockReturnValue(true);
-
-      const exists = sdkSessionExists(VAULT_PATH, 'session-abc');
-
-      expect(exists).toBe(true);
-    });
-
-    it('returns false when session file does not exist', () => {
-      mockExistsSync.mockReturnValue(false);
-
-      const exists = sdkSessionExists(VAULT_PATH, 'session-xyz');
-
-      expect(exists).toBe(false);
-    });
-
-    it('returns false on error', () => {
-      mockExistsSync.mockImplementation(() => {
-        throw new Error('Permission denied');
-      });
-
-      const exists = sdkSessionExists(VAULT_PATH, 'session-err');
-
-      expect(exists).toBe(false);
-    });
-  });
 
   describe('deleteSDKSession', () => {
     it('deletes session file when it exists', async () => {
@@ -350,62 +323,6 @@ describe('sdkSession', () => {
     });
   });
 
-  describe('loadSubagentFinalResult', () => {
-    it('returns the latest assistant text from sidecar JSONL', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockFsPromises.readFile.mockResolvedValue([
-        '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"First"}]}}',
-        '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Final answer"}]}}',
-      ].join('\n'));
-
-      const result = await loadSubagentFinalResult(
-        VAULT_PATH,
-        'session-abc',
-        'a123'
-      );
-
-      expect(result).toBe('Final answer');
-      expect(mockFsPromises.readFile).toHaveBeenCalledWith(
-        path.join(PROJECTS_DIR, ENCODED_VAULT, 'session-abc', 'subagents', 'agent-a123.jsonl'),
-        'utf-8'
-      );
-    });
-
-    it('falls back to top-level result when assistant text is absent', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockFsPromises.readFile.mockResolvedValue([
-        '{"type":"progress","result":"Intermediate result"}',
-        '{"type":"result","result":"Final result text"}',
-      ].join('\n'));
-
-      const result = await loadSubagentFinalResult(
-        VAULT_PATH,
-        'session-abc',
-        'a123'
-      );
-
-      expect(result).toBe('Final result text');
-    });
-
-    it('returns null when sidecar file is missing or agent id is invalid', async () => {
-      mockExistsSync.mockReturnValue(false);
-
-      const missing = await loadSubagentFinalResult(
-        VAULT_PATH,
-        'session-abc',
-        'a123'
-      );
-      expect(missing).toBeNull();
-
-      const invalid = await loadSubagentFinalResult(
-        VAULT_PATH,
-        'session-abc',
-        '../bad-agent'
-      );
-      expect(invalid).toBeNull();
-      expect(mockFsPromises.readFile).not.toHaveBeenCalled();
-    });
-  });
 
   describe('parseSDKMessageToChat', () => {
     it('converts user message with string content', () => {

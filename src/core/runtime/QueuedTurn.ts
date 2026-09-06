@@ -31,13 +31,6 @@ export function cloneChatTurnRequest(request: ChatTurnRequest): ChatTurnRequest 
   };
 }
 
-export function cloneQueuedChatTurn(turn: QueuedChatTurn): QueuedChatTurn {
-  return {
-    displayContent: turn.displayContent,
-    request: cloneChatTurnRequest(turn.request),
-  };
-}
-
 export function mergeQueuedChatTurns(
   existing: QueuedChatTurn,
   incoming: QueuedChatTurn,

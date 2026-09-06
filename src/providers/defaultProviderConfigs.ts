@@ -1,24 +1,20 @@
 import type { ProviderConfigMap } from '../core/types/settings';
-import { DEFAULT_ANTIGRAVITY_PROVIDER_SETTINGS } from './antigravity/settings';
-import { DEFAULT_CLAUDE_PROVIDER_SETTINGS } from './claude/settings';
-import { DEFAULT_CODEX_PROVIDER_SETTINGS } from './codex/settings';
-import { DEFAULT_GEMINI_PROVIDER_SETTINGS } from './gemini/settings';
-import { DEFAULT_GROK_PROVIDER_SETTINGS } from './grok/settings';
-import { DEFAULT_KIMICODE_PROVIDER_SETTINGS } from './kimicode/settings';
-import { DEFAULT_MIMOCODE_PROVIDER_SETTINGS } from './mimocode/settings';
-import { DEFAULT_OPENCODE_PROVIDER_SETTINGS } from './opencode/settings';
-import { DEFAULT_QWEN_PROVIDER_SETTINGS } from './qwen/settings';
+import { builtInProviderCatalog } from './BuiltInProviderCatalog';
 
+/**
+ * The provider half of the shipped default settings.
+ *
+ * No longer a source: it was a hand-maintained map of nine
+ * `DEFAULT_<PROVIDER>_PROVIDER_SETTINGS` constants standing beside the two
+ * registries — app-level inventory row 2, and a third place for a provider's
+ * defaults to be declared and to drift. Each provider's settings codec is the
+ * one declaration now, and this derives from it.
+ *
+ * Read at import time by `DEFAULT_GRIMOIRE_SETTINGS`, which is why it reaches
+ * the catalog instance directly rather than through the installed accessor:
+ * the accessor is filled when the providers register, and a module-level
+ * constant is evaluated before that.
+ */
 export function getBuiltInProviderDefaultConfigs(): ProviderConfigMap {
-  return {
-    antigravity: { ...DEFAULT_ANTIGRAVITY_PROVIDER_SETTINGS },
-    claude: { ...DEFAULT_CLAUDE_PROVIDER_SETTINGS },
-    codex: { ...DEFAULT_CODEX_PROVIDER_SETTINGS },
-    gemini: { ...DEFAULT_GEMINI_PROVIDER_SETTINGS },
-    grok: { ...DEFAULT_GROK_PROVIDER_SETTINGS },
-    kimicode: { ...DEFAULT_KIMICODE_PROVIDER_SETTINGS },
-    mimocode: { ...DEFAULT_MIMOCODE_PROVIDER_SETTINGS },
-    opencode: { ...DEFAULT_OPENCODE_PROVIDER_SETTINGS },
-    qwen: { ...DEFAULT_QWEN_PROVIDER_SETTINGS },
-  };
+  return builtInProviderCatalog.defaultConfigs();
 }

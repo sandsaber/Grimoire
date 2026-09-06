@@ -5,11 +5,18 @@ import * as path from 'node:path';
 import {
   encodeVaultPathForSDK,
   getSDKSessionPath,
-  locateSDKSession,
+  locateSDKSessions,
 } from '@/providers/claude/history/sdkSessionPaths';
 
 describe('sdkSessionPaths', () => {
   let tempDir: string;
+
+  /** The plural is what production calls; the singular wrapper had no caller. */
+  async function locateOne(vaultPath: string, sessionId: string): Promise<unknown> {
+    return (await locateSDKSessions(vaultPath, [sessionId], {
+      environment: { CLAUDE_CONFIG_DIR: tempDir },
+    })).get(sessionId) ?? { availability: 'unknown' };
+  }
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grimoire-claude-sessions-'));
@@ -35,17 +42,13 @@ describe('sdkSessionPaths', () => {
     await fs.mkdir(path.dirname(relocatedPath), { recursive: true });
     await fs.writeFile(relocatedPath, '{}\n', 'utf8');
 
-    await expect(locateSDKSession('/current/vault', 'session-1', {
-      environment: { CLAUDE_CONFIG_DIR: tempDir },
-    })).resolves.toEqual({
+    await expect(locateOne('/current/vault', 'session-1')).resolves.toEqual({
       availability: 'relocated',
       sessionPath: relocatedPath,
     });
   });
 
   it('reports unknown for unsafe session identifiers without scanning', async () => {
-    await expect(locateSDKSession('/vault', '../session', {
-      environment: { CLAUDE_CONFIG_DIR: tempDir },
-    })).resolves.toEqual({ availability: 'unknown' });
+    await expect(locateOne('/vault', '../session')).resolves.toEqual({ availability: 'unknown' });
   });
 });

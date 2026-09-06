@@ -1,0 +1,1256 @@
+import { randomUUID } from 'node:crypto';
+import { isAbsolute } from 'node:path';
+
+import { NodeManagedAcpProcessLauncher } from '@/app/execution/acp/NodeManagedAcpProcessLauncher';
+import { auxiliaryPurposeKey } from '@/app/execution/auxiliaryPurpose';
+import { delayThroughWindow } from '@/app/execution/hostTimers';
+import { KernelAuxQueryRunner } from '@/app/execution/KernelAuxQueryRunner';
+import { ProviderWorkspaceHolder } from '@/app/execution/ProviderWorkspaceHolder';
+import type { AuxQueryRunner } from '@/core/auxiliary/AuxQueryRunner';
+import type { ProviderAuxiliarySource } from '@/core/auxiliary/ProviderAuxiliarySource';
+import { resolveConfiguredTitleModel } from '@/core/auxiliary/titleModel';
+import {
+  executionSessionId,
+  interactionId,
+  runId,
+  sessionInstanceId,
+} from '@/core/execution/ExecutionIds';
+import type {
+  BackendLifecycleRegistration,
+  ExecutionLifecycleRegistry,
+} from '@/core/execution/ExecutionLifecycleRegistry';
+import { computeSystemPromptKey } from '@/core/prompt/mainAgent';
+import { getRuntimeEnvironmentText } from '@/core/providers/providerEnvironment';
+import type {
+  ProviderCommandDescriptor,
+  ProviderRuntimePorts,
+  ProviderWorkspaceSlots,
+} from '@/core/providers/ProviderModule';
+import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
+import {
+  type BoundConversation,
+  ExecutionChatRuntimeAdapter,
+  type ExecutionChatRuntimeHostPorts,
+} from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+import type {
+  ChatRuntimeQueryOptions,
+  ChatTurnRequest,
+  PreparedChatTurn,
+} from '@/core/runtime/types';
+import type { ApprovalCallback } from '@/core/runtime/types';
+import type { ChatMessage } from '@/core/types';
+import type GrimoirePlugin from '@/main';
+import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
+import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
+import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
+import { ManagedAcpAuxiliaryQuery } from '@/providers/acp/execution/ManagedAcpAuxiliaryQuery';
+import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
+import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
+import { createKimicodeModuleContext } from '@/providers/kimicode/app/KimicodeModuleContext';
+import { kimicodePlanUsageStore } from '@/providers/kimicode/app/KimicodePlanUsageStore';
+import { maybeGetKimicodeWorkspaceServices } from '@/providers/kimicode/app/KimicodeWorkspaceServices';
+import type { KimicodeAcpDynamicConfig } from '@/providers/kimicode/execution/KimicodeAcpDynamicConfig';
+import { KimicodeAcpDynamicConfigApplier } from '@/providers/kimicode/execution/KimicodeAcpDynamicConfig';
+import { KimicodeAcpFileSystem } from '@/providers/kimicode/execution/KimicodeAcpFileSystem';
+import { createKimicodeAuxiliaryFileSystem } from '@/providers/kimicode/execution/KimicodeAuxiliaryFileSystem';
+import { KimicodeContentPresenter } from '@/providers/kimicode/execution/KimicodeContentPresenter';
+import {
+  KimicodeExecutionBackend,
+  type KimicodeExecutionBackendContext,
+} from '@/providers/kimicode/execution/KimicodeExecutionBackend';
+import {
+  auxiliaryRetentionKey,
+  type KimicodeAuxiliaryEnvironment,
+  type KimicodeAuxiliaryPurpose,
+  type KimicodeAuxiliaryRequest,
+  KimicodeExecutionRequests,
+  type KimicodeInvocationEnvironment,
+} from '@/providers/kimicode/execution/KimicodeExecutionRequests';
+import { KimicodeInteractionBridge } from '@/providers/kimicode/execution/KimicodeInteractionBridge';
+import { KimicodeInteractionPresenter } from '@/providers/kimicode/execution/KimicodeInteractionPresenter';
+import {
+  type KimicodeMetadataLaunch,
+  KimicodeMetadataSession,
+} from '@/providers/kimicode/execution/KimicodeMetadataSession';
+import { KimicodeProjectionResultSink } from '@/providers/kimicode/execution/KimicodeProjectionResultSink';
+import { KimicodeSessionConfigState } from '@/providers/kimicode/execution/KimicodeSessionConfigState';
+import { loadKimicodeSessionCost } from '@/providers/kimicode/history/KimicodeUsageMetadataStore';
+import { kimicodeProviderModule } from '@/providers/kimicode/KimicodeProviderModule';
+import {
+  decodeKimicodeModelId,
+  isKimicodeModelSelectionId,
+} from '@/providers/kimicode/models';
+import {
+  buildKimicodePromptBlocks,
+  buildKimicodePromptText,
+} from '@/providers/kimicode/runtime/buildKimicodePrompt';
+import {
+  buildKimicodeAuxAgentConfig,
+  KIMICODE_AUX_AGENT_IDS,
+  type KimicodeAuxAgentProfile,
+} from '@/providers/kimicode/runtime/KimicodeAuxiliaryAgents';
+import { prepareKimicodeLaunchArtifacts } from '@/providers/kimicode/runtime/KimicodeLaunchArtifacts';
+import { buildKimicodeRuntimeEnv } from '@/providers/kimicode/runtime/KimicodeRuntimeEnvironment';
+import { getKimicodeState } from '@/providers/kimicode/types';
+import { kimicodeChatUIConfig } from '@/providers/kimicode/ui/KimicodeChatUIConfig';
+import { getEnhancedPath } from '@/utils/env';
+import { getVaultPath } from '@/utils/path';
+
+/** What a turn may answer with, before it is refused as too large. */
+const MAX_RESULT_BYTES = 256_000;
+
+/**
+ * What an auxiliary turn may answer with, which is much less.
+ *
+ * A title is a line and a refinement is a paragraph. The chat limit is for a
+ * turn that may legitimately produce a file's worth of text; an auxiliary answer
+ * that size is a model that misread its instructions, and reading 256 KB of it
+ * into a title field helps nobody.
+ */
+const AUXILIARY_RESULT_BYTE_LIMIT = 64_000;
+
+/**
+ * How long an auxiliary turn may run before it is abandoned.
+ *
+ * Shorter than a chat turn by an order of magnitude, and it has to be: nobody is
+ * watching it, and the thing waiting is a title that will not appear or a modal
+ * that will not answer.
+ */
+const AUXILIARY_TIMEOUT_MS = 60_000;
+
+/** Where a session opened only to answer a question keeps its state. */
+const METADATA_DATABASE = ':memory:';
+
+/**
+ * How long a turn waits for the window that describes it.
+ *
+ * `kimicode-wire.json` puts `usage_update` in the frame straight after the
+ * answer to `session/prompt`, on the same stdio stream — a gap measured in
+ * microseconds, not milliseconds. This is three orders of magnitude over that,
+ * so it is a bound rather than a delay: it is paid in full only by a CLI that
+ * stopped sending the update at all, and then it costs one turn 400ms rather
+ * than hanging it.
+ */
+const CONTEXT_USAGE_WAIT_MS = 400;
+
+/**
+ * Kimi Code chat execution, assembled from the running plugin.
+ *
+ * **Flipped.** `registration.ts` points `createRuntime` here, `main.ts`
+ * constructs one per load, and `KimicodeChatRuntime` is gone.
+ *
+ * The fourth ACP provider on the kernel, and the third in a row to add nothing
+ * to the shared stack: the client adapter, the transport, the process launcher
+ * and the managed backend are the same objects here as in OpenCode's, Grok's
+ * and MiMoCode's. What a fourth composition contributes is the Kimi Code
+ * launch and nothing else.
+ *
+ * It is also the first composition assembled for a provider whose session has
+ * never been observed. `kimi acp` refused `session/new` with "Authentication
+ * required" on the machine its wire recording was taken from, so what this
+ * stands on is `KimicodeChatRuntime` — which has been driving the same CLI on
+ * the legacy path — rather than on a recording of it.
+ * The three reference spaces remain: the turn, the process to spawn and the
+ * session config to apply, because an ACP session is configured after it
+ * exists rather than when it is created.
+ *
+ * It owns three things a tab cannot: the backend every tab dispatches through,
+ * the permission bridge every prompt is prepared by, and the isolated metadata
+ * session the model catalog, the settings tab and the toolbar ask their
+ * questions in. Everything else is built per tab in `createRuntime`, because it
+ * is about one conversation's session.
+ */
+export class KimicodeExecution {
+  private readonly requests = new KimicodeExecutionRequests(
+    () => opaqueId('kcreq'),
+    // Forwarded, not swallowed: a zero-arity lambda type-checks here and drops
+    // the conversation's database, which is the whole reason a turn carries
+    // one. Every resume then launches against the default database and the
+    // session it was told to load is not in it.
+    databasePath => this.environment(databasePath),
+    undefined,
+    request => this.auxiliaryEnvironment(request),
+  );
+
+  /**
+   * The auxiliary processes, one per runner that asked for one.
+   *
+   * Built here rather than per tab because auxiliary work belongs to no tab: a
+   * title is generated for a conversation nobody may be looking at, and an
+   * inline edit runs from a modal over a note. Disposed with the backend, which
+   * is what closes the processes it kept.
+   */
+  private readonly auxiliaryQueries = new ManagedAcpAuxiliaryQuery(
+    { resolve: requestRef => this.requests.resolveAuxiliary(requestRef) },
+    // Resolved per launch rather than captured: `createBackend` may be handed a
+    // fake factory by a test, and an auxiliary process launched behind it would
+    // be a real CLI nobody asked for.
+    { create: input => this.auxiliaryFactory().create(input) },
+    { setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>) },
+    AUXILIARY_RESULT_BYTE_LIMIT,
+    AUXILIARY_TIMEOUT_MS,
+  );
+
+  /**
+   * One bridge for every tab, because the backend is one and it prepares every
+   * request through the bridge it was built with. A per-tab bridge would leave
+   * the presentation for a request in a map the presenter cannot read.
+   */
+  private readonly interactions = new KimicodeInteractionBridge(() => opaqueId('kcix'));
+
+  private metadataSession: KimicodeMetadataSession | undefined;
+  private clientFactory: ManagedAcpClientFactory | undefined;
+  private auxiliaryClientFactory: ManagedAcpClientFactory | undefined;
+  private injectedClientFactory: ManagedAcpClientFactory | undefined;
+
+  /**
+   * Which tab answers for a write on which ACP session.
+   *
+   * The filesystem delegate belongs to the process, and the approval belongs to
+   * a tab; this is the only thing that knows both.
+   */
+  private readonly writeApprovers = new Map<string, () => ApprovalCallback | undefined>();
+
+  private readonly presenters = new Set<KimicodeInteractionPresenter>();
+  /**
+   * Who is waiting for a context window, by the session it belongs to.
+   *
+   * The sink waits at `noteTurnEnded` and a presenter reports the arrival, and
+   * the two are built in different methods on this object — `createBackend` and
+   * `createRuntime` — so the meeting point is here. Keyed by session because a
+   * composition serves every tab and a window belongs to one of them.
+   */
+  private readonly contextUsageWaiters = new Map<string, Set<() => void>>();
+  private readonly disposers: Array<() => void> = [];
+
+  private backend: KimicodeExecutionBackend | undefined;
+
+  /**
+   * This provider's workspace slots, built on the first question.
+   *
+   * The context is built with no conversation and with every runtime port
+   * refusing: a workspace slot answers about the plugin, never about a tab, and
+   * one that reached for a tab's session would be answering from whichever tab
+   * happened to build the workspace first. Refusing says so where it happens.
+   */
+  private readonly workspaceHolder = new ProviderWorkspaceHolder(
+    kimicodeProviderModule.workspace,
+    () => createKimicodeModuleContext(this.plugin, () => null,
+      {
+        databasePath: () => runtimeOnly('databasePath'),
+        sessionDropped: () => runtimeOnly('sessionDropped'),
+      }),
+  );
+
+  constructor(
+    private readonly plugin: GrimoirePlugin,
+    /**
+     * Held for the runtime half, which is the increment after this one: a tab's
+     * adapter dispatches through the same registry the backend is registered
+     * with, and taking it later would mean two objects disagreeing about which.
+     */
+    readonly registry: ExecutionLifecycleRegistry,
+  ) {}
+
+  /** What every open permission request is asking, for the tab that shows it. */
+  get interactionBridge(): KimicodeInteractionBridge {
+    return this.interactions;
+  }
+
+  /** The store every tab runtime will reference its turns through. */
+  get turnRequests(): KimicodeExecutionRequests {
+    return this.requests;
+  }
+
+  /**
+   * The backend, over an application-owned `kimicode acp` process by default.
+   *
+   * The client factory is a parameter because it is the seam between provider
+   * protocol and process ownership: a test that has to launch Kimi Code to check
+   * how a turn is composed is testing the wrong thing.
+   */
+  createBackend(clientFactory?: ManagedAcpClientFactory): KimicodeExecutionBackend {
+    // Injected once, and for both: a test that hands the backend a fake agent
+    // must not have an auxiliary turn launch a real one behind it.
+    if (clientFactory) {
+      this.injectedClientFactory = clientFactory;
+      this.auxiliaryClientFactory = clientFactory;
+    }
+    this.clientFactory = clientFactory ?? this.clientFactory ?? this.createClientFactory();
+
+    const context: KimicodeExecutionBackendContext = {
+      clientFactory: this.clientFactory,
+      requestResolver: this.requests,
+      dynamicApplier: new KimicodeAcpDynamicConfigApplier({
+        resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef),
+      }),
+      interactionBridge: this.interactions,
+      resultSink: new KimicodeProjectionResultSink({
+        awaitContextUsage: sessionId => this.awaitContextUsage(sessionId),
+      }),
+      reconciler: {
+        // A turn that answered the cancel it was sent is a turn known to
+        // have stopped, and ACP delivers that answer on the prompt itself.
+        // For anything else — a run this process did not see finish — what
+        // is known is nothing. Kimi Code's own session database could answer
+        // that, and until it is read the honest evidence is `unknown` with
+        // effects possible, which makes the kernel refuse to re-dispatch.
+        reconcile: async query => acpCancellationEvidence(query)
+          ?? { kind: 'unknown', effectsPossible: true },
+      },
+      auxiliaryQueries: this.auxiliaryQueries,
+      scheduler: {
+        setTimeout: (callback: () => void, delayMs: number) => window.setTimeout(callback, delayMs),
+        clearTimeout: (handle: unknown) => window.clearTimeout(
+          handle as ReturnType<typeof setTimeout>,
+        ),
+      },
+      sessionInstanceIdFactory: () => sessionInstanceId(opaqueId('si')),
+      interactionIdFactory: () => interactionId(opaqueId('ix')),
+      resultCommitTimeoutMs: 2_000,
+      recoveryTimeoutMs: 2_000,
+      runTimeoutMs: 10 * 60_000,
+      maxResultBytes: MAX_RESULT_BYTES,
+    };
+    this.backend = new KimicodeExecutionBackend(context);
+    return this.backend;
+  }
+
+  /**
+   * The backend as the kernel registers it, with its two side ports.
+   *
+   * `interactions` is not optional dressing: the registry refuses to resolve an
+   * interaction for a backend that declared no resolution port, so ACP's
+   * permission requests would hang the turn that raised them.
+   */
+  createBackendRegistration(clientFactory?: ManagedAcpClientFactory): BackendLifecycleRegistration {
+    const backend = clientFactory ? this.createBackend(clientFactory) : this.createBackend();
+    return { backend, interactions: backend, recovery: backend };
+  }
+
+  /**
+   * The Kimi Code chat runtime, over the kernel.
+   *
+   * One per tab, not one per provider.
+   * Four things are built per tab rather than shared, each for the same reason
+   * — they are about *this* conversation's session: what it is set to, what it
+   * has said, what commands it offers, and which prompt is on screen.
+   */
+
+  /** This provider's workspace slots, built on the first question. */
+  workspace(): Promise<ProviderWorkspaceSlots> {
+    return this.workspaceHolder.resolve();
+  }
+
+  /**
+   * The workspace if it has already been built, and nothing if it has not.
+   *
+   * For the callers that cannot wait: a plan indicator reads what it holds
+   * while a tab paints, and a promise on that path is a paint that waits.
+   */
+  builtWorkspace(): ProviderWorkspaceSlots | null {
+    return this.workspaceHolder.peek() ?? null;
+  }
+
+  createRuntime(): ExecutionChatRuntimeAdapter {
+    let conversation: BoundConversation | null = null;
+    let adapter: KimicodeRuntimeAdapter | undefined;
+    let sessionCommands: readonly ProviderCommandDescriptor[] = [];
+    // What the last launch resolved for this tab, which is what the
+    // conversation is saved pointing at.
+    let databasePath: string | null = null;
+    // Whether the agent no longer had this conversation's saved session. Seeded
+    // from what the conversation carries, because the drop is learned during a
+    // dispatch and the tab that draws the notice is usually a later one.
+    let sessionDropped = false;
+    const ownedSessions = new Set<string>();
+    let sawTurnCost = false;
+    const boundConversation = (): BoundConversation | null => conversation;
+    // Minted once, and only used while no conversation is bound: a fallback
+    // minted per read would give one tab's session and its runs different
+    // owners, which the registry refuses.
+    const kimicodeTab = opaqueId('kimicodetab');
+
+
+    const sessionConfig = new KimicodeSessionConfigState({
+      settingsBag: () => this.plugin.settings,
+      saveSettings: () => this.plugin.saveSettings(),
+      refreshSelectors: () => this.refreshSelectors(),
+      // Read late: the surface installs its callbacks on the runtime after this
+      // constructs, so a captured callback would be the one that was not there.
+      syncPermissionMode: permissionMode => {
+        const sync = adapter?.interactionCallbacks().permissionModeSync;
+        if (typeof sync === 'function') {
+          (sync as (mode: string) => void)(permissionMode);
+        }
+      },
+    });
+
+    const content = new KimicodeContentPresenter({
+      displayModel: () => sessionConfig.getActiveDisplayModel(),
+      // The session's own slash commands, which arrive as an update rather than
+      // as an answer to anything. Held here so the tab can list them without a
+      // second Kimi Code process being launched to ask.
+      onCommands: commands => {
+        sessionCommands = commands.map(command => ({
+          name: command.name,
+          ...(command.description ? { description: command.description } : {}),
+          source: 'session' as const,
+        }));
+      },
+      onConfigOptions: configOptions => this.settle(
+        sessionConfig.syncSessionModelState({ configOptions: [...configOptions] }),
+      ),
+      onCurrentMode: currentModeId => this.settle(
+        sessionConfig.syncSessionModeState({ currentModeId }),
+      ),
+      // A resume that had to open a different session is what the conversation
+      // carries forward; one that succeeded is what takes the marker back off.
+      onSessionResume: outcome => { sessionDropped = outcome === 'replaced'; },
+      onSessionOpened: opening => this.settle((async () => {
+        // This tab is the one that answers for a write on this session.
+        ownedSessions.add(opening.sessionId);
+        this.writeApprovers.set(
+          opening.sessionId,
+          () => adapter?.interactionCallbacks().approval as ApprovalCallback | undefined,
+        );
+        await sessionConfig.syncSessionModelState({
+          configOptions: opening.configOptions ? [...opening.configOptions] : null,
+          models: opening.models ?? null,
+        });
+        await sessionConfig.syncSessionModeState({
+          configOptions: opening.configOptions ? [...opening.configOptions] : null,
+          // Kimi Code reports its own default agent here, not the user's pick.
+          emitPermissionSync: false,
+          modes: opening.modes ?? null,
+        });
+      })()),
+      onContextUsage: sessionId => this.settleContextUsage(sessionId),
+      onCost: cost => {
+        // Only a cost that was actually recorded counts as one: Kimi Code sends
+        // a usage update every turn for the context badge, usually with no cost
+        // in it, and a flag set on the update rather than on the record would
+        // disable the fallback that reads the session's own database.
+        if (kimicodePlanUsageStore.recordCost(cost ?? null)) {
+          sawTurnCost = true;
+          this.refreshSelectors();
+        }
+      },
+    });
+
+    const presenter = new KimicodeInteractionPresenter(
+      this.interactions,
+      () => adapter?.interactionCallbacks() ?? {},
+    );
+    this.presenters.add(presenter);
+    // Held by the tab, not by the composition: a subscription pushed onto the
+    // shared list would outlive every tab that ever opened and be called for
+    // every interaction after it closed.
+    const releaseSettled = this.interactions.onSettled(ref => presenter.dismiss(ref));
+
+    const ports: ExecutionChatRuntimeHostPorts = {
+      prepareTurn: (request: ChatTurnRequest) => ({
+        isCompact: false,
+        mcpMentions: request.enabledMcpServers ?? new Set<string>(),
+        persistedContent: '',
+        prompt: buildKimicodePromptText(request),
+        request,
+      }),
+      encodeRequestRef: (
+        turn: PreparedChatTurn,
+        history?: ChatMessage[],
+        options?: ChatRuntimeQueryOptions,
+      ) => {
+        // Carried into the prompt only when no session can carry it itself: a
+        // bound session already holds the conversation, and sending the history
+        // again would say everything twice.
+        // The turn boundary: what the normalizer and the tool stream carry is
+        // this turn's, and the tokens the last prompt cost are not this
+        // prompt's. Here rather than at dispatch because this is the one place
+        // a turn is known to be starting.
+        content.beginTurn();
+        const bootstrap = ports.currentSessionId() ? [] : history ?? [];
+        const dynamic = this.dynamicConfiguration(sessionConfig, options);
+        const conversationDatabase = databasePath
+          ?? getKimicodeState(conversation?.providerState).databasePath
+          ?? undefined;
+        return this.requests.reference({
+          prompt: buildKimicodePromptBlocks(turn.request, [...bootstrap], {
+            ...(options?.orchestratorMode ? { orchestratorMode: true } : {}),
+          }),
+          ...(dynamic ? { dynamic } : {}),
+          ...(conversationDatabase ? { databasePath: conversationDatabase } : {}),
+          onLaunchResolved: resolved => { databasePath = resolved; },
+        });
+      },
+      /**
+       * The ACP session this conversation is actually on.
+       *
+       * The presenter's copy comes **first**, and a live run is what settled
+       * the order: it is read from the reply to `session/new` or
+       * `session/load`, so it is the session the last turn really ran in. The
+       * conversation's saved id is only what it was before. When the agent no
+       * longer has that session the backend replaces it, and a tab that kept
+       * reporting the old id would save the conversation pointing at a session
+       * that does not exist — every later turn starting over, forever.
+       *
+       * The conversation's own id is the fallback, which is what a tab that has
+       * not run a turn yet resumes from.
+       */
+      currentSessionId: () => content.lastSessionId() ?? conversation?.sessionId ?? null,
+      syncConversation: next => {
+        if (next?.id !== conversation?.id) {
+          // A different conversation is a different ACP session, and what the
+          // previous one was set to says nothing about this one.
+          content.forgetConversation();
+          sessionConfig.forgetSession();
+          sessionCommands = [];
+          // Another conversation is another database as often as not, and the
+          // last one's would send this turn to a session that is not in it.
+          databasePath = null;
+          // Seeded only when the conversation changes. A re-sync of the same
+          // one — a tab reactivating, a settings change rebuilding the binding —
+          // hands back the stored object, and what this runtime learned during a
+          // dispatch is newer than what that object says.
+          sessionDropped = getKimicodeState(next?.providerState).sessionDropped === true;
+        }
+        conversation = next;
+      },
+      /**
+       * Whether this conversation resumed into a session the agent had lost.
+       *
+       * Asked on every render rather than consumed, because the seam the UI
+       * draws has to be answerable again on the next paint. **Absent until
+       * 2026-08-30**: this fork carried every other half of the notice and not
+       * this one, so a live row found `kimi acp` answering `Unknown sessionId`,
+       * the session silently replaced, and nothing on screen to say the history
+       * above was no longer the agent's memory.
+       */
+      sessionDropped: () => sessionDropped,
+      /**
+       * The provider's words for a turn that never started.
+       *
+       * The agent's own words where it gave any, and a translation of the
+       * classification where it did not: for this provider a pre-dispatch
+       * rejection is almost always the session bind. What `kimi acp` answers
+       * for a session it cannot find is **not known here** — no account on this
+       * machine has ever opened one — and what it answers with no account is
+       * "Authentication required", for `session/new` and `session/load` alike.
+       * The resume policy keeps the binding rather than replacing it on an
+       * error that is not explicitly about a missing session, so a conversation
+       * whose sentence said nothing would repeat it forever.
+       */
+      describeFailure: reason => {
+        // The agent's own words, where it gave any — for a refused prompt and
+        // for a session it would not open, which is the same refusal one step
+        // earlier and the one a first-run user meets. `undefined` falls through
+        // to the sentences below, which are what a provider that refused
+        // without saying anything deserves.
+        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
+          const refused = content.consumeTurnRefusal();
+          // A refused *load* is the one refusal whose words are not the whole
+          // answer: the session may be fine and the CLI unusable, so the
+          // sentence about starting a new chat has to say what it depends on.
+          if (refused?.origin === 'session-load') {
+            return describeAcpSessionOpenFailure('Kimi Code', refused.message);
+          }
+          if (refused) {
+            return refused.message;
+          }
+        }
+        if (reason === 'provider-failure') {
+          return undefined;
+        }
+        // Two different failures that used to read as one. A CLI that is not
+        // installed is `spawn-failed`, and the neutral sentence for it —
+        // "Grimoire could not start the provider process" — names no action;
+        // the actionable half is that a desktop app does not inherit the shell
+        // PATH, so an absolute path in settings is what fixes it.
+        if (reason === 'spawn-failed') {
+          return 'Grimoire could not start the Kimi Code CLI. Set an absolute CLI path in the '
+            + 'Kimi Code settings — desktop apps do not inherit the shell PATH.';
+        }
+        if (reason === 'pre-dispatch-rejected') {
+          return describeAcpSessionOpenFailure('Kimi Code');
+        }
+        return undefined;
+      },
+      presentProviderContent: payload => content.present(payload),
+      consumeProviderTurnMetadata: () => {
+        // A vendor that reports no cost on the wire has still charged for the
+        // turn, and Kimi Code's own session database knows what. Read once per
+        // turn that reported nothing, which is what the legacy runtime did.
+        if (!sawTurnCost) {
+          this.settle(this.recordSessionCost(content.lastSessionId(), databasePath));
+        }
+        sawTurnCost = false;
+        return content.consumeTurnMetadata();
+      },
+      interactionPresenter: presenter,
+      delay: delayThroughWindow,
+      reportCleanupFailure: error => {
+        this.plugin.recordDebugLog({
+          error,
+          event: 'execution.cleanup.failed',
+          level: 'warn',
+          scope: 'kimicode',
+        });
+      },
+    };
+
+    // Built here, not passed in: the module's history contribution answers
+    // about *this tab's* conversation, so the context has to close over the
+    // same one the ports above sync.
+    const contributions = kimicodeProviderModule.runtimePorts(
+      createKimicodeModuleContext(this.plugin, boundConversation, {
+        databasePath: () => databasePath,
+        sessionDropped: () => sessionDropped,
+      }),
+    );
+
+    const runtime = new KimicodeRuntimeAdapter(
+      {
+        registry: this.registry,
+        backendId: kimicodeProviderModule.execution.descriptor.backendId,
+        capabilities: kimicodeProviderModule.capabilities,
+        // The conversation the tab is showing, read when a session is
+        // established: this is what a deleted conversation's control records
+        // are found by (D4). The tab's own id stands in only while no
+        // conversation is bound, which is a session that belongs to no chat.
+        owner: () => (conversation?.id
+          ? { kind: 'conversation', ownerId: conversation.id }
+          // A tab with no conversation yet owns this session itself, and
+          // saying `conversation` about it is what made its records
+          // unreachable: deleting a chat looks for its own id and never finds
+          // one keyed by a tab. Named for what it is, so the startup sweep can
+          // remove what a closed tab left behind.
+          : { kind: 'internal-service', ownerId: kimicodeTab }),
+        nextExecutionSessionId: () => executionSessionId(opaqueId('es')),
+        nextRunId: () => runId(opaqueId('run')),
+      },
+      ports,
+      contributions,
+      {
+        // The commands the open session announced, which is what the legacy
+        // runtime listed and what the catalog cannot know.
+        runtimeCommands: { listForSession: async () => sessionCommands },
+        // Reloading the vault's servers is what the tab asks for; the restart
+        // that makes a running process see them is the launch key's job.
+        mcp: {
+          load: async () => {
+            const manager = maybeGetKimicodeWorkspaceServices(this.plugin)?.mcpServerManager;
+            await manager?.loadServers();
+            return manager?.getServers() ?? [];
+          },
+          save: () => notWiredHere('save'),
+        },
+      },
+      () => {
+        // The tab closing is when the prompts it raised stop being anyone's,
+        // and when a write on its sessions has nobody left to ask.
+        presenter.dismissAll();
+        releaseSettled();
+        this.presenters.delete(presenter);
+        for (const sessionId of ownedSessions) {
+          this.writeApprovers.delete(sessionId);
+        }
+        ownedSessions.clear();
+      },
+    );
+    adapter = runtime;
+    return runtime;
+  }
+
+  /**
+   * What Grimoire asks Kimi Code when nobody is having a conversation.
+   *
+   * The model catalog, the settings tab and the chat toolbar all need the same
+   * two answers, and each of them used to build a whole chat runtime to get
+   * them. One isolated session serves all of them instead.
+   */
+  get metadata(): KimicodeMetadataSession {
+    this.metadataSession ??= new KimicodeMetadataSession({
+      // The same factory the backend runs on, so a test that hands the backend
+      // a fake agent is not answered by a real process launched behind it.
+      clientFactory: this.clientFactory ??= this.createClientFactory(),
+      launch: () => this.metadataLaunch(),
+      settingsBag: () => this.plugin.settings,
+      saveSettings: () => this.plugin.saveSettings(),
+      refreshSelectors: () => this.refreshSelectors(),
+    });
+    return this.metadataSession;
+  }
+
+  /**
+   * An `AuxQueryRunner` for one auxiliary conversation, answered by the kernel.
+   *
+   * One per caller, and the caller decides what that means: the title service
+   * builds one per title and resets it when the title is done, while inline edit
+   * holds one for as long as the edit lasts. That is the unit a process is kept
+   * for, so it is the unit the conversation id is minted for.
+   */
+
+  /**
+   * Every auxiliary service this provider has, behind the one seam all nine
+   * share. The runner is per service, and the model is only offered when this
+   * provider is the one that owns the configured title model.
+   */
+  auxiliarySource(): ProviderAuxiliarySource {
+    return {
+      createRunner: purpose => this.createAuxRunner(auxiliaryPurposeKey(purpose)),
+      resolveTitleModel: () => resolveConfiguredTitleModel(
+        this.plugin.settings,
+        (modelId, settings) => kimicodeChatUIConfig.ownsModel(modelId, settings),
+        decodeKimicodeModelId,
+      ),
+    };
+  }
+
+  createAuxRunner(purpose: KimicodeAuxiliaryPurpose): AuxQueryRunner {
+    const conversationId = opaqueId('ocaux');
+    return new KernelAuxQueryRunner({
+      reference: (config, prompt) => this.requests.referenceAuxiliary({
+        purpose,
+        conversationId,
+        systemPrompt: config.systemPrompt,
+        prompt,
+        ...(config.model ? { model: config.model } : {}),
+      }),
+      run: (requestRef, options) => (this.backend ?? this.createBackend())
+        .runAuxiliaryQuery(requestRef, options),
+      release: async () => {
+        await this.backend?.releaseAuxiliaryConversation(
+          auxiliaryRetentionKey(purpose, conversationId),
+        );
+      },
+    });
+  }
+
+  /** Drops every reference held, and takes down whatever is on screen. */
+  dispose(): void {
+    // The half the contract makes mandatory: a workspace built lazily is still
+    // a workspace, and an unload that never released it leaves whatever it
+    // opened behind the plugin that opened it.
+    void this.workspaceHolder.dispose().catch(() => undefined);
+
+    // Taken down before the subscriptions are dropped: unsubscribing first
+    // empties the set this iterates, and the prompts stay on screen.
+    for (const presenter of this.presenters) {
+      presenter.dismissAll();
+    }
+    for (const disposer of this.disposers.splice(0)) {
+      disposer();
+    }
+    this.presenters.clear();
+    this.requests.dispose();
+    // The backend closes these when it is disposed, and a composition disposed
+    // without one still has processes to close: an auxiliary turn needs no chat
+    // session and may have launched on its own.
+    this.settle(this.auxiliaryQueries.dispose());
+  }
+
+  /**
+   * What this turn asks the session to be set to.
+   *
+   * Sent every turn rather than only when it changes, because the session a
+   * turn lands on is decided at dispatch — it may be one this tab never
+   * configured, created by the backend after the old one went missing. The
+   * applier skips whatever is empty.
+   */
+  private dynamicConfiguration(
+    sessionConfig: KimicodeSessionConfigState,
+    options?: ChatRuntimeQueryOptions,
+  ): KimicodeAcpDynamicConfig | undefined {
+    const modeId = sessionConfig.resolveSelectedModeId();
+    const modelId = sessionConfig.resolveSelectedRawModelId(options);
+    const effortValue = sessionConfig.resolveSelectedEffortValue();
+    const effortConfigId = sessionConfig.effortConfigId;
+    // The level the vault is set to, for the turn that is composed before its
+    // session has said which levels exist — a tab's first, and the first after
+    // every reload. The applier resolves the id from the session's own reply;
+    // the legacy runtime applied it after the session opened for this reason.
+    const desiredEffort = sessionConfig.desiredEffortValue();
+    const dynamic: KimicodeAcpDynamicConfig = {
+      ...(modeId ? { modeId } : {}),
+      ...(modelId ? { modelId } : {}),
+      ...(effortConfigId && effortValue
+        ? { effort: { configId: effortConfigId, value: effortValue } }
+        : {}),
+      ...(!effortConfigId && desiredEffort ? { effortValue: desiredEffort } : {}),
+    };
+    return Object.keys(dynamic).length > 0 ? dynamic : undefined;
+  }
+
+  /**
+   * What the vendor charged, when only Kimi Code's database knows.
+   *
+   * The plan indicator for this provider is spend, and a vendor that omits
+   * `cost` from its usage update would otherwise never move it. The store
+   * records the difference from the session total, so reading it twice for one
+   * session counts nothing twice.
+   */
+  /**
+   * Gives this turn's own `usage_update` the moment it needs to arrive.
+   *
+   * Bounded, and the bound is generous by three orders of magnitude: the update
+   * is the frame after the prompt result on the same stdio stream, so it is
+   * usually parsed before this is even called. What the bound buys is that a
+   * CLI which stops sending one costs a turn 400ms once, rather than hanging
+   * it — and a turn is never failed for a badge.
+   */
+  private awaitContextUsage(sessionId: string): Promise<void> {
+    return new Promise<void>(resolve => {
+      const waiters = this.contextUsageWaiters.get(sessionId) ?? new Set<() => void>();
+      this.contextUsageWaiters.set(sessionId, waiters);
+      let settled = false;
+      const done = (): void => {
+        if (settled) return;
+        settled = true;
+        waiters.delete(done);
+        if (waiters.size === 0) this.contextUsageWaiters.delete(sessionId);
+        window.clearTimeout(timer);
+        resolve();
+      };
+      // The window's timers, as everything else in this file uses: a popout is
+      // a different global, and a handle minted on one cannot be cleared on the
+      // other.
+      const timer = window.setTimeout(done, CONTEXT_USAGE_WAIT_MS);
+      waiters.add(done);
+    });
+  }
+
+  private settleContextUsage(sessionId: string | undefined): void {
+    if (!sessionId) return;
+    for (const waiter of [...this.contextUsageWaiters.get(sessionId) ?? []]) {
+      waiter();
+    }
+  }
+
+  private async recordSessionCost(
+    sessionId: string | undefined,
+    databasePath: string | null,
+  ): Promise<void> {
+    if (!sessionId) {
+      return;
+    }
+    const cost = await loadKimicodeSessionCost(
+      sessionId,
+      databasePath ? { databasePath } : undefined,
+    );
+    if (kimicodePlanUsageStore.recordSessionTotalCost(sessionId, cost)) {
+      this.refreshSelectors();
+    }
+  }
+
+  /** Redraws the model and mode selectors of every open view. */
+  private refreshSelectors(): void {
+    for (const view of this.plugin.getAllViews()) {
+      view.refreshModelSelector();
+    }
+  }
+
+  /**
+   * Runs a settings sync the content channel started, and reports what failed.
+   *
+   * The presenter's ports are synchronous because presenting a chunk is; what
+   * they start is a write to the vault's settings. A rejection here would
+   * otherwise be an unhandled one, and the tab would show no sign that its
+   * model list did not update.
+   */
+  private settle(task: Promise<void>): void {
+    void task.catch(error => {
+      this.plugin.recordDebugLog({
+        error,
+        event: 'execution.sessionConfig.failed',
+        level: 'warn',
+        scope: 'kimicode',
+      });
+    });
+  }
+
+  /**
+   * The factory an auxiliary process is launched through, and it is not the
+   * chat one.
+   *
+   * **What a chat turn may reach and an auxiliary turn may not.** The chat
+   * filesystem opts out of containment in full access — the user asked for it,
+   * and they are watching the turn that uses it. An auxiliary turn has nobody
+   * watching and no surface to ask on: a title being generated in the background
+   * must not read outside the vault because the *chat* was set to full access,
+   * and must not write at all. The legacy runner contained every auxiliary read
+   * for exactly this reason, and it declared no write.
+   */
+  private auxiliaryFactory(): ManagedAcpClientFactory {
+    this.auxiliaryClientFactory ??= this.injectedClientFactory ?? this.createAuxiliaryFactory();
+    return this.auxiliaryClientFactory;
+  }
+
+  private createAuxiliaryFactory(): ManagedAcpClientFactory {
+    const fileSystem = createKimicodeAuxiliaryFileSystem(
+      () => getVaultPath(this.plugin.app) ?? process.cwd(),
+    );
+    return new AcpManagedClientAdapterFactory({
+      clientInfo: {
+        name: 'grimoire-aux',
+        version: this.plugin.manifest?.version ?? '0.0.0',
+      },
+      delegate: {
+        fileSystem: {
+          readTextFile: request => fileSystem.readTextFile(request),
+          writeTextFile: request => fileSystem.writeTextFile(request),
+        },
+      },
+      processLauncher: new NodeManagedAcpProcessLauncher({
+        resolve: startupRef => this.requests.resolveLaunch(startupRef),
+      }),
+    });
+  }
+
+  private createClientFactory(): ManagedAcpClientFactory {
+    const fileSystem = new KimicodeAcpFileSystem({
+      // Full access opts into unrestricted file access; safe and plan modes
+      // confine an ACP-delegated read or write to the session workspace.
+      resolveSession: () => ({
+        cwd: getVaultPath(this.plugin.app) ?? process.cwd(),
+        allowOutsideWorkspace: this.fullAccess(),
+      }),
+      approveWrite: input => this.approveWrite(input),
+    });
+    return new AcpManagedClientAdapterFactory({
+      clientInfo: {
+        name: 'grimoire',
+        version: this.plugin.manifest?.version ?? '0.0.0',
+      },
+      // Declared, and therefore used: an ACP client that advertises no
+      // filesystem is one the agent writes around, and the containment and the
+      // write approval below are the two things it would be writing around.
+      delegate: {
+        fileSystem: {
+          readTextFile: request => fileSystem.readTextFile(request),
+          writeTextFile: request => fileSystem.writeTextFile(request),
+        },
+      },
+      processLauncher: new NodeManagedAcpProcessLauncher({
+        resolve: startupRef => this.requests.resolveLaunch(startupRef),
+      }),
+    });
+  }
+
+  private fullAccess(): boolean {
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'kimicode',
+    );
+    return settings.permissionMode === 'full_access';
+  }
+
+  /**
+   * Whether an ACP-delegated write may happen, asked of the tab that owns the
+   * session it came in on.
+   *
+   * The legacy runtime asked its own approval callback, because a runtime was
+   * one tab. The client factory is one process for every tab, so the tab is
+   * found by the session the write arrived on — and a write whose session
+   * belongs to no open tab is refused rather than allowed by default.
+   */
+  private async approveWrite(input: {
+    readonly sessionId: string;
+    readonly requestPath: string;
+    readonly resolvedPath: string;
+  }): Promise<boolean> {
+    if (this.fullAccess()) {
+      return true;
+    }
+    const approval = this.writeApprovers.get(input.sessionId)?.();
+    if (!approval) {
+      return false;
+    }
+    const decision = await approval(
+      'write',
+      { path: input.resolvedPath, relativePath: input.requestPath },
+      `Kimi Code wants to write ${input.requestPath}.`,
+      { decisionReason: 'File write permission required' },
+    );
+    return decision === 'allow' || decision === 'allow-always';
+  }
+
+  /**
+   * The process a question is asked in, which is nobody's conversation.
+   *
+   * The database is in memory, which is what makes it isolated: the legacy
+   * warmups passed the same override for the same reason, so that asking what
+   * models exist never binds a session to a tab or writes Kimi Code state into
+   * the vault.
+   */
+  private async metadataLaunch(): Promise<KimicodeMetadataLaunch> {
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'kimicode',
+    );
+    const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
+    const executable = this.plugin.getResolvedProviderCliPath('kimicode') ?? 'kimi';
+    const runtimeEnv = buildKimicodeRuntimeEnv(settings, executable, METADATA_DATABASE);
+    const artifacts = await prepareKimicodeLaunchArtifacts({
+      runtimeEnv,
+      settings: {
+        customPrompt: this.plugin.settings.systemPrompt,
+        mediaFolder: this.plugin.settings.mediaFolder,
+        userName: this.plugin.settings.userName,
+        vaultPath: cwd,
+      },
+      workspaceRoot: cwd,
+    });
+    return {
+      startupRef: this.requests.referenceLaunch({
+        executable,
+        arguments: ['acp'],
+        cwd,
+        environment: definedEnvironment({
+          ...runtimeEnv,
+          KIMICODE_CONFIG: artifacts.configPath,
+          PATH: getEnhancedPath(runtimeEnv.PATH, isAbsolute(executable) ? executable : undefined),
+        }),
+      }),
+      cwd,
+      mcpServers: toAcpMcpServers([
+        ...(maybeGetKimicodeWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? []),
+      ]),
+    };
+  }
+
+  /**
+   * Everything a queued turn is launched under, read now rather than when it
+   * was queued.
+   *
+   * The artifacts are written here, before the reference is minted, because
+   * they are what the launch *is*: Kimi Code reads its config and system prompt
+   * from files, so a process spawned before they exist runs under the previous
+   * turn's configuration.
+   */
+  /**
+   * What an auxiliary `kimi acp` is launched under.
+   *
+   * The chat environment's shape with three differences, and each is what makes
+   * an auxiliary turn auxiliary: its **own artifacts directory** per purpose, so
+   * a title's config cannot be the conversation's; its **own agent**, whose
+   * permissions are what stops an unattended turn from writing to the vault;
+   * and its **own system prompt**, which is the caller's rather than the
+   * vault's — a title is asked for by the prompt that asks for a title.
+   *
+   * No MCP servers and no database: an auxiliary turn has no conversation to
+   * resume and nothing to offer a tool.
+   */
+  private async auxiliaryEnvironment(
+    request: KimicodeAuxiliaryRequest,
+  ): Promise<KimicodeAuxiliaryEnvironment> {
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'kimicode',
+    );
+    const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
+    const executable = this.plugin.getResolvedProviderCliPath('kimicode') ?? 'kimicode';
+    const runtimeEnv = buildKimicodeRuntimeEnv(settings, executable);
+    const profile = AUXILIARY_AGENT_PROFILES[request.purpose];
+    const agentId = KIMICODE_AUX_AGENT_IDS[profile];
+    const artifacts = await prepareKimicodeLaunchArtifacts({
+      artifactsSubdir: `kimicode/auxiliary/${request.purpose}`,
+      defaultAgentId: agentId,
+      managedAgents: [buildKimicodeAuxAgentConfig(profile)],
+      runtimeEnv,
+      systemPromptKey: request.systemPrompt,
+      systemPromptText: request.systemPrompt,
+      userName: this.plugin.settings.userName,
+      workspaceRoot: cwd,
+    });
+    const modelId = resolveKimicodeAuxiliaryModelId(settings, request.model);
+    return {
+      executable,
+      cwd,
+      environment: definedEnvironment({
+        ...runtimeEnv,
+        KIMICODE_CONFIG: artifacts.configPath,
+        KIMICODE_CONFIG_CONTENT: artifacts.configContent,
+        PATH: getEnhancedPath(runtimeEnv.PATH, isAbsolute(executable) ? executable : undefined),
+      }),
+      // The legacy runner's launch key, unchanged: command, config, environment
+      // and the instructions the artifacts wrote.
+      launchKey: JSON.stringify({
+        artifactKey: artifacts.launchKey,
+        command: executable,
+        configPath: artifacts.configPath,
+        envText: getRuntimeEnvironmentText(this.plugin.settings, 'kimicode'),
+      }),
+      agentId,
+      ...(modelId ? { modelId } : {}),
+    };
+  }
+
+  private async environment(databasePath?: string): Promise<KimicodeInvocationEnvironment> {
+    const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
+      this.plugin.settings,
+      'kimicode',
+    );
+    const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
+    const executable = this.plugin.getResolvedProviderCliPath('kimicode') ?? 'kimi';
+    // The conversation's own database, when it has one: a session created
+    // against one cannot be loaded from another, so a turn launched without it
+    // resumes nothing and leaves the history behind.
+    const runtimeEnv = buildKimicodeRuntimeEnv(settings, executable, databasePath ?? null);
+    const promptSettings = {
+      customPrompt: this.plugin.settings.systemPrompt,
+      mediaFolder: this.plugin.settings.mediaFolder,
+      userName: this.plugin.settings.userName,
+      vaultPath: cwd,
+    };
+    const artifacts = await prepareKimicodeLaunchArtifacts({
+      runtimeEnv,
+      settings: promptSettings,
+      workspaceRoot: cwd,
+    });
+    const mcpServers = maybeGetKimicodeWorkspaceServices(this.plugin)?.mcpServerManager?.getServers() ?? [];
+    return {
+      executable,
+      cwd,
+      environment: definedEnvironment({
+        ...runtimeEnv,
+        KIMICODE_CONFIG: artifacts.configPath,
+        PATH: getEnhancedPath(runtimeEnv.PATH, isAbsolute(executable) ? executable : undefined),
+      }),
+      // The legacy runtime's launch key, unchanged: what a running process
+      // cannot be told about after it has started.
+      launchKey: JSON.stringify({
+        command: executable,
+        configPath: artifacts.configPath,
+        envText: getRuntimeEnvironmentText(this.plugin.settings, 'kimicode'),
+        promptKey: computeSystemPromptKey(promptSettings),
+        // The artifact key already carries the resolved database, which is what
+        // makes a tab that moves to a conversation kept in another one restart
+        // its process — a running process reads one database.
+        artifactKey: artifacts.launchKey,
+        // Added to the legacy key rather than inherited from it: the legacy
+        // runtime shut the process down on an MCP reload, and a session that
+        // is already loaded is never told about a server list that changed
+        // under it. Here the fingerprint is what restarts the process, so the
+        // next turn's session is created with the servers the vault now has.
+        mcpServers,
+      }),
+      mcpServers,
+      // What the artifacts resolved, which is the answer the conversation is
+      // saved with — `KIMICODE_DB` when it was given, the vault default when
+      // it was not.
+      databasePath: artifacts.databasePath,
+    };
+  }
+}
+
+/**
+ * The three MCP members a chat tab never calls.
+ *
+ * Editing the server list is a settings surface, served by the workspace
+ * registration; refusing by name keeps a wrong call visible instead of making
+ * it look like it worked.
+ */
+function notWiredHere(slot: string): Promise<never> {
+  return Promise.reject(new Error(
+    `Kimi Code MCP slot "${slot}" is served by the workspace registration, not by a chat tab.`,
+  ));
+}
+
+/**
+ * Which agent each purpose runs as.
+ *
+ * An inline edit reads the note around what it is editing; a title and a
+ * refinement are given everything they need in the prompt. Copied from the
+ * three legacy services rather than decided again — this is their behaviour,
+ * moved.
+ */
+const AUXILIARY_AGENT_PROFILES: Readonly<Record<KimicodeAuxiliaryPurpose, KimicodeAuxAgentProfile>> = {
+  inline: 'readonly',
+  instructions: 'passive',
+  'title-gen': 'passive',
+};
+
+/**
+ * The raw model id an auxiliary turn runs under.
+ *
+ * Two id spaces and two callers. A caller that names a model hands over either
+ * the encoded selection id the settings UI stores or a raw provider id carried
+ * from elsewhere; decoding only the first and passing the second through is what
+ * the legacy runner does, and an id decoded from the wrong space is a model the
+ * account does not have.
+ *
+ * A caller that names none — inline edit and instruction refinement, unless the
+ * user set an override — falls back to **the model the chat is set to**, which
+ * is the behaviour the legacy runner had and the reason this takes the settings.
+ * Without it an auxiliary turn silently runs on whatever the CLI defaults to,
+ * which is a different model and a different bill from the one the vault is
+ * configured for. A raw id in that setting is left alone: the legacy runner only
+ * ever applied a decoded selection here.
+ */
+function resolveKimicodeAuxiliaryModelId(
+  settings: Record<string, unknown>,
+  model?: string,
+): string | undefined {
+  const trimmed = model?.trim();
+  if (trimmed) {
+    return isKimicodeModelSelectionId(trimmed) ? decodeKimicodeModelId(trimmed) ?? undefined : trimmed;
+  }
+
+  const selected = typeof settings.model === 'string' ? settings.model : '';
+  return isKimicodeModelSelectionId(selected) ? decodeKimicodeModelId(selected) ?? undefined : undefined;
+}
+
+function definedEnvironment(
+  environment: NodeJS.ProcessEnv,
+): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    Object.entries(environment).filter((entry): entry is [string, string] => (
+      entry[1] !== undefined
+    )),
+  );
+}
+
+function opaqueId(prefix: string): string {
+  return `${prefix}-${randomUUID().replaceAll('-', '')}`;
+}
+
+
+/**
+ * The adapter for one Kimi Code tab, plus the one lifecycle it has no port for.
+ *
+ * A tab closing is when the prompts it raised and the turns it queued stop
+ * being anyone's; waiting for its next turn is waiting for one that never
+ * comes.
+ */
+class KimicodeRuntimeAdapter extends ExecutionChatRuntimeAdapter {
+  constructor(
+    context: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[0],
+    ports: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[1],
+    features: ProviderRuntimePorts,
+    workspace: ProviderWorkspaceSlots,
+    private readonly releaseTab: () => void,
+  ) {
+    super(context, ports, features, workspace);
+  }
+
+  override async cleanup(): Promise<void> {
+    try {
+      await super.cleanup();
+    } finally {
+      this.releaseTab();
+    }
+  }
+}
+
+/**
+ * A runtime port reached from a workspace context.
+ *
+ * Refused rather than answered: these are a tab's, and a workspace slot that
+ * asked for one would be answering from whichever tab happened to build the
+ * workspace first. Nothing does today, and this is what would happen if
+ * something started.
+ */
+function runtimeOnly(port: string): never {
+  throw new Error(`Runtime port "${port}" is not available from a workspace context.`);
+}

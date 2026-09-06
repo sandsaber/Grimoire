@@ -1,0 +1,1823 @@
+import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
+
+import type { ExecutionSession, ResultRef } from '@/core/execution/ExecutionContracts';
+import { EXECUTION_SESSIONS_PATH } from '@/core/execution/ExecutionControlPaths';
+import { SETTINGS_TRANSITIONS_PATH } from '@/core/execution/ExecutionControlPaths';
+import { ExecutionControlRepositories } from '@/core/execution/ExecutionControlRepositories';
+import { ExecutionControlTransactionCoordinator } from '@/core/execution/ExecutionControlTransactionCoordinator';
+import type { RunId } from '@/core/execution/ExecutionIds';
+import {
+  executionSessionId,
+  interactionId,
+  lifecycleLeaseId,
+  runId,
+  sessionInstanceId,
+} from '@/core/execution/ExecutionIds';
+import {
+  ExecutionLifecycleRegistry,
+  type ExecutionLifecycleScheduler,
+} from '@/core/execution/ExecutionLifecycleRegistry';
+import { DeterministicFakeBackend } from '@/core/execution/testing/DeterministicFakeBackend';
+import type { DurableStorage } from '@/core/persistence/DurableStorage';
+import type { TransactionCrashPoint } from '@/core/persistence/TransactionIntentCoordinator';
+
+const SESSION_ID = executionSessionId(`es-${'1'.repeat(32)}`);
+const SESSION_ID_2 = executionSessionId(`es-${'2'.repeat(32)}`);
+const RUN_ID = runId(`run-${'3'.repeat(32)}`);
+const RUN_ID_2 = runId(`run-${'4'.repeat(32)}`);
+const INTERACTION_ID = interactionId(`ix-${'5'.repeat(32)}`);
+const OWNER = { kind: 'conversation' as const, ownerId: 'conversation-1' };
+const RESULT: ResultRef = { resultId: 'result-1', storage: 'projection' };
+
+describe('ExecutionLifecycleRegistry', () => {
+  it('keeps startup fail-closed and accepts a backend with no provider association', async () => {
+    const fixture = createFixture();
+
+    expect(fixture.backend.descriptor.association).toEqual({
+      kind: 'internal',
+      service: 'deterministic-test',
+    });
+    await expect(fixture.registry.createSession(sessionCommand())).rejects.toThrow(
+      'not accepting new work',
+    );
+
+    await fixture.registry.start();
+    await expect(fixture.registry.createSession(sessionCommand())).resolves.toBe(SESSION_ID);
+  });
+
+  it('deduplicates cross-stream delivery and persists exactly one terminal', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+
+    fixture.backend.emit(RUN_ID, { kind: 'result', result: RESULT }, {
+      deliveryId: 'native-result-1',
+      destination: 'both',
+    });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    }, { deliveryId: 'native-terminal-1', destination: 'both' });
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)).toMatchObject({
+      state: 'succeeded',
+      resultRef: RESULT,
+      terminal: { kind: 'succeeded', reason: 'completed', resultRef: RESULT },
+      lastSequence: 2,
+    });
+    const beforeRun = await currentRecord(fixture.repositories.runs.read(RUN_ID));
+    const beforeSession = await currentRecord(fixture.repositories.sessions.read(SESSION_ID));
+
+    fixture.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'failed',
+      reason: 'provider-failure',
+    }, { deliveryId: 'late-terminal-2', destination: 'session' });
+    await settle(fixture.registry);
+
+    const afterRun = await currentRecord(fixture.repositories.runs.read(RUN_ID));
+    const afterSession = await currentRecord(fixture.repositories.sessions.read(SESSION_ID));
+    expect(afterRun.revision).toBe(beforeRun.revision);
+    expect(afterSession.revision).toBe(beforeSession.revision);
+    expect(afterRun.payload.terminal).toEqual(beforeRun.payload.terminal);
+  });
+
+  it('accepts the identical delivery after persistence fails before an intent exists', async () => {
+    let failNextIntent = false;
+    const fixture = await startedFixture(undefined, {
+      crashInjector: point => {
+        if (failNextIntent && point === 'before-intent') {
+          failNextIntent = false;
+          throw new Error('injected before-intent failure');
+        }
+      },
+    });
+    await startDefaultRun(fixture);
+    const nativeSession = fixture.backend.sessions.get(SESSION_ID);
+    if (!nativeSession) {
+      throw new Error('Expected a fake native session.');
+    }
+    const delivery = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID },
+      { kind: 'thinking-activity' },
+      { deliveryId: 'retry-after-storage-failure' },
+    );
+
+    failNextIntent = true;
+    await expect(fixture.registry.ingest(delivery)).rejects.toThrow('before-intent');
+    await expect(fixture.registry.ingest(delivery)).resolves.toMatchObject({
+      kind: 'accepted',
+      envelopes: [{ eventId: 'retry-after-storage-failure', sequence: 1 }],
+    });
+
+    expect(fixture.registry.getRun(RUN_ID)?.lastSequence).toBe(1);
+  });
+
+  it('fences later ingress until a partially applied event transaction converges', async () => {
+    let failAfterSessionWrite = false;
+    const fixture = await startedFixture(undefined, {
+      crashInjector: point => {
+        if (failAfterSessionWrite && point === 'after-step-effect:step-0') {
+          throw new Error('injected partial event transaction');
+        }
+      },
+    });
+    await startDefaultRun(fixture);
+    const nativeSession = fixture.backend.sessions.get(SESSION_ID);
+    if (!nativeSession) {
+      throw new Error('Expected a fake native session.');
+    }
+    const first = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID },
+      { kind: 'thinking-activity' },
+      { deliveryId: 'partial-event-1' },
+    );
+    const second = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID },
+      { kind: 'progress', progressId: 'after-partial' },
+      { deliveryId: 'partial-event-2' },
+    );
+
+    failAfterSessionWrite = true;
+    await expect(fixture.registry.ingest(first)).rejects.toThrow('partial event transaction');
+    expect((await currentRecord(fixture.repositories.sessions.read(SESSION_ID))).payload)
+      .toMatchObject({ lastSequence: 1, acceptedEventIds: ['partial-event-1'] });
+    expect((await currentRecord(fixture.repositories.runs.read(RUN_ID))).payload.lastSequence)
+      .toBe(0);
+    await expect(fixture.registry.ingest(second)).rejects.toThrow('partial event transaction');
+    expect((await currentRecord(fixture.repositories.runs.read(RUN_ID))).payload.lastSequence)
+      .toBe(0);
+
+    failAfterSessionWrite = false;
+    await expect(fixture.registry.ingest(second)).resolves.toMatchObject({
+      kind: 'accepted',
+      envelopes: [{ eventId: 'partial-event-2', sequence: 2 }],
+    });
+    expect(fixture.registry.getRun(RUN_ID)?.lastSequence).toBe(2);
+  });
+
+  it('proactively completes a final partial terminal and runs its lifecycle hooks', async () => {
+    let failuresRemaining = 0;
+    const fixture = await startedFixture(undefined, {
+      crashInjector: point => {
+        if (failuresRemaining > 0 && point === 'after-step-effect:step-0') {
+          failuresRemaining -= 1;
+          throw new Error('injected recoverable terminal boundary');
+        }
+      },
+    });
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID,
+        runId: RUN_ID,
+        kind: 'approval',
+        presentationRef: 'approval-partial-terminal',
+        responseIds: ['allow', 'deny'],
+      },
+    });
+    await settle(fixture.registry);
+    const transitionId = `st-${'1'.repeat(32)}`;
+    await fixture.registry.beginSettingsTransition({
+      transitionId,
+      backendId: fixture.backend.descriptor.backendId,
+      settingsFingerprint: '1'.repeat(64),
+    });
+    const nativeSession = fixture.backend.sessions.get(SESSION_ID);
+    if (!nativeSession) {
+      throw new Error('Expected a fake native session.');
+    }
+    const terminal = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID },
+      { kind: 'terminal', terminal: 'failed', reason: 'provider-failure' },
+      { deliveryId: 'final-partial-terminal' },
+    );
+
+    failuresRemaining = 2;
+    await expect(fixture.registry.ingest(terminal))
+      .rejects.toThrow('recoverable terminal boundary');
+    await fixture.registry.waitForIdle();
+
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toMatchObject({
+      kind: 'failed',
+      reason: 'provider-failure',
+    });
+    expect(fixture.backend.cancelledInteractions).toEqual([INTERACTION_ID]);
+    expect(fixture.registry.getInteraction(INTERACTION_ID)?.status).toBe('cancelled');
+    expect((await currentRecord(
+      fixture.repositories.settingsTransitions.read(transitionId),
+    )).payload.status).toBe('quiescent');
+  });
+
+  it('proactively schedules recovery for a final partial connection loss', async () => {
+    let failuresRemaining = 0;
+    const fixture = await startedFixture(undefined, {
+      crashInjector: point => {
+        if (failuresRemaining > 0 && point === 'after-step-effect:step-0') {
+          failuresRemaining -= 1;
+          throw new Error('injected recoverable disconnect boundary');
+        }
+      },
+    });
+    await startDefaultRun(fixture);
+    fixture.backend.nativeStatusRecovery.setEvidence(RUN_ID, { kind: 'stopped-safe' });
+    const nativeSession = fixture.backend.sessions.get(SESSION_ID);
+    if (!nativeSession) {
+      throw new Error('Expected a fake native session.');
+    }
+    const disconnect = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID },
+      { kind: 'connection-lost' },
+      { deliveryId: 'final-partial-disconnect' },
+    );
+
+    failuresRemaining = 2;
+    await expect(fixture.registry.ingest(disconnect))
+      .rejects.toThrow('recoverable disconnect boundary');
+    await fixture.registry.waitForIdle();
+
+    expect(fixture.backend.nativeStatusRecovery.queries).toHaveLength(1);
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toMatchObject({
+      kind: 'interrupted',
+      reason: 'recovery-exhausted-safe',
+    });
+  });
+
+  it('fails every session mutation closed while a partial event cannot converge', async () => {
+    let failRecovery = false;
+    const fixture = await startedFixture(undefined, {
+      crashInjector: point => {
+        if (failRecovery && point === 'after-step-effect:step-0') {
+          throw new Error('persistent partial event boundary');
+        }
+      },
+    });
+    await startDefaultRun(fixture);
+    const nativeSession = fixture.backend.sessions.get(SESSION_ID);
+    if (!nativeSession) {
+      throw new Error('Expected a fake native session.');
+    }
+    const delivery = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID },
+      { kind: 'thinking-activity' },
+      { deliveryId: 'persistently-partial-event' },
+    );
+
+    failRecovery = true;
+    await expect(fixture.registry.ingest(delivery))
+      .rejects.toThrow('persistent partial event boundary');
+    await expect(fixture.registry.cancelRun(RUN_ID))
+      .rejects.toThrow('persistent partial event boundary');
+    await expect(fixture.registry.shutdown(`sd-${'2'.repeat(32)}`))
+      .rejects.toThrow('persistent partial event boundary');
+
+    expect(fixture.registry.getRun(RUN_ID)).toMatchObject({
+      cancellationRequested: false,
+      lastSequence: 0,
+    });
+    expect(fixture.backend.disposeCount).toBe(0);
+  });
+
+  it('does not treat thinking, tools, or progress as a required result', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture, 'required');
+
+    fixture.backend.emit(RUN_ID, { kind: 'thinking-activity' });
+    fixture.backend.emit(RUN_ID, { kind: 'tool-activity', toolCallId: 'tool-1' });
+    fixture.backend.emit(RUN_ID, { kind: 'progress', progressId: 'progress-1' });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toMatchObject({
+      kind: 'failed',
+      reason: 'missing-required-result',
+    });
+  });
+
+  it('classifies an omitted terminal through recovery instead of stream completion', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.nativeStatusRecovery.setEvidence(RUN_ID, {
+      kind: 'unknown',
+      effectsPossible: true,
+    });
+
+    fixture.backend.closeRunStream(RUN_ID);
+    await fixture.registry.waitForRunStream(RUN_ID);
+
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toMatchObject({
+      kind: 'indeterminate',
+      reason: 'effects-unknown',
+    });
+    expect(fixture.backend.nativeStatusRecovery.queries).toHaveLength(1);
+  });
+
+  it('rotates the live incarnation only after recovery evidence', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    const nextInstance = sessionInstanceId(`si-${'a'.repeat(32)}`);
+    fixture.backend.nativeStatusRecovery.setEvidence(RUN_ID, {
+      kind: 'running',
+      sessionInstanceId: nextInstance,
+    });
+
+    fixture.backend.emit(RUN_ID, { kind: 'connection-lost' }, {
+      deliveryId: 'disconnect-1',
+      destination: 'session',
+    });
+    fixture.backend.reconnectSession(SESSION_ID, nextInstance);
+    await settle(fixture.registry, 12);
+
+    expect(fixture.registry.getRun(RUN_ID)?.state).toBe('running');
+    expect(fixture.registry.getSession(SESSION_ID)).toMatchObject({
+      status: 'active',
+      sessionInstanceId: nextInstance,
+    });
+  });
+
+  it('persists native run identity, fences mismatches, and supplies both native refs to recovery', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, { kind: 'run-started' }, {
+      deliveryId: 'native-turn-started',
+      scope: { kind: 'run', runId: RUN_ID, nativeRunRef: 'native-turn-1' },
+    });
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)?.nativeRunRef).toBe('native-turn-1');
+    const nativeSession = fixture.backend.sessions.get(SESSION_ID);
+    if (!nativeSession) {
+      throw new Error('Expected a fake native session.');
+    }
+    const mismatched = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID, nativeRunRef: 'native-turn-2' },
+      { kind: 'thinking-activity' },
+      { deliveryId: 'mismatched-native-turn' },
+    );
+    await expect(fixture.registry.ingest(mismatched)).resolves.toEqual({
+      kind: 'ignored-invalid-scope',
+    });
+    expect(fixture.registry.getRun(RUN_ID)?.nativeRunRef).toBe('native-turn-1');
+
+    fixture.backend.nativeStatusRecovery.setEvidence(RUN_ID, {
+      kind: 'running',
+      sessionInstanceId: nativeSession.sessionInstanceId,
+    });
+    fixture.backend.emit(RUN_ID, { kind: 'connection-lost' }, {
+      deliveryId: 'native-turn-disconnected',
+      scope: { kind: 'run', runId: RUN_ID, nativeRunRef: 'native-turn-1' },
+    });
+    await settle(fixture.registry, 12);
+
+    expect(fixture.backend.nativeStatusRecovery.queries).toEqual([
+      expect.objectContaining({
+        nativeSessionRef: `fake-session-${SESSION_ID}`,
+        nativeRunRef: 'native-turn-1',
+      }),
+    ]);
+  });
+
+  it('reconciles a causal gap through the snapshot port without applying across it', async () => {
+    const fixture = await startedFixture(undefined, { recovery: 'snapshot' });
+    await startDefaultRun(fixture);
+    fixture.backend.snapshotRecovery.setEvidence(RUN_ID, { kind: 'stopped-safe' });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    }, {
+      deliveryId: 'causal-terminal-2',
+      destination: 'session',
+      causal: { streamId: 'native-run-1', sequence: 2 },
+    });
+    await settle(fixture.registry);
+
+    await fixture.registry.flushGaps(SESSION_ID);
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toMatchObject({
+      kind: 'interrupted',
+      reason: 'recovery-exhausted-safe',
+    });
+    expect(fixture.backend.snapshotRecovery.queries).toHaveLength(1);
+  });
+
+  it('discards both occupants of a causal conflict before waiting-interaction recovery rebases', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.nativeStatusRecovery.setEvidence(RUN_ID, {
+      kind: 'waiting-interaction',
+      interactionId: INTERACTION_ID,
+    });
+    const nativeSession = fixture.backend.sessions.get(SESSION_ID);
+    if (!nativeSession) {
+      throw new Error('Expected a fake native session.');
+    }
+    const firstOccupant = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID },
+      { kind: 'terminal', terminal: 'failed', reason: 'provider-failure' },
+      {
+        deliveryId: 'conflict-terminal-a',
+        causal: { streamId: 'conflicted-native-stream', sequence: 2 },
+      },
+    );
+    const secondOccupant = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID },
+      { kind: 'thinking-activity' },
+      {
+        deliveryId: 'conflict-thinking-b',
+        causal: { streamId: 'conflicted-native-stream', sequence: 2 },
+      },
+    );
+
+    await expect(fixture.registry.ingest(firstOccupant)).resolves.toEqual({ kind: 'buffered' });
+    await expect(fixture.registry.ingest(secondOccupant)).resolves.toMatchObject({
+      kind: 'causal-conflict',
+    });
+    await settle(fixture.registry);
+    const predecessor = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID },
+      { kind: 'thinking-activity' },
+      {
+        deliveryId: 'conflict-predecessor',
+        causal: { streamId: 'conflicted-native-stream', sequence: 1 },
+      },
+    );
+    await expect(fixture.registry.ingest(predecessor)).resolves.toMatchObject({
+      kind: 'accepted',
+      envelopes: [{ eventId: 'conflict-predecessor', sequence: 1 }],
+    });
+
+    expect(fixture.registry.getRun(RUN_ID)).toMatchObject({
+      state: 'running',
+      lastSequence: 1,
+    });
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toBeUndefined();
+  });
+
+  it('turns rejected cancellation with unknown effects into indeterminate', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.cancellationMode = 'reject';
+    fixture.backend.nativeStatusRecovery.setEvidence(RUN_ID, {
+      kind: 'unknown',
+      effectsPossible: true,
+    });
+
+    await fixture.registry.cancelRun(RUN_ID);
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toMatchObject({
+      kind: 'indeterminate',
+      reason: 'cancellation-unknown',
+    });
+  });
+
+  it('keeps one cancellation terminal when acknowledgement races explicit completion', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+
+    const cancellation = fixture.registry.cancelRun(RUN_ID);
+    fixture.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'cancelled',
+      reason: 'cancellation-confirmed',
+    }, { deliveryId: 'cancel-terminal-race', destination: 'session' });
+    await cancellation;
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toMatchObject({
+      kind: 'cancelled',
+      reason: 'cancellation-confirmed',
+    });
+    expect(fixture.registry.getRun(RUN_ID)?.lastSequence).toBe(1);
+  });
+
+  it('distinguishes side-effect-free dispatch rejection from lost acknowledgement', async () => {
+    const fixture = await startedFixture();
+    await fixture.registry.createSession(sessionCommand());
+
+    fixture.backend.dispatchMode = 'reject-side-effect-free';
+    await fixture.registry.startRun(SESSION_ID, request(RUN_ID));
+    fixture.backend.dispatchMode = 'lose-acknowledgement';
+    await fixture.registry.startRun(SESSION_ID, request(RUN_ID_2));
+
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toMatchObject({
+      kind: 'invalidated',
+      reason: 'pre-dispatch-rejected',
+    });
+    expect(fixture.registry.getRun(RUN_ID_2)?.terminal).toMatchObject({
+      kind: 'indeterminate',
+      reason: 'dispatch-unknown',
+    });
+    expect(fixture.backend.getRun(RUN_ID)).toBeNull();
+    expect(fixture.backend.getRun(RUN_ID_2)).not.toBeNull();
+    expect(fixture.backend.dispatchAttempts.get(RUN_ID_2)).toBe(1);
+  });
+
+  it('never relabels an accepted running attempt as invalidated', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, { kind: 'run-started' });
+    fixture.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'invalidated',
+      reason: 'side-effect-free-rejection',
+      sideEffectFree: true,
+    });
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)).toMatchObject({ state: 'running' });
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toBeUndefined();
+  });
+
+  it('rejects contradictory terminal kind and reason from a backend', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'provider-failure',
+    }, { deliveryId: 'contradictory-terminal' });
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toBeUndefined();
+    expect(fixture.registry.getRun(RUN_ID)?.lastSequence).toBe(0);
+  });
+
+  it('keeps interactions lifecycle-owned and closes them atomically with the run', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID,
+        runId: RUN_ID,
+        kind: 'approval',
+        presentationRef: 'approval-1',
+        responseIds: ['allow', 'deny'],
+      },
+    });
+    await settle(fixture.registry);
+
+    const lease = fixture.registry.acquireLease(
+      lifecycleLeaseId(`lease-${'6'.repeat(32)}`),
+      SESSION_ID,
+      'projection',
+    );
+    expect(fixture.registry.getInteraction(INTERACTION_ID)?.status).toBe('open');
+    expect(fixture.registry.canDisposeSession(SESSION_ID)).toBe(false);
+    lease.release();
+
+    fixture.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'failed',
+      reason: 'provider-failure',
+    });
+    await settle(fixture.registry);
+
+    expect(fixture.registry.getInteraction(INTERACTION_ID)?.status).toBe('cancelled');
+    await expect(fixture.registry.resolveInteraction({
+      interactionId: INTERACTION_ID,
+      responseId: 'allow',
+      resolvedAt: 50,
+    })).rejects.toThrow('after its run is terminal');
+  });
+
+  it('recovers an interaction resolution through an idempotent resolving intent', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID,
+        runId: RUN_ID,
+        kind: 'question',
+        presentationRef: 'question-1',
+        responseIds: ['yes', 'no'],
+      },
+    });
+    await settle(fixture.registry);
+    fixture.backend.interactionResolutionError = new Error('transient resolution failure');
+
+    await expect(fixture.registry.resolveInteraction({
+      interactionId: INTERACTION_ID,
+      responseId: 'yes',
+      resolvedAt: 60,
+    })).rejects.toThrow('transient resolution failure');
+    expect(fixture.registry.getInteraction(INTERACTION_ID)).toMatchObject({
+      status: 'resolving',
+      selectedResponseId: 'yes',
+    });
+
+    fixture.backend.interactionResolutionError = undefined;
+    await fixture.registry.resolveInteraction({
+      interactionId: INTERACTION_ID,
+      responseId: 'yes',
+      resolvedAt: 61,
+    });
+    expect(fixture.registry.getInteraction(INTERACTION_ID)?.status).toBe('resolved');
+    expect(fixture.backend.resolutions).toHaveLength(2);
+  });
+
+  it('replays a persisted resolving interaction on a fresh registry', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage, { transactionOffset: 0 });
+    await startDefaultRun(first);
+    first.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID,
+        runId: RUN_ID,
+        // An approval, because that is the kind a response id fully describes.
+        // A question carries an answer beside it, which is never written down —
+        // see the case below.
+        kind: 'approval',
+        presentationRef: 'approval-restart',
+        responseIds: ['yes', 'no'],
+      },
+    });
+    await settle(first.registry);
+    first.backend.interactionResolutionError = new Error('crash boundary');
+    await expect(first.registry.resolveInteraction({
+      interactionId: INTERACTION_ID,
+      responseId: 'yes',
+      resolvedAt: 60,
+    })).rejects.toThrow('crash boundary');
+
+    const restored = createFixture(storage, { transactionOffset: 1_000, instanceOffset: 10 });
+    restored.backend.nativeStatusRecovery.setEvidence(RUN_ID, { kind: 'running', sessionInstanceId: sessionInstanceId(`si-${'b'.repeat(32)}`) });
+    await restored.registry.start();
+
+    expect(restored.registry.getInteraction(INTERACTION_ID)?.status).toBe('resolved');
+    expect(restored.backend.resolutions).toEqual([
+      expect.objectContaining({ interactionId: INTERACTION_ID, responseId: 'yes' }),
+    ]);
+  });
+
+  it('cancels a question caught mid-resolution rather than replaying it', async () => {
+    // The answer travelled on the resolution and was never written down — D2
+    // forbids a second copy of what a person typed — so a reload leaves only the
+    // response id. Completing the interaction with that alone would tell the
+    // agent an answer nobody gave, so it is cancelled: what a closed tab already
+    // means, and the only honest outcome here.
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage, { transactionOffset: 0 });
+    await startDefaultRun(first);
+    first.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID,
+        runId: RUN_ID,
+        kind: 'question',
+        presentationRef: 'question-restart',
+        responseIds: ['yes', 'no'],
+      },
+    });
+    await settle(first.registry);
+    first.backend.interactionResolutionError = new Error('crash boundary');
+    await expect(first.registry.resolveInteraction({
+      interactionId: INTERACTION_ID,
+      responseId: 'yes',
+      resolvedAt: 60,
+      payload: { answers: ['the answer nobody will see again'] },
+    })).rejects.toThrow('crash boundary');
+
+    const restored = createFixture(storage, { transactionOffset: 1_000, instanceOffset: 10 });
+    restored.backend.nativeStatusRecovery.setEvidence(RUN_ID, { kind: 'running', sessionInstanceId: sessionInstanceId(`si-${'c'.repeat(32)}`) });
+    await restored.registry.start();
+
+    expect(restored.registry.getInteraction(INTERACTION_ID)?.status).toBe('cancelled');
+    // Not resolved with a response id and no answer, which is what replaying it
+    // would have been.
+    expect(restored.backend.resolutions).toEqual([]);
+  });
+
+  it('replays native interaction cancellation before declaring it cancelled', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage, { transactionOffset: 0 });
+    await startDefaultRun(first);
+    first.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID,
+        runId: RUN_ID,
+        kind: 'approval',
+        presentationRef: 'approval-restart',
+        responseIds: ['allow', 'deny'],
+      },
+    });
+    await settle(first.registry);
+    first.backend.interactionCancellationError = new Error('native cancel unavailable');
+    first.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'failed',
+      reason: 'provider-failure',
+    });
+    await settle(first.registry);
+    expect(first.registry.getInteraction(INTERACTION_ID)?.status).toBe('cancelling');
+
+    const restored = createFixture(storage, { transactionOffset: 1_000, instanceOffset: 10 });
+    await restored.registry.start();
+
+    expect(restored.backend.cancelledInteractions).toEqual([INTERACTION_ID]);
+    expect(restored.registry.getInteraction(INTERACTION_ID)?.status).toBe('cancelled');
+  });
+
+  it('appends reconciliation without rewriting the indeterminate terminal', async () => {
+    const fixture = await startedFixture();
+    await fixture.registry.createSession(sessionCommand());
+    fixture.backend.dispatchMode = 'lose-acknowledgement';
+    await fixture.registry.startRun(SESSION_ID, request(RUN_ID));
+    const terminal = fixture.registry.getRun(RUN_ID)?.terminal;
+    const hiddenAttempt = fixture.backend.getRun(RUN_ID);
+    expect(hiddenAttempt).not.toBeNull();
+    expect(fixture.backend.dispatchAttempts.get(RUN_ID)).toBe(1);
+    hiddenAttempt?.emit({ kind: 'result', result: RESULT }, {
+      deliveryId: 'late-hidden-result',
+      destination: 'session',
+    });
+    await settle(fixture.registry);
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toEqual(terminal);
+    expect(fixture.backend.dispatchAttempts.get(RUN_ID)).toBe(1);
+
+    await fixture.registry.appendReconciliation({
+      reconciliationId: `rec-${'7'.repeat(32)}`,
+      runId: RUN_ID,
+      originalTerminal: 'indeterminate',
+      observedOutcome: 'succeeded',
+      observedResult: RESULT,
+      evidence: { kind: 'native-history', evidenceRef: 'history-1' },
+      recordedAt: 70,
+    });
+
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toEqual(terminal);
+    await expect(fixture.repositories.reconciliations.read(`rec-${'7'.repeat(32)}`))
+      .resolves.toMatchObject({ kind: 'current', record: { revision: 1 } });
+  });
+
+  it('fences a backend generation until accepted work is terminal and settings are applied', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    const transitionId = `st-${'8'.repeat(32)}`;
+
+    await fixture.registry.beginSettingsTransition({
+      transitionId,
+      backendId: fixture.backend.descriptor.backendId,
+      settingsFingerprint: '9'.repeat(64),
+    });
+    await expect(fixture.registry.startRun(SESSION_ID, request(RUN_ID_2)))
+      .rejects.toThrow('draining');
+    expect((await currentRecord(
+      fixture.repositories.settingsTransitions.read(transitionId),
+    )).payload.status).toBe('draining');
+
+    fixture.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    await settle(fixture.registry);
+    await fixture.registry.markSettingsTransitionApplying(transitionId);
+    await fixture.registry.completeSettingsTransition(transitionId);
+
+    expect(fixture.registry.getBackendGeneration(fixture.backend.descriptor.backendId)).toBe(2);
+    expect((await currentRecord(
+      fixture.repositories.settingsTransitions.read(transitionId),
+    )).payload.status).toBe('completed');
+    expect(fixture.registry.getSession(SESSION_ID)).toBeNull();
+  });
+
+  it('fails closed when startup finds settings in an unknown applying boundary', async () => {
+    const fixture = createFixture();
+    const transitionId = `st-${'c'.repeat(32)}`;
+    await fixture.repositories.settingsTransitions.create(transitionId, {
+      transitionId,
+      backendId: fixture.backend.descriptor.backendId,
+      fromGeneration: 1,
+      toGeneration: 2,
+      status: 'applying',
+      settingsFingerprint: 'd'.repeat(64),
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    await fixture.registry.start();
+
+    expect((await currentRecord(
+      fixture.repositories.settingsTransitions.read(transitionId),
+    )).payload.status).toBe('restart-required');
+    await expect(fixture.registry.createSession(sessionCommand()))
+      .rejects.toThrow('not accepting sessions');
+  });
+
+  it('keeps a settings transition admitted until its durable write completes', async () => {
+    const storage = new GatedDurableStorage(SETTINGS_TRANSITIONS_PATH);
+    const fixture = await startedFixture(storage);
+    const transitionId = `st-${'e'.repeat(32)}`;
+    const checkpointId = `sd-${'f'.repeat(32)}`;
+
+    const transition = fixture.registry.beginSettingsTransition({
+      transitionId,
+      backendId: fixture.backend.descriptor.backendId,
+      settingsFingerprint: 'a'.repeat(64),
+    });
+    await storage.waitUntilBlocked();
+    const shutdown = fixture.registry.shutdown(checkpointId);
+    await Promise.resolve();
+    expect(await fixture.repositories.shutdownCheckpoints.read(checkpointId))
+      .toEqual({ kind: 'absent' });
+
+    storage.release();
+    await transition;
+    await shutdown;
+    expect((await currentRecord(
+      fixture.repositories.shutdownCheckpoints.read(checkpointId),
+    )).payload.status).toBe('completed');
+  });
+
+  it('gives up on an admission that never returns rather than never shutting down', async () => {
+    const scheduler = new ImmediateScheduler();
+    const fixture = await startedFixture(undefined, { scheduler });
+    const hung = deferred<ExecutionSession>();
+    const created = jest.spyOn(fixture.backend, 'createSession')
+      .mockReturnValue(hung.promise);
+    const admission = fixture.registry.createSession(sessionCommand());
+    // A few turns, not one: creation is serialized per owner now, so the call
+    // into the provider is a queue hop away rather than a microtask away.
+    for (let turn = 0; turn < 8 && created.mock.calls.length === 0; turn += 1) {
+      await Promise.resolve();
+    }
+    expect(created).toHaveBeenCalledTimes(1);
+
+    // An admission is held for the whole of `createSession`, provider included.
+    // Waiting on it unbounded made unloading the plugin depend on a CLI
+    // answering, while every other wait in `shutdown` already had the grace
+    // period this one skipped.
+    await expect(fixture.registry.shutdown(`sd-${'c'.repeat(32)}`)).resolves.toBeUndefined();
+
+    // And what it gave up on cleans up after itself rather than joining a
+    // registry that has already written its checkpoint.
+    const session = new DeterministicFakeSessionDouble();
+    hung.resolve(session as unknown as ExecutionSession);
+    await expect(admission).rejects.toThrow(/stopped accepting new work/);
+    expect(fixture.registry.getSession(SESSION_ID)).toBeNull();
+    expect(session.disposed).toBe(true);
+  });
+
+  it('closes admission synchronously and classifies unconfirmed work during bounded shutdown', async () => {
+    const scheduler = new ImmediateScheduler();
+    const fixture = await startedFixture(undefined, { scheduler });
+    await startDefaultRun(fixture);
+    fixture.backend.cancellationMode = 'silent';
+    const checkpointId = `sd-${'a'.repeat(32)}`;
+
+    const shutdown = fixture.registry.shutdown(checkpointId);
+    await expect(fixture.registry.createSession({
+      ...sessionCommand(),
+      executionSessionId: SESSION_ID_2,
+    })).rejects.toThrow('not accepting new work');
+    await shutdown;
+
+    expect(fixture.registry.getRun(RUN_ID)?.terminal).toMatchObject({
+      kind: 'indeterminate',
+      reason: 'shutdown-unknown',
+    });
+    expect(fixture.backend.disposeCount).toBe(1);
+    expect((await currentRecord(
+      fixture.repositories.shutdownCheckpoints.read(checkpointId),
+    )).payload).toMatchObject({
+      status: 'completed',
+      unresolvedRunIds: [RUN_ID],
+    });
+  });
+
+  it('persists a shutdown checkpoint before a hung recovery port can settle', async () => {
+    const scheduler = new ManualScheduler();
+    const fixture = await startedFixture(undefined, { scheduler });
+    await startDefaultRun(fixture);
+    fixture.backend.nativeStatusRecovery.setNeverResolve(RUN_ID);
+    const nativeSession = fixture.backend.sessions.get(SESSION_ID);
+    if (!nativeSession) {
+      throw new Error('Expected a fake native session.');
+    }
+    const disconnect = fixture.backend.createDelivery(
+      nativeSession,
+      { kind: 'run', runId: RUN_ID },
+      { kind: 'connection-lost' },
+      { deliveryId: 'hung-recovery-disconnect' },
+    );
+    await fixture.registry.ingest(disconnect);
+    await waitUntil(() => fixture.backend.nativeStatusRecovery.queries.length === 1);
+    expect(fixture.backend.nativeStatusRecovery.queries).toHaveLength(1);
+
+    const checkpointId = `sd-${'9'.repeat(32)}`;
+    const shutdown = fixture.registry.shutdown(checkpointId);
+    await flushPromises(12);
+    expect((await currentRecord(
+      fixture.repositories.shutdownCheckpoints.read(checkpointId),
+    )).payload.status).toBe('started');
+
+    for (let turn = 0; turn < 5; turn += 1) {
+      scheduler.fireAll();
+      await flushPromises(12);
+    }
+    await shutdown;
+    expect((await currentRecord(
+      fixture.repositories.shutdownCheckpoints.read(checkpointId),
+    )).payload.status).toBe('completed');
+  });
+
+  it('restores completed results without dispatching the run again', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage, { transactionOffset: 0 });
+    await startDefaultRun(first, 'required');
+    first.backend.emit(RUN_ID, { kind: 'result', result: RESULT });
+    first.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    await settle(first.registry);
+
+    const restored = createFixture(storage, { transactionOffset: 1_000, instanceOffset: 10 });
+    await restored.registry.start();
+
+    expect(restored.registry.getRun(RUN_ID)).toMatchObject({
+      terminal: { kind: 'succeeded' },
+      resultRef: RESULT,
+    });
+    expect(restored.backend.sessions.get(SESSION_ID)?.config.nativeSessionRef)
+      .toBe(`fake-session-${SESSION_ID}`);
+    expect(restored.backend.getRun(RUN_ID)).toBeNull();
+  });
+
+  it('does not carry a closed conversation\'s finished turns into the next start', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage);
+    for (const [session, run] of [[SESSION_ID, RUN_ID], [SESSION_ID_2, RUN_ID_2]] as const) {
+      await first.registry.createSession({ ...sessionCommand(), executionSessionId: session });
+      await first.registry.startRun(session, request(run, 'none'));
+      first.backend.emit(run, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+        deliveryId: `terminal-${run}`,
+        destination: 'both',
+      });
+    }
+    await settle(first.registry);
+    // Only the first is closed: a disposed session is one nobody reopens.
+    await first.registry.disposeSession(SESSION_ID);
+
+    const restored = createFixture(storage, { transactionOffset: 5_000, instanceOffset: 50 });
+    await restored.registry.start();
+
+    // The disposed session's finished turn stays on disk — deletion and an
+    // honest history read it — and out of this process, which otherwise paid
+    // for the vault's whole history on every start with no way to let go of it.
+    expect(restored.registry.getRun(RUN_ID)).toBeNull();
+    await expect(restored.repositories.runs.read(RUN_ID))
+      .resolves.toMatchObject({ kind: 'current' });
+    // The session that is still open keeps its own: it is about to be reopened.
+    expect(restored.registry.getRun(RUN_ID_2)).not.toBeNull();
+  });
+
+  it('leaves no checkpoint or completed transition behind across restarts', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage);
+    await startDefaultRun(first);
+    await first.registry.shutdown(`sd-${'d'.repeat(32)}`);
+    const second = createFixture(storage, { transactionOffset: 2_000, instanceOffset: 20 });
+    await second.registry.start();
+    await second.registry.shutdown(`sd-${'e'.repeat(32)}`);
+
+    // Two unloads, two checkpoints written — and at most the last one left,
+    // because a startup consumes what it finds. D3: "consumed at next startup".
+    const third = createFixture(storage, { transactionOffset: 3_000, instanceOffset: 30 });
+    await third.registry.start();
+
+    await expect(third.repositories.shutdownCheckpoints.listRecordIds()).resolves.toEqual([]);
+    await expect(third.repositories.settingsTransitions.listRecordIds()).resolves.toEqual([]);
+  });
+
+  it('reconciles an incomplete shutdown checkpoint before accepting restored work', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage, { transactionOffset: 0 });
+    await startDefaultRun(first);
+    const checkpointId = `sd-${'b'.repeat(32)}`;
+    await first.repositories.shutdownCheckpoints.create(checkpointId, {
+      checkpointId,
+      status: 'started',
+      sessionIds: [SESSION_ID],
+      runIds: [RUN_ID],
+      unresolvedRunIds: [RUN_ID],
+      startedAt: 100,
+    });
+
+    const restored = createFixture(storage, {
+      transactionOffset: 1_000,
+      instanceOffset: 10,
+    });
+    restored.backend.nativeStatusRecovery.setEvidence(RUN_ID, { kind: 'stopped-safe' });
+    await restored.registry.start();
+
+    expect(restored.registry.getRun(RUN_ID)?.terminal).toMatchObject({
+      kind: 'interrupted',
+      reason: 'recovery-exhausted-safe',
+    });
+    // Consumed, which D3 says is the whole of its retention: the runs it named
+    // have been reconciled and the next unload writes its own. Kept, one file
+    // per unload accumulated for the life of the vault, each listed and read in
+    // full by every later startup.
+    await expect(restored.repositories.shutdownCheckpoints.read(checkpointId))
+      .resolves.toMatchObject({ kind: 'absent' });
+    await expect(restored.registry.createSession({
+      ...sessionCommand(),
+      executionSessionId: SESSION_ID_2,
+    })).resolves.toBe(SESSION_ID_2);
+  });
+});
+
+describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
+  const OTHER_OWNER = { kind: 'conversation' as const, ownerId: 'conversation-2' };
+
+  /** One conversation's worth of records: a session, a run, and its terminal. */
+  async function recordATurn(
+    fixture: ReturnType<typeof createFixture>,
+    session: ReturnType<typeof executionSessionId>,
+    run: RunId,
+    owner: { kind: 'conversation'; ownerId: string },
+    options: { keepOpen?: boolean } = {},
+  ): Promise<void> {
+    await fixture.registry.createSession({ ...sessionCommand(), executionSessionId: session, owner });
+    await fixture.registry.startRun(session, { ...request(run, 'none'), owner });
+    fixture.backend.emit(run, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+      deliveryId: `terminal-${run}`,
+      destination: 'both',
+    });
+    await settle(fixture.registry);
+    if (!options.keepOpen) {
+      await fixture.registry.disposeSession(session);
+    }
+  }
+
+  it('keeps the session record to live work instead of every turn it ever ran', async () => {
+    const fixture = await startedFixture();
+    await recordATurn(fixture, SESSION_ID, RUN_ID, OWNER, { keepOpen: true });
+
+    // This record is rewritten on every event the session sees, so a list that
+    // only ever grew made each of those writes larger than the last — for the
+    // whole life of a conversation. What the list is read for is live work, and
+    // a finished run is not that.
+    expect(fixture.registry.getSession(SESSION_ID)?.runIds).toEqual([]);
+    // The turn itself is still there, both in the process and on disk: the run
+    // record names its own session and its own owner, which is what deletion
+    // and a restart read.
+    expect(fixture.registry.getRun(RUN_ID)).not.toBeNull();
+    await expect(fixture.repositories.runs.read(RUN_ID))
+      .resolves.toMatchObject({ kind: 'current' });
+
+    // And disposal still forgets it, which it can only do if the process kept
+    // the list the record stopped carrying.
+    await fixture.registry.disposeSession(SESSION_ID);
+    expect(fixture.registry.getRun(RUN_ID)).toBeNull();
+  });
+
+  it('lets go of a disposed session\'s runs and interactions', async () => {
+    const fixture = await startedFixture();
+    await recordATurn(fixture, SESSION_ID, RUN_ID, OWNER);
+    await recordATurn(fixture, SESSION_ID_2, RUN_ID_2, OTHER_OWNER, { keepOpen: true });
+
+    // The maps are the process's memory of work in progress. A run whose
+    // session is disposed is neither in progress nor reachable, and keeping it
+    // means a working day's session holds every turn it ever ran.
+    expect(fixture.registry.getRun(RUN_ID)).toBeNull();
+    // The open session keeps its own: a tab that is still there can still ask
+    // about the turn it just finished.
+    expect(fixture.registry.getRun(RUN_ID_2)).not.toBeNull();
+  });
+
+  it('lets go of an interaction the closed session had opened', async () => {
+    const fixture = await startedFixture();
+    await fixture.registry.createSession(sessionCommand());
+    await fixture.registry.startRun(SESSION_ID, request(RUN_ID, 'none'));
+    fixture.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID,
+        runId: RUN_ID,
+        kind: 'approval',
+        presentationRef: 'approval-disposed',
+        responseIds: ['allow', 'deny'],
+      },
+    });
+    await settle(fixture.registry);
+    await fixture.registry.resolveInteraction({
+      interactionId: INTERACTION_ID,
+      responseId: 'allow',
+      resolvedAt: 1,
+    });
+    fixture.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+      deliveryId: 'terminal-disposed',
+      destination: 'both',
+    });
+    await settle(fixture.registry);
+    expect(fixture.registry.getInteraction(INTERACTION_ID)).not.toBeNull();
+
+    await fixture.registry.disposeSession(SESSION_ID);
+
+    // A prompt raised by a tab that has closed cannot be shown to anyone or
+    // answered by anyone; what happened to it is in its durable record.
+    expect(fixture.registry.getInteraction(INTERACTION_ID)).toBeNull();
+  });
+
+  it('removes every record the conversation owns, and only those', async () => {
+    const fixture = await startedFixture();
+    await recordATurn(fixture, SESSION_ID, RUN_ID, OWNER);
+    await recordATurn(fixture, SESSION_ID_2, RUN_ID_2, OTHER_OWNER);
+
+    await fixture.registry.deleteOwnedRecords(OWNER);
+
+    // D4: deleting a conversation deletes every control record owned by it. The
+    // other conversation's records are the control: a sweep that took them too
+    // would be a deletion nobody asked for.
+    await expect(fixture.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+    await expect(fixture.repositories.runs.read(RUN_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+    await expect(fixture.repositories.sessions.read(SESSION_ID_2))
+      .resolves.toMatchObject({ kind: 'current' });
+    await expect(fixture.repositories.runs.read(RUN_ID_2))
+      .resolves.toMatchObject({ kind: 'current' });
+  });
+
+  it('answers a second deletion the same way as the first', async () => {
+    const fixture = await startedFixture();
+    await recordATurn(fixture, SESSION_ID, RUN_ID, OWNER);
+
+    await fixture.registry.deleteOwnedRecords(OWNER);
+
+    // D4: idempotent. A deletion that threw on its second call would make the
+    // recovery of an interrupted one impossible.
+    await expect(fixture.registry.deleteOwnedRecords(OWNER)).resolves.toBeUndefined();
+  });
+
+  it('stops a live run itself rather than asking the caller to have stopped it', async () => {
+    const fixture = await startedFixture();
+    await fixture.registry.createSession(sessionCommand());
+    await fixture.registry.startRun(SESSION_ID, request(RUN_ID, 'none'));
+
+    // D4: a conversation is deleted from a surface where cancelling is
+    // fire-and-forget and disposal is a void call on a queue, so a caller can
+    // only ask. Refusing here is what left the chat gone from the UI and its
+    // records in the vault — the growth D4 exists to stop.
+    await expect(fixture.registry.deleteOwnedRecords(OWNER)).resolves.toBeUndefined();
+
+    expect(fixture.registry.getSession(SESSION_ID)).toBeNull();
+    await expect(fixture.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'absent' });
+    await expect(fixture.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+  });
+
+  it('does not delete around a session that is still being created', async () => {
+    const fixture = await startedFixture();
+    const opened = deferred<void>();
+    const created = jest.spyOn(fixture.backend, 'createSession');
+    const real = created.getMockImplementation();
+    created.mockImplementation(async config => {
+      // The window the race lived in: a session registers only after its
+      // provider answers, so a delete that ran here saw no session to close and
+      // no records to remove — and the creation went on to register a live one,
+      // holding a provider process, owned by a conversation that no longer
+      // exists.
+      await opened.promise;
+      return (real ?? fixture.backend.constructor.prototype.createSession).call(
+        fixture.backend,
+        config,
+      );
+    });
+
+    const creating = fixture.registry.createSession(sessionCommand());
+    const deleting = fixture.registry.deleteOwnedRecords(OWNER);
+    opened.resolve();
+    await creating;
+    await deleting;
+
+    // Whichever order they ran in, nothing is left half-owned: no session in
+    // the map, and no record naming a conversation that is gone.
+    expect(fixture.registry.getSession(SESSION_ID)).toBeNull();
+    await expect(fixture.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+    created.mockRestore();
+  });
+
+  it('sweeps records a tab owned rather than a conversation', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage);
+    // What a tab that ran a turn before it was bound to a chat leaves behind.
+    // D4 removes records when the *conversation* that owns them is deleted, so
+    // these were unreachable by construction — no conversation would ever ask.
+    const tabOwner = { kind: 'internal-service' as const, ownerId: 'grimoiretab-1' };
+    await first.registry.createSession({
+      ...sessionCommand(),
+      executionSessionId: SESSION_ID,
+      owner: tabOwner,
+    });
+    await first.registry.startRun(SESSION_ID, { ...request(RUN_ID, 'none'), owner: tabOwner });
+    first.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+      deliveryId: `terminal-${RUN_ID}`,
+      destination: 'both',
+    });
+    await settle(first.registry);
+    await first.registry.disposeSession(SESSION_ID);
+    await expect(first.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'current' });
+
+    const restored = createFixture(storage, { transactionOffset: 7_000, instanceOffset: 70 });
+    await restored.registry.start();
+
+    // The tab that owned it belongs to a process that is gone; nothing in this
+    // one can resume it, and nothing else would ever remove it.
+    await expect(restored.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'absent' });
+    await expect(restored.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+  });
+
+  it('deletes nothing when the store belongs to a newer build', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage);
+    const tabOwner = { kind: 'internal-service' as const, ownerId: 'grimoiretab-1' };
+    await first.registry.createSession({
+      ...sessionCommand(),
+      executionSessionId: SESSION_ID,
+      owner: tabOwner,
+    });
+    await first.registry.startRun(SESSION_ID, { ...request(RUN_ID, 'none'), owner: tabOwner });
+    first.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+      deliveryId: `terminal-${RUN_ID}`,
+      destination: 'both',
+    });
+    await settle(first.registry);
+    await first.registry.disposeSession(SESSION_ID);
+
+    // A record this build cannot read, of the kind a *newer* build writes. D5
+    // says such a store opens read-only — but the tab sweep runs before the
+    // load that discovers it, and it used to step over what it could not read
+    // and delete everything else. A reverted build then destroyed the newer
+    // build's records on its way to deciding it was not allowed to write.
+    const otherSession = `es-${'c'.repeat(32)}`;
+    await storage.writeAtomic(
+      `${EXECUTION_SESSIONS_PATH}/${otherSession}.json`,
+      JSON.stringify({ schemaVersion: 9_999, revision: 1, payload: {} }),
+    );
+
+    const restored = createFixture(storage, { transactionOffset: 7_100, instanceOffset: 71 });
+    await restored.registry.start();
+
+    expect(restored.registry.getMigrationRequirement()).not.toBeNull();
+    // Nothing swept. The tab-owned records are still there for the build that
+    // can read the store, which is the whole point of opening read-only.
+    await expect(restored.repositories.runs.read(RUN_ID)).resolves.toMatchObject({ kind: 'current' });
+  });
+
+  it('refuses to remove records a lease still holds', async () => {
+    const fixture = await startedFixture();
+    await fixture.registry.createSession(sessionCommand());
+    const lease = fixture.registry.acquireLease(
+      lifecycleLeaseId(`lease-${'7'.repeat(32)}`),
+      SESSION_ID,
+      'projection',
+    );
+
+    // The refusal that survives: cancelling reaches a run, and nothing reaches
+    // a lease. A holder is still reading the session, and taking its records
+    // away underneath would strand exactly what the lease was taken for.
+    await expect(fixture.registry.deleteOwnedRecords(OWNER))
+      .rejects.toThrow(/still has lifecycle owners/i);
+    await expect(fixture.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'current' });
+    lease.release();
+  });
+
+  it('finishes a deletion that was interrupted half-way', async () => {
+    const storage = new TestDurableStorage();
+    const crash = armableCrashAt('after-step-effect:step-0');
+    const crashed = await startedFixture(storage, { crashInjector: crash.injector });
+    await recordATurn(crashed, SESSION_ID, RUN_ID, OWNER);
+    crash.arm();
+
+    await expect(crashed.registry.deleteOwnedRecords(OWNER))
+      .rejects.toThrow('crash:after-step-effect:step-0');
+
+    // D4: a partially completed deletion is finished on next startup rather
+    // than left half-applied — which is what the intent is written for.
+    const restarted = createFixture(storage, { transactionOffset: 50 });
+    await restarted.registry.start();
+
+    await expect(restarted.repositories.sessions.read(SESSION_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+    await expect(restarted.repositories.runs.read(RUN_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+  });
+});
+
+describe('ExecutionLifecycleRegistry — crash injection at each durable boundary', () => {
+  it('converges an interrupted run start instead of leaving a session that names no run', async () => {
+    const storage = new TestDurableStorage();
+    const crash = armableCrashAt('after-step-effect:step-0');
+    const crashed = await startedFixture(storage, { crashInjector: crash.injector });
+    await crashed.registry.createSession(sessionCommand());
+    crash.arm();
+
+    await expect(crashed.registry.startRun(SESSION_ID, request(RUN_ID)))
+      .rejects.toThrow('crash:after-step-effect:step-0');
+    expect((await currentRecord(crashed.repositories.sessions.read(SESSION_ID))).payload.runIds)
+      .toEqual([RUN_ID]);
+    await expect(crashed.repositories.runs.read(RUN_ID))
+      .resolves.toMatchObject({ kind: 'absent' });
+
+    const restarted = createFixture(storage, { transactionOffset: 50, instanceOffset: 40 });
+    await restarted.registry.start();
+
+    // The run the session already names is written before anything classifies
+    // it. A session that survives naming a run with no record is a session
+    // whose deletion, recovery and disposal all read a run that is not there.
+    const run = await currentRecord(restarted.repositories.runs.read(RUN_ID));
+    expect(run.payload.terminal).toMatchObject({ kind: 'indeterminate' });
+  });
+
+  it('converges a terminal commit the process died half-way through', async () => {
+    const storage = new TestDurableStorage();
+    const crash = latchedCrashAt('after-step-effect:step-0');
+    const crashed = await startedFixture(storage, { crashInjector: crash.injector });
+    await startDefaultRun(crashed);
+    const delivery = runDelivery(crashed, RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    }, 'terminal-half-applied');
+    await settle(crashed.registry);
+    crash.latch();
+
+    await expect(crashed.registry.ingest(delivery))
+      .rejects.toThrow('crash:after-step-effect:step-0');
+    // The worst half to be left with: the session has already dropped the run
+    // from its live list and remembered the delivery as accepted, so a
+    // redelivery is deduplicated — while the run record still has no terminal.
+    const halfSession = await currentRecord(crashed.repositories.sessions.read(SESSION_ID));
+    expect(halfSession.payload.runIds).toEqual([]);
+    expect(halfSession.payload.acceptedEventIds).toContain('terminal-half-applied');
+    expect((await currentRecord(crashed.repositories.runs.read(RUN_ID))).payload.terminal)
+      .toBeUndefined();
+
+    const restarted = createFixture(storage, { transactionOffset: 90, instanceOffset: 60 });
+    await restarted.registry.start();
+
+    // The provider's terminal, not the `indeterminate` a restart hands a run
+    // nothing finished: the intent still owed the run write and paid it.
+    expect((await currentRecord(restarted.repositories.runs.read(RUN_ID))).payload.terminal)
+      .toMatchObject({ kind: 'succeeded', reason: 'completed' });
+  });
+
+  it('converges a gap that was applied to the session but not to every run it named', async () => {
+    const storage = new TestDurableStorage();
+    const crash = armableCrashAt('after-step-effect:step-0');
+    const crashed = await startedFixture(storage, {
+      recovery: 'snapshot',
+      crashInjector: crash.injector,
+    });
+    await startDefaultRun(crashed);
+    crashed.backend.emit(RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    }, {
+      deliveryId: 'causal-terminal-2',
+      destination: 'session',
+      causal: { streamId: 'native-run-1', sequence: 2 },
+    });
+    await settle(crashed.registry);
+    crash.arm();
+
+    await expect(crashed.registry.flushGaps(SESSION_ID))
+      .rejects.toThrow('crash:after-step-effect:step-0');
+    expect((await currentRecord(crashed.repositories.sessions.read(SESSION_ID))).payload.status)
+      .toBe('recovering');
+    expect((await currentRecord(crashed.repositories.runs.read(RUN_ID))).payload.state)
+      .not.toBe('recovering');
+
+    await recoverControlTransactions(storage);
+
+    // The run the gap named reaches the state the session already claims for
+    // it. Left as it was, the next startup would find a session recovering a
+    // run that never entered recovery.
+    expect((await currentRecord(readRecords(storage).runs.read(RUN_ID))).payload.state)
+      .toBe('recovering');
+  });
+
+  it('converges a session event that reached one run but not the next', async () => {
+    const storage = new TestDurableStorage();
+    const crash = latchedCrashAt('after-step-effect:step-1');
+    const crashed = await startedFixture(storage, { crashInjector: crash.injector });
+    await crashed.registry.createSession(sessionCommand());
+    await crashed.registry.startRun(SESSION_ID, request(RUN_ID));
+    await crashed.registry.startRun(SESSION_ID, request(RUN_ID_2));
+    crashed.backend.emit(RUN_ID, { kind: 'thinking-activity' }, { deliveryId: 'activity-1' });
+    crashed.backend.emit(RUN_ID_2, { kind: 'thinking-activity' }, { deliveryId: 'activity-2' });
+    await settle(crashed.registry);
+    const delivery = sessionDelivery(crashed, { kind: 'connection-lost' }, 'session-half-applied');
+    crash.latch();
+
+    await expect(crashed.registry.ingest(delivery))
+      .rejects.toThrow('crash:after-step-effect:step-1');
+    expect((await currentRecord(crashed.repositories.runs.read(RUN_ID))).payload.state)
+      .toBe('disconnected');
+    expect((await currentRecord(crashed.repositories.runs.read(RUN_ID_2))).payload.state)
+      .not.toBe('disconnected');
+
+    await recoverControlTransactions(storage);
+
+    // One session event reaches every run it named, or none of them can be
+    // trusted: the second run is not less lost than the first.
+    expect((await currentRecord(readRecords(storage).runs.read(RUN_ID_2))).payload.state)
+      .toBe('disconnected');
+  });
+
+  it('recovers a half-applied event transaction inside the ingest that hit it', async () => {
+    const crash = armableCrashAt('after-step-effect:step-0');
+    const fixture = await startedFixture(undefined, { crashInjector: crash.injector });
+    await startDefaultRun(fixture);
+    const delivery = runDelivery(fixture, RUN_ID, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    }, 'terminal-recovered-in-place');
+    await settle(fixture.registry);
+    crash.arm();
+
+    // A storage fault that clears is not a dead process: the same call finishes
+    // the intent it started, and the caller is told the truth rather than an
+    // error it would have to reconcile itself.
+    await expect(fixture.registry.ingest(delivery)).resolves.toMatchObject({ kind: 'accepted' });
+    expect(fixture.registry.getRun(RUN_ID)?.terminal)
+      .toMatchObject({ kind: 'succeeded', reason: 'completed' });
+    expect((await currentRecord(fixture.repositories.runs.read(RUN_ID))).payload.terminal)
+      .toMatchObject({ kind: 'succeeded', reason: 'completed' });
+  });
+});
+
+function runDelivery(
+  fixture: ReturnType<typeof createFixture>,
+  id: RunId,
+  event: Parameters<DeterministicFakeBackend['emit']>[1],
+  deliveryId: string,
+) {
+  return fixture.backend.createDelivery(
+    requireNativeSession(fixture),
+    { kind: 'run', runId: id },
+    event,
+    { deliveryId },
+  );
+}
+
+function sessionDelivery(
+  fixture: ReturnType<typeof createFixture>,
+  event: Parameters<DeterministicFakeBackend['emit']>[1],
+  deliveryId: string,
+) {
+  return fixture.backend.createDelivery(
+    requireNativeSession(fixture),
+    { kind: 'session' },
+    event,
+    { deliveryId },
+  );
+}
+
+function requireNativeSession(fixture: ReturnType<typeof createFixture>) {
+  const session = fixture.backend.sessions.get(SESSION_ID);
+  if (!session) {
+    throw new Error('Expected a fake native session.');
+  }
+  return session;
+}
+
+/** A fresh reader over a store a crashed process left behind. */
+function readRecords(storage: DurableStorage): ExecutionControlRepositories {
+  let clock = 20_000;
+  return new ExecutionControlRepositories(storage, () => clock++);
+}
+
+/**
+ * What the next startup does before it reads anything: finish what was owed.
+ *
+ * Called directly rather than through `registry.start()` by the two tests whose
+ * boundary a full restart cannot discriminate: startup terminalizes every
+ * non-terminal run it finds, so a batch that converged and a batch that did not
+ * both end `indeterminate`. That the startup path performs this recovery at all
+ * is what the two restart tests above prove; these two prove what it converges.
+ */
+async function recoverControlTransactions(storage: DurableStorage): Promise<void> {
+  let clock = 10_000;
+  const now = () => clock++;
+  const repositories = new ExecutionControlRepositories(storage, now);
+  await new ExecutionControlTransactionCoordinator(storage, repositories, { now })
+    .recoverPending();
+}
+
+/**
+ * A crash that stays.
+ *
+ * The ingest path answers a failed commit by finishing the intent itself, so an
+ * injector that fires once is recovered from inside the same call. A process
+ * that died is the case this models, and it does not get that chance.
+ */
+function latchedCrashAt(target: TransactionCrashPoint): {
+  readonly injector: (point: TransactionCrashPoint) => void;
+  latch(): void;
+} {
+  let latched = false;
+  return {
+    injector: point => {
+      if (latched && point === target) {
+        throw new Error(`crash:${point}`);
+      }
+    },
+    latch: () => { latched = true; },
+  };
+}
+
+/**
+ * A crash that waits to be armed.
+ *
+ * The work these tests set up writes control transactions of its own, so an
+ * injector that fires on the first matching point crashes the setup rather
+ * than the thing under test.
+ */
+function armableCrashAt(target: TransactionCrashPoint): {
+  readonly injector: (point: TransactionCrashPoint) => void;
+  arm(): void;
+} {
+  let armed = false;
+  return {
+    injector: point => {
+      if (armed && point === target) {
+        armed = false;
+        throw new Error(`crash:${point}`);
+      }
+    },
+    arm: () => { armed = true; },
+  };
+}
+
+async function startedFixture(
+  storage?: DurableStorage,
+  options: FixtureOptions = {},
+) {
+  const fixture = createFixture(storage, options);
+  await fixture.registry.start();
+  return fixture;
+}
+
+interface FixtureOptions {
+  readonly transactionOffset?: number;
+  readonly instanceOffset?: number;
+  readonly recovery?: 'native' | 'snapshot';
+  readonly scheduler?: ExecutionLifecycleScheduler;
+  readonly crashInjector?: (point: TransactionCrashPoint) => void;
+}
+
+function createFixture(
+  storage: DurableStorage = new TestDurableStorage(),
+  options: FixtureOptions = {},
+) {
+  let clock = 1;
+  let instanceOrdinal = options.instanceOffset ?? 1;
+  let transactionOrdinal = options.transactionOffset ?? 0;
+  const now = () => clock++;
+  const repositories = new ExecutionControlRepositories(storage, now);
+  const controlTransactions = new ExecutionControlTransactionCoordinator(
+    storage,
+    repositories,
+    { now, crashInjector: options.crashInjector },
+  );
+  const backend = new DeterministicFakeBackend({
+    sessionInstanceIdFactory: () => sessionInstanceId(
+      `si-${(instanceOrdinal++).toString(16).padStart(32, '0')}`,
+    ),
+    now,
+  });
+  const registry = new ExecutionLifecycleRegistry({
+    repositories,
+    controlTransactions,
+    nextTransactionId: () => `tx-${(++transactionOrdinal).toString(16).padStart(32, '0')}`,
+    now,
+    scheduler: options.scheduler ?? new PassiveScheduler(),
+    shutdownGracePeriodMs: 10,
+  });
+  registry.registerBackend({
+    backend,
+    recovery: options.recovery === 'snapshot'
+      ? backend.snapshotRecovery
+      : backend.nativeStatusRecovery,
+    interactions: backend,
+  });
+  return { storage, repositories, controlTransactions, backend, registry };
+}
+
+async function startDefaultRun(
+  fixture: ReturnType<typeof createFixture>,
+  resultExpectation: 'required' | 'optional' | 'none' = 'none',
+): Promise<void> {
+  await fixture.registry.createSession(sessionCommand());
+  await fixture.registry.startRun(SESSION_ID, request(RUN_ID, resultExpectation));
+}
+
+function sessionCommand() {
+  return {
+    backendId: new DeterministicFakeBackend({
+      sessionInstanceIdFactory: () => sessionInstanceId(`si-${'f'.repeat(32)}`),
+    }).descriptor.backendId,
+    executionSessionId: SESSION_ID,
+    owner: OWNER,
+  };
+}
+
+function request(
+  id: RunId,
+  resultExpectation: 'required' | 'optional' | 'none' = 'none',
+) {
+  return {
+    runId: id,
+    owner: OWNER,
+    resultExpectation,
+    requestRef: `request-${id}`,
+  };
+}
+
+async function settle(registry: ExecutionLifecycleRegistry, turns = 6): Promise<void> {
+  for (let index = 0; index < turns; index += 1) {
+    await Promise.resolve();
+  }
+  await registry.waitForIdle();
+}
+
+async function currentRecord<T>(read: Promise<{
+  readonly kind: string;
+  readonly record?: { readonly revision: number; readonly payload: T };
+}>): Promise<{ readonly revision: number; readonly payload: T }> {
+  const result = await read;
+  if ((result.kind !== 'current' && result.kind !== 'migrated') || !result.record) {
+    throw new Error(`Expected current record, received ${result.kind}.`);
+  }
+  return result.record;
+}
+
+/** Just enough session for the one that arrives after shutdown gave up. */
+class DeterministicFakeSessionDouble {
+  disposed = false;
+  readonly executionSessionId = SESSION_ID;
+  readonly sessionInstanceId = sessionInstanceId(`si-${'9'.repeat(32)}`);
+  getSnapshot(): { readonly nativeSessionRef?: string } {
+    return {};
+  }
+  subscribe(): () => void {
+    return () => undefined;
+  }
+  createRun(): never {
+    throw new Error('This session exists only to be disposed.');
+  }
+  async dispose(): Promise<void> {
+    this.disposed = true;
+  }
+}
+
+class ImmediateScheduler implements ExecutionLifecycleScheduler {
+  setTimeout(callback: () => void): unknown {
+    const handle = { cancelled: false };
+    void Promise.resolve().then(() => {
+      if (!handle.cancelled) {
+        callback();
+      }
+    });
+    return handle;
+  }
+
+  clearTimeout(handle: unknown): void {
+    (handle as { cancelled: boolean }).cancelled = true;
+  }
+}
+
+class PassiveScheduler implements ExecutionLifecycleScheduler {
+  private readonly callbacks = new Set<() => void>();
+
+  setTimeout(callback: () => void): unknown {
+    this.callbacks.add(callback);
+    return callback;
+  }
+
+  clearTimeout(handle: unknown): void {
+    this.callbacks.delete(handle as () => void);
+  }
+}
+
+class ManualScheduler implements ExecutionLifecycleScheduler {
+  private readonly callbacks = new Set<() => void>();
+
+  setTimeout(callback: () => void): unknown {
+    this.callbacks.add(callback);
+    return callback;
+  }
+
+  clearTimeout(handle: unknown): void {
+    this.callbacks.delete(handle as () => void);
+  }
+
+  fireAll(): void {
+    const callbacks = [...this.callbacks];
+    this.callbacks.clear();
+    for (const callback of callbacks) {
+      callback();
+    }
+  }
+}
+
+class GatedDurableStorage implements DurableStorage {
+  private readonly delegate = new TestDurableStorage();
+  private readonly blocked = deferred<void>();
+  private readonly released = deferred<void>();
+  private didBlock = false;
+
+  constructor(private readonly gatedPrefix: string) {}
+
+  read(path: string): Promise<string | null> {
+    return this.delegate.read(path);
+  }
+
+  writeAtomic(path: string, content: string): Promise<void> {
+    return this.delegate.writeAtomic(path, content);
+  }
+
+  async compareAndSwap(
+    path: string,
+    expectedContent: string | null,
+    nextContent: string | null,
+  ): Promise<boolean> {
+    if (!this.didBlock && path.startsWith(`${this.gatedPrefix}/`)) {
+      this.didBlock = true;
+      this.blocked.resolve();
+      await this.released.promise;
+    }
+    return this.delegate.compareAndSwap(path, expectedContent, nextContent);
+  }
+
+  remove(path: string): Promise<void> {
+    return this.delegate.remove(path);
+  }
+
+  list(prefix: string): Promise<string[]> {
+    return this.delegate.list(prefix);
+  }
+
+  waitUntilBlocked(): Promise<void> {
+    return this.blocked.promise;
+  }
+
+  release(): void {
+    this.released.resolve();
+  }
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(next => { resolve = next; });
+  return { promise, resolve };
+}
+
+async function flushPromises(count: number): Promise<void> {
+  for (let index = 0; index < count; index += 1) {
+    await Promise.resolve();
+  }
+}
+
+async function waitUntil(predicate: () => boolean): Promise<void> {
+  for (let turn = 0; turn < 100; turn += 1) {
+    if (predicate()) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error('Condition did not become true.');
+}

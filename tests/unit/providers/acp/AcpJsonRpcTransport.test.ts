@@ -4,6 +4,7 @@ import { PassThrough } from 'node:stream';
 import {
   AcpJsonRpcTransport,
   JsonRpcErrorResponse,
+  JsonRpcHandlerError,
 } from '../../../../src/providers/acp/AcpJsonRpcTransport';
 
 interface TransportHarness {
@@ -137,6 +138,85 @@ describe('AcpJsonRpcTransport', () => {
       id: 7,
       jsonrpc: '2.0',
       result: { content: 'export {};' },
+    });
+  });
+
+  it('answers a failed server request in the words the handler raised', async () => {
+    harness.transport.start();
+    harness.transport.onRequest('fs/read_text_file', async () => {
+      // What `node:fs` raises, and — under Jest — what it raises from *another
+      // realm*: the message is intact and `instanceof Error` is false. The agent
+      // reading this response is the reason it matters. Gemini CLI's write tool
+      // asks for the file it is about to replace, and shows the client's own
+      // sentence when the read fails; a wire that answered "Internal error"
+      // there told a live run nothing about a file that simply did not exist.
+      const error: Record<string, unknown> = {
+        code: 'ENOENT',
+        message: "ENOENT: no such file or directory, open '/tmp/project/new.md'",
+      };
+      throw error;
+    });
+
+    harness.sendInbound({
+      id: 11,
+      jsonrpc: '2.0',
+      method: 'fs/read_text_file',
+      params: { path: '/tmp/project/new.md', sessionId: 'session-1' },
+    });
+
+    await expect(harness.nextOutbound()).resolves.toEqual({
+      error: {
+        code: -32603,
+        message: "ENOENT: no such file or directory, open '/tmp/project/new.md'",
+      },
+      id: 11,
+      jsonrpc: '2.0',
+    });
+  });
+
+  it('carries the code a handler raised, where it raised one', async () => {
+    harness.transport.start();
+    harness.transport.onRequest('fs/read_text_file', async () => {
+      throw new JsonRpcHandlerError(-32002, 'Resource not found: /tmp/project/new.md');
+    });
+
+    harness.sendInbound({
+      id: 12,
+      jsonrpc: '2.0',
+      method: 'fs/read_text_file',
+      params: { path: '/tmp/project/new.md', sessionId: 'session-1' },
+    });
+
+    // The protocol's own code for it, rather than the internal error that every
+    // other failure answers with: a file that is not there and a file the client
+    // refused to reach are different answers, and read identically as -32603.
+    await expect(harness.nextOutbound()).resolves.toEqual({
+      error: {
+        code: -32002,
+        message: 'Resource not found: /tmp/project/new.md',
+      },
+      id: 12,
+      jsonrpc: '2.0',
+    });
+  });
+
+  it('still answers a rejection with nothing to say', async () => {
+    harness.transport.start();
+    harness.transport.onRequest('fs/read_text_file', async () => {
+      throw 'no message here';
+    });
+
+    harness.sendInbound({
+      id: 13,
+      jsonrpc: '2.0',
+      method: 'fs/read_text_file',
+      params: { path: '/tmp/project/new.md', sessionId: 'session-1' },
+    });
+
+    await expect(harness.nextOutbound()).resolves.toEqual({
+      error: { code: -32603, message: 'Internal error' },
+      id: 13,
+      jsonrpc: '2.0',
     });
   });
 

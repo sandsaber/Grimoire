@@ -50,18 +50,9 @@ describe('createCodexWorkspaceServices', () => {
     const services = await createCodexWorkspaceServices(plugin as any, vaultAdapter as any, homeAdapter as any);
 
     expect(services.usageProvider).toBeDefined();
-    expect(services.tabWarmupPolicy?.resolveMode({
-      conversation: null,
-      externalContextPaths: [],
-      plugin: plugin as any,
-      runtime: null,
-      tab: {
-        conversationId: null,
-        draftModel: 'gpt-5.5',
-        lifecycleState: 'blank',
-        providerId: 'codex',
-      },
-    })).toBe('runtime');
+    // The warm-up mode is a declaration on the provider module now, not a
+    // service registered here: every implementation returned a constant and
+    // read none of the context it was given.
   });
 
   it('refreshes Codex model discovery through the workspace model catalog', async () => {
@@ -94,12 +85,12 @@ describe('createCodexWorkspaceServices', () => {
     };
 
     const services = await createCodexWorkspaceServices(plugin as any, vaultAdapter as any, homeAdapter as any);
-    const changed = await services.modelCatalog?.refreshModels({
+    const outcome = await services.modelCatalog?.refreshModels({
       plugin: plugin as any,
       settings: plugin.settings,
     });
 
-    expect(changed).toBe(true);
+    expect(outcome).toBe('refreshed');
     expect(listModelsSpy).toHaveBeenCalledWith();
     expect(getCodexModelDiscoveryState(plugin.settings).discoveredModels).toEqual([
       { id: 'gpt-5.6', label: 'GPT-5.6', description: 'Latest' },
@@ -180,12 +171,12 @@ describe('createCodexWorkspaceServices', () => {
       createStubAdapter() as any,
     );
     resolvedCliPath = '/usr/local/bin/codex';
-    const changed = await services.modelCatalog?.refreshModels({
+    const outcome = await services.modelCatalog?.refreshModels({
       plugin: plugin as any,
       settings: settings,
     });
 
-    expect(changed).toBe(false);
+    expect(outcome).toBe('skipped');
     expect(listModelsSpy).not.toHaveBeenCalled();
   });
 
@@ -344,9 +335,9 @@ describe('createCodexWorkspaceServices', () => {
       createStubAdapter() as any,
       createStubAdapter() as any,
     );
-    const changed = await services.modelCatalog?.refreshModels({ plugin: plugin as any, settings });
+    const outcome = await services.modelCatalog?.refreshModels({ plugin: plugin as any, settings });
 
-    expect(changed).toBe(false);
+    expect(outcome).toBe('skipped');
     expect(listModelsSpy).not.toHaveBeenCalled();
     expect(plugin.saveSettings).not.toHaveBeenCalled();
   });

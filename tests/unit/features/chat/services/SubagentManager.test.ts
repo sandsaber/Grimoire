@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+import { NO_TASK_RESULT_INTERPRETATION } from '@/core/providers/noTaskResultInterpretation';
+import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import type { SubagentInfo, ToolCallInfo } from '@/core/types';
 import { SubagentManager } from '@/features/chat/services/SubagentManager';
 import { createStopSubagentHook } from '@/providers/claude/hooks/SubagentHooks';
@@ -47,9 +49,13 @@ jest.mock('@/features/chat/rendering/SubagentRenderer', () => ({
 
 const createManager = () => {
   const updates: SubagentInfo[] = [];
+  // Named, because it is no longer defaulted: reading a subagent result is
+  // provider-specific, and a manager that borrowed one provider's interpreter
+  // for every tab was wrong quietly.
   const manager = new SubagentManager((subagent) => {
     updates.push({ ...subagent });
-  });
+  }, providerCatalog().declarations('claude').asyncTaskResults
+    ?? NO_TASK_RESULT_INTERPRETATION);
   return { manager, updates };
 };
 
@@ -246,7 +252,14 @@ describe('SubagentManager', () => {
       expect(manager.getByTaskId('task-err')).toBeUndefined();
     });
 
-    it('marks pending and running async subagents as orphaned', () => {
+    it('forgets its running async subagents without declaring them lost', () => {
+      // **`orphanAllActive` is deleted, and this is what replaced it.** Leaving
+      // a conversation used to mark every running background agent `orphaned`
+      // with the result "Conversation ended" — a status meaning "nobody is
+      // watching this", which was true and was all anyone ever learned about
+      // it. The agents are recorded against the conversation now and the status
+      // panel draws them from the vault, so leaving and coming back shows them
+      // still running. What this manager drops is its own maps.
       const { manager } = createManager();
       const parentEl = createMockEl();
 
@@ -254,14 +267,11 @@ describe('SubagentManager', () => {
       manager.handleTaskToolUse('running-task', { description: 'Running task', run_in_background: true }, parentEl);
       manager.handleTaskToolResult('running-task', JSON.stringify({ agent_id: 'agent-running' }));
 
-      const orphaned = manager.orphanAllActive();
+      manager.clear();
 
-      expect(orphaned).toHaveLength(2);
-      orphaned.forEach((subagent) => {
-        expect(subagent.asyncStatus).toBe('orphaned');
-        expect(subagent.result).toContain('Conversation ended');
-      });
       expect(manager.getByTaskId('pending-task')).toBeUndefined();
+      expect(manager.getByTaskId('running-task')).toBeUndefined();
+      expect(manager.isPendingAsyncTask('pending-task')).toBe(false);
       expect(manager.getByTaskId('running-task')).toBeUndefined();
     });
 
@@ -1274,7 +1284,9 @@ Only this is the final result.
       expect(result?.mode).toBe('sync');
       expect(manager.getSyncSubagent('task-1')).toBeDefined();
       expect(manager.isPendingAsyncTask('task-1')).toBe(false);
-      expect(manager.hasRunningSubagents()).toBe(false);
+      // Not a background subagent, which is what the line above says: whether
+      // one is *running* is the durable records' question now.
+      expect(manager.getByTaskId('task-1')).toBeUndefined();
     });
 
     it('treats stringified completed task metadata with agentId as sync when mode is unknown', () => {
@@ -1298,7 +1310,9 @@ Only this is the final result.
       expect(result?.mode).toBe('sync');
       expect(manager.getSyncSubagent('task-1')).toBeDefined();
       expect(manager.isPendingAsyncTask('task-1')).toBe(false);
-      expect(manager.hasRunningSubagents()).toBe(false);
+      // Not a background subagent, which is what the line above says: whether
+      // one is *running* is the durable records' question now.
+      expect(manager.getByTaskId('task-1')).toBeUndefined();
     });
 
     it('treats sync result text with agentId metadata as sync when mode is unknown', () => {
@@ -1326,7 +1340,9 @@ Only this is the final result.
       expect(result?.mode).toBe('sync');
       expect(manager.getSyncSubagent('task-1')).toBeDefined();
       expect(manager.isPendingAsyncTask('task-1')).toBe(false);
-      expect(manager.hasRunningSubagents()).toBe(false);
+      // Not a background subagent, which is what the line above says: whether
+      // one is *running* is the durable records' question now.
+      expect(manager.getByTaskId('task-1')).toBeUndefined();
     });
 
     it('resolves to sync on errored task result when mode is unknown', () => {
@@ -1546,176 +1562,16 @@ Only this is the final result.
   // ============================================
 
   describe('hook delivery', () => {
-    describe('hasRunningSubagents', () => {
-      it('returns false when no subagents exist', () => {
-        const { manager } = createManager();
-        expect(manager.hasRunningSubagents()).toBe(false);
-      });
+    // **Nine tests were deleted here.** They characterised
+    // `hasRunningSubagents` — which subagents count as running, and its sweep of
+    // terminal entries out of the two async maps. That question is the durable
+    // records' now: `durableAgentsRunning` in `tabDurableSubagents.ts` answers
+    // it, and this manager keeps its rendering. The sweep went with it because
+    // both terminal transitions delete their own entry and `clear()` empties
+    // both on a conversation switch.
+    //
+    // What replaced them: `tests/unit/features/chat/tabs/tabDurableSubagents.test.ts`.
 
-      it('returns true when pending async subagents exist', () => {
-        const { manager } = createManager();
-        const parentEl = createMockEl();
-        manager.handleTaskToolUse('task-1', { description: 'Background', run_in_background: true }, parentEl);
-
-        expect(manager.hasRunningSubagents()).toBe(true);
-      });
-
-      it('returns true when active running subagents exist', () => {
-        const { manager } = createManager();
-        const parentEl = createMockEl();
-        manager.handleTaskToolUse('task-1', { description: 'Background', run_in_background: true }, parentEl);
-        manager.handleTaskToolResult('task-1', JSON.stringify({ agent_id: 'agent-123' }));
-
-        expect(manager.hasRunningSubagents()).toBe(true);
-      });
-
-      it('returns false and clears terminal entries lingering in both async maps', () => {
-        const { manager } = createManager();
-        const internal = manager as any;
-
-        internal.activeAsyncSubagents.set('agent-completed', {
-          id: 'task-completed',
-          mode: 'async',
-          status: 'completed',
-          asyncStatus: 'completed',
-        });
-        internal.pendingAsyncSubagents.set('task-orphaned', {
-          id: 'task-orphaned',
-          mode: 'async',
-          status: 'error',
-          asyncStatus: 'orphaned',
-        });
-
-        expect(manager.hasRunningSubagents()).toBe(false);
-        expect(internal.activeAsyncSubagents.size).toBe(0);
-        expect(internal.pendingAsyncSubagents.size).toBe(0);
-      });
-
-      it('returns true for a running entry plus a completed entry and only removes completed', () => {
-        const { manager } = createManager();
-        const internal = manager as any;
-
-        internal.activeAsyncSubagents.set('agent-running', {
-          id: 'task-running',
-          mode: 'async',
-          status: 'running',
-          asyncStatus: 'running',
-        });
-        internal.activeAsyncSubagents.set('agent-completed', {
-          id: 'task-completed',
-          mode: 'async',
-          status: 'completed',
-          asyncStatus: 'completed',
-        });
-
-        expect(manager.hasRunningSubagents()).toBe(true);
-        expect(internal.activeAsyncSubagents.has('agent-running')).toBe(true);
-        expect(internal.activeAsyncSubagents.has('agent-completed')).toBe(false);
-      });
-
-      it('returns true and keeps a pending entry awaiting agent_id', () => {
-        const { manager } = createManager();
-        const internal = manager as any;
-
-        internal.pendingAsyncSubagents.set('task-pending', {
-          id: 'task-pending',
-          mode: 'async',
-          status: 'running',
-          asyncStatus: 'pending',
-        });
-
-        expect(manager.hasRunningSubagents()).toBe(true);
-        expect(internal.pendingAsyncSubagents.has('task-pending')).toBe(true);
-      });
-
-      it('returns false when all subagents have completed', () => {
-        const { manager } = createManager();
-        const parentEl = createMockEl();
-        manager.handleTaskToolUse('task-1', { description: 'Task agent-123', run_in_background: true }, parentEl);
-        manager.handleTaskToolResult('task-1', JSON.stringify({ agent_id: 'agent-123' }));
-        manager.handleAgentOutputToolUse({
-          id: 'output-agent-123',
-          name: 'AgentOutput',
-          input: { agent_id: 'agent-123' },
-          status: 'running',
-          isExpanded: false,
-        });
-        manager.handleAgentOutputToolResult(
-          'output-agent-123',
-          JSON.stringify({ result: 'Result from agent-123' }),
-          false
-        );
-
-        expect(manager.hasRunningSubagents()).toBe(false);
-      });
-
-      it('returns false after a live task notification completes an active async subagent', () => {
-        const { manager, updates } = createManager();
-        const parentEl = createMockEl();
-        manager.handleTaskToolUse('task-1', { description: 'Background', run_in_background: true }, parentEl);
-        manager.handleTaskToolResult('task-1', JSON.stringify({ agent_id: 'agent-123' }));
-
-        expect(manager.hasRunningSubagents()).toBe(true);
-
-        const completed = manager.handleAsyncSubagentResult(
-          'agent-123',
-          'completed',
-          'Background agent finished.'
-        );
-
-        expect(completed?.asyncStatus).toBe('completed');
-        expect(completed?.status).toBe('completed');
-        expect(completed?.result).toBe('Background agent finished.');
-        expect(manager.hasRunningSubagents()).toBe(false);
-        expect(updates[updates.length - 1]).toEqual(
-          expect.objectContaining({
-            agentId: 'agent-123',
-            asyncStatus: 'completed',
-            result: 'Background agent finished.',
-          })
-        );
-      });
-
-      it('returns false after parallel foreground tasks resolve from completed task results', () => {
-        const { manager } = createManager();
-        const parentEl = createMockEl();
-        const syncToolUseResult1 = {
-          status: 'completed',
-          agentId: 'agent-sync-1',
-          content: [{ type: 'text', text: 'Foreground result 1.' }],
-        };
-        const syncToolUseResult2 = {
-          status: 'completed',
-          agentId: 'agent-sync-2',
-          content: [{ type: 'text', text: 'Foreground result 2.' }],
-        };
-
-        manager.handleTaskToolUse('task-1', { prompt: 'Foreground 1' }, parentEl);
-        manager.handleTaskToolUse('task-2', { prompt: 'Foreground 2' }, parentEl);
-
-        const first = manager.renderPendingTaskFromTaskResult(
-          'task-1',
-          '{}',
-          false,
-          parentEl,
-          syncToolUseResult1
-        );
-        const second = manager.renderPendingTaskFromTaskResult(
-          'task-2',
-          '{}',
-          false,
-          parentEl,
-          syncToolUseResult2
-        );
-
-        expect(first?.mode).toBe('sync');
-        expect(second?.mode).toBe('sync');
-
-        manager.finalizeSyncSubagent('task-1', '{}', false, syncToolUseResult1);
-        manager.finalizeSyncSubagent('task-2', '{}', false, syncToolUseResult2);
-
-        expect(manager.hasRunningSubagents()).toBe(false);
-      });
 
       it('allows the Stop hook after a foreground task resolves from completed task metadata', async () => {
         const { manager } = createManager();
@@ -1724,9 +1580,12 @@ Only this is the final result.
           status: 'completed',
           agentId: 'agent-sync',
         };
-        const hook = createStopSubagentHook(() => ({
-          hasRunning: manager.hasRunningSubagents(),
-        }));
+        // **Asked the way the hook is asked now: with a promise.** The
+        // provider is the durable records in production; here it is a resolved
+        // answer, because what this test is about is the hook — that it lets a
+        // turn end when nothing is running, and blocks it when something is.
+        const running = { value: true };
+        const hook = createStopSubagentHook(async () => ({ hasRunning: running.value }));
 
         manager.handleTaskToolUse('task-1', { prompt: 'Foreground task' }, parentEl);
         const rendered = manager.renderPendingTaskFromTaskResult(
@@ -1740,6 +1599,7 @@ Only this is the final result.
         expect(rendered?.mode).toBe('sync');
 
         manager.finalizeSyncSubagent('task-1', '{}', false, completedToolUseResult);
+        running.value = false;
 
         const stopResult = await hook.hooks[0](
           {
@@ -1755,7 +1615,6 @@ Only this is the final result.
 
         expect(stopResult).toEqual({});
       });
-    });
   });
 
   // ============================================

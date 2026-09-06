@@ -76,7 +76,7 @@ describe('antigravityChatUIConfig', () => {
     ]);
   });
 
-  it('exposes blocked/auto-approve and multiple thinking options for the shared toolbar', () => {
+  it('exposes blocked/auto-approve, and offers no thinking level it cannot send', () => {
     const settings: Record<string, unknown> = {};
 
     expect(antigravityChatUIConfig.getPermissionModeToggle?.()).toEqual({
@@ -87,11 +87,12 @@ describe('antigravityChatUIConfig', () => {
       activeLabel: 'Auto-approve',
       activeDescription: 'Antigravity may edit files without Grimoire prompts',
     });
+    // One entry, which is the picker not offering a choice. The tiers that were
+    // here reached no argument and no prompt: `agy --print` takes no flag for a
+    // thinking level and the composer ignores one, so choosing High changed a
+    // settings field and nothing the model ever saw.
     expect(antigravityChatUIConfig.getReasoningOptions('antigravity', settings)).toEqual([
       { value: 'default', label: 'Default' },
-      { value: 'low', label: 'Low' },
-      { value: 'medium', label: 'Medium' },
-      { value: 'high', label: 'High' },
     ]);
 
     antigravityChatUIConfig.applyPermissionMode?.('full_access', settings);

@@ -5,7 +5,18 @@ interface MirrorCandidate {
   sources: Set<GrokSessionNotificationSource>;
 }
 
-/** Suppresses adjacent copies of the same update mirrored across Grok notification methods. */
+/**
+ * Suppresses adjacent copies of the same update mirrored across Grok
+ * notification methods.
+ *
+ * Adjacent only, and deliberately: some releases send the same update on both
+ * channels back to back, and one candidate is enough to catch that. A mirror
+ * that arrives *late* — with other updates between the copies — would slip
+ * through, and the answer then is a fingerprint window rather than a single
+ * candidate. The trigger for building one is evidence, not suspicion: a
+ * duplicated sentence in a transcript where the two copies are not adjacent on
+ * the wire. Until that is seen, a window would be a cache sized by guesswork.
+ */
 export class GrokSessionNotificationMirrorDeduplicator {
   private candidate: MirrorCandidate | null = null;
 

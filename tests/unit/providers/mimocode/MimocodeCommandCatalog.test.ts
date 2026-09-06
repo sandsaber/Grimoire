@@ -61,15 +61,4 @@ describe('MimocodeCommandCatalog', () => {
     ]);
   });
 
-  it('uses slash triggers for the shared dropdown', () => {
-    const catalog = new MimocodeCommandCatalog();
-
-    expect(catalog.getDropdownConfig()).toEqual({
-      providerId: 'mimocode',
-      triggerChars: ['/'],
-      builtInPrefix: '/',
-      skillPrefix: '/',
-      commandPrefix: '/',
-    });
-  });
 });

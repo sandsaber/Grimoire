@@ -56,19 +56,6 @@ export function getSDKSessionPath(
   return path.join(projectsPath, encodedVault, `${sessionId}.jsonl`);
 }
 
-export function sdkSessionExists(
-  vaultPath: string,
-  sessionId: string,
-  context?: ClaudeConfigDirContext,
-): boolean {
-  try {
-    const sessionPath = getSDKSessionPath(vaultPath, sessionId, context);
-    return existsSync(sessionPath);
-  } catch {
-    return false;
-  }
-}
-
 function hasFileSystemErrorCode(error: unknown, code: string): boolean {
   return !!error
     && typeof error === 'object'
@@ -162,15 +149,6 @@ export async function locateSDKSessions(
   }
 
   return locations;
-}
-
-export async function locateSDKSession(
-  vaultPath: string,
-  sessionId: string,
-  context?: ClaudeConfigDirContext,
-): Promise<SDKSessionLocation> {
-  return (await locateSDKSessions(vaultPath, [sessionId], context)).get(sessionId)
-    ?? { availability: 'unknown' };
 }
 
 export async function deleteSDKSession(

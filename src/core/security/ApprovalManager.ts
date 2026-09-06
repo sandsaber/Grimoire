@@ -107,7 +107,16 @@ export function matchesRulePattern(
     return isPathPrefixMatch(normalizedAction, normalizedRule);
   }
 
-  // Other tools: allow simple prefix matching
+  // Other tools: prefix matching, but never over a serialized input.
+  //
+  // A tool with no pattern of its own is described by `JSON.stringify(input)`,
+  // and a prefix of a serialized object is not a permission — `{"a":"` matches
+  // every call whose input happens to start the same way, whatever the rest of
+  // it says. Tools that do have a pattern — a glob, a search — are strings a
+  // prefix means something about, and those keep it.
+  if (normalizedAction.startsWith('{')) {
+    return false;
+  }
   if (normalizedAction.startsWith(normalizedRule)) return true;
 
   return false;

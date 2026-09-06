@@ -46,16 +46,16 @@ describe('chat toolbar selector CSS', () => {
       'min-width: 92px',
       'border-radius: var(--grimoire-radius-2)',
       'background: var(--background-primary)',
-      'box-shadow: var(--shadow-s, 0 6px 18px rgba(0, 0, 0, 0.22))',
+      'box-shadow: var(--grimoire-lift-1)',
     ]) {
       expect(thinkingMenu).toContain(declaration);
       expect(permissionMenu).toContain(declaration);
     }
     for (const declaration of [
       'min-height: 28px',
-      'padding: 0 8px',
+      'padding: 0 var(--grimoire-space-4)',
       'border-radius: var(--grimoire-radius-1)',
-      'font-weight: 400',
+      'font-weight: var(--grimoire-weight-normal)',
     ]) {
       expect(thinkingOption).toContain(declaration);
       expect(permissionOption).toContain(declaration);

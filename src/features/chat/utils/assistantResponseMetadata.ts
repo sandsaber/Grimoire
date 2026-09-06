@@ -1,4 +1,4 @@
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderId } from '../../../core/providers/types';
 import type { AssistantResponseMetadata } from '../../../core/types';
 
@@ -16,7 +16,7 @@ const CHAT_PROVIDER_LABELS: Record<string, string> = {
 };
 
 export function getAssistantResponseProviderLabel(providerId: ProviderId): string {
-  return CHAT_PROVIDER_LABELS[providerId] ?? ProviderRegistry.getProviderDisplayName(providerId);
+  return CHAT_PROVIDER_LABELS[providerId] ?? providerCatalog().displayName(providerId);
 }
 
 function normalizeDisplayString(value: unknown): string | undefined {
@@ -55,8 +55,8 @@ function resolveModelLabel(
     return undefined;
   }
 
-  const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-  return uiConfig.getModelOptions(settings).find(option => option.value === model)?.label
+  const models = providerCatalog().declarations(providerId).chatUI.models;
+  return models.options(settings).find(option => option.value === model)?.label
     ?? formatModelFallbackLabel(model);
 }
 
@@ -65,22 +65,28 @@ function resolveEffortMetadata(
   model: string,
   settings: Record<string, unknown>,
 ): Pick<AssistantResponseMetadata, 'effort' | 'effortLabel'> {
-  const capabilities = ProviderRegistry.getCapabilities(providerId);
+  const capabilities = providerCatalog().capabilities(providerId);
   if (capabilities.reasoningControl !== 'effort') {
     return {};
   }
 
-  const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-  const options = uiConfig.getReasoningOptions(model, settings);
+  // The guard above already refused a provider whose reasoning is not tiered,
+  // so a missing group here is a provider that declares no reasoning control at
+  // all — and has no effort to report.
+  const reasoning = providerCatalog().declarations(providerId).chatUI.reasoning;
+  if (!reasoning) {
+    return {};
+  }
+  const options = reasoning.options(model, settings);
   const rawEffort = normalizeDisplayString(settings.effortLevel)
-    ?? normalizeDisplayString(uiConfig.getDefaultReasoningValue(model, settings));
+    ?? normalizeDisplayString(reasoning.defaultValue(model, settings));
   if (!rawEffort) {
     return {};
   }
 
   const effort = options.some(option => option.value === rawEffort)
     ? rawEffort
-    : normalizeDisplayString(uiConfig.getDefaultReasoningValue(model, settings));
+    : normalizeDisplayString(reasoning.defaultValue(model, settings));
   if (!effort) {
     return {};
   }

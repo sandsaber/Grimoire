@@ -46,12 +46,14 @@ export class AntigravityCliResolver {
     pathText: string | undefined = process.env.PATH,
   ): string | null {
     const hostnamePath = (hostnamePaths?.[this.cachedHostname] ?? '').trim();
+    // Resolved once. The configured path was computed, then computed again as
+    // the first two arms of the chain below — the same two calls, in the same
+    // order, deciding the same thing twice.
     const configuredPath = resolveConfiguredCliPath(hostnamePath)
       ?? resolveConfiguredCliPath(legacyPath.trim());
     const envVars = parseEnvironmentVariables(envText);
     const enhancedPath = getEnhancedPath(envVars.PATH, configuredPath ?? (legacyPath.trim() || undefined));
-    return resolveConfiguredCliPath(hostnamePath)
-      ?? resolveConfiguredCliPath(legacyPath.trim())
+    return configuredPath
       ?? resolveExecutableFromPath('agy', pathText)
       ?? resolveExecutableFromPath('agy', enhancedPath)
       ?? resolveCommonAgyPath();
@@ -137,4 +139,24 @@ function getExecutableNames(command: string): string[] {
     command,
     ...extensions.map((extension) => `${command}${extension}`),
   ];
+}
+
+/**
+ * The one instance, shared by the module declaration and the workspace.
+ *
+ * A CLI path is needed to *create* a workspace — the process the workspace
+ * wraps is launched with it — so the module declares its resolution, and the
+ * workspace borrows the same object rather than building a second one. Two
+ * instances would mean the settings tab's `reset()` clearing a cache nothing
+ * reads, and a stale path surviving the user fixing it.
+ *
+ * Built on first use rather than at import: a module is constructed when its
+ * file is loaded, and this constructor reads the machine's hostname — work no
+ * provider the user has switched off should be doing, and work a test that
+ * mocks `getHostnameKey` cannot have happening before its own mock exists.
+ */
+let sharedResolver: AntigravityCliResolver | null = null;
+
+export function antigravityCliResolver(): AntigravityCliResolver {
+  return sharedResolver ??= new AntigravityCliResolver();
 }

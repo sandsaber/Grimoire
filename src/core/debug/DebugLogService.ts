@@ -1,3 +1,4 @@
+import { isRecord } from '../../utils/records';
 import { GRIMOIRE_STORAGE_PATH } from '../bootstrap/StoragePaths';
 import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
 
@@ -26,11 +27,7 @@ const SENSITIVE_KEY_PATTERN =
   /(authorization|bearer|body|clipboard|content|cookie|env|file|header|input|key|message|note|output|password|path|prompt|request|response|secret|selection|text|token|transcript)/i;
 
 const SAFE_STRING_KEY_PATTERN =
-  /^(account|argsSummary|code|command|commandSource|cwdLabel|dialogKind|errorCode|errorName|errorSummary|event|homePresent|killSignal|label|launchMode|level|messageType|method|mode|model|pathEntryCount|pathHasLocalBin|phase|plan|promptLength|provider|providerId|rateLimitInfoFields|rateLimitType|reason|reset|runtime|scope|shellPresent|signal|source|state|status|stderrPreview|stdinMode|stdioMode|usageKind|window|windowLabel)$/i;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
+  /^(account|argsSummary|code|command|commandSource|cwdLabel|dialogKind|errorCode|errorName|errorSummary|event|homePresent|killSignal|label|launchMode|level|messageType|method|mode|modeId|model|pathEntryCount|pathHasLocalBin|phase|plan|promptLength|provider|providerId|rateLimitInfoFields|rateLimitType|reason|recordKind|reset|runtime|scope|shellPresent|signal|source|state|status|stderrPreview|stdinMode|stdioMode|usageKind|window|windowLabel)$/i;
 
 function padDatePart(value: number): string {
   return String(value).padStart(2, '0');
@@ -54,7 +51,14 @@ function redactSensitiveText(value: string): string {
   return truncate(value)
     .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[redacted-email]')
     .replace(/\b(?:sk|rk|pk|api|key|token)[-_][A-Za-z0-9._-]{8,}\b/gi, '[redacted-secret]')
-    .replace(/(?:\/(?:Users|Volumes|private|tmp|var)\/|[A-Za-z]:\\)[^\s"'`]+/g, '[redacted-path]');
+    // D7 forbids absolute paths outside the vault. The list used to be
+    // macOS-and-Windows — `/Users`, `/Volumes`, `/private`, `/tmp`, `/var` — so
+    // on Linux a home directory went into the log verbatim, most often through
+    // a CLI's own stderr.
+    .replace(
+      /(?:\/(?:Users|Volumes|private|tmp|var|home|root|opt|srv|mnt|media|etc|usr)\/|[A-Za-z]:\\)[^\s"'`]+/g,
+      '[redacted-path]',
+    );
 }
 
 function sanitizeIdentifier(value: string, fallback: string): string {

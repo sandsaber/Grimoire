@@ -32,22 +32,30 @@ function createMockCallbacks() {
       permissionMode: 'full_access',
     }),
     getEnvironmentVariables: jest.fn().mockReturnValue(''),
-    getUIConfig: jest.fn().mockReturnValue({
-      getModelOptions: jest.fn().mockReturnValue([
-        { value: 'sonnet', label: 'Sonnet' },
-        { value: 'opus', label: 'Opus' },
-      ]),
-      isAdaptiveReasoningModel: jest.fn().mockReturnValue(true),
-      getReasoningOptions: jest.fn().mockReturnValue([
-        { value: 'low', label: 'Low' },
-        { value: 'medium', label: 'Med' },
-        { value: 'high', label: 'High' },
-      ]),
-      getDefaultReasoningValue: jest.fn().mockReturnValue('high'),
-      getContextWindowSize: jest.fn().mockReturnValue(200000),
-      isDefaultModel: jest.fn().mockReturnValue(true),
-      applyModelDefaults: jest.fn(),
-      normalizeModelVariant: jest.fn((model: string) => model),
+    getChatUI: jest.fn().mockReturnValue({
+      bangBashEnabled: jest.fn().mockReturnValue(false),
+      icon: jest.fn().mockReturnValue(null),
+      models: {
+        applyDefaults: jest.fn(),
+        contextWindow: jest.fn().mockReturnValue(200000),
+        customModelIds: jest.fn().mockReturnValue(new Set<string>()),
+        isBuiltIn: jest.fn().mockReturnValue(true),
+        normalizeVariant: jest.fn((model: string) => model),
+        options: jest.fn().mockReturnValue([
+          { value: 'sonnet', label: 'Sonnet' },
+          { value: 'opus', label: 'Opus' },
+        ]),
+        ownsModel: jest.fn().mockReturnValue(true),
+      },
+      reasoning: {
+        defaultValue: jest.fn().mockReturnValue('high'),
+        isTiered: jest.fn().mockReturnValue(true),
+        options: jest.fn().mockReturnValue([
+          { value: 'low', label: 'Low' },
+          { value: 'medium', label: 'Med' },
+          { value: 'high', label: 'High' },
+        ]),
+      },
     }),
     getCapabilities: jest.fn().mockReturnValue({
       providerId: 'claude',

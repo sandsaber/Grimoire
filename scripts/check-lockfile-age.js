@@ -43,7 +43,13 @@ async function validateLockfileAge(lockfile, npmrc, options = {}) {
   });
 
   if (failures.length > 0) throw new Error(`Lockfile release-age validation failed:\n${failures.map((failure) => `- ${failure}`).join('\n')}`);
-  return { minimumAgeDays, packagesChecked: packages.length };
+  // An exception is a temporary waiver, and an expired one waives nothing: the
+  // package it covered is either old enough now or already failing above. They
+  // accumulated to forty-two before anyone noticed, because nothing said so.
+  const expired = [...exceptions.values()]
+    .filter((entry) => nowMs > entry.expiresAt.getTime())
+    .map((entry) => `${entry.package}@${entry.version}`);
+  return { minimumAgeDays, packagesChecked: packages.length, expiredExceptions: expired };
 }
 
 function validateExceptionPolicy(policy) {
@@ -210,6 +216,12 @@ async function main() {
     const exceptions = JSON.parse(readFileSync(resolve(process.cwd(), DEFAULT_EXCEPTION_POLICY), 'utf8'));
     const result = await validateLockfileAge(lockfile, npmrc, { exceptions });
     process.stdout.write(`Lockfile release-age validation passed (${result.packagesChecked} packages, ${result.minimumAgeDays}-day minimum).\n`);
+    if (result.expiredExceptions.length > 0) {
+      process.stdout.write(
+        `${result.expiredExceptions.length} lockfile-age exception(s) have expired and can be pruned: `
+        + `${result.expiredExceptions.join(', ')}\n`,
+      );
+    }
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;

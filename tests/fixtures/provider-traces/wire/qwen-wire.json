@@ -1,0 +1,2642 @@
+{
+  "schemaVersion": 1,
+  "providerId": "qwen",
+  "kind": "wire-recording",
+  "recordedAgainst": "qwen 0.22.3",
+  "transport": "stdio JSON-RPC 2.0 (`qwen --acp`)",
+  "coverage": "complete",
+  "cases": [
+    "initialize",
+    "session/new",
+    "session/set_config_option",
+    "session/prompt"
+  ],
+  "sessionUpdatesObserved": [
+    "agent_message_chunk",
+    "agent_thought_chunk",
+    "available_commands_update",
+    "usage_update"
+  ],
+  "serverMethodsObserved": [
+    "qwen/notify/session/mode-update",
+    "session/update"
+  ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content.",
+  "exchange": [
+    {
+      "seq": 1,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 2,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentInfo": {
+            "name": "qwen-code",
+            "title": "Qwen Code",
+            "version": "0.22.3"
+          },
+          "authMethods": [
+            {
+              "id": "openai",
+              "name": "Use OpenAI API key",
+              "description": "Requires setting the `OPENAI_API_KEY` environment variable",
+              "_meta": {
+                "type": "terminal",
+                "args": [
+                  "--auth-type=openai"
+                ]
+              }
+            }
+          ],
+          "agentCapabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": true,
+              "audio": true,
+              "embeddedContext": true
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "resume": {}
+            },
+            "mcpCapabilities": {
+              "sse": true,
+              "http": true
+            },
+            "_meta": {
+              "imageCapability": {
+                "autoHandlesWrongModel": true,
+                "maxBytes": 10380902,
+                "maxImagesPerTurn": 4
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/new",
+        "params": {
+          "cwd": "/tmp/grimoire-qwen-wire-GhVpBK",
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "models": {
+            "currentModelId": "GLM-5.2(openai)",
+            "availableModels": [
+              {
+                "modelId": "GLM-5.2(openai)",
+                "name": "[Z.AI] GLM-5.2",
+                "description": null,
+                "_meta": {
+                  "contextLimit": 1000000
+                }
+              },
+              {
+                "modelId": "GLM-5.1(openai)",
+                "name": "[Z.AI] GLM-5.1",
+                "description": null,
+                "_meta": {
+                  "contextLimit": 204800
+                }
+              },
+              {
+                "modelId": "GLM-5(openai)",
+                "name": "[Z.AI] GLM-5",
+                "description": null,
+                "_meta": {
+                  "contextLimit": 204800
+                }
+              },
+              {
+                "modelId": "GLM-5-Turbo(openai)",
+                "name": "[Z.AI] GLM-5-Turbo",
+                "description": null,
+                "_meta": {
+                  "contextLimit": 204800
+                }
+              }
+            ]
+          },
+          "modes": {
+            "currentModeId": "auto",
+            "availableModes": [
+              {
+                "id": "plan",
+                "name": "Plan",
+                "description": "Analyze only, do not modify files or execute commands"
+              },
+              {
+                "id": "default",
+                "name": "Default",
+                "description": "Require approval for file edits or shell commands"
+              },
+              {
+                "id": "auto-edit",
+                "name": "Auto Edit",
+                "description": "Automatically approve file edits"
+              },
+              {
+                "id": "auto",
+                "name": "Auto",
+                "description": "LLM classifier auto-approves safe actions, blocks risky ones"
+              },
+              {
+                "id": "yolo",
+                "name": "YOLO",
+                "description": "Automatically approve all tools"
+              }
+            ]
+          },
+          "configOptions": [
+            {
+              "id": "mode",
+              "name": "Mode",
+              "description": "Session permission mode",
+              "category": "mode",
+              "type": "select",
+              "currentValue": "auto",
+              "options": [
+                {
+                  "value": "plan",
+                  "name": "Plan",
+                  "description": "Analyze only, do not modify files or execute commands"
+                },
+                {
+                  "value": "default",
+                  "name": "Default",
+                  "description": "Require approval for file edits or shell commands"
+                },
+                {
+                  "value": "auto-edit",
+                  "name": "Auto Edit",
+                  "description": "Automatically approve file edits"
+                },
+                {
+                  "value": "auto",
+                  "name": "Auto",
+                  "description": "LLM classifier auto-approves safe actions, blocks risky ones"
+                },
+                {
+                  "value": "yolo",
+                  "name": "YOLO",
+                  "description": "Automatically approve all tools"
+                }
+              ]
+            },
+            {
+              "id": "model",
+              "name": "Model",
+              "description": "AI model to use",
+              "category": "model",
+              "type": "select",
+              "currentValue": "GLM-5.2(openai)",
+              "options": [
+                {
+                  "value": "GLM-5.2(openai)",
+                  "name": "[Z.AI] GLM-5.2",
+                  "description": ""
+                },
+                {
+                  "value": "GLM-5.1(openai)",
+                  "name": "[Z.AI] GLM-5.1",
+                  "description": ""
+                },
+                {
+                  "value": "GLM-5(openai)",
+                  "name": "[Z.AI] GLM-5",
+                  "description": ""
+                },
+                {
+                  "value": "GLM-5-Turbo(openai)",
+                  "name": "[Z.AI] GLM-5-Turbo",
+                  "description": ""
+                }
+              ]
+            },
+            {
+              "id": "reasoning_effort",
+              "name": "Reasoning effort",
+              "description": "How hard reasoning-capable models should think",
+              "category": "thought_level",
+              "type": "select",
+              "currentValue": "high",
+              "options": [
+                {
+                  "value": "default",
+                  "name": "Default",
+                  "description": "Use the model or provider default"
+                },
+                {
+                  "value": "low",
+                  "name": "Low",
+                  "description": "Providers map or clamp the requested tier for the active model"
+                },
+                {
+                  "value": "medium",
+                  "name": "Medium",
+                  "description": "Providers map or clamp the requested tier for the active model"
+                },
+                {
+                  "value": "high",
+                  "name": "High",
+                  "description": "Providers map or clamp the requested tier for the active model"
+                },
+                {
+                  "value": "xhigh",
+                  "name": "Extra high",
+                  "description": "Providers map or clamp the requested tier for the active model"
+                },
+                {
+                  "value": "max",
+                  "name": "Max",
+                  "description": "Providers map or clamp the requested tier for the active model"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "status",
+                "description": "show version info",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [
+                    "paths"
+                  ],
+                  "modelInvocable": false,
+                  "altNames": [
+                    "about"
+                  ]
+                }
+              },
+              {
+                "name": "advisor",
+                "description": "Get a second opinion on the current conversation from a reviewer model",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "tasks",
+                "description": "List background tasks (text dump — interactive dialog opens via the footer pill)",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "auth",
+                "description": "Connect an LLM provider",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false,
+                  "altNames": [
+                    "connect",
+                    "login"
+                  ]
+                }
+              },
+              {
+                "name": "btw",
+                "description": "Ask a quick side question without affecting the main conversation",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "bug",
+                "description": "submit a bug report",
+                "input": {
+                  "hint": "<description>"
+                },
+                "_meta": {
+                  "argumentHint": "<description>",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "clear",
+                "description": "Clear conversation history and free up context",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false,
+                  "altNames": [
+                    "reset",
+                    "new"
+                  ]
+                }
+              },
+              {
+                "name": "compress",
+                "description": "Compresses the context by replacing it with a summary.",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false,
+                  "altNames": [
+                    "summarize"
+                  ]
+                }
+              },
+              {
+                "name": "compress-fast",
+                "description": "Fast context compression without AI. Strips old tool outputs and thinking parts.",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "config",
+                "description": "Get or set any setting by dot-path key",
+                "input": {
+                  "hint": "<key>[=<value>] or --help"
+                },
+                "_meta": {
+                  "argumentHint": "<key>[=<value>] or --help",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage breakdown. Use \"/context detail\" for per-item breakdown.",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [
+                    "detail"
+                  ],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "curator",
+                "description": "Maintain project auto-skills based on recent use.",
+                "input": {
+                  "hint": "[status|run [--dry-run]|pin <directory>|unpin <directory>|restore <directory>]"
+                },
+                "_meta": {
+                  "argumentHint": "[status|run [--dry-run]|pin <directory>|unpin <directory>|restore <directory>]",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [
+                    "status",
+                    "run",
+                    "pin",
+                    "unpin",
+                    "restore"
+                  ],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "diff",
+                "description": "Show working-tree change stats versus HEAD",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "docs",
+                "description": "open full Qwen Code documentation in your browser",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "doctor",
+                "description": "Run installation and environment diagnostics",
+                "input": {
+                  "hint": "[memory|cpu-profile|rollback] [--sample] [--snapshot] [--duration]"
+                },
+                "_meta": {
+                  "argumentHint": "[memory|cpu-profile|rollback] [--sample] [--snapshot] [--duration]",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [
+                    "memory",
+                    "cpu-profile",
+                    "rollback"
+                  ],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "directory",
+                "description": "Manage workspace directories",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "acp"
+                  ],
+                  "subcommands": [
+                    "add",
+                    "show"
+                  ],
+                  "modelInvocable": false,
+                  "altNames": [
+                    "dir"
+                  ]
+                }
+              },
+              {
+                "name": "effort",
+                "description": "Set how hard reasoning-capable models think (low, medium, high, xhigh, max); mapped and clamped per provider.",
+                "input": {
+                  "hint": "[low|medium|high|xhigh|max]"
+                },
+                "_meta": {
+                  "argumentHint": "[low|medium|high|xhigh|max]",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "export",
+                "description": "Export current session message history to a file",
+                "input": {
+                  "hint": "[md|html|json|jsonl] [path]"
+                },
+                "_meta": {
+                  "argumentHint": "[md|html|json|jsonl] [path]",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [
+                    "html",
+                    "md",
+                    "json",
+                    "jsonl"
+                  ],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "extensions",
+                "description": "Manage extensions",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [
+                    "list",
+                    "manage",
+                    "install",
+                    "explore"
+                  ],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "hooks",
+                "description": "Manage Qwen Code hooks",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "import-config",
+                "description": "Import MCP servers from Claude configs",
+                "input": {
+                  "hint": "[all|claude-code|claude-desktop] [--scope user|project]"
+                },
+                "_meta": {
+                  "argumentHint": "[all|claude-code|claude-desktop] [--scope user|project]",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "init",
+                "description": "Analyzes the project and creates a tailored QWEN.md file.",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "language",
+                "description": "View or change the language setting",
+                "input": {
+                  "hint": "ui|output <language>"
+                },
+                "_meta": {
+                  "argumentHint": "ui|output <language>",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [
+                    "ui",
+                    "output"
+                  ],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "learn",
+                "description": "Create a reusable skill from a knowledge source (file, URL, conversation, or text).",
+                "input": {
+                  "hint": "<path|URL|text> [focus]"
+                },
+                "_meta": {
+                  "argumentHint": "<path|URL|text> [focus]",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "dream",
+                "description": "Consolidate managed auto-memory topic files.",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "forget",
+                "description": "Remove matching entries from managed auto-memory.",
+                "input": {
+                  "hint": "<memory text to remove>"
+                },
+                "_meta": {
+                  "argumentHint": "<memory text to remove>",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "goal",
+                "description": "Set or control a session goal",
+                "input": {
+                  "hint": "[<objective> | set <objective> | edit <objective> | pause | resume | clear]"
+                },
+                "_meta": {
+                  "argumentHint": "[<objective> | set <objective> | edit <objective> | pause | resume | clear]",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "model",
+                "description": "Switch the model for this session (--fast for suggestion model, --voice for voice transcription model, --vision for the vision bridge model, --compaction for chat compression model, --image … (elided)",
+                "input": {
+                  "hint": "[--fast|--voice|--vision|--compaction|--image] [--project|--global] [<model-id>] | <model-id> <prompt>"
+                },
+                "_meta": {
+                  "argumentHint": "[--fast|--voice|--vision|--compaction|--image] [--project|--global] [<model-id>] | <model-id> <prompt>",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "remember",
+                "description": "Save a durable memory to the memory system.",
+                "input": {
+                  "hint": "<text to remember>"
+                },
+                "_meta": {
+                  "argumentHint": "<text to remember>",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "skills",
+                "description": "Open the skills panel (browse, search, toggle, pick).",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "stats",
+                "description": "Show usage statistics dashboard.",
+                "input": {
+                  "hint": "[model|tools|skills|daily|monthly|export]"
+                },
+                "_meta": {
+                  "argumentHint": "[model|tools|skills|daily|monthly|export]",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [
+                    "model",
+                    "tools",
+                    "skills",
+                    "daily",
+                    "monthly",
+                    "export"
+                  ],
+                  "modelInvocable": false,
+                  "altNames": [
+                    "usage"
+                  ]
+                }
+              },
+              {
+                "name": "summary",
+                "description": "Generate a project summary and save it to .qwen/PROJECT_SUMMARY.md",
+                "input": {
+                  "hint": "[path]"
+                },
+                "_meta": {
+                  "argumentHint": "[path]",
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "update",
+                "description": "Check for Qwen Code updates and install if available",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "insight",
+                "description": "generate personalized programming insights from your chat history",
+                "input": null,
+                "_meta": {
+                  "source": "builtin-command",
+                  "sourceLabel": "Built-in",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "batch",
+                "description": "Execute batch operations on multiple files in parallel. Automatically discovers files, splits into chunks, and processes with parallel worker agents. Use `/batch` followed by operation and f… (elided)",
+                "input": {
+                  "hint": "<operation> <file-pattern>"
+                },
+                "_meta": {
+                  "argumentHint": "<operation> <file-pattern>",
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "computer-use",
+                "description": "Control local desktop applications through Computer Use for tasks that require reading or operating app UI. Prefer purpose-built connectors, APIs, or CLIs when available.",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "coordinate",
+                "description": "Coordinate a small team of Qwen Code teammates with enforced read-only workers, an optional worktree-pinned writer, shared tasks, peer messages, and existing Agent View tabs. Invoke explicit… (elided)",
+                "input": {
+                  "hint": "<goal>"
+                },
+                "_meta": {
+                  "argumentHint": "<goal>",
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": false
+                }
+              },
+              {
+                "name": "dataviz",
+                "description": "Design guidance for charts, graphs, dashboards, maps, and data visualizations, including a local palette validator.",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "extension-creator",
+                "description": "Create, scaffold, customize, validate, and locally test Qwen Code extensions. Use when the user wants a new Qwen Code extension, needs help choosing an extension template, wants to add QWEN.… (elided)",
+                "input": {
+                  "hint": "<extension-path> [template]"
+                },
+                "_meta": {
+                  "argumentHint": "<extension-path> [template]",
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "goal-draft",
+                "description": "Turn a fuzzy intention into a /goal objective the Goal verifier can actually judge - one outcome, numbered binary \"Done when\" checks that leave evidence in the transcript, guardrails, a budg… (elided)",
+                "input": {
+                  "hint": "[intent, or an existing goal to tighten]"
+                },
+                "_meta": {
+                  "argumentHint": "[intent, or an existing goal to tighten]",
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Create a loop that runs a prompt now and follows up either on a fixed schedule or through self-paced wakeups. Usage - /loop check the build, /loop 5m check the build, /loop check the PR ever… (elided)",
+                "input": {
+                  "hint": "[interval] [prompt] | list | clear"
+                },
+                "_meta": {
+                  "argumentHint": "[interval] [prompt] | list | clear",
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "new-app",
+                "description": "Workflow for creating new applications from scratch. Covers requirements gathering, tech stack selection, scaffolding, implementation, and delivery of a functional prototype.",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "qc-helper",
+                "description": "Answer any question about Qwen Code usage, features, configuration, and troubleshooting by referencing the official user documentation. Also helps users view or modify their settings.json. I… (elided)",
+                "input": {
+                  "hint": "<question>"
+                },
+                "_meta": {
+                  "argumentHint": "<question>",
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "review",
+                "description": "Review changed code for correctness, security, code quality, and performance. Use when the user asks to review code changes, a PR, or specific files. Invoke with `/review`, `/review <pr-numb… (elided)",
+                "input": {
+                  "hint": "[pr-number|file-path] [--effort low|medium|high] [--severity-floor critical|suggestion] [--topology minimal] [--comment] [--fix] [--resume]"
+                },
+                "_meta": {
+                  "argumentHint": "[pr-number|file-path] [--effort low|medium|high] [--severity-floor critical|suggestion] [--topology minimal] [--comment] [--fix] [--resume]",
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "simplify",
+                "description": "Review recent code changes for reuse, code quality, and efficiency, then directly apply straightforward cleanup improvements. Use when the user wants a post-implementation cleanup pass, pre-… (elided)",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "stuck",
+                "description": "Diagnose frozen, stuck, or slow Qwen Code sessions on this machine. Scans for problematic processes, high CPU/memory usage, hung subprocesses, and debug logs. Use /stuck or /stuck <PID> to f… (elided)",
+                "input": {
+                  "hint": "[PID or symptom]"
+                },
+                "_meta": {
+                  "argumentHint": "[PID or symptom]",
+                  "source": "bundled-skill",
+                  "sourceLabel": "Skill",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "brainstorming",
+                "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "dispatching-parallel-agents",
+                "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "executing-plans",
+                "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "find-skills",
+                "description": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilitie… (elided)",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "finishing-a-development-branch",
+                "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "meta-cognition-parallel",
+                "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, 三层分析, parallel analysis, 并行元认知",
+                "input": {
+                  "hint": "<rust_question>"
+                },
+                "_meta": {
+                  "argumentHint": "<rust_question>",
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "receiving-code-review",
+                "description": "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not pe… (elided)",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "requesting-code-review",
+                "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "rust-call-graph",
+                "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, 调用图, 调用关系, 谁调用了, 调用了谁",
+                "input": {
+                  "hint": "<function_name> [--depth N] [--direction in|out|both]"
+                },
+                "_meta": {
+                  "argumentHint": "<function_name> [--depth N] [--direction in|out|both]",
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "rust-code-navigator",
+                "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, 跳转定义, 查找引用, 定义在哪, 谁用了这个",
+                "input": {
+                  "hint": "<symbol> [in file.rs:line]"
+                },
+                "_meta": {
+                  "argumentHint": "<symbol> [in file.rs:line]",
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "rust-daily",
+                "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust 日报, Rust 周报, Rust 新闻, Rust 动态\n",
+                "input": {
+                  "hint": "[today|week|month]"
+                },
+                "_meta": {
+                  "argumentHint": "[today|week|month]",
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "rust-deps-visualizer",
+                "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, 依赖图, 依赖可视化, 显示依赖",
+                "input": {
+                  "hint": "[--depth N] [--features]"
+                },
+                "_meta": {
+                  "argumentHint": "[--depth N] [--features]",
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "rust-learner",
+                "description": "Use when asking about Rust versions or crate info. Keywords: latest version, what's new, changelog, Rust 1.x, Rust release, stable, nightly, crate info, crates.io, lib.rs, docs.rs, API docum… (elided)",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "rust-refactor-helper",
+                "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, 重构, 重命名, 提取函数, 安全重构",
+                "input": {
+                  "hint": "<action> <target> [--dry-run]"
+                },
+                "_meta": {
+                  "argumentHint": "<action> <target> [--dry-run]",
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "rust-router",
+                "description": "CRITICAL: Use for ALL Rust questions including errors, design, and coding.\nHIGHEST PRIORITY for: 比较, 对比, compare, vs, versus, 区别, difference, 最佳实践, best practice,\ntokio vs, async-std vs, 比较 … (elided)",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "rust-symbol-analyzer",
+                "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, 符号分析, 项目结构, 列出所有, 有哪些struct",
+                "input": {
+                  "hint": "[file.rs] [--type struct|trait|fn|mod]"
+                },
+                "_meta": {
+                  "argumentHint": "[file.rs] [--type struct|trait|fn|mod]",
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "rust-trait-explorer",
+                "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait 实现, 谁实现了, 实现了哪些trait",
+                "input": {
+                  "hint": "<TraitName|StructName>"
+                },
+                "_meta": {
+                  "argumentHint": "<TraitName|StructName>",
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "subagent-driven-development",
+                "description": "Use when executing implementation plans with independent tasks in the current session",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "systematic-debugging",
+                "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "test-driven-development",
+                "description": "Use when implementing any feature or bugfix, before writing implementation code",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "unsafe-checker",
+                "description": "CRITICAL: Use for unsafe Rust code review and FFI. Triggers on: unsafe, raw pointer, FFI, extern, transmute, *mut, *const, union, #[repr(C)], libc, std::ffi, MaybeUninit, NonNull, SAFETY com… (elided)",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "using-git-worktrees",
+                "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "using-superpowers",
+                "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "verification-before-completion",
+                "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims… (elided)",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "writing-plans",
+                "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              },
+              {
+                "name": "writing-skills",
+                "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
+                "input": {
+                  "hint": ""
+                },
+                "_meta": {
+                  "source": "skill-dir-command",
+                  "sourceLabel": "User",
+                  "supportedModes": [
+                    "interactive",
+                    "non_interactive",
+                    "acp"
+                  ],
+                  "subcommands": [],
+                  "modelInvocable": true
+                }
+              }
+            ],
+            "_meta": {
+              "availableSkills": [
+                "batch",
+                "brainstorming",
+                "coding-guidelines",
+                "computer-use",
+                "coordinate",
+                "dataviz",
+                "dispatching-parallel-agents",
+                "domain-cli",
+                "domain-cloud-native",
+                "domain-embedded",
+                "domain-fintech",
+                "domain-iot",
+                "domain-ml",
+                "domain-web",
+                "executing-plans",
+                "extension-creator",
+                "find-skills",
+                "finishing-a-development-branch",
+                "goal-draft",
+                "loop",
+                "m01-ownership",
+                "m02-resource",
+                "m03-mutability",
+                "m04-zero-cost",
+                "m05-type-driven",
+                "m06-error-handling",
+                "m07-concurrency",
+                "m09-domain",
+                "m10-performance",
+                "m11-ecosystem",
+                "m12-lifecycle",
+                "m13-domain-error",
+                "m14-mental-model",
+                "m15-anti-pattern",
+                "meta-cognition-parallel",
+                "new-app",
+                "qc-helper",
+                "receiving-code-review",
+                "requesting-code-review",
+                "review",
+                "rust-call-graph",
+                "rust-code-navigator",
+                "rust-daily",
+                "rust-deps-visualizer",
+                "rust-learner",
+                "rust-refactor-helper",
+                "rust-router",
+                "rust-symbol-analyzer",
+                "rust-trait-explorer",
+                "simplify",
+                "stuck",
+                "subagent-driven-development",
+                "systematic-debugging",
+                "test-driven-development",
+                "unsafe-checker",
+                "using-git-worktrees",
+                "using-superpowers",
+                "verification-before-completion",
+                "writing-plans",
+                "writing-skills"
+              ],
+              "availableSkillDetails": [
+                {
+                  "name": "batch",
+                  "description": "Execute batch operations on multiple files in parallel. Automatically discovers files, splits into chunks, and processes with parallel worker agents. Use `/batch` followed by operation and f… (elided)",
+                  "body": "# /batch - Parallel Batch Operations\n\nYou are orchestrating a batch operation across multiple files. Your job is to:\n\n1. Parse the user's request to understand the target files and operation… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/batch/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "brainstorming",
+                  "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.",
+                  "body": "# Brainstorming Ideas Into Designs\n\nHelp turn ideas into fully formed designs and specs through natural collaborative dialogue.\n\nStart by understanding the current project context, then ask … (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/brainstorming/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "coding-guidelines",
+                  "description": "Use when asking about Rust code style or best practices. Keywords: naming, formatting, comment, clippy, rustfmt, lint, code style, best practice, P.NAM, G.FMT, code review, naming convention… (elided)",
+                  "body": "# Rust Coding Guidelines (50 Core Rules)\n\n## Naming (Rust-Specific)\n\n| Rule | Guideline |\n|------|-----------|\n| No `get_` prefix | `fn name()` not `fn get_name()` |\n| Iterator convention | … (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/coding-guidelines/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "computer-use",
+                  "description": "Control local desktop applications through Computer Use for tasks that require reading or operating app UI. Prefer purpose-built connectors, APIs, or CLIs when available.",
+                  "body": "## `node_repl` + `@qwen-code/cua-sdk` (Computer Use)\n\n- Use `node_repl` (JavaScript) for all Computer Use actions.\n- Do not use other technologies besides `node_repl` for computer interactio… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/computer-use/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "coordinate",
+                  "description": "Coordinate a small team of Qwen Code teammates with enforced read-only workers, an optional worktree-pinned writer, shared tasks, peer messages, and existing Agent View tabs. Invoke explicit… (elided)",
+                  "body": "# Coordinate Qwen Code Teammates\n\nAct as the team leader. Decompose the goal, keep task ownership clear, reconcile disagreements, and deliver the final result.\n\n## Build one bounded team\n\nWh… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/coordinate/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": false
+                },
+                {
+                  "name": "dataviz",
+                  "description": "Design guidance for charts, graphs, dashboards, maps, and data visualizations, including a local palette validator.",
+                  "body": "# Dataviz\n\nUse this skill before producing a chart, dashboard, map, or data visualization.\n\n## Workflow\n\n1. Identify the analytic task: comparison, trend, distribution, relationship,\n   rank… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/dataviz/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "dispatching-parallel-agents",
+                  "description": "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
+                  "body": "# Dispatching Parallel Agents\n\n## Overview\n\nYou delegate tasks to specialized agents with isolated context. By precisely crafting their instructions and context, you ensure they stay focused… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/dispatching-parallel-agents/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "domain-cli",
+                  "description": "Use when building CLI tools. Keywords: CLI, command line, terminal, clap, structopt, argument parsing, subcommand, interactive, TUI, ratatui, crossterm, indicatif, progress bar, colored outp… (elided)",
+                  "body": "# CLI Domain\n\n> **Layer 3: Domain Constraints**\n\n## Domain Constraints → Design Implications\n\n| Domain Rule | Design Constraint | Rust Implication |\n|-------------|-------------------|------… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/domain-cli/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "domain-cloud-native",
+                  "description": "Use when building cloud-native apps. Keywords: kubernetes, k8s, docker, container, grpc, tonic, microservice, service mesh, observability, tracing, metrics, health check, cloud, deployment, … (elided)",
+                  "body": "# Cloud-Native Domain\n\n> **Layer 3: Domain Constraints**\n\n## Domain Constraints → Design Implications\n\n| Domain Rule | Design Constraint | Rust Implication |\n|-------------|-----------------… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/domain-cloud-native/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "domain-embedded",
+                  "description": "Use when developing embedded/no_std Rust. Keywords: embedded, no_std, microcontroller, MCU, ARM, RISC-V, bare metal, firmware, HAL, PAC, RTIC, embassy, interrupt, DMA, peripheral, GPIO, SPI,… (elided)",
+                  "body": "## Project Context (Auto-Injected)\n\n**Target configuration:**\n!`cat .cargo/config.toml 2>/dev/null || echo \"No .cargo/config.toml found\"`\n\n---\n\n# Embedded Domain\n\n> **Layer 3: Domain Constra… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/domain-embedded/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "domain-fintech",
+                  "description": "Use when building fintech apps. Keywords: fintech, trading, decimal, currency, financial, money, transaction, ledger, payment, exchange rate, precision, rounding, accounting, 金融, 交易系统, 货币, 支付",
+                  "body": "# FinTech Domain\n\n> **Layer 3: Domain Constraints**\n\n## Domain Constraints → Design Implications\n\n| Domain Rule | Design Constraint | Rust Implication |\n|-------------|-------------------|--… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/domain-fintech/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "domain-iot",
+                  "description": "Use when building IoT apps. Keywords: IoT, Internet of Things, sensor, MQTT, device, edge computing, telemetry, actuator, smart home, gateway, protocol, 物联网, 传感器, 边缘计算, 智能家居",
+                  "body": "# IoT Domain\n\n> **Layer 3: Domain Constraints**\n\n## Domain Constraints → Design Implications\n\n| Domain Rule | Design Constraint | Rust Implication |\n|-------------|-------------------|------… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/domain-iot/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "domain-ml",
+                  "description": "Use when building ML/AI apps in Rust. Keywords: machine learning, ML, AI, tensor, model, inference, neural network, deep learning, training, prediction, ndarray, tch-rs, burn, candle, 机器学习, 人工智能, 模型推理",
+                  "body": "# Machine Learning Domain\n\n> **Layer 3: Domain Constraints**\n\n## Domain Constraints → Design Implications\n\n| Domain Rule | Design Constraint | Rust Implication |\n|-------------|-------------… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/domain-ml/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "domain-web",
+                  "description": "Use when building web services. Keywords: web server, HTTP, REST API, GraphQL, WebSocket, axum, actix, warp, rocket, tower, hyper, reqwest, middleware, router, handler, extractor, state mana… (elided)",
+                  "body": "# Web Domain\n\n> **Layer 3: Domain Constraints**\n\n## Domain Constraints → Design Implications\n\n| Domain Rule | Design Constraint | Rust Implication |\n|-------------|-------------------|------… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/domain-web/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "executing-plans",
+                  "description": "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
+                  "body": "# Executing Plans\n\n## Overview\n\nLoad plan, review critically, execute all tasks, report when complete.\n\n**Announce at start:** \"I'm using the executing-plans skill to implement this plan.\"\n\n… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/executing-plans/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "extension-creator",
+                  "description": "Create, scaffold, customize, validate, and locally test Qwen Code extensions. Use when the user wants a new Qwen Code extension, needs help choosing an extension template, wants to add QWEN.… (elided)",
+                  "body": "# Extension Creator\n\nUse this skill to create Qwen Code extensions with the existing extension\nscaffold command and bundled templates.\n\n## Workflow\n\n1. Identify the target extension path and… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/extension-creator/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "find-skills",
+                  "description": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilitie… (elided)",
+                  "body": "# Find Skills\n\nThis skill helps you discover and install skills from the open agent skills ecosystem.\n\n## When to Use This Skill\n\nUse this skill when the user:\n\n- Asks \"how do I do X\" where … (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/find-skills/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "finishing-a-development-branch",
+                  "description": "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup",
+                  "body": "# Finishing a Development Branch\n\n## Overview\n\nGuide completion of development work by presenting clear options and handling chosen workflow.\n\n**Core principle:** Verify tests → Detect envir… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/finishing-a-development-branch/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "goal-draft",
+                  "description": "Turn a fuzzy intention into a /goal objective the Goal verifier can actually judge - one outcome, numbered binary \"Done when\" checks that leave evidence in the transcript, guardrails, a budg… (elided)",
+                  "body": "# /goal-draft — write a Goal the verifier can judge\n\nYou are already inside the loaded `goal-draft` skill — do not call the `skill` tool to invoke it again; start with Step 0.\n\nYou are draft… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/goal-draft/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "loop",
+                  "description": "Create a loop that runs a prompt now and follows up either on a fixed schedule or through self-paced wakeups. Usage - /loop check the build, /loop 5m check the build, /loop check the PR ever… (elided)",
+                  "body": "# /loop — run a prompt repeatedly\n\n## Subcommands\n\nIf the input (after stripping the `/loop` prefix) is exactly one of these keywords, run the subcommand instead of scheduling:\n\n- **`list`**… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/loop/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m01-ownership",
+                  "description": "CRITICAL: Use for ownership/borrow/lifetime issues. Triggers: E0382, E0597, E0506, E0507, E0515, E0716, E0106, value moved, borrowed value does not live long enough, cannot move out of, use … (elided)",
+                  "body": "# Ownership & Lifetimes\n\n> **Layer 1: Language Mechanics**\n\n## Core Question\n\n**Who should own this data, and for how long?**\n\nBefore fixing ownership errors, understand the data's role:\n- I… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m01-ownership/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m02-resource",
+                  "description": "CRITICAL: Use for smart pointers and resource management. Triggers: Box, Rc, Arc, Weak, RefCell, Cell, smart pointer, heap allocation, reference counting, RAII, Drop, should I use Box or Rc,… (elided)",
+                  "body": "# Resource Management\n\n> **Layer 1: Language Mechanics**\n\n## Core Question\n\n**What ownership pattern does this resource need?**\n\nBefore choosing a smart pointer, understand:\n- Is ownership s… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m02-resource/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m03-mutability",
+                  "description": "CRITICAL: Use for mutability issues. Triggers: E0596, E0499, E0502, cannot borrow as mutable, already borrowed as immutable, mut, &mut, interior mutability, Cell, RefCell, Mutex, RwLock, 可变性… (elided)",
+                  "body": "# Mutability\n\n> **Layer 1: Language Mechanics**\n\n## Core Question\n\n**Why does this data need to change, and who can change it?**\n\nBefore adding interior mutability, understand:\n- Is mutation… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m03-mutability/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m04-zero-cost",
+                  "description": "CRITICAL: Use for generics, traits, zero-cost abstraction. Triggers: E0277, E0308, E0599, generic, trait, impl, dyn, where, monomorphization, static dispatch, dynamic dispatch, impl Trait, t… (elided)",
+                  "body": "# Zero-Cost Abstraction\n\n> **Layer 1: Language Mechanics**\n\n## Core Question\n\n**Do we need compile-time or runtime polymorphism?**\n\nBefore choosing between generics and trait objects:\n- Is t… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m04-zero-cost/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m05-type-driven",
+                  "description": "CRITICAL: Use for type-driven design. Triggers: type state, PhantomData, newtype, marker trait, builder pattern, make invalid states unrepresentable, compile-time validation, sealed trait, Z… (elided)",
+                  "body": "# Type-Driven Design\n\n> **Layer 1: Language Mechanics**\n\n## Core Question\n\n**How can the type system prevent invalid states?**\n\nBefore reaching for runtime checks:\n- Can the compiler catch t… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m05-type-driven/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m06-error-handling",
+                  "description": "CRITICAL: Use for error handling. Triggers: Result, Option, Error, ?, unwrap, expect, panic, anyhow, thiserror, when to panic vs return Result, custom error, error propagation, 错误处理, Result … (elided)",
+                  "body": "# Error Handling\n\n> **Layer 1: Language Mechanics**\n\n## Core Question\n\n**Is this failure expected or a bug?**\n\nBefore choosing error handling strategy:\n- Can this fail in normal operation?\n-… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m06-error-handling/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m07-concurrency",
+                  "description": "CRITICAL: Use for concurrency/async. Triggers: E0277 Send Sync, cannot be sent between threads, thread, spawn, channel, mpsc, Mutex, RwLock, Atomic, async, await, Future, tokio, deadlock, ra… (elided)",
+                  "body": "# Concurrency\n\n> **Layer 1: Language Mechanics**\n\n## Core Question\n\n**Is this CPU-bound or I/O-bound, and what's the sharing model?**\n\nBefore choosing concurrency primitives:\n- What's the wo… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m07-concurrency/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m09-domain",
+                  "description": "CRITICAL: Use for domain modeling. Triggers: domain model, DDD, domain-driven design, entity, value object, aggregate, repository pattern, business rules, validation, invariant, 领域模型, 领域驱动设计, 业务规则",
+                  "body": "# Domain Modeling\n\n> **Layer 2: Design Choices**\n\n## Core Question\n\n**What is this concept's role in the domain?**\n\nBefore modeling in code, understand:\n- Is it an Entity (identity matters) … (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m09-domain/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m10-performance",
+                  "description": "CRITICAL: Use for performance optimization. Triggers: performance, optimization, benchmark, profiling, flamegraph, criterion, slow, fast, allocation, cache, SIMD, make it faster, 性能优化, 基准测试",
+                  "body": "# Performance Optimization\n\n> **Layer 2: Design Choices**\n\n## Core Question\n\n**What's the bottleneck, and is optimization worth it?**\n\nBefore optimizing:\n- Have you measured? (Don't guess)\n-… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m10-performance/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m11-ecosystem",
+                  "description": "Use when integrating crates or ecosystem questions. Keywords: E0425, E0433, E0603, crate, cargo, dependency, feature flag, workspace, which crate to use, using external C libraries, creating… (elided)",
+                  "body": "## Current Dependencies (Auto-Injected)\n\n!`grep -A 100 '^\\[dependencies\\]' Cargo.toml 2>/dev/null | head -30 || echo \"No Cargo.toml found\"`\n\n---\n\n# Ecosystem Integration\n\n> **Layer 2: Design… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m11-ecosystem/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m12-lifecycle",
+                  "description": "Use when designing resource lifecycles. Keywords: RAII, Drop, resource lifecycle, connection pool, lazy initialization, connection pool design, resource cleanup patterns, cleanup, scope, Onc… (elided)",
+                  "body": "# Resource Lifecycle\n\n> **Layer 2: Design Choices**\n\n## Core Question\n\n**When should this resource be created, used, and cleaned up?**\n\nBefore implementing lifecycle:\n- What's the resource's… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m12-lifecycle/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m13-domain-error",
+                  "description": "Use when designing domain error handling. Keywords: domain error, error categorization, recovery strategy, retry, fallback, domain error hierarchy, user-facing vs internal errors, error code… (elided)",
+                  "body": "# Domain Error Strategy\n\n> **Layer 2: Design Choices**\n\n## Core Question\n\n**Who needs to handle this error, and how should they recover?**\n\nBefore designing error types:\n- Is this user-facin… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m13-domain-error/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m14-mental-model",
+                  "description": "Use when learning Rust concepts. Keywords: mental model, how to think about ownership, understanding borrow checker, visualizing memory layout, analogy, misconception, explaining ownership, … (elided)",
+                  "body": "# Mental Models\n\n> **Layer 2: Design Choices**\n\n## Core Question\n\n**What's the right way to think about this Rust concept?**\n\nWhen learning or explaining Rust:\n- What's the correct mental mo… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m14-mental-model/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "m15-anti-pattern",
+                  "description": "Use when reviewing code for anti-patterns. Keywords: anti-pattern, common mistake, pitfall, code smell, bad practice, code review, is this an anti-pattern, better way to do this, common mist… (elided)",
+                  "body": "# Anti-Patterns\n\n> **Layer 2: Design Choices**\n\n## Core Question\n\n**Is this pattern hiding a design problem?**\n\nWhen reviewing code:\n- Is this solving the symptom or the cause?\n- Is there a … (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/m15-anti-pattern/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "meta-cognition-parallel",
+                  "description": "EXPERIMENTAL: Three-layer parallel meta-cognition analysis. Triggers on: /meta-parallel, 三层分析, parallel analysis, 并行元认知",
+                  "body": "# Meta-Cognition Parallel Analysis (Experimental)\n\n> **Status:** Experimental | **Version:** 0.2.0 | **Last Updated:** 2025-01-27\n>\n> This skill tests parallel three-layer cognitive analysis… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/meta-cognition-parallel/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "new-app",
+                  "description": "Workflow for creating new applications from scratch. Covers requirements gathering, tech stack selection, scaffolding, implementation, and delivery of a functional prototype.",
+                  "body": "**Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype. Utilize all tools at your disposal to implement the application. Some too… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/new-app/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "qc-helper",
+                  "description": "Answer any question about Qwen Code usage, features, configuration, and troubleshooting by referencing the official user documentation. Also helps users view or modify their settings.json. I… (elided)",
+                  "body": "# Qwen Code Helper\n\nYou are a helpful assistant for **Qwen Code** — an AI coding agent for the terminal. Your job is to answer user questions about Qwen Code's usage, features, configuration… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/qc-helper/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "receiving-code-review",
+                  "description": "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not pe… (elided)",
+                  "body": "# Code Review Reception\n\n## Overview\n\nCode review requires technical evaluation, not emotional performance.\n\n**Core principle:** Verify before implementing. Ask before assuming. Technical co… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/receiving-code-review/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "requesting-code-review",
+                  "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements",
+                  "body": "# Requesting Code Review\n\nDispatch a code reviewer subagent to catch issues before they cascade. The reviewer gets precisely crafted context for evaluation — never your session's history. Th… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/requesting-code-review/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "review",
+                  "description": "Review changed code for correctness, security, code quality, and performance. Use when the user asks to review code changes, a PR, or specific files. Invoke with `/review`, `/review <pr-numb… (elided)",
+                  "body": "# Code Review\n\nYou are an expert code reviewer. Your job is to review code changes and provide actionable feedback.\n\n**Critical rules (most commonly violated — read these first):**\n\n1. **For… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/review/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "rust-call-graph",
+                  "description": "Visualize Rust function call graphs using LSP. Triggers on: /call-graph, call hierarchy, who calls, what calls, 调用图, 调用关系, 谁调用了, 调用了谁",
+                  "body": "# Rust Call Graph\n\nVisualize function call relationships using LSP call hierarchy.\n\n## Usage\n\n```\n/rust-call-graph <function_name> [--depth N] [--direction in|out|both]\n```\n\n**Options:**\n- `… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/rust-call-graph/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "rust-code-navigator",
+                  "description": "Navigate Rust code using LSP. Triggers on: /navigate, go to definition, find references, where is defined, 跳转定义, 查找引用, 定义在哪, 谁用了这个",
+                  "body": "# Rust Code Navigator\n\nNavigate large Rust codebases efficiently using Language Server Protocol.\n\n## Usage\n\n```\n/rust-code-navigator <symbol> [in file.rs:line]\n```\n\n**Examples:**\n- `/rust-co… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/rust-code-navigator/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "rust-daily",
+                  "description": "CRITICAL: Use for Rust news and daily/weekly/monthly reports. Triggers on:\nrust news, rust daily, rust weekly, TWIR, rust blog,\nRust 日报, Rust 周报, Rust 新闻, Rust 动态\n",
+                  "body": "# Rust Daily Report\n\n> **Version:** 2.1.0 | **Last Updated:** 2025-01-27\n\nFetch Rust community updates, filtered by time range.\n\n## Data Sources\n\n| Category | Sources |\n|----------|---------… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/rust-daily/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "rust-deps-visualizer",
+                  "description": "Visualize Rust project dependencies as ASCII art. Triggers on: /deps-viz, dependency graph, show dependencies, visualize deps, 依赖图, 依赖可视化, 显示依赖",
+                  "body": "# Rust Dependencies Visualizer\n\nGenerate ASCII art visualizations of your Rust project's dependency tree.\n\n## Usage\n\n```\n/rust-deps-visualizer [--depth N] [--features]\n```\n\n**Options:**\n- `-… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/rust-deps-visualizer/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "rust-learner",
+                  "description": "Use when asking about Rust versions or crate info. Keywords: latest version, what's new, changelog, Rust 1.x, Rust release, stable, nightly, crate info, crates.io, lib.rs, docs.rs, API docum… (elided)",
+                  "body": "# Rust Learner\n\n> **Version:** 2.1.0 | **Last Updated:** 2025-01-27\n\nYou are an expert at fetching Rust and crate information. Help users by:\n- **Version queries**: Get latest Rust/crate ver… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/rust-learner/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "rust-refactor-helper",
+                  "description": "Safe Rust refactoring with LSP analysis. Triggers on: /refactor, rename symbol, move function, extract, 重构, 重命名, 提取函数, 安全重构",
+                  "body": "# Rust Refactor Helper\n\nPerform safe refactoring with comprehensive impact analysis.\n\n## Usage\n\n```\n/rust-refactor-helper <action> <target> [--dry-run]\n```\n\n**Actions:**\n- `rename <old> <new… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/rust-refactor-helper/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "rust-router",
+                  "description": "CRITICAL: Use for ALL Rust questions including errors, design, and coding.\nHIGHEST PRIORITY for: 比较, 对比, compare, vs, versus, 区别, difference, 最佳实践, best practice,\ntokio vs, async-std vs, 比较 … (elided)",
+                  "body": "---\n\n# Rust Question Router\n\n> **Version:** 2.0.0 | **Last Updated:** 2025-01-22\n>\n> **v2.0:** Context optimized - detailed examples moved to sub-files\n\n## Meta-Cognition Framework\n\n### Core… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/rust-router/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "rust-symbol-analyzer",
+                  "description": "Analyze Rust project structure using LSP symbols. Triggers on: /symbols, project structure, list structs, list traits, list functions, 符号分析, 项目结构, 列出所有, 有哪些struct",
+                  "body": "# Rust Symbol Analyzer\n\nAnalyze project structure by examining symbols across your Rust codebase.\n\n## Usage\n\n```\n/rust-symbol-analyzer [file.rs] [--type struct|trait|fn|mod]\n```\n\n**Examples:… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/rust-symbol-analyzer/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "rust-trait-explorer",
+                  "description": "Explore Rust trait implementations using LSP. Triggers on: /trait-impl, find implementations, who implements, trait 实现, 谁实现了, 实现了哪些trait",
+                  "body": "# Rust Trait Explorer\n\nDiscover trait implementations and understand polymorphic designs.\n\n## Usage\n\n```\n/rust-trait-explorer <TraitName|StructName>\n```\n\n**Examples:**\n- `/rust-trait-explore… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/rust-trait-explorer/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "simplify",
+                  "description": "Review recent code changes for reuse, code quality, and efficiency, then directly apply straightforward cleanup improvements. Use when the user wants a post-implementation cleanup pass, pre-… (elided)",
+                  "body": "# Simplify Recent Changes\n\nYou are running a structured cleanup workflow over recent code changes. Your goal is not just to comment on the code, but to safely improve it.\n\n## Step 1: Identif… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/simplify/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "stuck",
+                  "description": "Diagnose frozen, stuck, or slow Qwen Code sessions on this machine. Scans for problematic processes, high CPU/memory usage, hung subprocesses, and debug logs. Use /stuck or /stuck <PID> to f… (elided)",
+                  "body": "# /stuck — diagnose frozen/slow Qwen Code sessions\n\nThe user thinks another Qwen Code session on this machine is frozen, stuck, or very slow. Investigate and present a diagnostic report.\n\n##… (elided)",
+                  "filePath": "/home/grimoire/.local/lib/qwen-code/lib/bundled/stuck/SKILL.md",
+                  "level": "bundled",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "subagent-driven-development",
+                  "description": "Use when executing implementation plans with independent tasks in the current session",
+                  "body": "# Subagent-Driven Development\n\nExecute plan by dispatching a fresh implementer subagent per task, a task review (spec compliance + code quality) after each, and a broad whole-branch review a… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/subagent-driven-development/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "systematic-debugging",
+                  "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
+                  "body": "# Systematic Debugging\n\n## Overview\n\nRandom fixes waste time and create new bugs. Quick patches mask underlying issues.\n\n**Core principle:** ALWAYS find root cause before attempting fixes. S… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/systematic-debugging/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "test-driven-development",
+                  "description": "Use when implementing any feature or bugfix, before writing implementation code",
+                  "body": "# Test-Driven Development (TDD)\n\n## Overview\n\nWrite the test first. Watch it fail. Write minimal code to pass.\n\n**Core principle:** If you didn't watch the test fail, you don't know if it te… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/test-driven-development/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "unsafe-checker",
+                  "description": "CRITICAL: Use for unsafe Rust code review and FFI. Triggers on: unsafe, raw pointer, FFI, extern, transmute, *mut, *const, union, #[repr(C)], libc, std::ffi, MaybeUninit, NonNull, SAFETY com… (elided)",
+                  "body": "Display the following ASCII art exactly as shown. Do not modify spaces or line breaks:\n```text\n⚠️ **Unsafe Rust Checker Loaded**\n\n     *  ^  *\n    /◉\\_~^~_/◉\\\n ⚡/     o     \\⚡\n   '_        _… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/unsafe-checker/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "using-git-worktrees",
+                  "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback",
+                  "body": "# Using Git Worktrees\n\n## Overview\n\nEnsure work happens in an isolated workspace. Prefer your platform's native worktree tools. Fall back to manual git worktrees only when no native tool is … (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/using-git-worktrees/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "using-superpowers",
+                  "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions",
+                  "body": "<SUBAGENT-STOP>\nIf you were dispatched as a subagent to execute a specific task, ignore this skill.\n</SUBAGENT-STOP>\n\n<EXTREMELY-IMPORTANT>\nIf you think there is even a 1% chance a skill mig… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/using-superpowers/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "verification-before-completion",
+                  "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims… (elided)",
+                  "body": "# Verification Before Completion\n\n## Overview\n\nClaiming work is complete without verification is dishonesty, not efficiency.\n\n**Core principle:** Evidence before claims, always.\n\n**Violating… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/verification-before-completion/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "writing-plans",
+                  "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
+                  "body": "# Writing Plans\n\n## Overview\n\nWrite comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: … (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/writing-plans/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                },
+                {
+                  "name": "writing-skills",
+                  "description": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
+                  "body": "# Writing Skills\n\n## Overview\n\n**Writing skills IS Test-Driven Development applied to process documentation.**\n\n**Personal skills live in your runtime's skills directory** \n\nYou write test c… (elided)",
+                  "filePath": "/home/grimoire/.agents/skills/writing-skills/SKILL.md",
+                  "level": "user",
+                  "modelInvocable": true
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/set_config_option",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "configId": "mode",
+          "value": "auto"
+        }
+      }
+    },
+    {
+      "seq": 7,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "qwen/notify/session/mode-update",
+        "params": {
+          "v": 1,
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "currentModeId": "auto"
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "configOptions": [
+            {
+              "id": "mode",
+              "name": "Mode",
+              "description": "Session permission mode",
+              "category": "mode",
+              "type": "select",
+              "currentValue": "auto",
+              "options": [
+                {
+                  "value": "plan",
+                  "name": "Plan",
+                  "description": "Analyze only, do not modify files or execute commands"
+                },
+                {
+                  "value": "default",
+                  "name": "Default",
+                  "description": "Require approval for file edits or shell commands"
+                },
+                {
+                  "value": "auto-edit",
+                  "name": "Auto Edit",
+                  "description": "Automatically approve file edits"
+                },
+                {
+                  "value": "auto",
+                  "name": "Auto",
+                  "description": "LLM classifier auto-approves safe actions, blocks risky ones"
+                },
+                {
+                  "value": "yolo",
+                  "name": "YOLO",
+                  "description": "Automatically approve all tools"
+                }
+              ]
+            },
+            {
+              "id": "model",
+              "name": "Model",
+              "description": "AI model to use",
+              "category": "model",
+              "type": "select",
+              "currentValue": "GLM-5.2(openai)",
+              "options": [
+                {
+                  "value": "GLM-5.2(openai)",
+                  "name": "[Z.AI] GLM-5.2",
+                  "description": ""
+                },
+                {
+                  "value": "GLM-5.1(openai)",
+                  "name": "[Z.AI] GLM-5.1",
+                  "description": ""
+                },
+                {
+                  "value": "GLM-5(openai)",
+                  "name": "[Z.AI] GLM-5",
+                  "description": ""
+                },
+                {
+                  "value": "GLM-5-Turbo(openai)",
+                  "name": "[Z.AI] GLM-5-Turbo",
+                  "description": ""
+                }
+              ]
+            },
+            {
+              "id": "reasoning_effort",
+              "name": "Reasoning effort",
+              "description": "How hard reasoning-capable models should think",
+              "category": "thought_level",
+              "type": "select",
+              "currentValue": "high",
+              "options": [
+                {
+                  "value": "default",
+                  "name": "Default",
+                  "description": "Use the model or provider default"
+                },
+                {
+                  "value": "low",
+                  "name": "Low",
+                  "description": "Providers map or clamp the requested tier for the active model"
+                },
+                {
+                  "value": "medium",
+                  "name": "Medium",
+                  "description": "Providers map or clamp the requested tier for the active model"
+                },
+                {
+                  "value": "high",
+                  "name": "High",
+                  "description": "Providers map or clamp the requested tier for the active model"
+                },
+                {
+                  "value": "xhigh",
+                  "name": "Extra high",
+                  "description": "Providers map or clamp the requested tier for the active model"
+                },
+                {
+                  "value": "max",
+                  "name": "Max",
+                  "description": "Providers map or clamp the requested tier for the active model"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 9,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "Reply with exactly: ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 10,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "The"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 11,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " user"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 12,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " wants"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 13,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " me"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 14,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " to"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 15,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " reply"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 16,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " with"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 17,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " exactly"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 18,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " \""
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 19,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "ok"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 20,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "\"."
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 21,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "ok"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 22,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": ""
+            },
+            "_meta": {
+              "usage": {
+                "inputTokens": 28101,
+                "outputTokens": 14,
+                "totalTokens": 28115,
+                "thoughtTokens": 11,
+                "cachedReadTokens": 21632
+              },
+              "durationMs": 6176
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 23,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "94b70c5e-9450-4292-adda-76d77f9cb98e",
+          "update": {
+            "sessionUpdate": "usage_update",
+            "used": 28101,
+            "size": 1000000
+          }
+        }
+      }
+    },
+    {
+      "seq": 24,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "stopReason": "end_turn",
+          "_meta": {
+            "qwen.branchPoint": {
+              "assistantRecordUuid": "0d1b5113-7ead-4278-bbf5-398323b068e9",
+              "checkpointUuid": "9d8e4c5d-f5dc-4009-9fc4-80a4c5e60156"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

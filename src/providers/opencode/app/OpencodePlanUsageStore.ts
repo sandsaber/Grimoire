@@ -1,4 +1,4 @@
-import { type ProviderCostValue, ProviderSpendUsageStore } from '../../../core/providers/ProviderSpendUsageStore';
+import { type ProviderCostValue, ProviderSpendUsageStore } from '../../../providers/shared/ProviderSpendUsageStore';
 import { getOpencodeProviderSettings } from '../settings';
 
 const OPENCODE_USAGE_NOTE = 'Pay per token across vendors · no cap set.';

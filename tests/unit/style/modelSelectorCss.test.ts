@@ -37,14 +37,14 @@ describe('model-selector.css', () => {
     expect(searchRule).toContain('height: 34px');
     expect(searchRule).toContain('min-height: 34px');
     expect(searchRule).toContain('max-height: 34px');
-    expect(searchRule).toContain('padding: 0 9px');
+    expect(searchRule).toContain('padding: 0 var(--grimoire-space-4)');
   });
 
   it('frames the model search container so it does not bleed past the dropdown edges', () => {
     const css = readModelSelectorCss();
     const searchRule = getRule(css, '.grimoire-model-search');
     expect(searchRule).toContain('border: 1px solid var(--background-modifier-border)');
-    expect(searchRule).toContain('border-radius: 6px');
+    expect(searchRule).toContain('border-radius: var(--grimoire-radius-2)');
     expect(searchRule).toContain('box-sizing: border-box');
     expect(searchRule).toMatch(/margin:\s*0/);
   });
@@ -94,12 +94,12 @@ describe('model-selector.css', () => {
 
     expect(dropdownRule).toContain('width: min(360px, calc(100vw - 24px))');
     expect(detailRule).not.toContain('display: none');
-    expect(detailRule).toContain('font-size: 10px');
+    expect(detailRule).toContain('font-size: var(--grimoire-text-2xs)');
     expect(detailRule).toContain('color: var(--text-muted)');
 
     const labelRule = getLastRule(css, '.grimoire-model-option-label');
     expect(labelRule).toContain('color: var(--text-normal)');
-    expect(labelRule).toContain('font-weight: 500');
+    expect(labelRule).toContain('font-weight: var(--grimoire-weight-medium)');
   });
 
   it('keeps the plan usage badge compact and delegates its tooltip to the aria label', () => {
@@ -108,8 +108,8 @@ describe('model-selector.css', () => {
     const labelRule = getRule(css, '.grimoire-plan-usage-badge-label');
     const meterRule = getRule(css, '.grimoire-plan-usage-badge-meter');
 
-    expect(badgeRule).toContain('gap: 5px');
-    expect(badgeRule).toContain('padding: 0 6px');
+    expect(badgeRule).toContain('gap: var(--grimoire-space-2)');
+    expect(badgeRule).toContain('padding: 0 var(--grimoire-space-3)');
     expect(labelRule).toContain('display: none');
     expect(meterRule).toContain('width: 18px');
     expect(css).not.toContain('.grimoire-plan-usage-badge-tip');

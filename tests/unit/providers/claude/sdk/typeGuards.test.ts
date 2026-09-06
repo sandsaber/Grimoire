@@ -16,11 +16,11 @@ describe('isSessionInitEvent', () => {
 
   it('should return false for stream chunk events', () => {
     const textChunk: TransformEvent = { type: 'text', content: 'hello' };
-    const doneChunk: TransformEvent = { type: 'done' };
+    const errorChunk2: TransformEvent = { type: 'error', content: 'boom' };
     const toolUseChunk: TransformEvent = { type: 'tool_use', id: 't1', name: 'Read', input: {} };
 
     expect(isSessionInitEvent(textChunk)).toBe(false);
-    expect(isSessionInitEvent(doneChunk)).toBe(false);
+    expect(isSessionInitEvent(errorChunk2)).toBe(false);
     expect(isSessionInitEvent(toolUseChunk)).toBe(false);
   });
 });
@@ -28,14 +28,12 @@ describe('isSessionInitEvent', () => {
 describe('isStreamChunk', () => {
   it('should return true for stream chunk events', () => {
     const textChunk: TransformEvent = { type: 'text', content: 'hello' };
-    const doneChunk: TransformEvent = { type: 'done' };
     const errorChunk: TransformEvent = { type: 'error', content: 'oops' };
     const blockedChunk: TransformEvent = { type: 'notice', content: 'blocked cmd', level: 'warning' };
     const toolUseChunk: TransformEvent = { type: 'tool_use', id: 't1', name: 'Read', input: {} };
     const toolResultChunk: TransformEvent = { type: 'tool_result', id: 't1', content: 'result' };
 
     expect(isStreamChunk(textChunk)).toBe(true);
-    expect(isStreamChunk(doneChunk)).toBe(true);
     expect(isStreamChunk(errorChunk)).toBe(true);
     expect(isStreamChunk(blockedChunk)).toBe(true);
     expect(isStreamChunk(toolUseChunk)).toBe(true);

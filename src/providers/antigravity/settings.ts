@@ -40,14 +40,23 @@ export const DEFAULT_ANTIGRAVITY_PROVIDER_SETTINGS: Readonly<PersistedAntigravit
   visibleModels: [],
 });
 
-function normalizeHostnameCliPaths(value: unknown): HostnameCliPaths {
+/**
+ * The per-host CLI paths, from whatever was persisted.
+ *
+ * Exported because the provider module had its own copy: the flip was going to
+ * make the module the settings authority, and the copy was to live "until the
+ * Antigravity flip". The flip shipped and the copy stayed, which is how two
+ * implementations of one rule drift. The host filter is the module's, kept
+ * because an entry keyed by nothing addresses no machine.
+ */
+export function normalizeHostnameCliPaths(value: unknown): HostnameCliPaths {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
   }
 
   const result: HostnameCliPaths = {};
   for (const [key, entry] of Object.entries(value)) {
-    if (typeof entry === 'string' && entry.trim()) {
+    if (key.trim() !== '' && typeof entry === 'string' && entry.trim()) {
       result[key] = entry.trim();
     }
   }

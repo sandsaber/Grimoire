@@ -1,6 +1,8 @@
 import type { Component } from 'obsidian';
 import { Notice, setIcon } from 'obsidian';
 
+import { createObsidianVaultNoteSource } from '@/app/context/ObsidianVaultNoteSource';
+
 import { ProjectWorkspaceStore } from '../../../core/context/ProjectWorkspaceStore';
 import { RelevantNotesService } from '../../../core/context/RelevantNotesService';
 import { VaultSearchService } from '../../../core/context/VaultSearchService';
@@ -9,17 +11,19 @@ import type { ProviderCommandDropdownConfig } from '../../../core/providers/comm
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
 import { getOpaqueProviderState } from '../../../core/providers/getOpaqueProviderState';
 import { getEnabledProviderForModel, getProviderForModel } from '../../../core/providers/modelRouting';
-import { ProviderRegistry } from '../../../core/providers/ProviderRegistry';
+import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type { ProviderChatUiContribution } from '../../../core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
-import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
-  ProviderChatUIConfig,
   ProviderId,
 } from '../../../core/providers/types';
 import {
   DEFAULT_CHAT_PROVIDER_ID,
 } from '../../../core/providers/types';
-import type { ChatRuntime } from '../../../core/runtime/ChatRuntime';
+import type {
+  ExecutionChatRuntimeAdapter,
+  ExecutionInteractionCallbacks,
+} from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { AutoTurnResult } from '../../../core/runtime/types';
 import { TOOL_AGENT_OUTPUT } from '../../../core/tools/toolNames';
 import {
@@ -45,7 +49,6 @@ import { StreamController } from '../controllers/StreamController';
 import { MessageRenderer } from '../rendering/MessageRenderer';
 import { cleanupThinkingBlock } from '../rendering/ThinkingBlockRenderer';
 import { findRewindContext } from '../rewind';
-import { BangBashService } from '../services/BangBashService';
 import { SubagentManager } from '../services/SubagentManager';
 import { ChatState } from '../state/ChatState';
 import { BangBashModeManager as BangBashModeManagerClass } from '../ui/BangBashModeManager';
@@ -61,6 +64,12 @@ import { buildAssistantResponseMetadata } from '../utils/assistantResponseMetada
 import { recalculateUsageForModel } from '../utils/usageInfo';
 import { getTabProviderId } from './providerResolution';
 import { attachInputResizeHandle, buildTabDOM } from './tabDOM';
+import {
+  durableAgentsRunning,
+  recordDurableSubagent,
+  refreshBackgroundAgentCard,
+} from './tabDurableSubagents';
+import { resolveTabProjectionExecution } from './tabProjectionExecution';
 import {
   AUTO_SCROLL_REENABLE_DELAY_MS,
   isTabScrollAtBottom,
@@ -80,7 +89,6 @@ import {
   getTabHiddenCommands,
   getTabPermissionMode,
   getTabSettingsSnapshot,
-  hasStartedConversation,
   type ProviderCatalogInfo,
   resolveBlankTabModel,
   resolveTabModel,
@@ -97,6 +105,7 @@ export {
   resolveTabModel,
 } from './tabSettings';
 
+import { NO_TASK_RESULT_INTERPRETATION } from '../../../core/providers/noTaskResultInterpretation';
 import {
   initializeContextManagers,
   openRelevantVaultPath,
@@ -180,12 +189,7 @@ export function createTab(options: TabCreateOptions): TabData {
     onConversationChanged: onConversationIdChanged,
   });
 
-  // Create subagent manager with no-op callback.
-  // This placeholder is replaced in initializeTabControllers() with the actual
-  // callback that updates the StreamController. We defer the real callback
-  // because StreamController doesn't exist until controllers are initialized.
-  const subagentManager = new SubagentManager(() => {});
-  const vaultTextIndex = new VaultTextIndex(plugin.app);
+  const vaultTextIndex = new VaultTextIndex(createObsidianVaultNoteSource(plugin.app));
   const vaultSearchService = new VaultSearchService(vaultTextIndex);
   const relevantNotesService = new RelevantNotesService(vaultTextIndex);
 
@@ -210,6 +214,16 @@ export function createTab(options: TabCreateOptions): TabData {
     ?? (draftModel
       ? getEnabledProviderForModel(draftModel, plugin.settings)
       : DEFAULT_CHAT_PROVIDER_ID);
+  // Built here rather than above, because it needs the provider this tab is
+  // for: reading a subagent result is provider-specific, and the interpreter
+  // used to default to one named provider's for every tab until a rebind.
+  // The callback is a placeholder — `initializeTabControllers` replaces it once
+  // the StreamController it updates exists.
+  const subagentManager = new SubagentManager(
+    () => {},
+    providerCatalog().declarations(initialProviderId).asyncTaskResults
+      ?? NO_TASK_RESULT_INTERPRETATION,
+  );
 
   const tab: TabData = {
     id,
@@ -236,6 +250,7 @@ export function createTab(options: TabCreateOptions): TabData {
       navigationController: null,
     },
     services: {
+      agentMentionServices: new Map(),
       subagentManager,
       instructionRefineService: null,
       titleGenerationService: null,
@@ -267,6 +282,8 @@ export function createTab(options: TabCreateOptions): TabData {
     },
     dom,
     renderer: null,
+    // Built after the controllers are, because a tab's binding reads them.
+    execution: null,
     orchestratorMode: conversation?.orchestratorMode === true
       || (!isBound && options.orchestratorMode === true),
   };
@@ -348,19 +365,27 @@ export async function initializeTabService(
     return;
   }
 
-  let service: ChatRuntime | null = null;
+  let service: ExecutionChatRuntimeAdapter | null = null;
   let unsubscribeReadyState: (() => void) | null = null;
   const previousService = tab.service;
 
   try {
     if (typeof previousService?.cleanup === 'function') {
-      previousService.cleanup();
+      // Discarded on purpose: `ChatRuntime.cleanup()` returns void by contract,
+      // and the implementations that are async are total — a tab must not wait
+      // on a provider to finish closing before it can be replaced.
+      void previousService.cleanup();
     }
     tab.service = null;
     tab.serviceInitialized = false;
 
     await applyBlankDraftSettings(tab, plugin, providerId);
-    const runtime = ProviderRegistry.createChatRuntime({ plugin, providerId });
+    // From the composition that builds it, not through a registration whose
+    // factory reached the same composition by way of a plugin.
+    const runtime = plugin.getApplicationRuntimeOrNull()?.createRuntimeFor(providerId);
+    if (!runtime) {
+      throw new Error(`${providerCatalog().displayNameOrId(providerId)} has no execution to run on.`);
+    }
     service = runtime;
     unsubscribeReadyState = runtime.onReadyStateChange(() => {});
     tab.dom.eventCleanups.push(() => unsubscribeReadyState?.());
@@ -368,18 +393,14 @@ export async function initializeTabService(
     // Passive sync: set session state without starting the runtime process.
     // The runtime starts on demand when query() is called.
     if (conversation) {
-      const hasStartedSession = hasStartedConversation(conversation);
-      const externalContextPaths = hasStartedSession
-        ? conversation.externalContextPaths || []
-        : (plugin.settings.persistentExternalContextPaths || []);
 
-      runtime.syncConversationState(conversation, externalContextPaths);
+      runtime.syncConversationState(conversation);
     }
 
     // Re-check after async operations — tab may have been closed during init
     if (isClosingLifecycleState(tab.lifecycleState)) {
       unsubscribeReadyState?.();
-      service?.cleanup();
+      void service?.cleanup();
       return;
     }
 
@@ -401,7 +422,7 @@ export async function initializeTabService(
   } catch (error) {
     // Clean up partial state on failure
     unsubscribeReadyState?.();
-    service?.cleanup();
+    void service?.cleanup();
     tab.service = null;
     tab.serviceInitialized = false;
 
@@ -428,7 +449,10 @@ function isConversationLike(value: unknown): value is Conversation {
 function initializeSlashCommands(
   tab: TabData,
   getHiddenCommands?: () => Set<string>,
-  catalogInfo?: { config: ProviderCommandDropdownConfig; getEntries: () => Promise<ProviderCommandEntry[]> } | null,
+  catalogInfo?: {
+    config: ProviderCommandDropdownConfig;
+    getEntries: () => Promise<readonly ProviderCommandEntry[]>;
+  } | null,
 ): void {
   const { dom } = tab;
 
@@ -470,7 +494,6 @@ function initializeInstructionAndTodo(tab: TabData, plugin: GrimoirePlugin): voi
     const vaultPath = getVaultPath(plugin.app);
     if (vaultPath) {
       const enhancedPath = getEnhancedPath();
-      const bashService = new BangBashService(vaultPath, enhancedPath);
 
       tab.ui.bangBashModeManager = new BangBashModeManagerClass(
         dom.inputEl,
@@ -482,10 +505,20 @@ function initializeInstructionAndTodo(tab: TabData, plugin: GrimoirePlugin): voi
             const id = `bash-${Date.now()}`;
             statusPanel.addBashOutput({ id, command, status: 'running', output: '' });
 
-            const result = await bashService.execute(command);
-            const output = [result.stdout, result.stderr, result.error].filter(Boolean).join('\n').trim();
-            const status = result.exitCode === 0 ? 'completed' : 'error';
-            statusPanel.updateBashOutput(id, { status, output, exitCode: result.exitCode });
+            // Through the kernel rather than a child process of this feature:
+            // the run is owned by the application, so unloading the plugin
+            // takes the command down with it.
+            const result = await plugin.runShellCommand({
+              command,
+              cwd: vaultPath,
+              environment: { ...process.env as Record<string, string>, PATH: enhancedPath },
+            });
+            const output = [result.stdout, result.stderr, result.error]
+              .filter(Boolean).join('\n').trim();
+            statusPanel.updateBashOutput(id, {
+              status: result.failed ? 'error' : 'completed',
+              output,
+            });
           },
           getInputWrapper: () => dom.inputWrapper,
         }
@@ -501,25 +534,24 @@ function isBangBashEnabledForProvider(
   settings: Record<string, unknown>,
   providerId: ProviderId,
 ): boolean {
-  return ProviderRegistry.getChatUIConfig(providerId).isBangBashEnabled?.(settings) ?? false;
+  return providerCatalog().declarations(providerId).chatUI.bangBashEnabled(settings);
 }
 
-function getModelCatalogProviderIds(_tab: TabData, plugin: GrimoirePlugin): ProviderId[] {
-  return ProviderRegistry.getEnabledProviderIds(plugin.settings);
+function getModelCatalogProviderIds(
+  _tab: TabData,
+  plugin: GrimoirePlugin,
+): readonly ProviderId[] {
+  return providerCatalog().enabledIds(plugin.settings);
 }
 
 async function refreshTabModelOptions(tab: TabData, plugin: GrimoirePlugin): Promise<void> {
   const providerIds = getModelCatalogProviderIds(tab, plugin);
   await Promise.all(providerIds.map(async (providerId) => {
-    const catalog = ProviderWorkspaceRegistry.getModelCatalog(providerId);
-    if (!catalog || catalog.isAvailable?.(plugin.settings) === false) {
-      return;
-    }
-
-    await catalog.refreshModels({
-      plugin,
-      settings: plugin.settings,
-    });
+    // `enabledIds` above is the gate the row's own `isAvailable` was: for the
+    // one provider that implemented it, it answered "is this provider enabled",
+    // which the catalog already decided before this loop started.
+    const models = (await plugin.getApplicationRuntimeOrNull()?.workspaceFor(providerId))?.models;
+    await models?.refresh();
   }).map((promise) => promise.catch(() => undefined)));
 
   tab.ui.modelSelector?.updateDisplay();
@@ -546,20 +578,22 @@ function initializeInputToolbar(
   const inputToolbar = dom.inputWrapper.createDiv({ cls: 'grimoire-input-toolbar' });
 
   // The model picker is mixed-provider even when the active session remains bound.
-  const mixedModelUIConfigProxy = (): ProviderChatUIConfig => {
+  const mixedModelChatUIProxy = (): ProviderChatUiContribution => {
     const draftProvider = tab.draftModel
       ? getEnabledProviderForModel(tab.draftModel, plugin.settings)
       : getTabProviderId(tab, plugin);
-    const baseConfig = ProviderRegistry.getChatUIConfig(draftProvider);
+    const base = providerCatalog().declarations(draftProvider).chatUI;
     return {
-      ...baseConfig,
-      getModelOptions: (settings: Record<string, unknown>) =>
-        getBlankTabModelOptions(settings),
+      ...base,
+      models: {
+        ...base.models,
+        options: (settings: Record<string, unknown>) => getBlankTabModelOptions(settings),
+      },
     };
   };
 
   const toolbarComponents = createInputToolbar(inputToolbar, {
-    getUIConfig: () => mixedModelUIConfigProxy(),
+    getChatUI: () => mixedModelChatUIProxy(),
     getCapabilities: () => getTabCapabilities(tab, plugin),
     getSettings: () => getTabSettingsSnapshot(tab, plugin),
     getEnvironmentVariables: () => plugin.getActiveEnvironmentVariables(),
@@ -594,20 +628,20 @@ function initializeInputToolbar(
 
         // Update settings for the new provider
         plugin.settings.settingsProvider = newProvider;
-        const uiConfig = ProviderRegistry.getChatUIConfig(newProvider);
+        const newChatUI = providerCatalog().declarations(newProvider).chatUI;
         await updateTabProviderSettings(
           tab,
           plugin,
           (settings) => {
             settings.model = model;
-            uiConfig.applyModelDefaults(model, settings);
+            newChatUI.models.applyDefaults(model, settings);
           },
           onDraftSettingsChanged,
         );
         if (didProviderChange) {
           runProviderChangedInBackground(onProviderChanged, newProvider);
         }
-        prepareModelMetadataInBackground(tab, plugin, newProvider, model, uiConfig);
+        prepareModelMetadataInBackground(tab, plugin, newProvider, model, newChatUI);
         tab.ui.thinkingBudgetSelector?.updateDisplay();
         tab.ui.serviceTierToggle?.updateDisplay();
         tab.ui.modelSelector?.updateDisplay();
@@ -632,7 +666,7 @@ function initializeInputToolbar(
         return;
       }
 
-      const uiConfig: ProviderChatUIConfig = getTabChatUIConfig(tab, plugin);
+      const chatUI = getTabChatUIConfig(tab, plugin);
       const modelSelectionGeneration = (tab.modelSelectionGeneration ?? 0) + 1;
       tab.modelSelectionGeneration = modelSelectionGeneration;
       const targetConversationId = tab.conversationId;
@@ -677,7 +711,7 @@ function initializeInputToolbar(
               plugin,
               (settings) => {
                 settings.model = model;
-                uiConfig.applyModelDefaults(model, settings);
+                chatUI.models.applyDefaults(model, settings);
               },
               onDraftSettingsChanged,
             );
@@ -718,7 +752,7 @@ function initializeInputToolbar(
       if (!providerSettings || !isCurrentSelection()) {
         return;
       }
-      prepareModelMetadataInBackground(tab, plugin, boundProvider, model, uiConfig);
+      prepareModelMetadataInBackground(tab, plugin, boundProvider, model, chatUI);
       tab.ui.thinkingBudgetSelector?.updateDisplay();
       tab.ui.serviceTierToggle?.updateDisplay();
       tab.ui.modelSelector?.updateDisplay();
@@ -729,10 +763,10 @@ function initializeInputToolbar(
       // Recalculate context usage percentage for the new model's context window
       const currentUsage = tab.state.usage;
       if (currentUsage) {
-        const newContextWindow = uiConfig.getContextWindowSize(
+        const newContextWindow = chatUI.models.contextWindow(
           model,
-          providerSettings.customContextLimits,
           providerSettings,
+          providerSettings.customContextLimits,
         );
         tab.state.usage = recalculateUsageForModel(currentUsage, model, newContextWindow);
       }
@@ -743,7 +777,7 @@ function initializeInputToolbar(
         tab,
         plugin,
         (settings) => {
-          getTabChatUIConfig(tab, plugin).applyModeSelection?.(mode, settings);
+          getTabChatUIConfig(tab, plugin).modeSelector?.apply(mode, settings);
         },
         onDraftSettingsChanged,
       );
@@ -756,7 +790,7 @@ function initializeInputToolbar(
         plugin,
         (settings) => {
           settings.thinkingBudget = budget;
-          getTabChatUIConfig(tab, plugin).applyReasoningSelection?.(settings.model, budget, settings);
+          getTabChatUIConfig(tab, plugin).reasoning?.apply?.(settings.model, budget, settings);
         },
         onDraftSettingsChanged,
       );
@@ -768,7 +802,7 @@ function initializeInputToolbar(
         plugin,
         (settings) => {
           settings.effortLevel = effort;
-          getTabChatUIConfig(tab, plugin).applyReasoningSelection?.(settings.model, effort, settings);
+          getTabChatUIConfig(tab, plugin).reasoning?.apply?.(settings.model, effort, settings);
         },
         onDraftSettingsChanged,
       );
@@ -791,9 +825,12 @@ function initializeInputToolbar(
         tab,
         plugin,
         (settings) => {
-          const uiConfig = getTabChatUIConfig(tab, plugin);
-          if (uiConfig.applyPermissionMode) {
-            uiConfig.applyPermissionMode(mode, settings);
+          // A provider that publishes a toggle but implements no apply hook —
+          // Claude and Codex — keeps the shared field written directly, which
+          // is what the optional member on the row makes visible.
+          const permissionMode = getTabChatUIConfig(tab, plugin).permissionMode;
+          if (permissionMode?.apply) {
+            permissionMode.apply(mode, settings);
           } else {
             settings.permissionMode = mode;
           }
@@ -883,7 +920,7 @@ function initializeInputToolbar(
   );
   tab.ui.runtimeContextActivity = new RuntimeContextActivityView(dom.contextRuntimeEl);
 
-  tab.ui.mcpServerSelector.setMcpManager(getProviderMcpManager(getTabProviderId(tab, plugin)));
+  tab.ui.mcpServerSelector.setMcpManager(getProviderMcpManager(getTabProviderId(tab, plugin), plugin));
 
   // Sync @-mentions to UI selector
   tab.ui.fileContextManager?.setOnMcpMentionChange((servers) => {
@@ -1053,9 +1090,9 @@ function resolveForkSource(tab: TabData, plugin: GrimoirePlugin): ForkSource | n
   // fall back to persisted conversation metadata when no runtime is active.
   const sourceSessionId = tab.service
     ? tab.service.resolveSessionIdForFork(conversation ?? null)
-    : ProviderRegistry
-      .getConversationHistoryService(conversation?.providerId ?? tab.providerId)
-      .resolveSessionIdForConversation(conversation);
+    : providerCatalog()
+      .declarations(conversation?.providerId ?? tab.providerId)
+      .conversationState?.resolveSessionId(conversation) ?? null;
 
   if (!sourceSessionId) {
     new Notice(t('chat.fork.failed', { error: t('chat.fork.errorNoSession') }));
@@ -1253,6 +1290,14 @@ export function initializeTabControllers(
   services.subagentManager.setCallback(
     (subagent) => {
       tab.controllers.streamController?.onAsyncSubagentStateChange(subagent);
+      // **Recorded, then redrawn from what was recorded** — and the redraw
+      // waits for the write. Fired side by side, the read wins: the first
+      // `running` event drew an empty list because nothing was adopted yet, and
+      // a terminal drew the record before its result was appended, which the
+      // card reads as still running. Nothing follows a terminal, so it stayed
+      // that way.
+      void recordDurableSubagent(tab, plugin, subagent)
+        .then(() => refreshBackgroundAgentCard(tab, plugin));
 
       // During active stream, regular end-of-turn save captures latest state.
       if (!tab.state.isStreaming && tab.state.currentConversationId) {
@@ -1282,6 +1327,9 @@ export function initializeTabControllers(
       getTitleGenerationService: () => services.titleGenerationService,
       getStatusPanel: () => ui.statusPanel,
       getAgentService: () => tab.service, // Use tab's service instead of plugin's
+      // For one thing only: stopping a turn. The kernel owns the run, so the
+      // runtime's own `cancel` acts on a run it never started.
+      getProjectionExecution: () => resolveTabProjectionExecution(tab, plugin),
       getActiveProviderSettings: () => getTabSettingsSnapshot(tab, plugin),
       getOrchestratorMode: () => tab.orchestratorMode,
       dismissPendingInlinePrompts: () => tab.controllers.inputController?.dismissPendingApproval(),
@@ -1306,17 +1354,13 @@ export function initializeTabControllers(
         tab.orchestratorMode = conversation?.orchestratorMode === true;
         tab.draftModel = null;
         tab.draftSettings = null;
-        const hasStartedSession = hasStartedConversation(conversation);
         tab.conversationId = conversation?.id ?? null;
         tab.lifecycleState = conversation ? 'bound_cold' : 'blank';
         syncSlashCommandDropdownForProvider(tab, plugin, getProviderCatalogConfig, conversation);
 
         // If the runtime already exists for the right provider, sync it passively
         if (tab.service && tab.service.providerId === nextProviderId && conversation) {
-          const externalContextPaths = hasStartedSession
-            ? conversation.externalContextPaths || []
-            : (plugin.settings.persistentExternalContextPaths || []);
-          tab.service.syncConversationState(conversation, externalContextPaths);
+          tab.service.syncConversationState(conversation);
         }
 
         refreshTabProviderUI(tab, plugin);
@@ -1341,14 +1385,25 @@ export function initializeTabControllers(
         refreshTabProviderUI(tab, plugin);
         applyProviderUIGating(tab, plugin);
         syncSlashCommandDropdownForProvider(tab, plugin, getProviderCatalogConfig);
+        // A blank tab owns no conversation, so it shows no background work.
+        // Without this the cards of the conversation just left stay on screen.
+        void refreshBackgroundAgentCard(tab, plugin);
       },
       onConversationLoaded: () => {
         ui.slashCommandDropdown?.resetSdkSkillsCache();
         refreshRuntimeContextUI(tab, plugin);
+        // **This is what makes the card mean anything.** An agent started in a
+        // tab that has since closed fires no live event, so opening the
+        // conversation is the only moment it can appear at all — and the whole
+        // point of recording it was that it appears.
+        void refreshBackgroundAgentCard(tab, plugin);
       },
       onConversationSwitched: () => {
         ui.slashCommandDropdown?.resetSdkSkillsCache();
         refreshRuntimeContextUI(tab, plugin);
+        // And on the way in to another conversation, which also clears the
+        // cards belonging to the one being left.
+        void refreshBackgroundAgentCard(tab, plugin);
       },
     }
   );
@@ -1356,6 +1411,9 @@ export function initializeTabControllers(
   tab.controllers.inputController = new InputController({
     plugin,
     state,
+    // Read late: the binding is built after the controllers are, and a tab
+    // whose provider is not on the projection path never has one.
+    getProjectionExecution: () => resolveTabProjectionExecution(tab, plugin),
     renderer: tab.renderer,
     streamController: tab.controllers.streamController,
     selectionController: tab.controllers.selectionController,
@@ -1379,7 +1437,12 @@ export function initializeTabControllers(
     resetInputHeight: () => {
       // Per-tab input height is managed by CSS, no dynamic adjustment needed
     },
-    getAuxiliaryModel: () => tab.service?.getAuxiliaryModel?.() ?? tab.draftModel ?? null,
+    // The tab's draft, not the runtime's: `getAuxiliaryModel` is absent from
+    // the adapter by contract — recorded in `adapterMemberCoverage.test.ts` —
+    // so the optional call answered `undefined` for every flipped provider and
+    // this fallback is what has been running. Typing the field as the adapter
+    // is what made that visible.
+    getAuxiliaryModel: () => tab.draftModel ?? null,
     getAgentService: () => tab.service,
     getSubagentManager: () => services.subagentManager,
     getActiveProviderSettings: () => getTabSettingsSnapshot(tab, plugin),
@@ -1397,7 +1460,6 @@ export function initializeTabControllers(
       }
 
       const previousProviderId = tab.providerId;
-      const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
       const targetModel = model ?? resolveBlankTabModel(plugin, providerId);
       const snapshot = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
         plugin.settings,
@@ -1405,7 +1467,8 @@ export function initializeTabControllers(
       ) as TabProviderSettings;
 
       snapshot.model = targetModel;
-      uiConfig.applyModelDefaults(targetModel, snapshot);
+      providerCatalog().declarations(providerId).chatUI.models
+        .applyDefaults(targetModel, snapshot);
       ProviderSettingsCoordinator.commitProviderSettingsSnapshot(
         plugin.settings,
         providerId,
@@ -1443,8 +1506,8 @@ export function initializeTabControllers(
           );
           tab.providerId = derivedProvider;
         }
-        if (!ProviderRegistry.isEnabled(tab.providerId, plugin.settings)) {
-          throw new Error(`${ProviderRegistry.getProviderDisplayName(tab.providerId)} is disabled. Enable it in Grimoire settings first.`);
+        if (!providerCatalog().isEnabled(plugin.settings, tab.providerId)) {
+          throw new Error(`${providerCatalog().displayName(tab.providerId)} is disabled. Enable it in Grimoire settings first.`);
         }
 
         await initializeTabService(tab, plugin);
@@ -1685,6 +1748,12 @@ export function deactivateTab(tab: TabData): void {
 export async function destroyTab(tab: TabData): Promise<void> {
   tab.lifecycleState = 'closing';
 
+  // First, and before anything cancels: this ends the *view* of the work. What
+  // happens to a run still going is the kernel's to decide, and a tab that
+  // stopped drawing is not a tab that stopped the turn.
+  tab.execution?.detach();
+  tab.execution = null;
+
   // Invalidate any in-flight stream so sendMessage finally-blocks skip
   // DOM/save work against a torn-down tab (mirrors createNew({ force })).
   if (tab.state.isStreaming) {
@@ -1733,7 +1802,12 @@ export async function destroyTab(tab: TabData): Promise<void> {
   tab.ui.navigationSidebar?.destroy();
   tab.ui.navigationSidebar = null;
 
-  tab.services.subagentManager.orphanAllActive();
+  // **Closing a tab no longer abandons the work it started.** This used to mark
+  // every running background agent `orphaned` — a status meaning "nobody is
+  // watching this any more", which was true and was all anyone ever learned
+  // about it. The records outlive the tab now and the status panel draws them
+  // from the vault, so reopening the conversation shows the agent still running
+  // and how it ended. The in-memory maps still go: they belong to this tab.
   tab.services.subagentManager.clear();
 
   for (const cleanup of tab.dom.eventCleanups) {
@@ -1741,8 +1815,8 @@ export async function destroyTab(tab: TabData): Promise<void> {
   }
   tab.dom.eventCleanups.length = 0;
 
-  // Clean up runtime before removing DOM
-  tab.service?.cleanup();
+  // Clean up runtime before removing DOM. Discarded: see `replaceTabRuntime`.
+  void tab.service?.cleanup();
   tab.service = null;
   tab.dom.contentEl.remove();
 }
@@ -1761,47 +1835,50 @@ export function getTabTitle(tab: TabData, plugin: GrimoirePlugin): string {
       return conversation.title;
     }
   }
-  return 'New Chat';
+  return t('chat.ui.messages.newChatTitle');
 }
 
-/** Shared between Tab.ts and TabManager.ts to avoid duplication. */
+/**
+ * Gives the tab's adapter everything its presenter needs, in one call.
+ *
+ * **Off the frozen contract.** These were seven `ChatRuntime` setters that the
+ * adapter stored and never acted on — a seam, not a runtime capability — and
+ * they are one `installInteractions` on the adapter now. Installed together
+ * rather than one at a time, so a presenter is never half built between two of
+ * them.
+ *
+ * Shared between Tab.ts and TabManager.ts to avoid duplication.
+ */
 export function setupServiceCallbacks(tab: TabData, plugin: GrimoirePlugin): void {
-  if (tab.service && tab.controllers.inputController) {
-    tab.service.setApprovalCallback(
-      async (toolName, input, description, options) =>
-        await tab.controllers.inputController?.handleApprovalRequest(toolName, input, description, options)
-        ?? 'cancel'
-    );
-    tab.service.setApprovalDismisser(
-      () => tab.controllers.inputController?.dismissPendingApprovalPrompt()
-    );
-    tab.service.setAskUserQuestionCallback(
-      async (input, signal) =>
-        await tab.controllers.inputController?.handleAskUserQuestion(input, signal)
-        ?? null
-    );
-    tab.service.setExitPlanModeCallback(
-      async (input, signal) => {
-        const decision = await tab.controllers.inputController?.handleExitPlanMode(input, signal) ?? null;
-        // Revert only on approve; feedback and cancel keep plan mode active.
-        if (decision !== null && decision.type !== 'feedback') {
-          // Only restore permission mode if still in plan mode — user may have toggled out via Shift+Tab
-          if (getTabPermissionMode(tab, plugin) === 'plan') {
-            const restoreMode = tab.state.prePlanPermissionMode ?? 'normal';
-            tab.state.prePlanPermissionMode = null;
-            updatePlanModeUI(tab, plugin, restoreMode);
-          }
+  const adapter = interactionInstallerFor(tab);
+  if (!adapter || !tab.controllers.inputController) {
+    return;
+  }
+
+  adapter.installInteractions({
+    approval: async (toolName, input, description, options) =>
+      await tab.controllers.inputController?.handleApprovalRequest(toolName, input, description, options)
+      ?? 'cancel',
+
+    approvalDismisser: () => tab.controllers.inputController?.dismissPendingApprovalPrompt(),
+
+    autoTurn: (result: AutoTurnResult) => renderAutoTriggeredTurn(tab, plugin, result),
+
+    planDecision: async (input, signal) => {
+      const decision = await tab.controllers.inputController?.handleExitPlanMode(input, signal) ?? null;
+      // Revert only on approve; feedback and cancel keep plan mode active.
+      if (decision !== null && decision.type !== 'feedback') {
+        // Only restore permission mode if still in plan mode — user may have toggled out via Shift+Tab
+        if (getTabPermissionMode(tab, plugin) === 'plan') {
+          const restoreMode = tab.state.prePlanPermissionMode ?? 'normal';
+          tab.state.prePlanPermissionMode = null;
+          updatePlanModeUI(tab, plugin, restoreMode);
         }
-        return decision;
       }
-    );
-    tab.service.setSubagentHookProvider(
-      () => ({
-        hasRunning: tab.services.subagentManager.hasRunningSubagents(),
-      })
-    );
-    tab.service.setAutoTurnCallback((result: AutoTurnResult) => renderAutoTriggeredTurn(tab, plugin, result));
-    tab.service.setPermissionModeSyncCallback((sdkMode) => {
+      return decision;
+    },
+
+    permissionModeSync: (sdkMode: string) => {
       // Claude SDK uses bypassPermissions; ACP providers emit already-normalized
       // Grimoire modes (full_access / plan / normal). Unknown values stay Safe.
       const mode = sdkMode === 'bypassPermissions' || sdkMode === LEGACY_YOLO_PERMISSION_MODE
@@ -1816,8 +1893,43 @@ export function setupServiceCallbacks(tab: TabData, plugin: GrimoirePlugin): voi
         }
         updatePlanModeUI(tab, plugin, mode);
       }
-    });
-  }
+    },
+
+    question: async (input, signal) =>
+      await tab.controllers.inputController?.handleAskUserQuestion(input, signal) ?? null,
+
+    subagentState: async () => ({
+      // **The records, and only the records.** This used to union them with the
+      // tab's own live map of subagents, because a record write is asynchronous
+      // and the answer was typed as immediate — so between a subagent starting
+      // and its record landing the vault said nothing, and this decides whether
+      // Claude may end a turn on top of running work. The hook body was always
+      // `async`; once the type admitted it, the answer could wait for the
+      // recordings in flight and read one source instead of two.
+      hasRunning: await durableAgentsRunning(tab, plugin),
+    }),
+  });
+}
+
+/**
+ * The tab's runtime as something that can take an interaction installation.
+ *
+ * Asked by shape rather than by class, like `tabProjectionExecution` asks for
+ * the same object: the field is typed as the frozen `ChatRuntime`, which no
+ * longer carries these — and must not. A tab whose runtime cannot take them is
+ * left alone rather than guessed at.
+ */
+interface InteractionInstaller {
+  installInteractions(callbacks: ExecutionInteractionCallbacks): void;
+}
+
+function interactionInstallerFor(tab: TabData): InteractionInstaller | null {
+  const service: unknown = tab.service;
+  return isInteractionInstaller(service) ? service : null;
+}
+
+function isInteractionInstaller(value: unknown): value is InteractionInstaller {
+  return typeof (value as InteractionInstaller | null)?.installInteractions === 'function';
 }
 
 function generateMessageId(): string {
@@ -1838,13 +1950,14 @@ function isVisibleAutoTurnChunk(chunk: StreamChunk, hiddenToolIds: Set<string>):
     case 'error':
     case 'tool_output':
     case 'context_compacted':
-    case 'subagent_tool_use':
-    case 'subagent_tool_result':
       return true;
     case 'tool_use':
-      return chunk.name !== TOOL_AGENT_OUTPUT;
+      // A subagent's own call is visible whatever it is called: the hidden
+      // names below are the turn's own plumbing, and a subagent's block is
+      // drawn from its calls.
+      return chunk.subagentId !== undefined || chunk.name !== TOOL_AGENT_OUTPUT;
     case 'tool_result':
-      return !hiddenToolIds.has(chunk.id);
+      return chunk.subagentId !== undefined || !hiddenToolIds.has(chunk.id);
     default:
       return false;
   }
@@ -1943,9 +2056,9 @@ async function renderAutoTriggeredTurn(tab: TabData, plugin: GrimoirePlugin, res
 export function updatePlanModeUI(tab: TabData, plugin: GrimoirePlugin, mode: string): void {
   const providerId = getTabProviderId(tab, plugin);
   const snapshot = getTabSettingsSnapshot(tab, plugin);
-  const uiConfig = ProviderRegistry.getChatUIConfig(providerId);
-  if (uiConfig.applyPermissionMode) {
-    uiConfig.applyPermissionMode(mode, snapshot);
+  const permissionMode = providerCatalog().declarations(providerId).chatUI.permissionMode;
+  if (permissionMode?.apply) {
+    permissionMode.apply(mode, snapshot);
   } else {
     snapshot.permissionMode = mode;
   }

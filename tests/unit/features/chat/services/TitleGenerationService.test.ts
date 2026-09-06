@@ -6,8 +6,9 @@ import {
   resetMockMessages,
   setMockMessages,
 } from '@test/__mocks__/claude-agent-sdk';
+import { claudeAuxiliaryServices } from '@test/helpers/auxiliary/claudeAuxiliaryServices';
 
-import { type TitleGenerationResult, TitleGenerationService } from '@/providers/claude/auxiliary/ClaudeTitleGenerationService';
+import type { TitleGenerationResult, TitleGenerationService } from '@/core/providers/types';
 function createMockPlugin(settings = {}) {
   return {
     settings: {
@@ -36,7 +37,7 @@ describe('TitleGenerationService', () => {
     jest.clearAllMocks();
     resetMockMessages();
     mockPlugin = createMockPlugin();
-    service = new TitleGenerationService(mockPlugin);
+    service = claudeAuxiliaryServices(mockPlugin).titleServiceFor('claude');
   });
 
   describe('generateTitle', () => {
@@ -451,10 +452,10 @@ describe('TitleGenerationService', () => {
       const first = service.generateTitle('conv-1', 'msg1', jest.fn());
       const second = service.generateTitle('conv-2', 'msg2', jest.fn());
       const active = (service as unknown as {
-        activeGenerations: Map<string, AbortController>;
+        activeGenerations: Map<string, { abortController: AbortController }>;
       }).activeGenerations;
-      const firstController = active.get('conv-1');
-      const secondController = active.get('conv-2');
+      const firstController = active.get('conv-1')?.abortController;
+      const secondController = active.get('conv-2')?.abortController;
 
       // One service is shared by every conversation a tab has opened, so cancelling one
       // must not take the other down with it.
