@@ -230,7 +230,17 @@ export async function recordAcpWire(
   }
 
   child.stdin.end();
+  const exited = new Promise<void>(resolve => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve();
+      return;
+    }
+    child.once('exit', () => resolve());
+  });
   child.kill();
+  // Windows keeps a handle on a live process's cwd, so the vault cannot be
+  // removed until the child is actually gone. `kill` only asks.
+  await exited;
   rmSync(vault, { force: true, recursive: true });
 
   const fromAgent = exchanges.filter(exchange => exchange.direction === 'server->client');
