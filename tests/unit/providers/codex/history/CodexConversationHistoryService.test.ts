@@ -756,4 +756,98 @@ describe('CodexConversationHistoryService', () => {
       content: 'Second prompt',
     });
   });
+
+  it('keeps the stored image attachment when the transcript replays it as an image input', async () => {
+    const threadId = 'thread-images';
+    const sessionsDir = path.join(tempHome, '.codex', 'sessions', '2026', '03', '27');
+    fs.mkdirSync(sessionsDir, { recursive: true });
+
+    const transcriptPath = path.join(
+      sessionsDir,
+      `rollout-2026-03-27T00-00-00-${threadId}.jsonl`,
+    );
+
+    fs.writeFileSync(
+      transcriptPath,
+      [
+        JSON.stringify({
+          timestamp: '2026-03-27T00:00:00.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: '<image name=[Image #1] path="/tmp/grimoire-codex-images-ab12/1-photo.png">',
+              },
+              { type: 'input_image', image_url: 'data:image/png;base64,AAAA' },
+              { type: 'input_text', text: '</image>' },
+              {
+                type: 'input_text',
+                text: 'What is on this photo?\n<excluded_folders>\n  <folder>Climate</folder>\n</excluded_folders>',
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-27T00:00:01.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'A cat.' }],
+          },
+        }),
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const conversation: Conversation = {
+      id: 'conv-images',
+      providerId: 'codex',
+      title: 'Codex Images',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      sessionId: threadId,
+      providerState: { threadId },
+      messages: [
+        {
+          id: 'msg-1',
+          role: 'user',
+          content: 'What is on this photo?',
+          displayContent: 'What is on this photo?',
+          timestamp: Date.now(),
+          images: [
+            {
+              id: 'img-1',
+              name: 'photo.png',
+              mediaType: 'image/png',
+              data: '',
+              hash: 'a'.repeat(64),
+              size: 1024,
+              source: 'paste',
+            },
+          ],
+        },
+        {
+          id: 'msg-2',
+          role: 'assistant',
+          content: 'A cat.',
+          timestamp: Date.now(),
+        },
+      ],
+    };
+
+    const service = new CodexConversationHistoryService();
+    await service.hydrateConversationHistory(conversation, null);
+
+    expect(conversation.messages).toHaveLength(2);
+    expect(conversation.messages[0]).toMatchObject({
+      id: 'msg-1',
+      role: 'user',
+      content: 'What is on this photo?',
+    });
+    expect(conversation.messages[0].images?.[0].hash).toBe('a'.repeat(64));
+  });
 });
