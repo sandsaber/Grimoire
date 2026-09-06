@@ -1,0 +1,660 @@
+/*
+ * Context management: the composer's summary of what is attached, the dialog
+ * that lists all of it, and the picker that adds more.
+ *
+ * See docs/design-system.md. Everything here is ink, ground, line and a
+ * hairline of accent; the only filled things on these three surfaces are Add
+ * and Done, which are one primary action each.
+ */
+
+/* ---- 3a · the composer ---- */
+
+.grimoire-context-attachments {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--grimoire-space-4);
+  width: 100%;
+}
+
+.grimoire-context-chips {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: var(--grimoire-space-6);
+}
+
+/* Add is always one control away, whatever else the row is showing. */
+.grimoire-file-chip--add {
+  padding: 0 var(--grimoire-space-8);
+  border-style: dashed;
+  border-color: var(--grimoire-line);
+  color: var(--grimoire-ink-faint);
+  cursor: pointer;
+}
+
+.grimoire-file-chip--add:hover {
+  border-color: var(--grimoire-line-3);
+  background: none;
+  color: var(--grimoire-ink);
+}
+
+/* The three most recent, past the threshold: a reminder, not a control. */
+.grimoire-file-chip--static {
+  cursor: default;
+}
+
+.grimoire-context-summary-bar {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-8) var(--grimoire-space-8) var(--grimoire-space-8) var(--grimoire-space-12);
+  border-bottom: 1px solid var(--grimoire-line);
+}
+
+.grimoire-context-summary-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--grimoire-accent);
+}
+
+.grimoire-context-summary-icon svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-summary-icon.is-over-budget {
+  color: var(--grimoire-error);
+}
+
+.grimoire-context-summary-icon.is-over-budget svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+}
+
+.grimoire-context-summary-count {
+  flex: 0 0 auto;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
+}
+
+.grimoire-context-summary-cost {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grimoire-context-summary-spacer {
+  flex: 1 1 auto;
+}
+
+.grimoire-context-summary-manage {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: var(--grimoire-hit-m);
+  gap: var(--grimoire-space-6);
+  padding: 0 var(--grimoire-space-8);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-muted);
+  cursor: pointer;
+  font-size: var(--grimoire-text-m);
+  line-height: 1;
+}
+
+.grimoire-context-summary-manage:hover {
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
+}
+
+.grimoire-context-summary-manage svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-more {
+  align-self: center;
+  padding: 0 var(--grimoire-space-4);
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-faint);
+  cursor: pointer;
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+}
+
+.grimoire-context-more:hover {
+  background: none;
+  color: var(--grimoire-ink);
+}
+
+/* ---- 3b · the manage dialog ---- */
+
+.grimoire-context-modal .modal-content {
+  padding: 0;
+}
+
+.grimoire-context-manager {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(640px, 92vw);
+  height: min(560px, 80vh);
+  overflow: hidden;
+}
+
+.grimoire-context-header {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 44px;
+  gap: var(--grimoire-space-8);
+  padding: 0 var(--grimoire-space-10) 0 var(--grimoire-space-16);
+  border-bottom: 1px solid var(--grimoire-line);
+}
+
+.grimoire-context-title {
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-l);
+  font-weight: var(--grimoire-weight-semibold);
+  line-height: 1;
+}
+
+.grimoire-context-header-count {
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  line-height: 1;
+}
+
+.grimoire-context-header-spacer,
+.grimoire-context-row-spacer,
+.grimoire-context-bulk-spacer,
+.grimoire-context-footer-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* One field, two jobs: filter what is attached, or type to add from the vault. */
+.grimoire-context-search {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 40px;
+  gap: var(--grimoire-space-8);
+  padding: 0 var(--grimoire-space-10) 0 var(--grimoire-space-16);
+  border-bottom: 1px solid var(--grimoire-line);
+}
+
+.grimoire-context-search-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+}
+
+.grimoire-context-search-icon svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  outline: 0;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-search-input::placeholder {
+  color: var(--grimoire-ink-faint);
+}
+
+.grimoire-context-search .grimoire-primary-action {
+  height: var(--grimoire-hit-m);
+}
+
+/* A band, not a fill: the eye must not read the selection as a surface. */
+.grimoire-context-bulk {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 34px;
+  gap: var(--grimoire-space-8);
+  padding: 0 var(--grimoire-space-10) 0 var(--grimoire-space-16);
+  border-bottom: 1px solid var(--grimoire-line);
+  background: var(--grimoire-accent-wash-weak);
+}
+
+.grimoire-context-bulk-count {
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-bulk-tokens {
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+}
+
+.grimoire-context-bulk-clear {
+  padding: 0 var(--grimoire-space-6);
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-muted);
+  cursor: pointer;
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-bulk-clear:hover {
+  background: none;
+  color: var(--grimoire-ink);
+}
+
+.grimoire-context-bulk-remove {
+  display: inline-flex;
+  align-items: center;
+  height: var(--grimoire-hit-s);
+  gap: var(--grimoire-space-4);
+  padding: 0 var(--grimoire-space-6);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-error);
+  cursor: pointer;
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-bulk-remove:hover {
+  background: var(--grimoire-error-wash);
+  color: var(--grimoire-error);
+}
+
+.grimoire-context-bulk-remove-icon svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--grimoire-space-6) var(--grimoire-space-8) var(--grimoire-space-10);
+  scrollbar-width: thin;
+  scrollbar-color: var(--grimoire-line-2) transparent;
+}
+
+.grimoire-context-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: var(--grimoire-list-row-h);
+  gap: var(--grimoire-space-10);
+  padding: 0 var(--grimoire-space-8);
+  border-radius: var(--grimoire-radius-1);
+  cursor: pointer;
+}
+
+.grimoire-context-row:hover,
+.grimoire-context-row.is-focused {
+  background: var(--grimoire-hover);
+}
+
+/* Selection keeps the wash rather than gaining a colour of its own. */
+.grimoire-context-row.is-selected {
+  background: var(--grimoire-hover);
+}
+
+/*
+ * Adding something already attached flashes the row it is already on, so the
+ * count staying the same reads as an answer rather than as nothing happening.
+ */
+.grimoire-context-row.is-duplicate {
+  background: var(--grimoire-accent-wash);
+}
+
+.grimoire-context-row.is-failed {
+  opacity: 0.6;
+}
+
+.grimoire-context-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  border: 1.5px solid var(--grimoire-line-3);
+  border-radius: var(--grimoire-radius-1);
+  color: var(--grimoire-accent-contrast);
+  cursor: pointer;
+}
+
+.grimoire-context-row.is-selected .grimoire-context-checkbox {
+  border-color: var(--grimoire-accent);
+  background: var(--grimoire-accent);
+}
+
+.grimoire-context-checkbox svg {
+  width: 10px;
+  height: 10px;
+  stroke-width: 3;
+}
+
+.grimoire-context-row-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--grimoire-accent);
+}
+
+.grimoire-context-row-icon svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-row-icon.is-failed {
+  color: var(--grimoire-error);
+}
+
+.grimoire-context-row--candidate .grimoire-context-row-icon {
+  color: var(--grimoire-ink-muted);
+}
+
+.grimoire-context-row-name {
+  flex: none;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-row-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grimoire-context-row-tokens {
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  white-space: nowrap;
+}
+
+/* A failure names its cause where the price would have been. */
+.grimoire-context-row-error {
+  flex: 0 0 auto;
+  color: var(--grimoire-error);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  white-space: nowrap;
+}
+
+.grimoire-context-empty {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  padding: var(--grimoire-space-20);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-m);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.grimoire-context-footer {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 48px;
+  gap: var(--grimoire-space-10);
+  padding: 0 var(--grimoire-space-12) 0 var(--grimoire-space-16);
+  border-top: 1px solid var(--grimoire-line);
+}
+
+/* The budget, as a line rather than as a number the reader has to compare. */
+.grimoire-context-budget {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 4px;
+  border-radius: var(--grimoire-radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--grimoire-accent) var(--grimoire-context-budget-pct, 0%),
+    var(--grimoire-line) var(--grimoire-context-budget-pct, 0%)
+  );
+}
+
+.grimoire-context-budget.is-over {
+  background: var(--grimoire-error);
+}
+
+.grimoire-context-budget-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grimoire-context-remove-all {
+  height: var(--grimoire-hit-l);
+  padding: 0 var(--grimoire-space-8);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-error);
+  cursor: pointer;
+  font-size: var(--grimoire-text-s);
+  white-space: nowrap;
+}
+
+.grimoire-context-remove-all:hover {
+  background: var(--grimoire-error-wash);
+  color: var(--grimoire-error);
+}
+
+/* ---- 3c · the add picker ---- */
+
+.grimoire-context-picker {
+  position: absolute;
+  bottom: calc(100% + var(--grimoire-space-4));
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - var(--grimoire-space-24)));
+  max-height: 340px;
+  overflow: hidden;
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-2);
+  background: var(--grimoire-ground);
+  box-shadow: var(--grimoire-lift-1);
+}
+
+.grimoire-context-picker-search {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 38px;
+  gap: var(--grimoire-space-8);
+  padding: 0 var(--grimoire-space-10) 0 var(--grimoire-space-12);
+  border-bottom: 1px solid var(--grimoire-line);
+}
+
+.grimoire-context-picker-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+}
+
+.grimoire-context-picker-icon svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-picker-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  outline: 0;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-picker-input::placeholder {
+  color: var(--grimoire-ink-faint);
+}
+
+/* The keyboard map, where the keyboard can see it. */
+.grimoire-context-picker-hint {
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  white-space: nowrap;
+}
+
+.grimoire-context-picker-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--grimoire-space-6);
+}
+
+.grimoire-context-picker-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 32px;
+  gap: var(--grimoire-space-10);
+  padding: 0 var(--grimoire-space-8);
+  border-radius: var(--grimoire-radius-1);
+  cursor: pointer;
+}
+
+.grimoire-context-picker-row:hover,
+.grimoire-context-picker-row.is-highlighted {
+  background: var(--grimoire-hover);
+}
+
+/* Already in context: highlighted, inert, and saying so. */
+.grimoire-context-picker-row.is-attached {
+  background: var(--grimoire-hover);
+  cursor: default;
+}
+
+.grimoire-context-picker-row.is-attached .grimoire-context-picker-row-icon {
+  color: var(--grimoire-accent);
+}
+
+.grimoire-context-picker-row-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-muted);
+}
+
+.grimoire-context-picker-row-icon svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-picker-row-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* What matched, underlined in the accent — a line, which is what it may be. */
+.grimoire-context-picker-match {
+  text-decoration: underline;
+  text-decoration-color: var(--grimoire-accent);
+  text-underline-offset: 2px;
+}
+
+.grimoire-context-picker-row-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.grimoire-context-picker-row-meta {
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  white-space: nowrap;
+}
+
+.grimoire-context-picker-empty {
+  padding: var(--grimoire-space-12) var(--grimoire-space-8);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-picker-footer {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 34px;
+  gap: var(--grimoire-space-6);
+  padding: 0 var(--grimoire-space-12);
+  border-top: 1px solid var(--grimoire-line);
+}
+
+.grimoire-context-picker-quick,
+.grimoire-context-picker-sep {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+}
+
+.grimoire-context-picker-quick {
+  cursor: pointer;
+}
+
+.grimoire-context-picker-quick:hover {
+  background: none;
+  color: var(--grimoire-ink);
+}

@@ -2992,7 +2992,7 @@ describe('Tab - UI Callback Wiring', () => {
       expect(saveSettings).toHaveBeenCalled();
     });
 
-    it('should show selected external files as chips without inserting path text into the composer', () => {
+    it('shows a selected external file in the one attachment list, not in the composer text', () => {
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -3002,20 +3002,24 @@ describe('Tab - UI Callback Wiring', () => {
       const toolbarCallbacks = toolbarModule.createInputToolbar.mock.calls.at(-1)?.[1];
 
       tab.dom.inputEl.value = 'Summarize';
+      mockExternalContextSelector.getExternalContexts.mockReturnValue(['/vault/docs/brief.pdf']);
       toolbarCallbacks.onExternalContextFileSelect('/vault/docs/brief.pdf');
 
       expect(tab.dom.inputEl.value).toBe('Summarize');
       expect(tab.ui.fileContextManager?.hideMentionDropdown).toHaveBeenCalled();
       expect(tab.ui.fileContextManager?.handleInputChange).not.toHaveBeenCalled();
 
-      const chip = tab.dom.contextRowEl.querySelector('.grimoire-external-file-chip');
+      // External files used to have a chip row of their own beside the vault
+      // one, so nine attachments could span two rows that never agreed on a
+      // count.
+      expect(tab.dom.contextRowEl.querySelector('.grimoire-external-file-indicator')).toBeNull();
+      const chip = tab.dom.contextRowEl.querySelector('.grimoire-file-chip');
       expect(chip).not.toBeNull();
-      expect(chip?.querySelector('.grimoire-external-file-chip-name')?.textContent).toBe('brief.pdf');
-      expect(chip?.getAttribute('title')).toBe('/vault/docs/brief.pdf');
+      expect(chip?.querySelector('.grimoire-file-chip-name')?.textContent).toBe('brief.pdf');
       expect(tab.dom.contextRowEl.hasClass('has-content')).toBe(true);
     });
 
-    it('should remove selected external file chips through the Files selector', () => {
+    it('removes an external file at its source when its chip is removed', () => {
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -3024,8 +3028,9 @@ describe('Tab - UI Callback Wiring', () => {
       const toolbarModule = jest.requireMock('@/features/chat/ui/InputToolbar');
       const toolbarCallbacks = toolbarModule.createInputToolbar.mock.calls.at(-1)?.[1];
 
+      mockExternalContextSelector.getExternalContexts.mockReturnValue(['/vault/docs/brief.pdf']);
       toolbarCallbacks.onExternalContextFileSelect('/vault/docs/brief.pdf');
-      const removeButton = tab.dom.contextRowEl.querySelector<HTMLElement>('.grimoire-external-file-chip-remove');
+      const removeButton = tab.dom.contextRowEl.querySelector<HTMLElement>('.grimoire-file-chip-remove');
 
       removeButton?.click();
 

@@ -1,4 +1,4 @@
-import { Notice, setIcon, TFile } from 'obsidian';
+import { Notice, TFile } from 'obsidian';
 
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderId } from '../../../core/providers/types';
@@ -6,6 +6,7 @@ import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
 import { validateContextPath } from '../../../utils/externalContext';
 import { updateContextRowHasContent } from '../controllers/contextRowVisibility';
+import { ContextAttachments } from '../ui/context-manager/ContextAttachments';
 import { FileContextManager } from '../ui/FileContext';
 import { ImageContextManager } from '../ui/ImageContext';
 import type { RelevantNotesCurrentSource } from '../ui/RelevantNotesView';
@@ -26,14 +27,6 @@ export function getBasename(filePath: string): string {
   return normalizedPath.split('/').pop() || filePath;
 }
 
-export function getOrCreateExternalFileIndicator(tab: TabData): HTMLElement {
-  const existing = tab.dom.contextRowEl.querySelector('.grimoire-external-file-indicator');
-  if (existing) {
-    return existing as HTMLElement;
-  }
-  return tab.dom.contextRowEl.createDiv({ cls: 'grimoire-external-file-indicator grimoire-hidden' });
-}
-
 export function isExternalFilePath(contextPath: string): boolean {
   return validateContextPath(contextPath).type === 'file';
 }
@@ -42,48 +35,18 @@ export function getSelectedExternalFilePaths(tab: TabData): string[] {
   return (tab.ui.externalContextSelector?.getExternalContexts() ?? []).filter(isExternalFilePath);
 }
 
-export function renderExternalFileChips(tab: TabData, selectedFilePath?: string): void {
-  const indicatorEl = getOrCreateExternalFileIndicator(tab);
-  const filePaths = getSelectedExternalFilePaths(tab);
-  const selectedPaths = selectedFilePath && !filePaths.includes(selectedFilePath)
-    ? [...filePaths, selectedFilePath]
-    : filePaths;
-
-  indicatorEl.empty();
-
-  if (selectedPaths.length === 0) {
-    indicatorEl.removeClass('grimoire-visible-flex');
-    indicatorEl.addClass('grimoire-hidden');
-    updateContextRowHasContent(tab.dom.contextRowEl);
-    return;
-  }
-
-  indicatorEl.addClass('grimoire-visible-flex');
-  indicatorEl.removeClass('grimoire-hidden');
-
-  for (const filePath of selectedPaths) {
-    const chipEl = indicatorEl.createSpan({ cls: 'grimoire-external-file-chip' });
-    chipEl.setAttribute('title', filePath);
-    const iconEl = chipEl.createSpan({ cls: 'grimoire-external-file-chip-icon' });
-    setIcon(iconEl, 'file');
-    chipEl.createSpan({
-      cls: 'grimoire-external-file-chip-name',
-      text: getBasename(filePath),
-    });
-    const removeEl = chipEl.createSpan({
-      cls: 'grimoire-external-file-chip-remove',
-      text: '\u00D7',
-      attr: { 'aria-label': t('chat.ui.externalContext.removeFile') },
-    });
-    removeEl.addEventListener('click', (event) => {
-      event.stopPropagation();
-      tab.ui.externalContextSelector?.removePath(filePath);
-      renderExternalFileChips(tab);
-    });
-  }
-
+/**
+ * Redraws what is attached after an external path changed.
+ *
+ * External files used to have a chip row of their own beside the vault one,
+ * which is how a reader could have nine things attached across two rows that
+ * never agreed on a count.
+ */
+export function renderExternalFileChips(tab: TabData): void {
+  tab.ui.contextAttachments?.sync();
   updateContextRowHasContent(tab.dom.contextRowEl);
 }
+
 export function syncContextSummary(tab: TabData, plugin: GrimoirePlugin): void {
   const { contextSummaryEl } = tab.dom;
   contextSummaryEl.empty();
@@ -302,6 +265,7 @@ export function initializeContextManagers(tab: TabData, plugin: GrimoirePlugin):
       getExcludedTags: () => plugin.settings.excludedTags,
       getExcludedFolders: () => plugin.settings.excludedFolders,
       onChipsChanged: () => {
+        tab.ui.contextAttachments?.sync();
         void updateRelevantNotes(tab, plugin);
         syncContextSummary(tab, plugin);
         syncBoundStatus(tab, plugin);
@@ -317,6 +281,49 @@ export function initializeContextManagers(tab: TabData, plugin: GrimoirePlugin):
     dom.contextMemoryEl
   );
   tab.ui.fileContextManager.setMcpManager(getProviderMcpManager(getTabProviderId(tab, plugin), plugin));
+
+  /*
+   * One list over the three places an attachment can come from. Each had its
+   * own view before this and none could see the other two, so "what is
+   * attached, and what does it cost" was a question the composer could not
+   * answer past four chips.
+   */
+  tab.ui.contextAttachments = new ContextAttachments(dom.contextRowEl, {
+    app,
+    getOpenNotePath: () => (typeof tab.ui.fileContextManager?.getCurrentNotePath === 'function'
+      ? tab.ui.fileContextManager.getCurrentNotePath()
+      : null),
+    getVaultPaths: () => {
+      const manager = tab.ui.fileContextManager;
+      const openNote = typeof manager?.getCurrentNotePath === 'function'
+        ? manager.getCurrentNotePath()
+        : null;
+      const attached = typeof manager?.getAttachedFiles === 'function'
+        ? manager.getAttachedFiles()
+        : new Set<string>();
+      return [...attached].filter(path => path !== openNote);
+    },
+    getExternalPaths: () => (typeof tab.ui.externalContextSelector?.getExternalContexts === 'function'
+      ? tab.ui.externalContextSelector.getExternalContexts()
+      : []),
+    detachOpenNote: () => tab.ui.fileContextManager?.clearCurrentNote?.(),
+    detachVaultPath: (path) => tab.ui.fileContextManager?.detachFile?.(path),
+    detachExternalPath: (path) => tab.ui.externalContextSelector?.removePath?.(path),
+    attachVaultPath: (path) => tab.ui.fileContextManager?.attachFile?.(path),
+    getBudget: () => ({
+      windowTokens: tab.state.usage?.contextWindow ?? 0,
+      usedTokens: tab.state.usage?.contextTokens ?? 0,
+    }),
+    isStreaming: () => tab.state.isStreaming,
+    openPath: (path) => openRelevantVaultPath(plugin, path),
+    cardEl: dom.inputWrapper,
+    attachOpenFile: () => {
+      const active = app.workspace.getActiveFile?.();
+      if (active) tab.ui.fileContextManager?.attachFile?.(active.path);
+      tab.ui.contextAttachments?.sync();
+    },
+  });
+  dom.eventCleanups.push(() => tab.ui.contextAttachments?.destroy());
 
   const markVaultSearchDirty = (file: unknown): void => {
     if (file instanceof TFile) {

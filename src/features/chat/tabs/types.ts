@@ -22,6 +22,7 @@ import type { SubagentManager } from '../services/SubagentManager';
 import type { ChatState } from '../state/ChatState';
 import type { BangBashModeManager } from '../ui/BangBashModeManager';
 import type { RuntimeContextActivityView } from '../ui/context/RuntimeContextActivity';
+import type { ContextAttachments } from '../ui/context-manager/ContextAttachments';
 import type { FileContextManager } from '../ui/FileContext';
 import type { ImageContextManager } from '../ui/ImageContext';
 import type {
@@ -124,6 +125,8 @@ export interface TabServices {
  */
 export interface TabUIComponents {
   fileContextManager: FileContextManager | null;
+  /** The one list behind the composer chips, the manage dialog and the picker. */
+  contextAttachments: ContextAttachments | null;
   imageContextManager: ImageContextManager | null;
   modelSelector: ModelSelector | null;
   planUsageBadge: PlanUsageBadge | null;

@@ -261,6 +261,7 @@ export function createTab(options: TabCreateOptions): TabData {
     },
     ui: {
       fileContextManager: null,
+    contextAttachments: null,
       imageContextManager: null,
       modelSelector: null,
       planUsageBadge: null,
@@ -862,7 +863,7 @@ function initializeInputToolbar(
     onExternalContextFileSelect: (filePath: string) => {
       dom.inputEl.focus();
       tab.ui.fileContextManager?.hideMentionDropdown();
-      renderExternalFileChips(tab, filePath);
+      renderExternalFileChips(tab);
       autoResizeTextarea(dom.inputEl);
     },
     onOrchestratorModeChange: async () => {

@@ -64,11 +64,11 @@ export class ImageContextManager {
     this.inputEl = inputEl;
     this.callbacks = callbacks;
 
-    // Create image preview in previewContainerEl, before file indicator if present
-    const fileIndicator = this.previewContainerEl.querySelector('.grimoire-file-indicator');
+    // Images sit above what is attached as text, so the two never interleave.
+    const attachmentsEl = this.previewContainerEl.querySelector('.grimoire-context-attachments');
     this.imagePreviewEl = this.previewContainerEl.createDiv({ cls: 'grimoire-image-preview' });
-    if (fileIndicator && fileIndicator.parentElement === this.previewContainerEl) {
-      this.previewContainerEl.insertBefore(this.imagePreviewEl, fileIndicator);
+    if (attachmentsEl && attachmentsEl.parentElement === this.previewContainerEl) {
+      this.previewContainerEl.insertBefore(this.imagePreviewEl, attachmentsEl);
     }
 
     this.setupDragAndDrop();

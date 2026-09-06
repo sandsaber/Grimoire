@@ -5,6 +5,7 @@
 @import "./base/variables.css";
 @import "./base/container.css";
 @import "./base/animations.css";
+@import "./base/primitives.css";
 
 /* Components */
 @import "./components/header.css";
@@ -34,6 +35,7 @@
 
 /* Features */
 @import "./features/file-context.css";
+@import "./features/context-manager.css";
 @import "./features/vault-search.css";
 @import "./features/file-link.css";
 @import "./features/image-context.css";

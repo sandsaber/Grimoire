@@ -1,0 +1,143 @@
+/*
+ * The four shapes the system repeats often enough that a second copy would
+ * drift: the icon button, the one filled action a surface gets, the group
+ * label above a list, and the status dot.
+ *
+ * They live in `base/` rather than in a component sheet because none of them
+ * belongs to one component, and every one of them had already been written out
+ * by hand in five places with five sets of values.
+ */
+
+/* An icon-only control in dense repeating chrome. Its name lives in aria-label. */
+.grimoire-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: var(--grimoire-hit-l);
+  height: var(--grimoire-hit-l);
+  padding: 0;
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-muted);
+  cursor: pointer;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-icon-btn:hover {
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
+}
+
+.grimoire-icon-btn--small {
+  width: var(--grimoire-hit-s);
+  height: var(--grimoire-hit-s);
+}
+
+.grimoire-icon-btn--medium {
+  width: var(--grimoire-hit-m);
+  height: var(--grimoire-hit-m);
+}
+
+/* Removing something reads as removing it, on hover and not before. */
+.grimoire-icon-btn--danger:hover {
+  background: var(--grimoire-error-wash);
+  color: var(--grimoire-error);
+}
+
+.grimoire-icon-btn svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-icon-btn--small svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+}
+
+.grimoire-icon-btn:disabled {
+  color: var(--grimoire-ink-ghost);
+  cursor: default;
+}
+
+.grimoire-icon-btn:disabled:hover {
+  background: none;
+  color: var(--grimoire-ink-ghost);
+}
+
+/*
+ * The one filled action a surface is allowed. If a second one appears, one of
+ * them is not primary.
+ */
+.grimoire-primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: var(--grimoire-space-6);
+  height: var(--grimoire-hit-l);
+  padding: 0 var(--grimoire-space-14);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: var(--grimoire-accent);
+  color: var(--grimoire-accent-contrast);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
+  line-height: 1;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.grimoire-primary-action:hover {
+  background: var(--grimoire-accent-hover);
+  color: var(--grimoire-accent-contrast);
+}
+
+.grimoire-primary-action:disabled {
+  background: var(--grimoire-line);
+  color: var(--grimoire-ink-faint);
+  cursor: default;
+}
+
+/* Uppercase monospace, tracked out: the only label style above a list. */
+.grimoire-group-label {
+  padding: var(--grimoire-space-8) var(--grimoire-space-6) var(--grimoire-space-4);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: var(--grimoire-label-tracking);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.grimoire-group-label + .grimoire-group-label,
+.grimoire-context-row + .grimoire-group-label {
+  padding-top: var(--grimoire-space-14);
+}
+
+/*
+ * Status is a dot beside a word, never a hue on its own. Filled and pulsing
+ * means working; an outline means waiting on the reader.
+ */
+.grimoire-dot {
+  width: 5px;
+  height: 5px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  border-radius: var(--grimoire-radius-circle);
+}
+
+.grimoire-dot--streaming {
+  background: var(--grimoire-accent);
+  animation: grimoire-pulse 1.4s ease-in-out infinite;
+}
+
+.grimoire-dot--attention {
+  border: 1px solid var(--grimoire-accent);
+  background: none;
+}

@@ -194,7 +194,7 @@ describe('FileContextManager', () => {
     manager.destroy();
   });
 
-  it('renders current note chip and removes on click', () => {
+  it('binds the open note and lets it be detached', () => {
     const app = createMockApp();
     const manager = new FileContextManager(
       app,
@@ -204,18 +204,15 @@ describe('FileContextManager', () => {
     );
 
     manager.setCurrentNote('notes/chip.md');
+    expect(manager.getCurrentNotePath()).toBe('notes/chip.md');
+    expect(manager.getAttachedFiles().has('notes/chip.md')).toBe(true);
 
-    const indicator = findByClass(containerEl, 'grimoire-file-indicator');
-    expect(indicator).toBeDefined();
-    expect(indicator?.style.display).toBe('flex');
-
-    const removeEl = findByClass(containerEl, 'grimoire-file-chip-remove');
-    expect(removeEl).toBeDefined();
-
-    removeEl!.click();
+    // Detaching the bound note unbinds it too, or the next sync puts it
+    // straight back — which is what "remove" not working looks like.
+    manager.detachFile('notes/chip.md');
 
     expect(manager.getCurrentNotePath()).toBeNull();
-    expect(indicator?.style.display).toBe('none');
+    expect(manager.getAttachedFiles().has('notes/chip.md')).toBe(false);
 
     manager.destroy();
   });
@@ -915,21 +912,4 @@ describe('FileContextManager', () => {
     });
   });
 
-  describe('onOpenFile callback', () => {
-    it('should show Notice when file not found in vault', async () => {
-      const { Notice: NoticeMock } = jest.requireMock('obsidian');
-      const app = createMockApp();
-      const manager = new FileContextManager(
-        app, containerEl as any, inputEl, createMockCallbacks()
-      );
-
-      const chipsView = (manager as any).chipsView;
-      const openCallback = chipsView.callbacks.onOpenFile;
-      expect(openCallback).toBeDefined();
-
-      await openCallback('notes/missing.md');
-      expect(NoticeMock).toHaveBeenCalledWith(expect.stringContaining('Could not open file'));
-      manager.destroy();
-    });
-  });
 });

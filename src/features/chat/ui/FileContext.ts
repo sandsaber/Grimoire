@@ -17,7 +17,6 @@ import { externalContextScanner } from '../../../utils/externalContextScanner';
 import { getVaultPath, normalizePathForVault as normalizePathForVaultUtil } from '../../../utils/path';
 import type { ProviderMcpServerView } from '../tabs/tabSettings';
 import { FileContextState } from './file-context/state/FileContextState';
-import { FileChipsView } from './file-context/view/FileChipsView';
 
 export interface FileContextCallbacks {
   getExcludedTags: () => string[];
@@ -33,13 +32,11 @@ export interface FileContextCallbacks {
 export class FileContextManager {
   private app: App;
   private callbacks: FileContextCallbacks;
-  private chipsContainerEl: HTMLElement;
   private dropdownContainerEl: HTMLElement;
   private contextMemoryEl: HTMLElement | null;
   private inputEl: HTMLTextAreaElement;
   private state: FileContextState;
   private mentionDataProvider: VaultMentionDataProvider;
-  private chipsView: FileChipsView;
   private mentionDropdown: MentionDropdownController;
   private deleteEventRef: EventRef | null = null;
   private renameEventRef: EventRef | null = null;
@@ -59,7 +56,6 @@ export class FileContextManager {
     contextMemoryEl?: HTMLElement
   ) {
     this.app = app;
-    this.chipsContainerEl = chipsContainerEl;
     this.dropdownContainerEl = dropdownContainerEl ?? chipsContainerEl;
     this.contextMemoryEl = contextMemoryEl ?? null;
     this.inputEl = inputEl;
@@ -68,32 +64,6 @@ export class FileContextManager {
     this.state = new FileContextState();
     this.mentionDataProvider = new VaultMentionDataProvider(this.app);
     this.mentionDataProvider.initializeInBackground();
-
-    this.chipsView = new FileChipsView(this.chipsContainerEl, {
-      onRemoveAttachment: (filePath) => {
-        if (filePath === this.currentNotePath) {
-          this.currentNotePath = null;
-          this.state.detachFile(filePath);
-          this.refreshCurrentNoteChip();
-        }
-      },
-      onOpenFile: (filePath) => {
-        void (async (): Promise<void> => {
-          const file = this.app.vault.getAbstractFileByPath(filePath);
-          if (!(file instanceof TFile)) {
-            new Notice(t('chat.ui.errors.couldNotOpenFile', { path: filePath }));
-            return;
-          }
-          try {
-            await this.app.workspace.getLeaf().openFile(file);
-          } catch (error) {
-            new Notice(t('chat.ui.errors.openFileFailed', {
-              error: error instanceof Error ? error.message : String(error),
-            }));
-          }
-        })();
-      },
-    });
 
     this.mentionDropdown = new MentionDropdownController(
       this.dropdownContainerEl,
@@ -177,6 +147,31 @@ export class FileContextManager {
       this.state.attachFile(notePath);
     }
     this.refreshCurrentNoteChip();
+  }
+
+  /** Attaches a vault path the reader picked rather than mentioned. */
+  attachFile(path: string): void {
+    this.state.attachFile(path);
+    this.refreshCurrentNoteChip();
+  }
+
+  /**
+   * Removes one attachment.
+   *
+   * Detaching the bound note also unbinds it, or the next sync would put it
+   * straight back — which is what "remove" not working looks like.
+   */
+  detachFile(path: string): void {
+    if (path === this.currentNotePath) {
+      this.currentNotePath = null;
+    }
+    this.state.detachFile(path);
+    this.refreshCurrentNoteChip();
+  }
+
+  clearCurrentNote(): void {
+    if (!this.currentNotePath) return;
+    this.detachFile(this.currentNotePath);
   }
 
   /** Auto-attaches the currently focused file (for new sessions). */
@@ -276,7 +271,6 @@ export class FileContextManager {
     if (this.deleteEventRef) this.app.vault.offref(this.deleteEventRef);
     if (this.renameEventRef) this.app.vault.offref(this.renameEventRef);
     this.mentionDropdown.destroy();
-    this.chipsView.destroy();
   }
 
   /** Normalizes a file path to be vault-relative with forward slashes. */
@@ -286,7 +280,6 @@ export class FileContextManager {
   }
 
   private refreshCurrentNoteChip(): void {
-    this.chipsView.renderCurrentNote(this.currentNotePath);
     this.renderContextMemory();
     this.callbacks.onChipsChanged?.();
   }
