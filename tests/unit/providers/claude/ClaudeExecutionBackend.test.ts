@@ -973,7 +973,7 @@ describe('ClaudeExecutionBackend', () => {
     // that streams the whole time is the healthy case, not the stuck one.
     const fixture = createFixture();
     const session = await createSession(fixture.backend, 'native-session');
-    collectEvents(session.createRun(request('1', 'default')));
+    void collectEvents(session.createRun(request('1', 'default')));
     await waitFor(() => fixture.query.received.length === 1);
 
     const armed = fixture.scheduler.pending(60_000);
