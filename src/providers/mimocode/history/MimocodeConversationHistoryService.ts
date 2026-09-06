@@ -1,3 +1,4 @@
+import { carryOverImageAttachments } from '../../../core/attachments/carryOverImages';
 import type { ProviderConversationHistoryService } from '../../../core/providers/types';
 import type { Conversation } from '../../../core/types';
 import { getMimocodeState, type MimocodeProviderState } from '../types';
@@ -31,7 +32,7 @@ export class MimocodeConversationHistoryService implements ProviderConversationH
       return;
     }
 
-    conversation.messages = messages;
+    conversation.messages = carryOverImageAttachments(conversation.messages, messages);
     this.hydratedKeys.set(conversation.id, hydrationKey);
   }
 
