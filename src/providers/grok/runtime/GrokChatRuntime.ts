@@ -1651,10 +1651,11 @@ export class GrokChatRuntime implements ChatRuntime {
         sessionId,
       });
       this.sessionInvalidated = false;
-      this.loadedSessionId = response.sessionId;
-      this.sessionId = response.sessionId;
-      this.sessionCwds.set(response.sessionId, cwd);
-      this.updateSessionPaths(response.sessionId, cwd);
+      // ACP session/load responses need not repeat the session id.
+      this.loadedSessionId = sessionId;
+      this.sessionId = sessionId;
+      this.sessionCwds.set(sessionId, cwd);
+      this.updateSessionPaths(sessionId, cwd);
       await this.syncSessionModelState({
         configOptions: response.configOptions ?? null,
         models: response.models ?? null,
@@ -1667,7 +1668,7 @@ export class GrokChatRuntime implements ChatRuntime {
       logGrokDebug(this.plugin, 'session.load.succeeded', {
         currentModelId: normalizedModels?.currentModelId ?? null,
         modelCount: normalizedModels?.availableModels.length ?? 0,
-        sessionId: response.sessionId,
+        sessionId,
       }, { level: 'info' });
       return true;
     } catch (error) {

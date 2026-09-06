@@ -206,7 +206,13 @@ export interface AcpLoadSessionResponse {
   configOptions?: AcpSessionConfigOption[] | null;
   models?: AcpSessionModelState | null;
   modes?: AcpSessionModeState | null;
-  sessionId: AcpSessionId;
+  /**
+   * Optional: `session/load` speaks about the session the client named, so an
+   * agent need not repeat its id. Grok Build 1.0.13 answers with `models` and
+   * `_meta` alone and carries the id only under `_meta.sessionId`, so a runtime
+   * that binds to this field binds to `undefined`.
+   */
+  sessionId?: AcpSessionId | null;
 }
 
 export interface AcpListSessionsRequest {

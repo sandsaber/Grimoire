@@ -232,6 +232,27 @@ describe('GrokChatRuntime', () => {
     expect(runtime.consumeSessionInvalidation()).toBe(false);
   });
 
+  it('keeps the requested session id when the agent answers session/load without one', async () => {
+    const runtime = new GrokChatRuntime(createMockPlugin());
+    runtime.syncConversationState({ sessionId: 'session-1' });
+    // Grok Build 1.0.13 answers session/load with models and _meta only - the
+    // ACP response carries no top-level sessionId, and the id it echoes back
+    // lives under _meta.
+    (runtime as any).connection = {
+      loadSession: jest.fn().mockResolvedValue({
+        _meta: { sessionId: 'session-1' },
+        models: {
+          availableModels: [{ modelId: 'grok-4.6', name: 'Grok 4.6' }],
+          currentModelId: 'grok-4.6',
+        },
+      }),
+    };
+
+    await expect((runtime as any).loadSession('session-1', '/vault')).resolves.toBe(true);
+
+    expect(runtime.getSessionId()).toBe('session-1');
+  });
+
   it('soft-fails a session the agent no longer lists, whatever the error said', async () => {
     const runtime = new GrokChatRuntime(createMockPlugin());
     runtime.syncConversationState({ sessionId: 'session-1' });

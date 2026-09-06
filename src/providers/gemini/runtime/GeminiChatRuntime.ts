@@ -582,9 +582,10 @@ export class GeminiChatRuntime implements ChatRuntime {
         sessionId,
       });
       this.sessionInvalidated = false;
-      this.loadedSessionId = response.sessionId;
-      this.sessionId = response.sessionId;
-      this.sessionCwds.set(response.sessionId, cwd);
+      // ACP session/load responses need not repeat the session id.
+      this.loadedSessionId = sessionId;
+      this.sessionId = sessionId;
+      this.sessionCwds.set(sessionId, cwd);
       this.syncSessionDiscovery({
         configOptions: response.configOptions ?? null,
         models: response.models ?? null,
