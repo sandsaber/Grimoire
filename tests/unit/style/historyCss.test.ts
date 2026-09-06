@@ -31,7 +31,7 @@ describe('history.css', () => {
 
     expect(getRule(css, '.grimoire-history-search')).toContain('display: flex');
     expect(getRule(css, '.grimoire-history-group')).toContain('display: grid');
-    expect(getRule(css, '.grimoire-history-provider-dot')).toContain('background: var(--grimoire-history-provider-color');
+    expect(css).not.toContain('.grimoire-history-provider-dot');
   });
 
   it('reveals history actions without changing row width', () => {

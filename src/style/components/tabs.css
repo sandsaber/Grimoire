@@ -2,13 +2,13 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-tab-badges {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
   max-width: 100%;
   min-width: 0;
   overflow: auto hidden;
@@ -47,7 +47,7 @@
 
 .grimoire-tab-badge-active {
   border-color: var(--grimoire-accent-line);
-  background: var(--grimoire-accent-soft);
+  background: var(--grimoire-accent-wash);
   color: var(--grimoire-accent-text);
 }
 
@@ -67,7 +67,7 @@
 .grimoire-tab-badge-streaming,
 .grimoire-tab-badge-attention {
   width: 38px;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-tab-badge-streaming .grimoire-tab-activity-dot,
@@ -85,41 +85,14 @@
   justify-content: center;
 }
 
-.grimoire-tab-badge-streaming[data-provider="claude"] {
-  --grimoire-ok: var(--grimoire-provider-claude, #d97757);
-}
 
-.grimoire-tab-badge-streaming[data-provider="codex"] {
-  --grimoire-ok: var(--grimoire-provider-codex, #19c37d);
-}
 
-.grimoire-tab-badge-streaming[data-provider="qwen"] {
-  --grimoire-ok: var(--grimoire-provider-qwen, #615ced);
-}
 
-.grimoire-tab-badge-streaming[data-provider="antigravity"] {
-  --grimoire-ok: var(--grimoire-provider-antigravity, #5b8def);
-}
 
-.grimoire-tab-badge-streaming[data-provider="gemini"] {
-  --grimoire-ok: var(--grimoire-provider-gemini, #669df6);
-}
 
-.grimoire-tab-badge-streaming[data-provider="opencode"] {
-  --grimoire-ok: var(--grimoire-provider-opencode, #e0b341);
-}
 
-.grimoire-tab-badge-streaming[data-provider="mimocode"] {
-  --grimoire-ok: var(--grimoire-provider-mimocode, #ff6a00);
-}
 
-.grimoire-tab-badge-streaming[data-provider="kimicode"] {
-  --grimoire-ok: var(--grimoire-provider-kimicode, #7c3aed);
-}
 
-.grimoire-tab-badge-streaming[data-provider="grok"] {
-  --grimoire-ok: var(--grimoire-provider-grok, var(--text-faint));
-}
 
 .grimoire-tab-badge-attention {
   color: var(--grimoire-workbench-muted);
@@ -138,7 +111,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   pointer-events: none;
 }
 
@@ -148,7 +121,7 @@
   align-items: center;
   max-width: min(420px, 100%);
   overflow: hidden;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5) var(--grimoire-space-5);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12) var(--grimoire-space-12);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
   background: var(--background-secondary);
@@ -172,7 +145,7 @@
 button.grimoire-tab-close-toast-undo {
   flex: 0 0 auto;
   min-height: 0;
-  padding: 0 var(--grimoire-space-1);
+  padding: 0 var(--grimoire-space-2);
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -207,8 +180,8 @@ button.grimoire-tab-close-toast-undo:focus-visible {
 .grimoire-panel-tabs {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-1);
-  margin: 0 var(--grimoire-window-padding-x) var(--grimoire-space-1);
+  gap: var(--grimoire-space-2);
+  margin: 0 var(--grimoire-window-padding-x) var(--grimoire-space-2);
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -225,7 +198,7 @@ button.grimoire-tab-close-toast-undo:focus-visible {
   min-width: 0;
   height: 26px;
   overflow: visible;
-  padding: 0 var(--grimoire-space-5);
+  padding: 0 var(--grimoire-space-12);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -260,7 +233,7 @@ button.grimoire-tab-close-toast-undo:focus-visible {
   left: 11px;
   height: 1.5px;
   border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-brand);
+  background: var(--grimoire-accent);
   opacity: 1;
 }
 

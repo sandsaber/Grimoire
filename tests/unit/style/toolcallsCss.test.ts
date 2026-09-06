@@ -21,8 +21,8 @@ describe('toolcalls.css', () => {
     expect(toolRule).toContain('width: calc(100% - 44px)');
     expect(toolRule).toContain('max-width: calc(100% - 44px)');
     expect(toolRule).toContain('justify-self: start');
-    expect(headerRule).toContain('padding: var(--grimoire-space-2) var(--grimoire-space-4) var(--grimoire-space-2) 0');
-    expect(contentRule).toContain('margin: 1px 0 var(--grimoire-space-2)');
+    expect(headerRule).toContain('padding: var(--grimoire-space-4) var(--grimoire-space-8) var(--grimoire-space-4) 0');
+    expect(contentRule).toContain('margin: 1px 0 var(--grimoire-space-4)');
     expect(contentRule).toContain('max-width: 100%');
     expect(contentRule).toContain('max-height: min(52vh, 520px)');
     expect(contentRule).toContain('overflow: auto');
@@ -54,11 +54,11 @@ describe('toolcalls.css', () => {
     const actionRule = getRule(css, '.grimoire-tool-truncation-action');
     expect(actionRule).toContain('display: flex');
     expect(actionRule).toContain('justify-content: space-between');
-    expect(actionRule).toContain('padding: var(--grimoire-space-4) var(--grimoire-space-4) var(--grimoire-space-3) 0');
+    expect(actionRule).toContain('padding: var(--grimoire-space-8) var(--grimoire-space-8) var(--grimoire-space-6) 0');
 
     const buttonRule = getRule(css, '.grimoire-tool-show-all');
     expect(buttonRule).toContain('cursor: pointer');
     expect(buttonRule).toContain('border-radius: var(--grimoire-radius-pill)');
-    expect(buttonRule).toContain('padding: var(--grimoire-space-3) var(--grimoire-space-5)');
+    expect(buttonRule).toContain('padding: var(--grimoire-space-6) var(--grimoire-space-12)');
   });
 });

@@ -1,7 +1,5 @@
 import { Menu, Notice, setIcon, setTooltip } from 'obsidian';
 
-import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
-
 import { buildFallbackTitle } from '../../../core/prompt/fallbackTitle';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderId, TitleGenerationService } from '../../../core/providers/types';
@@ -852,10 +850,6 @@ export class ConversationController {
     item.setAttribute('data-conversation-id', conv.id);
     item.setAttribute('tabindex', isCurrent ? '-1' : '0');
 
-    const providerDot = item.createSpan({ cls: 'grimoire-history-provider-dot' });
-    (providerDot.style as CSSStyleDeclaration & Record<string, string>)['--grimoire-history-provider-color'] =
-      this.getHistoryProviderColor(conv.providerId);
-
     const content = item.createDiv({ cls: 'grimoire-history-item-content' });
     const titleEl = content.createDiv({ cls: 'grimoire-history-item-title', text: conv.title });
     titleEl.setAttribute('title', conv.title);
@@ -1052,16 +1046,6 @@ export class ConversationController {
     }
 
     return parts.join(' · ');
-  }
-
-  private getHistoryProviderColor(providerId: string | undefined): string {
-    // The product default, not one provider's colour picked out of the list: a
-    // conversation whose provider is not registered was showing Claude's dot,
-    // which reads as a claim about which provider it belongs to.
-    const resolvedProviderId = providerId && providerCatalog().has(providerId)
-      ? providerId
-      : DEFAULT_CHAT_PROVIDER_ID;
-    return `var(--grimoire-provider-${resolvedProviderId})`;
   }
 
   private formatRelativeTime(timestamp: number): string {

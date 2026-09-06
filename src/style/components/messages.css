@@ -15,10 +15,10 @@
 .grimoire-messages {
   flex: 1;
   overflow-y: auto;
-  padding: var(--grimoire-space-5) var(--grimoire-space-1);
+  padding: var(--grimoire-space-12) var(--grimoire-space-2);
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
 }
 
 /* Focusable messages panel for vim-style navigation */
@@ -34,25 +34,25 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--grimoire-space-7);
+  padding: var(--grimoire-space-20);
   min-height: 200px;
 }
 
 .grimoire-welcome-greeting {
   max-width: 30rem;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   border: 1px solid var(--grimoire-workbench-border);
   border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-accent-soft);
+  background: var(--grimoire-accent-wash);
   color: var(--text-muted);
-  font-size: var(--grimoire-text-xl);
+  font-size: var(--grimoire-text-l);
   font-weight: var(--grimoire-weight-medium);
   letter-spacing: 0;
   line-height: 1.35;
 }
 
 .grimoire-message {
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   border-radius: var(--grimoire-radius-2);
   min-width: 0;
   max-width: 95%;
@@ -68,15 +68,15 @@
   flex: 0 0 auto;
   overflow: visible;
   padding: 0;
-  gap: var(--grimoire-space-5);
+  gap: var(--grimoire-space-12);
 }
 
 .grimoire-bound-status {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   min-width: 0;
-  padding: var(--grimoire-space-1) var(--grimoire-space-1) 0;
+  padding: var(--grimoire-space-2) var(--grimoire-space-2) 0;
   color: var(--grimoire-workbench-faint);
   font-size: var(--grimoire-text-xs);
 }
@@ -91,7 +91,7 @@
 }
 
 .grimoire-bound-status-dot.busy {
-  background: var(--grimoire-brand);
+  background: var(--grimoire-accent);
   box-shadow: var(--grimoire-focus-ring);
 }
 
@@ -114,13 +114,13 @@
 
 .grimoire-bound-status-meta::before {
   content: "·";
-  margin-right: var(--grimoire-space-3);
+  margin-right: var(--grimoire-space-6);
   color: var(--text-faint);
 }
 
 .grimoire-container--chat-window .grimoire-message {
   display: grid;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   min-width: 0;
   padding: 0;
   border-radius: 0;
@@ -148,17 +148,17 @@
 
 .grimoire-message-user {
   position: relative;
-  background: var(--grimoire-accent-soft);
+  background: var(--grimoire-accent-wash);
   border: 1px solid var(--grimoire-accent-line);
   align-self: flex-end;
   max-width: 86%;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   border-radius: var(--grimoire-radius-3) var(--grimoire-radius-3) 4px var(--grimoire-radius-3);
 }
 
 /* Reserve room for the date/action row positioned below the question bubble. */
 .grimoire-container--chat-window .grimoire-message-user {
-  margin-bottom: var(--grimoire-space-6);
+  margin-bottom: var(--grimoire-space-16);
 }
 
 /* Text selection in user messages - visible highlight */
@@ -189,14 +189,14 @@
 
 .grimoire-container--chat-window .grimoire-message-assistant .grimoire-message-content {
   display: grid;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-assistant-response-meta {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  margin-bottom: var(--grimoire-space-2);
+  gap: var(--grimoire-space-8);
+  margin-bottom: var(--grimoire-space-4);
   color: var(--grimoire-workbench-faint);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-2xs);
@@ -210,45 +210,18 @@
   width: 6px;
   height: 6px;
   border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-provider-generic, var(--grimoire-workbench-faint));
+  background: var(--grimoire-ink-muted);
   flex: 0 0 auto;
 }
 
-.grimoire-assistant-response-meta[data-provider="claude"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-claude);
-}
 
-.grimoire-assistant-response-meta[data-provider="codex"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-codex);
-}
 
-.grimoire-assistant-response-meta[data-provider="qwen"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-qwen);
-}
 
-.grimoire-assistant-response-meta[data-provider="antigravity"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-antigravity);
-}
 
-.grimoire-assistant-response-meta[data-provider="gemini"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-gemini);
-}
 
-.grimoire-assistant-response-meta[data-provider="opencode"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-opencode);
-}
 
-.grimoire-assistant-response-meta[data-provider="mimocode"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-mimocode);
-}
 
-.grimoire-assistant-response-meta[data-provider="kimicode"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-kimicode);
-}
 
-.grimoire-assistant-response-meta[data-provider="grok"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-grok);
-}
 
 .grimoire-assistant-response-separator {
   color: var(--grimoire-workbench-muted);
@@ -300,7 +273,7 @@
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
-  padding-inline-end: var(--grimoire-text-block-inline-end-buffer, var(--grimoire-space-8));
+  padding-inline-end: var(--grimoire-text-block-inline-end-buffer, var(--grimoire-space-24));
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -323,7 +296,7 @@
   width: 24px;
   height: 24px;
   box-sizing: border-box;
-  padding: var(--grimoire-space-2);
+  padding: var(--grimoire-space-4);
   border: none;
   border-radius: var(--grimoire-radius-1);
   color: var(--text-faint);
@@ -334,7 +307,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-text-copy-btn svg {
@@ -369,7 +342,7 @@
 }
 
 .grimoire-text-block--with-completion-time {
-  padding-bottom: var(--grimoire-space-8);
+  padding-bottom: var(--grimoire-space-24);
 }
 
 .grimoire-text-block--with-completion-time > .grimoire-message-completion-time {
@@ -382,15 +355,15 @@
 }
 
 .grimoire-text-block+.grimoire-tool-call {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-tool-call+.grimoire-text-block {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-message-content p {
-  margin: 0 0 var(--grimoire-space-4) 0;
+  margin: 0 0 var(--grimoire-space-8) 0;
   overflow-wrap: anywhere;
 }
 
@@ -404,8 +377,8 @@
 
 .grimoire-message-content ul,
 .grimoire-message-content ol {
-  margin: var(--grimoire-space-4) 0;
-  padding-inline-start: var(--grimoire-space-7);
+  margin: var(--grimoire-space-8) 0;
+  padding-inline-start: var(--grimoire-space-20);
   min-width: 0;
 }
 
@@ -430,8 +403,8 @@
 }
 
 .grimoire-message-content blockquote {
-  margin: var(--grimoire-space-4) 0;
-  padding-inline-start: var(--grimoire-space-5);
+  margin: var(--grimoire-space-8) 0;
+  padding-inline-start: var(--grimoire-space-12);
   border-inline-start: 2px solid var(--background-modifier-border);
 }
 
@@ -441,7 +414,7 @@
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  margin: var(--grimoire-space-4) 0;
+  margin: var(--grimoire-space-8) 0;
 }
 
 .grimoire-message-content .grimoire-table-scroll > table {
@@ -456,7 +429,7 @@
 .grimoire-message-content th,
 .grimoire-message-content td {
   border: 1px solid var(--background-modifier-border);
-  padding: var(--grimoire-space-3) var(--grimoire-space-4);
+  padding: var(--grimoire-space-6) var(--grimoire-space-8);
   text-align: start;
   overflow-wrap: normal;
   word-break: normal;
@@ -491,7 +464,7 @@
 
 /* Response duration footer - styled as another line of content */
 .grimoire-response-footer {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-baked-duration {
@@ -507,7 +480,7 @@
   bottom: -24px;
   right: 0;
   display: flex;
-  gap: var(--grimoire-space-5);
+  gap: var(--grimoire-space-12);
   opacity: 1;
   z-index: 1;
 }
@@ -543,8 +516,8 @@
 .grimoire-compact-boundary {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  margin: var(--grimoire-space-5) 0;
+  gap: var(--grimoire-space-8);
+  margin: var(--grimoire-space-12) 0;
 }
 
 .grimoire-compact-boundary::before,
@@ -563,25 +536,25 @@
 
 /* Session restart notice: the seam where a saved session could not be resumed */
 .grimoire-session-restart-notice {
-  margin: var(--grimoire-space-2) 0 var(--grimoire-space-1);
+  margin: var(--grimoire-space-4) 0 var(--grimoire-space-2);
 }
 
 .grimoire-session-restart-notice-hint {
   color: var(--text-muted);
   font-size: var(--grimoire-text-s);
   line-height: 1.5;
-  padding: 0 var(--grimoire-space-2);
+  padding: 0 var(--grimoire-space-4);
   text-align: center;
 }
 
 .grimoire-container--chat-window .grimoire-messages {
-  gap: var(--grimoire-space-5);
+  gap: var(--grimoire-space-12);
   padding: 0;
 }
 
 .grimoire-container--chat-window .grimoire-welcome {
   min-height: 160px;
-  padding: var(--grimoire-space-6) var(--grimoire-space-4);
+  padding: var(--grimoire-space-16) var(--grimoire-space-8);
 }
 
 .grimoire-container--chat-window .grimoire-welcome-greeting {
@@ -597,7 +570,7 @@
 .grimoire-container--chat-window .grimoire-message-user {
   max-width: 86%;
   align-self: flex-end;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   border-radius: var(--grimoire-radius-3) var(--grimoire-radius-3) 4px var(--grimoire-radius-3);
 }
 

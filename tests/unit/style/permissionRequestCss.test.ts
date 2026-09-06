@@ -23,10 +23,10 @@ describe('permission request CSS', () => {
   it('uses the branded permission shell and accents only safe action icons', () => {
     const card = getRule(css, '.grimoire-permission-request');
     expect(card).toContain('border-radius: var(--grimoire-radius-3)');
-    expect(card).toContain('var(--grimoire-brand) 2%');
+    expect(card).toContain('var(--grimoire-accent) 2%');
     expect(getRule(css, '.grimoire-permission-request::before'))
-      .toContain('var(--grimoire-accent-line-strong)');
-    expect(getRule(css, '.grimoire-permission-shield')).toContain('var(--grimoire-accent-soft)');
+      .toContain('var(--grimoire-accent-line)');
+    expect(getRule(css, '.grimoire-permission-shield')).toContain('var(--grimoire-accent-wash)');
     expect(getRule(css, '.grimoire-permission-tool')).toContain('border-radius: var(--grimoire-radius-pill)');
     const target = getRule(css, '.grimoire-permission-target');
     expect(target).toContain('background: var(--grimoire-sink)');

@@ -53,8 +53,8 @@ describe('nav-sidebar.css', () => {
     const row = getRule(css, '.grimoire-nav-directory-item');
 
     expect(directory).toContain('width: min(280px, calc(100% - 56px))');
-    expect(directory).toContain('padding: var(--grimoire-space-4) var(--grimoire-space-5)');
+    expect(directory).toContain('padding: var(--grimoire-space-8) var(--grimoire-space-12)');
     expect(row).toContain('min-height: 30px');
-    expect(row).toContain('padding: var(--grimoire-space-1) var(--grimoire-space-3)');
+    expect(row).toContain('padding: var(--grimoire-space-2) var(--grimoire-space-6)');
   });
 });

@@ -1,10 +1,10 @@
 .grimoire-mode-selector {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   margin-left: auto;
-  padding-left: var(--grimoire-space-5);
-  padding-right: var(--grimoire-space-4);
+  padding-left: var(--grimoire-space-12);
+  padding-right: var(--grimoire-space-8);
 }
 
 .grimoire-mode-label {
@@ -14,7 +14,7 @@
 }
 
 .grimoire-mode-label.active {
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
   font-weight: var(--grimoire-weight-semibold);
 }
 
@@ -34,7 +34,7 @@
   height: 28px;
   min-width: 0;
   overflow: hidden;
-  padding: 0 var(--grimoire-space-3);
+  padding: 0 var(--grimoire-space-6);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-raise);
@@ -48,7 +48,7 @@
 
 .grimoire-container--chat-window .grimoire-mode-label.active {
   border-color: var(--grimoire-accent-line);
-  background: var(--grimoire-accent-soft);
+  background: var(--grimoire-accent-wash);
   color: var(--grimoire-accent-text);
   box-shadow: none;
 }

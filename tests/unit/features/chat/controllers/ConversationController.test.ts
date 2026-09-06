@@ -3,7 +3,6 @@ import '@/providers';
 import { createMockEl } from '@test/helpers/mockElement';
 import { Menu, Notice } from 'obsidian';
 
-import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
 import { ConversationController, type ConversationControllerDeps } from '@/features/chat/controllers/ConversationController';
 import { ChatState } from '@/features/chat/state/ChatState';
 import { t } from '@/i18n/i18n';
@@ -952,36 +951,24 @@ describe('ConversationController', () => {
     });
 
     describe('renderHistoryDropdown', () => {
-      it('uses registered provider CSS variables, and the product default for invalid IDs', () => {
+      it('names a provider in ink rather than painting the row its vendor colour', () => {
         const container = createMockEl();
         (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
           { id: 'claude', providerId: 'claude', title: 'Claude', createdAt: 1000, messageCount: 1, preview: '' },
           { id: 'codex', providerId: 'codex', title: 'Codex', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'opencode', providerId: 'opencode', title: 'OpenCode', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'mimocode', providerId: 'mimocode', title: 'MiMoCode', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'kimicode', providerId: 'kimicode', title: 'Kimi Code', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'grok', providerId: 'grok', title: 'Grok Build', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'antigravity', providerId: 'antigravity', title: 'Antigravity', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'gemini', providerId: 'gemini', title: 'Gemini CLI', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'qwen', providerId: 'qwen', title: 'Qwen Code', createdAt: 1000, messageCount: 1, preview: '' },
           { id: 'invalid', providerId: 'invalid', title: 'Invalid', createdAt: 1000, messageCount: 1, preview: '' },
         ]);
 
         controller.renderHistoryDropdown(container, { onSelectConversation: jest.fn() });
 
-        for (const providerId of ['claude', 'codex', 'opencode', 'mimocode', 'kimicode', 'grok', 'antigravity', 'gemini', 'qwen']) {
+        // Nordic spends no hue on identity: the nine vendor colours are gone,
+        // and with them the dot that existed only to carry one. An
+        // unregistered provider had been showing Claude's, which reads as a
+        // claim about which provider the conversation belongs to.
+        for (const providerId of ['claude', 'codex', 'invalid']) {
           expect(getHistoryItem(container, providerId)
-            .querySelector('.grimoire-history-provider-dot')
-            .style['--grimoire-history-provider-color'])
-            .toBe(`var(--grimoire-provider-${providerId})`);
+            .querySelector('.grimoire-history-provider-dot')).toBeNull();
         }
-        // The product default, not one provider's colour picked out of the
-        // list: an unregistered provider used to show Claude's dot, which reads
-        // as a claim about which provider the conversation belongs to.
-        expect(getHistoryItem(container, 'invalid')
-          .querySelector('.grimoire-history-provider-dot')
-          .style['--grimoire-history-provider-color'])
-          .toBe(`var(--grimoire-provider-${DEFAULT_CHAT_PROVIDER_ID})`);
       });
 
       it('should render history items to provided container', () => {

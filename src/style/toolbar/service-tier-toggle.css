@@ -2,7 +2,7 @@
 .grimoire-service-tier-toggle {
   display: flex;
   align-items: center;
-  padding-left: var(--grimoire-space-1);
+  padding-left: var(--grimoire-space-2);
 }
 
 .grimoire-service-tier-button {
@@ -35,7 +35,7 @@
 }
 
 .grimoire-service-tier-button.active {
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-container--chat-window .grimoire-service-tier-toggle {
@@ -60,6 +60,6 @@
 
 .grimoire-container--chat-window .grimoire-service-tier-button.active {
   border-color: var(--grimoire-accent-line);
-  background: var(--grimoire-accent-soft);
+  background: var(--grimoire-accent-wash);
   color: var(--grimoire-accent-text);
 }

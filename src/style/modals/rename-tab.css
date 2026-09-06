@@ -3,7 +3,7 @@
 }
 
 .grimoire-rename-tab-modal .modal-content {
-  padding-bottom: var(--grimoire-space-6);
+  padding-bottom: var(--grimoire-space-16);
 }
 
 .grimoire-rename-tab-form {
@@ -12,7 +12,7 @@
 }
 
 .grimoire-rename-tab-label {
-  margin: var(--grimoire-space-4) var(--grimoire-space-1) var(--grimoire-space-3);
+  margin: var(--grimoire-space-8) var(--grimoire-space-2) var(--grimoire-space-6);
   color: var(--text-faint);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-xs);
@@ -26,9 +26,9 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
   min-width: 0;
-  padding-right: var(--grimoire-space-3);
+  padding-right: var(--grimoire-space-6);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--grimoire-radius-2);
   background: var(--background-primary);
@@ -51,7 +51,7 @@
   flex: 1 1 auto;
   height: 42px;
   min-width: 0;
-  padding: 0 var(--grimoire-space-2) 0 var(--grimoire-space-5);
+  padding: 0 var(--grimoire-space-4) 0 var(--grimoire-space-12);
   border: 0;
   border-radius: inherit;
   background: transparent;
@@ -74,7 +74,7 @@ button.grimoire-rename-tab-reset {
   justify-content: center;
   width: 30px;
   height: 30px;
-  padding: var(--grimoire-space-3);
+  padding: var(--grimoire-space-6);
   border: 0;
   border-radius: var(--grimoire-radius-2);
   background: transparent;
@@ -101,7 +101,7 @@ button.grimoire-rename-tab-suggest {
   justify-content: center;
   width: 30px;
   height: 30px;
-  padding: var(--grimoire-space-3);
+  padding: var(--grimoire-space-6);
   border: 0;
   border-radius: var(--grimoire-radius-2);
   background: transparent;
@@ -134,8 +134,8 @@ button.grimoire-rename-tab-suggest svg {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--grimoire-space-5);
-  margin-top: var(--grimoire-space-6);
+  gap: var(--grimoire-space-12);
+  margin-top: var(--grimoire-space-16);
 }
 
 .grimoire-rename-tab-counter {
@@ -149,12 +149,12 @@ button.grimoire-rename-tab-suggest svg {
 .grimoire-rename-tab-actions {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
 }
 
 .grimoire-rename-tab-actions button {
   min-height: 34px;
-  padding: var(--grimoire-space-3) var(--grimoire-space-5);
+  padding: var(--grimoire-space-6) var(--grimoire-space-12);
 }
 
 @media (max-width: 420px) {

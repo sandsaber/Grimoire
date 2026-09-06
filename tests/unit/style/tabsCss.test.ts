@@ -11,7 +11,7 @@ function getRule(css: string, selector: string): string {
 }
 
 describe('tabs.css', () => {
-  it('shows provider-colored activity dots without replacing the tab number', () => {
+  it('shows an activity dot without replacing the tab number', () => {
     const css = readTabsCss();
     const normalizedCss = css.replace(/\r\n/g, '\n');
 
@@ -20,8 +20,9 @@ describe('tabs.css', () => {
 .grimoire-tab-badge-attention .grimoire-tab-activity-dot {
   display: block;
 }`);
-    expect(getRule(css, '.grimoire-tab-badge-streaming[data-provider="codex"]'))
-      .toContain('--grimoire-ok: var(--grimoire-provider-codex');
+    // The dot says a tab is working, not which vendor is doing the work: status
+    // is the accent, and identity never a hue.
+    expect(css).not.toContain('[data-provider=');
     expect(getRule(css, '.grimoire-tab-number')).toContain('display: inline-flex');
   });
 

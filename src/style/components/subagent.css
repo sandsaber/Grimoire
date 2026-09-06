@@ -1,32 +1,32 @@
 .grimoire-subagent-list {
-  margin: var(--grimoire-space-4) 0;
+  margin: var(--grimoire-space-8) 0;
 }
 
 .grimoire-container--chat-window .grimoire-message-content > .grimoire-subagent-list {
-  margin: var(--grimoire-space-1) 0;
+  margin: var(--grimoire-space-2) 0;
 }
 
 .grimoire-text-block+.grimoire-subagent-list {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-subagent-list+.grimoire-text-block {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-tool-call+.grimoire-subagent-list {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-subagent-list+.grimoire-tool-call {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-subagent-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-2) 0;
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-4) 0;
   cursor: pointer;
   overflow: hidden;
 }
@@ -75,26 +75,26 @@
 }
 
 .grimoire-subagent-content {
-  padding: var(--grimoire-space-2) 0;
-  padding-inline-start: var(--grimoire-space-6);
-  margin-inline-start: var(--grimoire-space-3);
+  padding: var(--grimoire-space-4) 0;
+  padding-inline-start: var(--grimoire-space-16);
+  margin-inline-start: var(--grimoire-space-6);
   border-inline-start: 2px solid var(--background-modifier-border);
 }
 
 .grimoire-subagent-section {
-  margin: var(--grimoire-space-1) 0 var(--grimoire-space-3);
+  margin: var(--grimoire-space-2) 0 var(--grimoire-space-6);
 }
 
 .grimoire-subagent-section-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   cursor: pointer;
   user-select: none;
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-s);
   color: var(--text-muted);
-  padding: var(--grimoire-space-1) 0;
+  padding: var(--grimoire-space-2) 0;
 }
 
 .grimoire-subagent-section-header:hover {
@@ -107,7 +107,7 @@
 }
 
 .grimoire-subagent-section-body {
-  padding-inline-start: var(--grimoire-space-3);
+  padding-inline-start: var(--grimoire-space-6);
 }
 
 .grimoire-subagent-prompt-text,
@@ -128,7 +128,7 @@
 .grimoire-subagent-tools {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-subagent-tool-item {
@@ -138,10 +138,10 @@
 .grimoire-subagent-tool-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   cursor: pointer;
   overflow: hidden;
-  padding: var(--grimoire-space-1) 0;
+  padding: var(--grimoire-space-2) 0;
 }
 
 .grimoire-subagent-tool-header:hover {
@@ -204,7 +204,7 @@
 }
 
 .grimoire-subagent-tool-content {
-  padding: var(--grimoire-space-1) 0 var(--grimoire-space-1) var(--grimoire-space-6);
+  padding: var(--grimoire-space-2) 0 var(--grimoire-space-2) var(--grimoire-space-16);
 }
 
 .grimoire-subagent-tool-empty {
@@ -212,7 +212,7 @@
   font-style: italic;
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-s);
-  padding: var(--grimoire-space-1) 0;
+  padding: var(--grimoire-space-2) 0;
 }
 
 .grimoire-subagent-status-text {
@@ -220,7 +220,7 @@
   font-family: var(--font-monospace);
   color: var(--text-muted);
   margin-inline-start: auto;
-  padding-inline-start: var(--grimoire-space-4);
+  padding-inline-start: var(--grimoire-space-8);
 }
 
 .grimoire-subagent-list.async .grimoire-subagent-icon {

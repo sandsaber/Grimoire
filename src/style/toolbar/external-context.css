@@ -3,7 +3,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  margin-left: var(--grimoire-space-4);
+  margin-left: var(--grimoire-space-8);
 }
 
 .grimoire-external-context-icon-wrapper {
@@ -29,7 +29,7 @@
 }
 
 .grimoire-external-context-icon.active {
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
   animation: external-context-glow 2s ease-in-out infinite;
 }
 
@@ -44,7 +44,7 @@
   right: 0;
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-semibold);
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
   opacity: 0;
   transition: opacity var(--grimoire-duration) var(--grimoire-ease);
   pointer-events: none;
@@ -59,7 +59,7 @@
   left: 50%;
   transform: translateX(-50%);
   bottom: 100%;
-  margin-bottom: var(--grimoire-space-2);
+  margin-bottom: var(--grimoire-space-4);
   min-width: 260px;
   max-width: 320px;
   background: var(--background-secondary);
@@ -78,7 +78,7 @@
 }
 
 .grimoire-external-context-header {
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-semibold);
   color: var(--text-muted);
@@ -91,7 +91,7 @@
 }
 
 .grimoire-external-context-empty {
-  padding: var(--grimoire-space-6) var(--grimoire-space-5);
+  padding: var(--grimoire-space-16) var(--grimoire-space-12);
   text-align: center;
   color: var(--text-muted);
   font-size: var(--grimoire-text-s);
@@ -101,8 +101,8 @@
 .grimoire-external-context-item {
   display: flex;
   align-items: center;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
+  gap: var(--grimoire-space-8);
   border-bottom: 1px solid var(--background-modifier-border-focus);
 }
 
@@ -166,7 +166,7 @@
 
 .grimoire-container--chat-window .grimoire-external-context-icon-wrapper.active {
   border-color: var(--grimoire-accent-line);
-  background: var(--grimoire-accent-soft);
+  background: var(--grimoire-accent-wash);
   color: var(--grimoire-accent-text);
 }
 
@@ -179,7 +179,7 @@
   min-width: 14px;
   height: 14px;
   border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-brand);
+  background: var(--grimoire-accent);
   color: var(--text-on-accent);
   font-size: var(--grimoire-text-2xs);
   opacity: 1;
@@ -227,7 +227,7 @@
 }
 
 .grimoire-external-context-lock.locked {
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
   opacity: 0.9;
 }
 
@@ -254,7 +254,7 @@
 }
 
 .grimoire-external-context-remove:hover {
-  background: rgba(var(--grimoire-error-rgb), 0.15);
+  background: color-mix(in srgb, var(--grimoire-error) 15%, transparent);
   color: var(--grimoire-error);
   opacity: 1;
 }

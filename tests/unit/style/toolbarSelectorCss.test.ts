@@ -53,7 +53,7 @@ describe('chat toolbar selector CSS', () => {
     }
     for (const declaration of [
       'min-height: 28px',
-      'padding: 0 var(--grimoire-space-4)',
+      'padding: 0 var(--grimoire-space-8)',
       'border-radius: var(--grimoire-radius-1)',
       'font-weight: var(--grimoire-weight-normal)',
     ]) {
@@ -99,13 +99,16 @@ describe('chat toolbar selector CSS', () => {
     }
   });
 
-  it('uses a consistent Qwen accent in model, tab, and response indicators', () => {
+  it('carries provider identity as ink in the model, tab, and response surfaces alike', () => {
     const modelCss = readFileSync('src/style/toolbar/model-selector.css', 'utf8');
     const tabsCss = readFileSync('src/style/components/tabs.css', 'utf8');
     const messagesCss = readFileSync('src/style/components/messages.css', 'utf8');
 
-    expect(modelCss).toContain('var(--grimoire-provider-qwen, #615ced)');
-    expect(tabsCss).toContain('.grimoire-tab-badge-streaming[data-provider="qwen"]');
-    expect(messagesCss).toContain('.grimoire-assistant-response-meta[data-provider="qwen"]');
+    // One provider used to be pinned to one hue in three places, which is three
+    // chances to disagree. There is no hue to disagree about now.
+    for (const css of [modelCss, tabsCss, messagesCss]) {
+      expect(css).not.toMatch(/--grimoire-provider-[a-z]/);
+      expect(css).not.toMatch(/\[data-provider="[a-z]+"\]/);
+    }
   });
 });

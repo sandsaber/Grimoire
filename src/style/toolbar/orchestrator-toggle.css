@@ -2,7 +2,7 @@
 .grimoire-orchestrator-toggle {
   display: flex;
   align-items: center;
-  padding-left: var(--grimoire-space-1);
+  padding-left: var(--grimoire-space-2);
 }
 
 .grimoire-orchestrator-button {
@@ -35,7 +35,7 @@
 }
 
 .grimoire-orchestrator-button.active {
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-container--chat-window .grimoire-orchestrator-toggle {
@@ -60,7 +60,7 @@
 
 .grimoire-container--chat-window .grimoire-orchestrator-button.active {
   border-color: var(--grimoire-accent-line);
-  background: var(--grimoire-accent-soft);
+  background: var(--grimoire-accent-wash);
   color: var(--grimoire-accent-text);
   box-shadow: none;
 }

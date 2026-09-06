@@ -37,7 +37,7 @@ describe('model-selector.css', () => {
     expect(searchRule).toContain('height: 34px');
     expect(searchRule).toContain('min-height: 34px');
     expect(searchRule).toContain('max-height: 34px');
-    expect(searchRule).toContain('padding: 0 var(--grimoire-space-4)');
+    expect(searchRule).toContain('padding: 0 var(--grimoire-space-8)');
   });
 
   it('frames the model search container so it does not bleed past the dropdown edges', () => {
@@ -69,22 +69,14 @@ describe('model-selector.css', () => {
     expect(buttonRule).toContain('max-width: min(100%, 260px)');
   });
 
-  it('colors the selected model dot from the resolved provider', () => {
+  it('marks a provider in ink rather than in its vendor colour', () => {
     const css = readModelSelectorCss();
 
-    expect(css).toContain('.grimoire-model-button-provider-icon[data-provider="claude"]');
-    expect(css).toContain('color: var(--grimoire-provider-claude, #d97757)');
-    expect(css).toContain('.grimoire-model-button-provider-icon[data-provider="opencode"]');
-    expect(css).toContain('color: var(--grimoire-provider-opencode, #e0b341)');
-  });
-
-  it('colors provider group dots from provider ids rather than display-name classes', () => {
-    const css = readModelSelectorCss();
-
-    expect(css).toContain('.grimoire-model-group-provider-icon[data-provider="mimocode"]');
-    expect(css).toContain('color: var(--grimoire-provider-mimocode, #ff6a00)');
-    expect(css).toContain('.grimoire-model-group-provider-icon[data-provider="grok"]');
-    expect(css).not.toContain('.grimoire-model-group-section--mimocode .grimoire-model-group-provider-icon');
+    // Nordic spends no hue on identity. The nine brand colours are gone, and
+    // with them every `[data-provider="…"]` rule whose whole body was one.
+    expect(css).not.toMatch(/--grimoire-provider-/);
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(getRule(css, '.grimoire-model-button-provider-icon')).toContain('color: var(--grimoire-ink-muted)');
   });
 
   it('gives model choices room and preserves distinguishing secondary context', () => {
@@ -108,8 +100,8 @@ describe('model-selector.css', () => {
     const labelRule = getRule(css, '.grimoire-plan-usage-badge-label');
     const meterRule = getRule(css, '.grimoire-plan-usage-badge-meter');
 
-    expect(badgeRule).toContain('gap: var(--grimoire-space-2)');
-    expect(badgeRule).toContain('padding: 0 var(--grimoire-space-3)');
+    expect(badgeRule).toContain('gap: var(--grimoire-space-4)');
+    expect(badgeRule).toContain('padding: 0 var(--grimoire-space-6)');
     expect(labelRule).toContain('display: none');
     expect(meterRule).toContain('width: 18px');
     expect(css).not.toContain('.grimoire-plan-usage-badge-tip');

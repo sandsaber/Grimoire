@@ -78,7 +78,7 @@ change a one-line edit.
 | Ground | `--grimoire-ground`, `--grimoire-plane`, `--grimoire-hover`, `--grimoire-field` | `--background-primary`, `--background-secondary`, `--background-modifier-hover`, `--background-modifier-form-field` |
 | Line | `--grimoire-line`, `--grimoire-line-2`, `--grimoire-line-3` | `--background-modifier-border{,-hover,-focus}` |
 | Ink | `--grimoire-ink`, `--grimoire-ink-muted`, `--grimoire-ink-faint`, `--grimoire-ink-ghost` | `--text-normal`, `--text-muted`, `--text-faint`, faint at 62% |
-| Space | `--grimoire-space-1` … `--grimoire-space-8` | `--size-2-1` … `--size-4-6` |
+| Space | `--grimoire-space-2` … `--grimoire-space-24` | `--size-2-1` … `--size-4-6` |
 | Radius | `--grimoire-radius-1/2/3` | `--radius-s/m/l` |
 | Type | `--grimoire-text-xs/s/m/l` | `--font-ui-smaller/small/medium/large` |
 | Weight | `--grimoire-weight-normal/medium/semibold` | `--font-normal/medium/semibold` |
@@ -128,7 +128,7 @@ because each one is a class, not an instance.
   `var(--interactive-accent-rgb, var(--color-accent-rgb, 127, 95, 217))`. Obsidian defines
   `--color-<hue>-rgb` for its palette but **no accent triple at all**, so every
   `rgba(var(--grimoire-brand-rgb), …)` resolved to that fallback — a fixed violet — whatever accent
-  the user had picked. Those read `color-mix(in srgb, var(--grimoire-brand) N%, transparent)` now.
+  the user had picked. Those read `color-mix(in srgb, var(--grimoire-accent) N%, transparent)` now.
   The fallback is what hid it: the value looked considered and was frozen.
 
 ## A specimen you can move

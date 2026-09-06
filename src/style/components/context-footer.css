@@ -5,8 +5,8 @@
   height: 26px;
   display: inline-flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
-  padding: 0 var(--grimoire-space-5) 0 var(--grimoire-space-4);
+  gap: var(--grimoire-space-6);
+  padding: 0 var(--grimoire-space-12) 0 var(--grimoire-space-8);
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-raise);
   color: var(--grimoire-workbench-muted);
@@ -32,7 +32,7 @@
   flex: 0 0 auto;
   border-radius: 50%;
   background: conic-gradient(
-    var(--grimoire-context-ring-color, var(--grimoire-brand))
+    var(--grimoire-context-ring-color, var(--grimoire-accent))
     calc(var(--grimoire-context-meter-pct, 0) * 3.6deg),
     var(--grimoire-line-3) 0
   );

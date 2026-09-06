@@ -18,22 +18,22 @@
 @keyframes external-context-glow {
   0%,
   100% {
-    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--grimoire-brand) 40%, transparent));
+    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--grimoire-accent) 40%, transparent));
   }
 
   50% {
-    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--grimoire-brand) 80%, transparent));
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--grimoire-accent) 80%, transparent));
   }
 }
 
 @keyframes mcp-glow {
   0%,
   100% {
-    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--grimoire-brand) 40%, transparent));
+    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--grimoire-accent) 40%, transparent));
   }
 
   50% {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--grimoire-brand) 90%, transparent));
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--grimoire-accent) 90%, transparent));
   }
 }
 

@@ -5,7 +5,7 @@
   bottom: 100%;
   left: 0;
   right: 0;
-  margin-bottom: var(--grimoire-space-2);
+  margin-bottom: var(--grimoire-space-4);
   background: var(--background-secondary);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -34,8 +34,8 @@
 .grimoire-mention-item {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -66,7 +66,7 @@
 }
 
 .grimoire-mention-empty {
-  padding: var(--grimoire-space-5);
+  padding: var(--grimoire-space-12);
   text-align: center;
   color: var(--text-muted);
   font-size: var(--grimoire-text-m);
@@ -98,7 +98,7 @@
 .grimoire-mention-text {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-1);
+  gap: var(--grimoire-space-2);
   min-width: 0;
   flex: 1;
 }
@@ -111,7 +111,7 @@
 
 /* Context file items in @-mention dropdown */
 .grimoire-mention-item.context-file .grimoire-mention-icon {
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-mention-item.context-file .grimoire-mention-text {
@@ -159,7 +159,7 @@
 .grimoire-mention-item.agent .grimoire-mention-text {
   flex-direction: row;
   align-items: baseline;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   overflow: hidden;
   white-space: nowrap;
 }
@@ -199,14 +199,14 @@
 .grimoire-context-runtime-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-5);
+  gap: var(--grimoire-space-12);
   min-width: 0;
 }
 
 .grimoire-context-section {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   min-width: 0;
 }
 
@@ -221,9 +221,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   min-width: 0;
-  padding: var(--grimoire-space-4) 0;
+  padding: var(--grimoire-space-8) 0;
   background: transparent;
   border: 0;
   border-top: 1px solid var(--background-modifier-border);
@@ -254,7 +254,7 @@
 .grimoire-context-file-body {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-1);
+  gap: var(--grimoire-space-2);
   min-width: 0;
 }
 
@@ -285,7 +285,7 @@
 .grimoire-context-file-method {
   flex-shrink: 0;
   border-radius: var(--grimoire-radius-1);
-  padding: var(--grimoire-space-1) var(--grimoire-space-3);
+  padding: var(--grimoire-space-2) var(--grimoire-space-6);
   background: var(--background-modifier-hover);
   color: var(--text-muted);
   font-size: var(--grimoire-text-2xs);
@@ -299,7 +299,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
   max-width: 45%;
 }
 

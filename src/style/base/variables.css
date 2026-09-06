@@ -18,31 +18,27 @@
  * surface can read it.
  */
 body {
-  /* Accent — the user's, never ours. */
-  --grimoire-brand: var(--interactive-accent, var(--color-accent));
   /*
-   * Kept only for the provider marks below, which are real triples. Obsidian
-   * defines --color-<hue>-rgb for its palette but no accent triple at all, so
-   * every `rgba(var(--grimoire-brand-rgb), …)` in this plugin resolved to the
-   * fallback — a fixed violet — on thirty-two surfaces, whatever accent the
-   * user had chosen. Those read `color-mix(… var(--grimoire-brand) …)` now.
+   * Accent — the user's, never ours, and spent on a budget. It may be a line,
+   * a dot, a glyph, a 40% border, a 12% wash, or the single filled primary
+   * action a surface is allowed. Anything else is ink, ground or line.
    */
-  --grimoire-accent: var(--grimoire-brand);
-  --grimoire-accent-hover: var(--interactive-accent-hover, var(--grimoire-brand));
-  --grimoire-accent-text: var(--text-accent, var(--grimoire-brand));
+  --grimoire-accent: var(--interactive-accent, var(--color-accent));
+  --grimoire-accent-hover: var(--interactive-accent-hover, var(--grimoire-accent));
+  --grimoire-accent-text: var(--text-accent, var(--grimoire-accent));
   --grimoire-accent-contrast: var(--text-on-accent, var(--background-primary));
-
   /*
-   * The only two ways the accent may cover area: a line, and a wash. A
-   * saturated block is reserved for the one primary action a surface has.
+   * The two ways the accent may cover area. There is no accent RGB triple in
+   * Obsidian — it defines --color-<hue>-rgb for its palette and no accent one
+   * at all — so every `rgba(var(--grimoire-brand-rgb), …)` in this plugin once
+   * resolved to a fixed violet fallback on thirty-two surfaces, whatever
+   * accent the user had chosen. A translucent accent is a color-mix.
    */
-  --grimoire-accent-line: color-mix(in srgb, var(--grimoire-brand) 40%, transparent);
-  --grimoire-accent-line-strong: color-mix(in srgb, var(--grimoire-brand) 62%, transparent);
-  --grimoire-accent-soft: color-mix(in srgb, var(--grimoire-brand) 10%, transparent);
-  --grimoire-accent-wash: var(--grimoire-accent-soft);
-  --grimoire-accent-wash-strong: color-mix(in srgb, var(--grimoire-brand) 16%, transparent);
-  --grimoire-surface-glow: color-mix(in srgb, var(--grimoire-brand) 12%, transparent);
-  --grimoire-focus-ring: 0 0 0 2px color-mix(in srgb, var(--grimoire-brand) 45%, transparent);
+  --grimoire-accent-line: color-mix(in srgb, var(--grimoire-accent) 40%, transparent);
+  --grimoire-accent-wash: color-mix(in srgb, var(--grimoire-accent) 12%, transparent);
+  /* Bulk selection, and nothing else: a band the eye must not read as a fill. */
+  --grimoire-accent-wash-weak: color-mix(in srgb, var(--grimoire-accent) 8%, transparent);
+  --grimoire-focus-ring: 0 0 0 2px color-mix(in srgb, var(--grimoire-accent) 45%, transparent);
 
   /* Ground — three planes, no more. */
   --grimoire-ground: var(--background-primary);
@@ -58,6 +54,7 @@ body {
   --grimoire-raise-2: var(--grimoire-active);
   --grimoire-field: var(--background-modifier-form-field);
   --grimoire-sink: var(--grimoire-field);
+  --grimoire-code: var(--code-background);
 
   /* Line — the system's main structural device. */
   --grimoire-line: var(--background-modifier-border);
@@ -80,15 +77,39 @@ body {
   --grimoire-workbench-faint: var(--grimoire-ink-faint);
   --grimoire-workbench-ghost: var(--grimoire-ink-ghost);
 
-  /* Space — Obsidian's 4px ladder, so Grimoire keeps the host's rhythm. */
-  --grimoire-space-1: var(--size-2-1, 2px);
-  --grimoire-space-2: var(--size-4-1, 4px);
-  --grimoire-space-3: var(--size-2-3, 6px);
-  --grimoire-space-4: var(--size-4-2, 8px);
-  --grimoire-space-5: var(--size-4-3, 12px);
-  --grimoire-space-6: var(--size-4-4, 16px);
-  --grimoire-space-7: var(--size-4-5, 20px);
-  --grimoire-space-8: var(--size-4-6, 24px);
+  /*
+   * Space — named by the value it is, because the ladder is the design's own
+   * (2 4 6 8 10 12 14 16 20 22 24 40) rather than an ordinal position that
+   * says nothing. Obsidian's own steps are read where the host has one, so
+   * Grimoire keeps the app's rhythm; 10, 14, 22 and 40 are Nordic's, and the
+   * host has no token for them.
+   */
+  --grimoire-space-2: var(--size-2-1, 2px);
+  --grimoire-space-4: var(--size-4-1, 4px);
+  --grimoire-space-6: var(--size-2-3, 6px);
+  --grimoire-space-8: var(--size-4-2, 8px);
+  --grimoire-space-10: 10px;
+  --grimoire-space-12: var(--size-4-3, 12px);
+  --grimoire-space-14: 14px;
+  --grimoire-space-16: var(--size-4-4, 16px);
+  --grimoire-space-20: var(--size-4-5, 20px);
+  --grimoire-space-22: 22px;
+  --grimoire-space-24: var(--size-4-6, 24px);
+  --grimoire-space-40: 40px;
+
+  /*
+   * Size — the fixed heights the system repeats. A hit target is 24px where
+   * the control sits in a message meta row, 26px in a panel switch, and 28px
+   * in the header and the composer toolbar; nothing in between is a size.
+   */
+  --grimoire-header-h: 40px;
+  --grimoire-hit-s: 24px;
+  --grimoire-hit-m: 26px;
+  --grimoire-hit-l: 28px;
+  --grimoire-chip-h: 24px;
+  --grimoire-tool-row-h: 26px;
+  --grimoire-segment-h: 26px;
+  --grimoire-list-row-h: 34px;
 
   /* Radius — the theme's, so a square-cornered theme stays square. */
   --grimoire-radius-1: var(--radius-s, 4px);
@@ -99,25 +120,19 @@ body {
   --grimoire-radius-circle: 50%;
 
   /*
-   * Type — relative to the reader's own --font-text-size, which Obsidian
-   * calc()s these from. A literal px size ignores a reader who set their
+   * Type — Obsidian's own interface ladder, which it calc()s from the reader's
+   * --font-text-size. A literal px size ignores a reader who set their
    * interface larger, which is an accessibility regression, not a style.
-   */
-  /*
-   * The base is Obsidian's own --font-ui-small, which its `body` table sets to
-   * 13px — the size this plugin's body text has always been. An earlier draft
-   * multiplied it by 0.87 on the assumption that the token was 15px, which
-   * would have shrunk every string in the plugin by an eighth. Read the file,
-   * not the memory of it.
+   * Five steps carry the whole plugin: 10 and 11 are monospace meta, 12 is the
+   * workhorse, 13 is body and the composer, 15 titles a modal.
    */
   --grimoire-text-base: var(--font-ui-small, 13px);
-  --grimoire-text-2xs: calc(var(--grimoire-text-base) * 0.77);
-  --grimoire-text-xs: calc(var(--grimoire-text-base) * 0.85);
-  --grimoire-text-s: calc(var(--grimoire-text-base) * 0.92);
-  --grimoire-text-m: var(--grimoire-text-base);
-  --grimoire-text-l: calc(var(--grimoire-text-base) * 1.08);
-  --grimoire-text-xl: calc(var(--grimoire-text-base) * 1.23);
-  --grimoire-text-2xl: calc(var(--grimoire-text-base) * 1.54);
+  --grimoire-text-2xs: calc(var(--font-ui-smaller, 12px) * 0.84);
+  --grimoire-text-xs: calc(var(--font-ui-smaller, 12px) * 0.92);
+  --grimoire-text-s: var(--font-ui-smaller, 12px);
+  --grimoire-text-m: var(--font-ui-small, 13px);
+  --grimoire-text-l: var(--font-ui-medium, 15px);
+  --grimoire-text-xl: var(--font-ui-large, 20px);
   --grimoire-mono: var(--font-monospace);
   /* Four weights, down from the thirteen the stylesheets had grown. */
   --grimoire-weight-normal: var(--font-normal, 400);
@@ -126,56 +141,44 @@ body {
   --grimoire-weight-bold: var(--font-bold, 700);
   --grimoire-leading-tight: var(--line-height-tight, 1.3);
   --grimoire-leading: var(--line-height-normal, 1.5);
+  /* Prose and code set looser than chrome, and are the only two that do. */
+  --grimoire-leading-body: 1.55;
+  --grimoire-leading-code: 1.6;
   /* Micro-labels: uppercase monospace, tracked out. One definition, one look. */
   --grimoire-label-tracking: 0.12em;
+  --grimoire-section-tracking: 0.14em;
+
+  /*
+   * Icons — Lucide at three sizes and two stroke widths. 12px sits inside a
+   * line of 12px text, 14px is the chrome default, 16px is the header. The
+   * heavier stroke is for a check, which reads as a hairline at 1.75.
+   */
+  --grimoire-icon-s: 12px;
+  --grimoire-icon-m: 14px;
+  --grimoire-icon-l: 16px;
+  --grimoire-stroke: 1.75;
+  --grimoire-stroke-check: 2.25;
 
   /* Lift — three steps, and the first is nothing. */
   --grimoire-lift-0: none;
   --grimoire-lift-1: var(--shadow-s);
   --grimoire-lift-2: var(--shadow-l);
 
-  /* Motion — one duration, one curve. */
+  /* Motion — one duration, one curve, and two keyframes in the whole system. */
   --grimoire-duration: 120ms;
   --grimoire-duration-slow: 200ms;
   --grimoire-ease: cubic-bezier(0.2, 0, 0, 1);
 
-  /* Status. */
-  --grimoire-ok: var(--color-green);
-  --grimoire-ok-rgb: var(--color-green-rgb, 99, 211, 154);
-  --grimoire-warn: var(--color-yellow);
-  --grimoire-error: var(--color-red);
-  --grimoire-error-rgb: var(--color-red-rgb, 220, 53, 69);
-  --grimoire-compact: var(--color-cyan, var(--interactive-accent));
-
   /*
-   * Provider marks — the one place a fixed colour is correct, because these are
-   * identity rather than decoration. Everything else in the system is the
-   * user's theme.
+   * Status. Colour never carries a state on its own — a dot is paired with a
+   * word — so this palette is small and each entry has one job: success is the
+   * `+` of a diff, error names a failure, warn is a budget approaching its
+   * edge.
    */
-  --grimoire-brand-claude: #d97757;
-  --grimoire-brand-claude-rgb: 217, 119, 87;
-  --grimoire-brand-codex: #19c37d;
-  --grimoire-brand-codex-rgb: 25, 195, 125;
-  --grimoire-brand-qwen: #615ced;
-  --grimoire-brand-qwen-rgb: 97, 92, 237;
-  --grimoire-brand-antigravity: #5b8def;
-  --grimoire-brand-antigravity-rgb: 91, 141, 239;
-  --grimoire-brand-gemini: #669df6;
-  --grimoire-brand-gemini-rgb: 102, 157, 246;
-  --grimoire-brand-opencode: #e0b341;
-  --grimoire-brand-opencode-rgb: 224, 179, 65;
-  --grimoire-brand-mimocode: #ff6a00;
-  --grimoire-brand-kimicode: #7c3aed;
-  --grimoire-brand-grok: var(--text-faint);
-  --grimoire-provider-claude: var(--grimoire-brand-claude);
-  --grimoire-provider-codex: var(--grimoire-brand-codex);
-  --grimoire-provider-qwen: var(--grimoire-brand-qwen);
-  --grimoire-provider-antigravity: var(--grimoire-brand-antigravity);
-  --grimoire-provider-gemini: var(--grimoire-brand-gemini);
-  --grimoire-provider-opencode: var(--grimoire-brand-opencode);
-  --grimoire-provider-mimocode: var(--grimoire-brand-mimocode);
-  --grimoire-provider-kimicode: var(--grimoire-brand-kimicode);
-  --grimoire-provider-grok: var(--grimoire-brand-grok);
-  /* A provider Grimoire has no mark for reads as ink, not as a guessed hue. */
-  --grimoire-provider-generic: var(--grimoire-ink-faint);
+  --grimoire-ok: var(--text-success, var(--color-green));
+  --grimoire-warn: var(--color-yellow);
+  --grimoire-error: var(--text-error, var(--color-red));
+  --grimoire-error-line: color-mix(in srgb, var(--grimoire-error) 40%, transparent);
+  --grimoire-error-wash: color-mix(in srgb, var(--grimoire-error) 12%, transparent);
+  --grimoire-compact: var(--color-cyan, var(--interactive-accent));
 }

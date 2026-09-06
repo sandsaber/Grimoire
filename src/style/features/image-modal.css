@@ -40,7 +40,7 @@
   background: var(--background-secondary);
   border-radius: 50%;
   cursor: pointer;
-  font-size: var(--grimoire-text-2xl);
+  font-size: var(--grimoire-text-xl);
   color: var(--text-muted);
   box-shadow: var(--grimoire-lift-1);
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);

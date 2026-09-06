@@ -9,7 +9,7 @@
 }
 
 .grimoire-fork-target-option {
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   border-radius: var(--grimoire-radius-2);
   cursor: pointer;
   color: var(--text-normal);

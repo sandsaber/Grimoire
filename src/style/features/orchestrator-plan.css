@@ -4,7 +4,7 @@
   container-name: grimoire-orchestrator-plan;
   container-type: inline-size;
   width: 100%;
-  margin: var(--grimoire-space-4) 0 var(--grimoire-space-5);
+  margin: var(--grimoire-space-8) 0 var(--grimoire-space-12);
   color: var(--text-normal);
   font-family: var(--font-interface);
   font-size: var(--grimoire-text-s);
@@ -20,12 +20,12 @@
 .grimoire-orchestrator-plan-badge {
   display: inline-flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   height: 25px;
-  padding: 0 var(--grimoire-space-4);
+  padding: 0 var(--grimoire-space-8);
   border: 1px solid var(--grimoire-accent-line);
   border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-accent-soft);
+  background: var(--grimoire-accent-wash);
   color: var(--grimoire-accent-text);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-2xs);
@@ -43,7 +43,7 @@
 
 .grimoire-orchestrator-plan-summary {
   max-width: 650px;
-  margin: var(--grimoire-space-4) 0 var(--grimoire-space-5);
+  margin: var(--grimoire-space-8) 0 var(--grimoire-space-12);
   color: var(--grimoire-workbench-muted);
   font-size: var(--grimoire-text-m);
   line-height: 1.55;
@@ -61,9 +61,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--grimoire-space-5);
+  gap: var(--grimoire-space-12);
   min-height: 62px;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   border-bottom: 1px solid var(--grimoire-line-2);
 }
 
@@ -72,7 +72,7 @@
 }
 
 .grimoire-orchestrator-plan-eyebrow {
-  margin-bottom: var(--grimoire-space-3);
+  margin-bottom: var(--grimoire-space-6);
   color: var(--grimoire-workbench-faint);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-2xs);
@@ -96,7 +96,7 @@
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   color: var(--grimoire-workbench-faint);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-2xs);
@@ -107,7 +107,7 @@
 .grimoire-orchestrator-plan-numbers {
   display: flex;
   align-items: center;
-  padding-inline-start: var(--grimoire-space-4);
+  padding-inline-start: var(--grimoire-space-8);
 }
 
 .grimoire-orchestrator-plan-number {
@@ -131,16 +131,16 @@
 }
 
 .grimoire-orchestrator-plan-tasks {
-  padding: 0 var(--grimoire-space-5);
+  padding: 0 var(--grimoire-space-12);
 }
 
 .grimoire-orchestrator-plan-task {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   min-height: 57px;
-  padding: var(--grimoire-space-4) 0;
+  padding: var(--grimoire-space-8) 0;
   border-bottom: 1px solid var(--grimoire-line-2);
 }
 
@@ -171,8 +171,8 @@ button.grimoire-orchestrator-plan-task-toggle:hover {
 }
 
 button.grimoire-orchestrator-plan-task-toggle.is-selected {
-  border-color: var(--grimoire-brand);
-  background: var(--grimoire-brand);
+  border-color: var(--grimoire-accent);
+  background: var(--grimoire-accent);
   color: var(--text-on-accent);
 }
 
@@ -204,15 +204,15 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
 .grimoire-orchestrator-plan-task-meta {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   min-width: 0;
-  margin-top: var(--grimoire-space-2);
+  margin-top: var(--grimoire-space-4);
 }
 
 .grimoire-orchestrator-plan-task-id {
   overflow: hidden;
   max-width: 180px;
-  padding: var(--grimoire-space-1) var(--grimoire-space-3);
+  padding: var(--grimoire-space-2) var(--grimoire-space-6);
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-raise);
   color: var(--grimoire-workbench-faint);
@@ -236,8 +236,8 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
   display: inline-flex;
   align-items: center;
   max-width: 130px;
-  gap: var(--grimoire-space-3);
-  padding: var(--grimoire-space-2) var(--grimoire-space-4);
+  gap: var(--grimoire-space-6);
+  padding: var(--grimoire-space-4) var(--grimoire-space-8);
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-raise);
   color: var(--grimoire-workbench-faint);
@@ -254,41 +254,14 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
   background: var(--grimoire-workbench-faint);
 }
 
-.grimoire-orchestrator-plan-model[data-provider="claude"] .grimoire-orchestrator-plan-model-dot {
-  background: var(--grimoire-provider-claude, #d97757);
-}
 
-.grimoire-orchestrator-plan-model[data-provider="codex"] .grimoire-orchestrator-plan-model-dot {
-  background: var(--grimoire-provider-codex, #19c37d);
-}
 
-.grimoire-orchestrator-plan-model[data-provider="qwen"] .grimoire-orchestrator-plan-model-dot {
-  background: var(--grimoire-provider-qwen, #615ced);
-}
 
-.grimoire-orchestrator-plan-model[data-provider="antigravity"] .grimoire-orchestrator-plan-model-dot {
-  background: var(--grimoire-provider-antigravity, #4285f4);
-}
 
-.grimoire-orchestrator-plan-model[data-provider="gemini"] .grimoire-orchestrator-plan-model-dot {
-  background: var(--grimoire-provider-gemini, #4285f4);
-}
 
-.grimoire-orchestrator-plan-model[data-provider="opencode"] .grimoire-orchestrator-plan-model-dot {
-  background: var(--grimoire-provider-opencode, #f4c542);
-}
 
-.grimoire-orchestrator-plan-model[data-provider="mimocode"] .grimoire-orchestrator-plan-model-dot {
-  background: var(--grimoire-provider-mimocode, #ff6a00);
-}
 
-.grimoire-orchestrator-plan-model[data-provider="kimicode"] .grimoire-orchestrator-plan-model-dot {
-  background: var(--grimoire-provider-kimicode, #7c3aed);
-}
 
-.grimoire-orchestrator-plan-model[data-provider="grok"] .grimoire-orchestrator-plan-model-dot {
-  background: var(--grimoire-provider-grok, var(--text-faint));
-}
 
 .grimoire-orchestrator-plan-model-label {
   overflow: hidden;
@@ -300,9 +273,9 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--grimoire-space-5);
+  gap: var(--grimoire-space-12);
   min-height: 54px;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   border-top: 1px solid var(--grimoire-line-2);
 }
 
@@ -319,12 +292,12 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
 }
 
 button.grimoire-orchestrator-plan-button {
   min-height: 32px;
-  padding: 0 var(--grimoire-space-5);
+  padding: 0 var(--grimoire-space-12);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-1);
   font-size: var(--grimoire-text-xs);
@@ -341,9 +314,9 @@ button.grimoire-orchestrator-plan-cancel-button {
 button.grimoire-orchestrator-plan-spawn-button {
   display: inline-flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  border-color: var(--grimoire-brand);
-  background: var(--grimoire-brand);
+  gap: var(--grimoire-space-8);
+  border-color: var(--grimoire-accent);
+  background: var(--grimoire-accent);
   color: var(--text-on-accent);
 }
 
@@ -353,7 +326,7 @@ button.grimoire-orchestrator-plan-spawn-button {
   justify-content: center;
   min-width: 18px;
   height: 18px;
-  padding: 0 var(--grimoire-space-2);
+  padding: 0 var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-line-2);
   font-family: var(--font-monospace);
@@ -365,14 +338,14 @@ button.grimoire-orchestrator-plan-spawn-button {
 }
 
 .grimoire-orchestrator-plan-inline.is-readonly .grimoire-orchestrator-plan-summary {
-  margin-bottom: var(--grimoire-space-4);
+  margin-bottom: var(--grimoire-space-8);
 }
 
 @container grimoire-orchestrator-plan (max-width: 470px) {
   .grimoire-orchestrator-plan-header {
     align-items: flex-start;
     flex-direction: column;
-    gap: var(--grimoire-space-4);
+    gap: var(--grimoire-space-8);
   }
 
   .grimoire-orchestrator-plan-task {

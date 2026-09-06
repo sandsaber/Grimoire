@@ -43,7 +43,6 @@ const RUNTIME_TOKENS = new Set([
   '--grimoire-fixed-dropdown-bottom',
   '--grimoire-fixed-dropdown-left',
   '--grimoire-fixed-dropdown-width',
-  '--grimoire-history-provider-color',
   '--grimoire-input-wrapper-height',
   '--grimoire-textarea-max-height',
   '--grimoire-textarea-min-height',
@@ -90,23 +89,40 @@ describe('Nordic design system', () => {
   });
 
   it('takes every colour from the theme, so the plugin follows the user', () => {
-    // Provider marks are identity, not decoration, and are the one fixed
-    // colour the system allows. They live in the token file with the reason.
+    // There is no exception left. Provider marks were the one fixed colour the
+    // system allowed, and Nordic draws a provider as its glyph in --text-muted
+    // instead, so nothing in the plugin names a hue the user did not pick.
     const offenders: string[] = [];
-    for (const file of MODULE_FILES) {
+    for (const file of CSS_FILES) {
       const lines = read(file).split(/\r?\n/);
       lines.forEach((line, index) => {
         const at = `${file}:${index + 1}`;
         // A literal channel triple is a colour chosen for one theme.
         if (/rgba?\(\s*[0-9]/.test(line)) offenders.push(`${at} ${line.trim()}`);
-        // A hex is allowed only as the fallback of a provider mark token.
-        if (/#[0-9a-fA-F]{3,8}\b/.test(line) && !/var\(--grimoire-(provider|brand)-/.test(line)) {
-          offenders.push(`${at} ${line.trim()}`);
-        }
+        if (/#[0-9a-fA-F]{3,8}\b/.test(line)) offenders.push(`${at} ${line.trim()}`);
       });
     }
 
     expect(offenders).toEqual([]);
+  });
+
+  it('carries provider identity as a glyph, never as a hue', () => {
+    // Nine vendor colours reached five stylesheets, which is five chances for
+    // one provider to be two colours. Status is the accent dot; identity is the
+    // mark. Neither is a brand palette.
+    const brands: string[] = [];
+    for (const file of CSS_FILES) {
+      const lines = read(file).split(/\r?\n/);
+      lines.forEach((line, index) => {
+        if (/--grimoire-(provider|brand)-[a-z]/.test(line)) {
+          brands.push(`${file}:${index + 1} ${line.trim()}`);
+        }
+        // A rule selected by provider id exists to paint that provider.
+        if (/\[data-provider(-id)?=/.test(line)) brands.push(`${file}:${index + 1} ${line.trim()}`);
+      });
+    }
+
+    expect(brands).toEqual([]);
   });
 
   it('spaces on one ladder', () => {
