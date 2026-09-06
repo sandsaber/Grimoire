@@ -2180,6 +2180,7 @@ export class ContextUsageMeter {
       return;
     }
     this.container.removeClass('grimoire-hidden');
+    this.container.removeClass('is-empty');
     this.container.setCssProps({
       '--grimoire-context-meter-pct': `${Math.min(100, Math.max(0, usage.percentage))}`,
     });
@@ -2195,6 +2196,10 @@ export class ContextUsageMeter {
       this.container.removeClass('warning');
     }
 
+    this.container.setAttribute(
+      'aria-label',
+      t('chat.ui.contextUsage.ariaUsed', { percent: usage.percentage }),
+    );
     setTooltip(this.container, t('chat.ui.contextUsage.tokens', {
       used: this.formatTokens(usage.contextTokens),
       total: this.formatTokens(usage.contextWindow),
@@ -2204,6 +2209,8 @@ export class ContextUsageMeter {
   private renderEmptyState(contextWindow?: number): void {
     this.container.removeClass('grimoire-hidden');
     this.container.removeClass('warning');
+    // Nothing spent yet reads as an outline rather than as a full track.
+    this.container.addClass('is-empty');
     this.container.setCssProps({ '--grimoire-context-meter-pct': '0' });
     this.percentEl?.setText('0%');
     const windowLabel = contextWindow ? this.formatTokens(contextWindow) : t('chat.ui.contextUsage.context');

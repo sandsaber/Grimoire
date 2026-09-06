@@ -21,16 +21,6 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   max-height: 78vh;
-  animation: grimoire-ask-rise 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-@keyframes grimoire-ask-rise {
-  from {
-    transform: translateY(16px);
-  }
-  to {
-    transform: none;
-  }
 }
 
 /* ── Header ── */
@@ -464,7 +454,6 @@
   background: color-mix(in srgb, var(--grimoire-panel-2) 98%, var(--grimoire-accent) 2%);
   box-shadow:
     var(--grimoire-lift-2);
-  animation: grimoire-ask-rise 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .grimoire-permission-request::before {

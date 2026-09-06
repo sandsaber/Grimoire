@@ -165,6 +165,10 @@ export interface TabDOMElements {
   sourceShownCountEl: HTMLElement;
   composerSurfaceEl: HTMLElement;
 
+  /** The panel switch row: the view segments, and the transcript's jump controls. */
+  panelSwitchEl: HTMLElement;
+  panelJumpEl: HTMLElement;
+
   /** Current-tab view tabs. */
   panelTabsEl: HTMLElement;
   chatPanelButtonEl: HTMLButtonElement;

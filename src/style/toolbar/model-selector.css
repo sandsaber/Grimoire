@@ -241,7 +241,6 @@
   scrollbar-width: thin;
   scrollbar-color: var(--grimoire-workbench-border-strong) transparent;
   z-index: 10001;
-  animation: grimoire-pop 0.14s ease-out;
 }
 
 .grimoire-container--chat-window .grimoire-model-dropdown::-webkit-scrollbar {
@@ -676,7 +675,7 @@
 }
 
 .grimoire-model-catalog-loading::before {
-  animation: grimoire-model-spin 0.8s linear infinite;
+  animation: grimoire-spin 0.9s linear infinite;
   border: 2px solid color-mix(in srgb, var(--grimoire-accent) 20%, transparent);
   border-top-color: var(--grimoire-accent);
   border-radius: 50%;
@@ -684,16 +683,6 @@
   display: inline-block;
   height: 12px;
   width: 12px;
-}
-
-@keyframes grimoire-model-spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .grimoire-model-dropdown--loading {

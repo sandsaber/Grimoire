@@ -498,7 +498,7 @@
   border: 1.6px solid var(--grimoire-line-3);
   border-top-color: var(--grimoire-accent);
   border-radius: 50%;
-  animation: grimoire-spin 0.7s linear infinite;
+  animation: grimoire-spin 0.9s linear infinite;
 }
 
 .grimoire-tool-step > .grimoire-tool-content {

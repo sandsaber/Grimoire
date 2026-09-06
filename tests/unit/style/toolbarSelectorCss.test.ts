@@ -62,16 +62,20 @@ describe('chat toolbar selector CSS', () => {
     }
   });
 
-  it('matches numbered tab badges to the new-tab button size', () => {
+  it('gives a tab the header\'s full height and the header button its 28px square', () => {
     const tabsCss = readFileSync('src/style/components/tabs.css', 'utf8');
     const headerCss = readFileSync('src/style/components/header.css', 'utf8');
     const badgeRule = getRule(tabsCss, '.grimoire-tab-badge');
     const headerButtonRule = getRule(headerCss, '.grimoire-header-btn');
 
-    expect(badgeRule).toContain('width: 28px');
-    expect(badgeRule).toContain('height: 28px');
-    expect(headerButtonRule).toContain('width: 28px');
-    expect(headerButtonRule).toContain('height: 28px');
+    // A tab is not a badge any more: it fills the header's height so its
+    // underline can sit on the header's own rule.
+    expect(badgeRule).not.toContain('width: 28px');
+    expect(badgeRule).toContain('padding: 0 var(--grimoire-space-8)');
+    expect(getRule(tabsCss, '.grimoire-tab-badge-active'))
+      .toContain('border-bottom: 1.5px solid var(--grimoire-accent)');
+    expect(headerButtonRule).toContain('width: var(--grimoire-hit-l)');
+    expect(headerButtonRule).toContain('height: var(--grimoire-hit-l)');
   });
 
   it('keeps toolbar popup menus at the same distance from their buttons', () => {

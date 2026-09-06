@@ -31,7 +31,7 @@
 .grimoire-progress-block--running .grimoire-progress-icon,
 .grimoire-progress-item--in_progress .grimoire-progress-item-icon {
   color: var(--grimoire-accent);
-  animation: grimoire-progress-spin 1.2s linear infinite;
+  animation: grimoire-spin 0.9s linear infinite;
 }
 
 .grimoire-progress-block--completed .grimoire-progress-icon,
@@ -109,12 +109,6 @@
 .grimoire-text-block--commentary {
   color: var(--text-muted);
   font-size: var(--font-ui-small);
-}
-
-@keyframes grimoire-progress-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

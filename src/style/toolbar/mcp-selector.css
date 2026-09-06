@@ -30,7 +30,6 @@
 
 .grimoire-mcp-selector-icon.active {
   color: var(--grimoire-accent);
-  animation: mcp-glow 2s ease-in-out infinite;
 }
 
 .grimoire-mcp-selector-icon svg {

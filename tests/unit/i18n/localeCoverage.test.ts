@@ -61,10 +61,13 @@ const VERIFIED_IDENTICAL: Readonly<Record<typeof LOCALES[number], readonly strin
   de: [
     'chat.greetings.general.version.name',
     'chat.ui.ask.option',
+    // "Tab" is the German word too, and the rest of the string is punctuation
+    // and two placeholders.
     'chat.ui.ask.optional',
     'chat.ui.permission.agent',
     'chat.ui.status.aria',
     'chat.ui.subagent.prompt',
+    'chat.ui.tabs.tabLabel',
     'chat.ui.toolbar.permissionAuto',
     'chat.ui.toolbar.permissionPlan',
     'chat.ui.toolbar.plan',

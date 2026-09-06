@@ -1,40 +1,47 @@
-/* Compact context usage meter used in the chat session strip. */
-
+/*
+ * The context meter, at the right of the header.
+ *
+ * A 14px ring and a number, both quiet: it is a fact about the conversation
+ * rather than a control, and it earns no ground of its own. The ring is a
+ * conic gradient with an inner disc rather than a radial mask, because
+ * Obsidian's CSS review rates `css-masks` as partially supported against its
+ * compatibility baseline and a warning there is a product score.
+ */
 .grimoire-context-meter {
   position: relative;
-  height: 26px;
   display: inline-flex;
   align-items: center;
+  height: var(--grimoire-hit-l);
   gap: var(--grimoire-space-6);
-  padding: 0 var(--grimoire-space-12) 0 var(--grimoire-space-8);
+  padding: 0 var(--grimoire-space-8);
   border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-raise);
-  color: var(--grimoire-workbench-muted);
+  background: none;
+  color: var(--grimoire-ink-faint);
   cursor: default;
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
   outline: 0;
-  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
+  transition: color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-context-meter:hover,
 .grimoire-context-meter:focus-visible {
-  background: var(--grimoire-raise-2);
-  color: var(--text-normal);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-context-meter-ring {
   position: relative;
-  width: 13px;
-  height: 13px;
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
   flex: 0 0 auto;
-  border-radius: 50%;
+  border-radius: var(--grimoire-radius-circle);
   background: conic-gradient(
     var(--grimoire-context-ring-color, var(--grimoire-accent))
     calc(var(--grimoire-context-meter-pct, 0) * 3.6deg),
-    var(--grimoire-line-3) 0
+    var(--grimoire-line) 0
   );
   transition: background var(--grimoire-duration-slow) var(--grimoire-ease);
 }
@@ -42,9 +49,19 @@
 .grimoire-context-meter-ring::after {
   content: "";
   position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: var(--grimoire-panel);
+  inset: 2px;
+  border-radius: var(--grimoire-radius-circle);
+  background: var(--grimoire-ground);
+}
+
+/* Nothing spent yet: an outline, not a ring filled with its own track. */
+.grimoire-context-meter.is-empty .grimoire-context-meter-ring {
+  border: 1.5px solid var(--grimoire-line);
+  background: none;
+}
+
+.grimoire-context-meter.is-empty .grimoire-context-meter-ring::after {
+  display: none;
 }
 
 .grimoire-context-meter.warning {

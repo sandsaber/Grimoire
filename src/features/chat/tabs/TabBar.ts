@@ -1,3 +1,7 @@
+import { setIcon } from 'obsidian';
+
+import { t } from '../../../i18n/i18n';
+import { asActivatable } from '../../../shared/components/activatable';
 import type { TabBarItem, TabId } from './types';
 
 /** Callbacks for TabBar interactions. */
@@ -16,11 +20,19 @@ export interface TabBarCallbacks {
 }
 
 /**
- * TabBar renders minimal numbered badge navigation.
+ * The tab strip: one numbered tab per conversation, and the control that adds
+ * another.
+ *
+ * A tab carries its state as a dot rather than as a colour — filled and pulsing
+ * while the provider streams, a ring while the turn is waiting on an answer,
+ * nothing at rest — because a colour alone is not a state a reader can name.
+ * The active tab is marked by the accent underline sitting on the header's own
+ * rule, which is the only line in the strip.
  */
 export class TabBar {
   private containerEl: HTMLElement;
   private callbacks: TabBarCallbacks;
+  private newTabButtonEl: HTMLElement | null = null;
 
   constructor(containerEl: HTMLElement, callbacks: TabBarCallbacks) {
     this.containerEl = containerEl;
@@ -40,11 +52,30 @@ export class TabBar {
   update(items: TabBarItem[]): void {
     // Clear existing badges
     this.containerEl.empty();
+    this.newTabButtonEl = null;
 
     // Render badges
     for (const item of items) {
       this.renderBadge(item);
     }
+
+    this.renderNewTabButton();
+  }
+
+  /** The add control belongs to the strip it extends, not to the header's actions. */
+  private renderNewTabButton(): void {
+    const button = this.containerEl.createEl('button', {
+      cls: 'grimoire-header-btn grimoire-new-tab-btn',
+      attr: { type: 'button', 'aria-label': t('chat.ui.tabs.newTab') },
+    });
+    setIcon(button, 'plus');
+    button.addEventListener('click', () => this.callbacks.onNewTab());
+    this.newTabButtonEl = button;
+  }
+
+  /** The add control, so a caller can hide it once no further tab can be created. */
+  getNewTabButton(): HTMLElement | null {
+    return this.newTabButtonEl;
   }
 
   /** Renders a single tab badge. */
@@ -62,9 +93,11 @@ export class TabBar {
     badgeEl.createSpan({ cls: 'grimoire-tab-activity-dot' });
     badgeEl.createSpan({ cls: 'grimoire-tab-number', text: String(item.index) });
 
-    // Tooltip with full title (aria-label only; adding title too causes double tooltip)
-    badgeEl.setAttribute('aria-label', this.getAccessibleTitle(item));
-    badgeEl.setAttribute('data-provider', item.providerId);
+    asActivatable(badgeEl, {
+      label: this.getAccessibleTitle(item),
+      onActivate: () => this.callbacks.onTabClick(item.id),
+    });
+    if (item.isActive) badgeEl.setAttribute('aria-current', 'page');
 
     badgeEl.addEventListener('contextmenu', (event: MouseEvent) => {
       event.preventDefault();
@@ -76,22 +109,19 @@ export class TabBar {
       event.preventDefault();
       this.callbacks.onTabMiddleClick(item.id);
     });
-
-    // Click handler to switch tab
-    badgeEl.addEventListener('click', () => {
-      this.callbacks.onTabClick(item.id);
-    });
   }
 
   private getAccessibleTitle(item: TabBarItem): string {
-    // No orchestrator or worker variants any more: a worker is a dispatched
-    // agent rather than a tab, so no tab is one and no tab owns one.
-    return item.title;
+    // The tab shows its number, so the number is half of what names it; the
+    // title is the other half. No orchestrator or worker variants any more: a
+    // worker is a dispatched agent rather than a tab, so no tab is one.
+    return t('chat.ui.tabs.tabLabel', { index: item.index, title: item.title });
   }
 
   /** Destroys the tab bar. */
   destroy(): void {
     this.containerEl.empty();
+    this.newTabButtonEl = null;
     this.containerEl.removeClass('grimoire-tab-badges');
   }
 }

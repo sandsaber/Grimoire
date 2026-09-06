@@ -63,7 +63,7 @@ import { autoResizeTextarea } from '../ui/textareaResize';
 import { buildAssistantResponseMetadata } from '../utils/assistantResponseMetadata';
 import { recalculateUsageForModel } from '../utils/usageInfo';
 import { getTabProviderId } from './providerResolution';
-import { attachInputResizeHandle, buildTabDOM } from './tabDOM';
+import { applyPanelLabels, attachInputResizeHandle, buildTabDOM } from './tabDOM';
 import {
   durableAgentsRunning,
   recordDurableSubagent,
@@ -194,6 +194,7 @@ export function createTab(options: TabCreateOptions): TabData {
   const relevantNotesService = new RelevantNotesService(vaultTextIndex);
 
   const dom = buildTabDOM(contentEl);
+  applyPanelLabels(dom, plugin.settings.showPanelLabels === true);
   dom.eventCleanups.push(attachInputResizeHandle(dom));
   state.queueIndicatorEl = dom.queueIndicatorEl;
 
@@ -994,7 +995,7 @@ export function initializeTabUI(
   );
 
   tab.ui.navigationSidebar = new NavigationSidebar(
-    dom.workbenchGridEl,
+    dom.panelJumpEl,
     dom.chatScrollEl,
     dom.messagesEl,
     () => scrollTabToBottom(tab, plugin),

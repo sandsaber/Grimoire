@@ -389,6 +389,7 @@ const GENERAL_SETTINGS_SEARCH_KEYS: TranslationKey[] = [
   'settings.usageIndicators.name',
   'settings.debugLogging.name',
   'settings.maxTabs.name',
+  'settings.showPanelLabels.name',
 ];
 
 export class GrimoireSettingTab extends PluginSettingTab {
@@ -1958,6 +1959,21 @@ export class GrimoireSettingTab extends PluginSettingTab {
       });
 
     this.renderMaxTabsSetting(container);
+
+    new Setting(container)
+      .setName(t('settings.showPanelLabels.name'))
+      .setDesc(t('settings.showPanelLabels.desc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showPanelLabels)
+          .onChange(async (value) => {
+            this.plugin.settings.showPanelLabels = value;
+            await this.plugin.saveSettings();
+            for (const view of this.plugin.getAllViews()) {
+              view.refreshPanelLabels();
+            }
+          })
+      );
 
     new Setting(container)
       .setName(t('settings.enableAutoScroll.name'))

@@ -381,6 +381,8 @@
       "tabs": {
         "createFailed": "Não foi possível criar a aba",
         "newTab": "Nova aba",
+        "tabLabel": "Aba {index} · {title}",
+        "tabActions": "Ações da aba",
         "history": "Histórico de chats",
         "switchFailed": "Não foi possível trocar de aba",
         "closeFailed": "Não foi possível fechar a aba",
@@ -900,6 +902,10 @@
       "name": "Máximo de abas de chat",
       "desc": "Número máximo de abas de chat simultâneas (1-10). Cada aba usa uma sessão Claude separada.",
       "warning": "Mais de 5 abas pode afetar o desempenho e o uso de memória."
+    },
+    "showPanelLabels": {
+      "name": "Mostrar nomes dos painéis",
+      "desc": "Nomeia cada painel no seletor acima da conversa. O painel atual é sempre nomeado; os outros ficam como ícones até você ativar isto."
     },
     "tabBarPosition": {
       "name": "Posição da barra de abas",

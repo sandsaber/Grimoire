@@ -81,7 +81,7 @@
   border-top-color: var(--grimoire-accent);
   border-radius: 50%;
   box-sizing: border-box;
-  animation: grimoire-spin 0.8s linear infinite;
+  animation: grimoire-spin 0.9s linear infinite;
 }
 
 /* Agent reply - shown when agent asks clarifying question */

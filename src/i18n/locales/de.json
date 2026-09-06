@@ -381,6 +381,8 @@
       "tabs": {
         "createFailed": "Tab konnte nicht erstellt werden",
         "newTab": "Neuer Tab",
+        "tabLabel": "Tab {index} · {title}",
+        "tabActions": "Tab-Aktionen",
         "history": "Chatverlauf",
         "switchFailed": "Tab konnte nicht gewechselt werden",
         "closeFailed": "Tab konnte nicht geschlossen werden",
@@ -900,6 +902,10 @@
       "name": "Maximale Chat-Tabs",
       "desc": "Maximale Anzahl gleichzeitiger Chat-Tabs (1-10). Jeder Tab verwendet eine separate Claude-Sitzung.",
       "warning": "Mehr als 5 Tabs können Leistung und Speichernutzung beeinträchtigen."
+    },
+    "showPanelLabels": {
+      "name": "Bereichsnamen anzeigen",
+      "desc": "Benennt jeden Bereich im Umschalter über dem Verlauf. Der aktive Bereich wird immer benannt; die übrigen bleiben Symbole, bis du dies einschaltest."
     },
     "tabBarPosition": {
       "name": "Tab-Leiste Position",

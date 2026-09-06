@@ -85,7 +85,7 @@
 .grimoire-mcp-test-spinner {
   width: 20px;
   height: 20px;
-  animation: grimoire-spin 1s linear infinite;
+  animation: grimoire-spin 0.9s linear infinite;
 }
 
 .grimoire-mcp-test-spinner svg {

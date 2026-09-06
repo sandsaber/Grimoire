@@ -381,6 +381,8 @@
       "tabs": {
         "createFailed": "Failed to create tab",
         "newTab": "New tab",
+        "tabLabel": "Tab {index} · {title}",
+        "tabActions": "Tab actions",
         "history": "Chat history",
         "switchFailed": "Failed to switch tab",
         "closeFailed": "Failed to close tab",
@@ -900,6 +902,10 @@
       "name": "Maximum chat tabs",
       "desc": "Maximum number of concurrent chat tabs (1-10).",
       "warning": "Higher tab counts may affect performance and memory usage."
+    },
+    "showPanelLabels": {
+      "name": "Show panel labels",
+      "desc": "Name every panel in the switch above the transcript. The panel you are in is always named; the others are glyphs until you turn this on."
     },
     "tabBarPosition": {
       "name": "Tab bar position",

@@ -3,7 +3,7 @@
   font-style: italic;
   padding: var(--grimoire-space-4) 0;
   text-align: start;
-  animation: thinking-pulse 1.5s ease-in-out infinite;
+  animation: grimoire-pulse 1.4s ease-in-out infinite;
 }
 
 .grimoire-thinking.grimoire-thinking--compact {
@@ -18,7 +18,6 @@
 
 .grimoire-silent-turn-status {
   align-items: center;
-  animation: grimoire-silent-turn-fade 250ms ease-out;
   color: var(--text-muted);
   display: flex;
   font-size: var(--grimoire-text-m);
@@ -32,11 +31,6 @@
 
 .grimoire-silent-turn-status-elapsed {
   font-variant-numeric: tabular-nums;
-}
-
-@keyframes grimoire-silent-turn-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -147,7 +147,6 @@
   background: var(--background-primary);
   box-shadow: var(--grimoire-lift-1);
   z-index: 10004;
-  animation: grimoire-pop 0.14s ease-out;
 }
 
 .grimoire-container--chat-window .grimoire-thinking-gear {

@@ -19,7 +19,7 @@ describe('container.css source controls', () => {
   it('keeps the composer bottom gutter visually compact', () => {
     const composerRule = getRuleIncludingSelector(readContainerCss(), '.grimoire-composer-surface');
 
-    expect(composerRule).toContain('padding: var(--grimoire-space-6) var(--grimoire-window-padding-x) var(--grimoire-space-2)');
+    expect(composerRule).toContain('padding: var(--grimoire-space-8) var(--grimoire-window-padding-x) var(--grimoire-space-12)');
   });
 
   it('keeps source filter buttons visually flat except the active state', () => {

@@ -381,6 +381,8 @@
       "tabs": {
         "createFailed": "無法建立分頁",
         "newTab": "新增分頁",
+        "tabLabel": "分頁 {index} · {title}",
+        "tabActions": "分頁操作",
         "history": "聊天記錄",
         "switchFailed": "無法切換分頁",
         "closeFailed": "無法關閉分頁",
@@ -900,6 +902,10 @@
       "name": "最大聊天標籤數",
       "desc": "同時開啟的最大聊天標籤數（1-10）。每個標籤使用獨立的 Claude 對話。",
       "warning": "超過 5 個標籤可能會影響效能和記憶體使用。"
+    },
+    "showPanelLabels": {
+      "name": "顯示面板名稱",
+      "desc": "在對話上方的切換器中為每個面板顯示名稱。目前面板一律顯示名稱，其餘面板在開啟前只顯示圖示。"
     },
     "tabBarPosition": {
       "name": "標籤列位置",

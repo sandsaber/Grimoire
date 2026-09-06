@@ -12,13 +12,21 @@
 }
 
 .grimoire-container--chat-window {
-  --grimoire-window-padding-x: var(--grimoire-space-6);
+  --grimoire-window-padding-x: var(--grimoire-space-12);
   --grimoire-window-radius: 0;
-  background: var(--grimoire-panel);
+  background: var(--grimoire-ground);
 }
 
+/*
+ * The chat column is the container every responsive rule in the plugin asks,
+ * because the pane it lives in is resized by the user and the viewport is not
+ * what changed. 380px is where the composer drops the model's name to its
+ * glyph and the panel switch goes back to a rail of icons.
+ */
 .grimoire-chat-window-shell {
   position: relative;
+  container-name: grimoire-chat;
+  container-type: inline-size;
   isolation: isolate;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -27,7 +35,7 @@
   overflow: hidden;
   border: 0;
   border-radius: var(--grimoire-window-radius);
-  background: var(--grimoire-panel);
+  background: var(--grimoire-ground);
   box-shadow: none;
 }
 
@@ -453,8 +461,8 @@
   container-name: grimoire-permission;
   container-type: inline-size;
   overflow: visible;
-  padding: var(--grimoire-space-6) var(--grimoire-window-padding-x) var(--grimoire-space-2);
-  background: var(--grimoire-panel);
+  padding: var(--grimoire-space-8) var(--grimoire-window-padding-x) var(--grimoire-space-12);
+  background: var(--grimoire-ground);
 }
 
 .grimoire-composer-surface .grimoire-input-container,

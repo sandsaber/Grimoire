@@ -214,13 +214,15 @@ describe('messages.css', () => {
     const chatScrollRule = getExactRule(css, '.grimoire-chat-scroll');
     const composerRule = getExactRule(css, '.grimoire-composer-surface');
     const headerRule = getExactRule(readHeaderCss(), '.grimoire-header');
-    const panelTabsRule = getExactRule(readTabsCss(), '.grimoire-panel-tabs');
+    const panelSwitchRule = getExactRule(readTabsCss(), '.grimoire-panel-switch');
 
-    expect(windowRule).toContain('--grimoire-window-padding-x: var(--grimoire-space-6)');
+    // 12px is the gutter the design draws every column against; the header
+    // insets its own left edge to the same line.
+    expect(windowRule).toContain('--grimoire-window-padding-x: var(--grimoire-space-12)');
     expect(chatScrollRule).toContain('var(--grimoire-window-padding-x)');
     expect(composerRule).toContain('var(--grimoire-window-padding-x)');
-    expect(headerRule).toContain('var(--grimoire-window-padding-x)');
-    expect(panelTabsRule).toContain('var(--grimoire-window-padding-x)');
+    expect(headerRule).toContain('var(--grimoire-space-12)');
+    expect(panelSwitchRule).toContain('var(--grimoire-window-padding-x)');
   });
 
   it('constrains provider markdown media and raw html embeds to the chat width', () => {

@@ -381,6 +381,8 @@
       "tabs": {
         "createFailed": "No se pudo crear la pestaña",
         "newTab": "Nueva pestaña",
+        "tabLabel": "Pestaña {index} · {title}",
+        "tabActions": "Acciones de pestaña",
         "history": "Historial de chat",
         "switchFailed": "No se pudo cambiar de pestaña",
         "closeFailed": "No se pudo cerrar la pestaña",
@@ -900,6 +902,10 @@
       "name": "Máximo de pestañas de chat",
       "desc": "Número máximo de pestañas de chat simultáneas (1-10). Cada pestaña usa una sesión de Claude separada.",
       "warning": "Más de 5 pestañas puede afectar el rendimiento y el uso de memoria."
+    },
+    "showPanelLabels": {
+      "name": "Mostrar nombres de panel",
+      "desc": "Nombra cada panel en el selector sobre la conversación. El panel activo siempre se nombra; los demás son iconos hasta que actives esto."
     },
     "tabBarPosition": {
       "name": "Posición de la barra de pestañas",

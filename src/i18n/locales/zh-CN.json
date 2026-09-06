@@ -381,6 +381,8 @@
       "tabs": {
         "createFailed": "创建标签页失败",
         "newTab": "新建标签页",
+        "tabLabel": "标签页 {index} · {title}",
+        "tabActions": "标签页操作",
         "history": "对话历史",
         "switchFailed": "切换标签页失败",
         "closeFailed": "关闭标签页失败",
@@ -900,6 +902,10 @@
       "name": "最大聊天标签数",
       "desc": "同时开启的最大聊天标签数（1-10）。每个标签使用独立的 Claude 会话。",
       "warning": "超过 5 个标签可能会影响性能和内存使用。"
+    },
+    "showPanelLabels": {
+      "name": "显示面板名称",
+      "desc": "在对话上方的切换器中为每个面板显示名称。当前面板始终显示名称，其余面板在开启前只显示图标。"
     },
     "tabBarPosition": {
       "name": "标签栏位置",

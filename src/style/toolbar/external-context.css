@@ -30,7 +30,6 @@
 
 .grimoire-external-context-icon.active {
   color: var(--grimoire-accent);
-  animation: external-context-glow 2s ease-in-out infinite;
 }
 
 .grimoire-external-context-icon svg {
@@ -201,7 +200,6 @@
   background: var(--grimoire-plane);
   box-shadow: var(--grimoire-lift-2);
   z-index: 10002;
-  animation: grimoire-pop 0.14s ease-out;
 }
 
 .grimoire-container--chat-window .grimoire-external-context-list {

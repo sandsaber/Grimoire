@@ -381,6 +381,8 @@
       "tabs": {
         "createFailed": "Impossible de créer l’onglet",
         "newTab": "Nouvel onglet",
+        "tabLabel": "Onglet {index} · {title}",
+        "tabActions": "Actions de l'onglet",
         "history": "Historique des discussions",
         "switchFailed": "Impossible de changer d’onglet",
         "closeFailed": "Impossible de fermer l’onglet",
@@ -900,6 +902,10 @@
       "name": "Maximum d'onglets de chat",
       "desc": "Nombre maximum d'onglets de chat simultanés (1-10). Chaque onglet utilise une session Claude séparée.",
       "warning": "Plus de 5 onglets peut affecter les performances et l'utilisation de la mémoire."
+    },
+    "showPanelLabels": {
+      "name": "Afficher les noms des panneaux",
+      "desc": "Nomme chaque panneau dans le sélecteur au-dessus de la conversation. Le panneau actif est toujours nommé ; les autres restent des icônes tant que ceci est désactivé."
     },
     "tabBarPosition": {
       "name": "Position de la barre d'onglets",

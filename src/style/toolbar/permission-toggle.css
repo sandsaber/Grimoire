@@ -77,7 +77,6 @@
 .grimoire-permission-gears.open .grimoire-permission-options {
   opacity: 1;
   visibility: visible;
-  animation: grimoire-pop 0.14s ease-out;
 }
 
 .grimoire-permission-option {

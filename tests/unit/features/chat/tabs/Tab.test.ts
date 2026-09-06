@@ -723,9 +723,14 @@ describe('Tab - Creation', () => {
       expect(tab.dom.workbenchGridEl.hasClass('grimoire-chat-window-grid')).toBe(true);
       expect(tab.dom.panelTabsEl?.hasClass('grimoire-panel-tabs')).toBe(true);
       expect(tab.dom.panelTabsEl?.getAttribute('aria-label')).toBeNull();
-      expect(tab.dom.chatPanelButtonEl?.textContent).toBe('Chat');
-      expect(tab.dom.sourcesPanelButtonEl?.textContent).toBe('Sources');
-      expect(tab.dom.contextPanelButtonEl?.textContent).toBe('Context');
+      // A segment is a glyph and a word, and the word is only shown for the
+      // segment the reader is in — so the name has to live on the control.
+      expect(tab.dom.chatPanelButtonEl?.getAttribute('aria-label')).toBe('Chat');
+      expect(tab.dom.sourcesPanelButtonEl?.getAttribute('aria-label')).toBe('Sources');
+      expect(tab.dom.contextPanelButtonEl?.getAttribute('aria-label')).toBe('Context');
+      expect(tab.dom.chatPanelButtonEl?.querySelector('.grimoire-panel-tab-label')?.textContent).toBe('Chat');
+      expect(tab.dom.chatPanelButtonEl?.querySelector('.grimoire-panel-tab-icon')?.getAttribute('aria-hidden')).toBe('true');
+      expect(tab.dom.panelJumpEl?.hasClass('grimoire-panel-jump')).toBe(true);
       expect(Array.from(tab.dom.sourceFiltersEl.querySelectorAll('.grimoire-source-filter')).map(button => button.getAttribute('data-source-filter'))).toEqual([
         'all',
         'linked',

@@ -1,56 +1,44 @@
-@keyframes thinking-pulse {
+/*
+ * The whole of motion in the system.
+ *
+ * Two keyframes: something is alive, and something is waiting. Everything else
+ * a surface does — hover, press, open — is a 120ms transition on one curve, and
+ * nothing animates position on a surface the reader is already reading. The
+ * six that were here before this (two glows, three entrances and a fade) were
+ * decoration on surfaces that had just appeared, which is where motion is least
+ * welcome and most expensive.
+ */
+
+/* Alive: a streaming dot, a thinking line. */
+@keyframes grimoire-pulse {
   0%,
   100% {
-    opacity: 0.5;
-  }
-
-  50% {
     opacity: 1;
   }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes external-context-glow {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--grimoire-accent) 40%, transparent));
-  }
 
   50% {
-    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--grimoire-accent) 80%, transparent));
+    opacity: 0.35;
   }
 }
 
-@keyframes mcp-glow {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--grimoire-accent) 40%, transparent));
-  }
-
-  50% {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--grimoire-accent) 90%, transparent));
-  }
-}
-
+/* Waiting: every spinner in the plugin. */
 @keyframes grimoire-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-@keyframes grimoire-pop {
+/*
+ * The one exception, and it earns it: the undo bar's countdown is not
+ * decoration, it is the deadline. A user deciding whether to undo needs to see
+ * how long they have, and a number would be worse.
+ */
+@keyframes grimoire-tab-close-toast-countdown {
   from {
-    opacity: 0;
-    transform: translateY(7px) scale(0.985);
+    transform: scaleX(1);
   }
 
   to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scaleX(0);
   }
 }
