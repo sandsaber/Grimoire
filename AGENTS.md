@@ -122,15 +122,29 @@ Two habits the system exists to enforce, both learned from shipped defects:
 - **A fallback hides a missing dependency**, so a value that looks considered can be frozen. Prefer no
   fallback on a Grimoire token, and let the gate catch a missing one.
 
-The system is enforced, not documented: `tests/unit/style/designSystem.test.ts` and
-`tests/unit/style/themeAdaptation.test.ts`. Extend them when you extend the system, and prove a new
-rule by breaking it.
+There are no fixed colours. The nine provider brand colours were the last exception, and identity is
+the vendor's own mark drawn in `--grimoire-ink-muted` instead — status is an accent dot beside a
+word, never a hue on its own.
+
+The accent is spent on a budget, and it is short: a line, a dot, a glyph, a 40% border, a 12% wash,
+an 8% wash for one band, and exactly one filled action per surface. Anything else is ink, ground or
+line.
+
+The system is enforced, not documented: `tests/unit/style/designSystem.test.ts`,
+`tests/unit/style/themeAdaptation.test.ts` and `tests/unit/style/decisionCardCss.test.ts`. Extend
+them when you extend the system, and prove a new rule by breaking it. Regenerate the theme fixture
+with `node scripts/generate-theme-tokens.mjs` after adding a dependency on a host variable.
 
 Icons carry recognition, words carry meaning. Icon plus label where a choice has a cost; icon only in
 dense repeating chrome, and never without an accessible name; never icon-only for something that
 cannot be taken back. A non-button element that responds to a click goes through
 `asActivatable` in `src/shared/components/activatable.ts`, which gives it the role, the name, the tab
-stop and the Enter/Space handling a button has.
+stop and the Enter/Space handling a button has. A menu with one way in must not need a mouse: the tab
+menu was right-click only, which put six of its items out of the keyboard's reach entirely.
+
+Every decision Grimoire asks for wears one shape — a glyph, what is being decided, the material it
+acts on, numbered choices — whether it is a plan to approve, a question to answer or a permission to
+grant.
 
 Settings surfaces are built with the declarative settings API and must look native: style what
 Grimoire puts *inside* a row, never `.setting-item` and its parts.

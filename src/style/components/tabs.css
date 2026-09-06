@@ -131,7 +131,7 @@
   border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-plane);
-  box-shadow: var(--grimoire-lift-2);
+  box-shadow: var(--grimoire-lift-1);
   color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   pointer-events: auto;

@@ -56,7 +56,7 @@ grown apart before that moved.
 
 Rules the gates hold, in `tests/unit/style/designSystem.test.ts` and `themeAdaptation.test.ts`:
 
-1. every Grimoire token a stylesheet reads without a fallback is defined, or is one of the thirteen a
+1. every Grimoire token a stylesheet reads without a fallback is defined, or is one of the twelve a
    controller sets per element;
 2. sizes, weights and radii are steps in the scale;
 3. colour comes from the theme — no `rgba(<digits>` and no hex anywhere, including the token layer;

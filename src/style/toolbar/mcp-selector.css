@@ -139,7 +139,7 @@
   bottom: calc(100% + 8px);
   border-color: var(--grimoire-workbench-border-strong);
   background: var(--grimoire-plane);
-  box-shadow: var(--grimoire-lift-2);
+  box-shadow: var(--grimoire-lift-1);
 }
 
 .grimoire-mcp-selector-item {

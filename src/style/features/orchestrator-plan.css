@@ -54,7 +54,7 @@
   border: 1px solid var(--grimoire-line-2);
   border-radius: var(--grimoire-radius-3);
   background: var(--grimoire-sink);
-  box-shadow: var(--grimoire-lift-2);
+  box-shadow: var(--grimoire-lift-1);
 }
 
 .grimoire-orchestrator-plan-header {
