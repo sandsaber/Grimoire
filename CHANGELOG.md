@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 - 2026-09-06
+## 2.0.0 - Unreleased
 
 The provider runtime is rebuilt on an execution kernel. Every provider runs through it, and what a chat surface draws is read from the kernel's record of a turn rather than from whether the provider stopped talking. Existing conversations, settings, and provider-owned files are read as they are; nothing needs migrating.
 
