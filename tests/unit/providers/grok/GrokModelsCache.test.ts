@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import {
   expandGrokVisibleModelsWithFrontier,
   parseGrokConfigDefaultModel,
+  parseGrokConfigModelDefinitions,
   parseGrokModelsCache,
   parseGrokModelsCliOutput,
   readGrokNativeModelCatalog,
@@ -154,5 +155,111 @@ yolo = false
         { label: 'Grok 4.5', rawId: 'grok-4.5' },
       ],
     });
+  });
+
+  it('parses locally defined [model."..."] sections from config.toml', () => {
+    expect(parseGrokConfigModelDefinitions(`
+[models]
+default = "grok-4.6"
+
+[model."grok-0.7"]
+model = "qwen2.5-coder-32k:7b"
+base_url = "http://127.0.0.1:11434/v1"
+name = "Qwen2.5 Coder 7B 32k (Ollama)"
+description = "Local Ollama slot"
+`)).toEqual([
+      {
+        description: 'Local Ollama slot',
+        label: 'Qwen2.5 Coder 7B 32k (Ollama)',
+        rawId: 'grok-0.7',
+      },
+    ]);
+  });
+
+  it('falls back to the catalog label when a local model has no name', () => {
+    expect(parseGrokConfigModelDefinitions(`
+[model."grok-0.7"]
+model = "qwen2.5-coder-32k:7b"
+`)).toEqual([{ label: 'Grok 0.7', rawId: 'grok-0.7' }]);
+  });
+
+  it('ignores scalars under [model] and malformed config.toml', () => {
+    expect(parseGrokConfigModelDefinitions(`
+[model]
+default_timeout = 30
+
+[model."grok-0.7"]
+model = "qwen2.5-coder-32k:7b"
+`)).toEqual([{ label: 'Grok 0.7', rawId: 'grok-0.7' }]);
+    expect(parseGrokConfigModelDefinitions('this is not = valid toml [[[')).toEqual([]);
+    expect(parseGrokConfigModelDefinitions('[models]\ndefault = "grok-4.6"\n')).toEqual([]);
+  });
+
+  it('keeps config.toml-defined local models in the native catalog the runtime reads', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'grimoire-grok-local-'));
+    const nativeHome = path.join(tempRoot, 'native');
+    const managedHome = path.join(tempRoot, 'managed');
+    fs.mkdirSync(nativeHome, { recursive: true });
+    fs.mkdirSync(managedHome, { recursive: true });
+    // The cloud-sourced cache only ever has the frontier models.
+    fs.writeFileSync(path.join(managedHome, 'models_cache.json'), JSON.stringify({
+      models: {
+        'grok-4.6': { info: { id: 'grok-4.6', name: 'Grok 4.6' } },
+        'grok-4.5': { info: { id: 'grok-4.5', name: 'Grok 4.5' } },
+      },
+    }));
+    // The managed config.toml is where Grimoire writes local Ollama models.
+    fs.writeFileSync(path.join(managedHome, 'config.toml'), [
+      '[models]',
+      'default = "grok-4.6"',
+      '',
+      '[model."grok-0.7"]',
+      'model = "qwen2.5-coder-32k:7b"',
+      'base_url = "http://127.0.0.1:11434/v1"',
+      'name = "Qwen2.5 Coder 7B 32k (Ollama)"',
+      '',
+    ].join('\n'));
+
+    const catalog = readGrokNativeModelCatalog({
+      env: {
+        GROK_AUTH_PATH: path.join(nativeHome, 'auth.json'),
+        GROK_HOME: managedHome,
+      },
+      managedGrokHomePath: managedHome,
+    });
+
+    expect(catalog.models.map((model) => model.rawId)).toEqual(
+      expect.arrayContaining(['grok-4.6', 'grok-4.5', 'grok-0.7']),
+    );
+    expect(catalog.models.find((model) => model.rawId === 'grok-0.7')).toEqual({
+      label: 'Qwen2.5 Coder 7B 32k (Ollama)',
+      rawId: 'grok-0.7',
+    });
+  });
+
+  it('lets a config.toml override win over the cached entry for the same model', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'grimoire-grok-override-'));
+    const managedHome = path.join(tempRoot, 'managed');
+    fs.mkdirSync(managedHome, { recursive: true });
+    fs.writeFileSync(path.join(managedHome, 'models_cache.json'), JSON.stringify({
+      models: { 'grok-4.6': { info: { id: 'grok-4.6', name: 'Grok 4.6' } } },
+    }));
+    // Grok resolves `[model.*]` above the prefetched cloud catalog, so an override of a
+    // frontier model has to reach the picker as the user wrote it.
+    fs.writeFileSync(path.join(managedHome, 'config.toml'), [
+      '[model."grok-4.6"]',
+      'base_url = "https://gateway.example/v1"',
+      'name = "Grok 4.6 (corp gateway)"',
+      '',
+    ].join('\n'));
+
+    const catalog = readGrokNativeModelCatalog({
+      env: { GROK_HOME: managedHome },
+      managedGrokHomePath: managedHome,
+    });
+
+    expect(catalog.models.filter((model) => model.rawId === 'grok-4.6')).toEqual([
+      { label: 'Grok 4.6 (corp gateway)', rawId: 'grok-4.6' },
+    ]);
   });
 });

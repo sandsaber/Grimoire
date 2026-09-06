@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import type { EventRef, WorkspaceLeaf } from 'obsidian';
-import { ItemView, Menu, Notice, Platform, Scope } from 'obsidian';
+import { ItemView, Menu, Notice, Platform, Scope, setTooltip } from 'obsidian';
 
 import { GRIMOIRE_CHANGELOG_URL } from '../../app/changelog/source';
 import {
@@ -9,6 +9,7 @@ import {
   agentInstanceId,
   agentRunId,
 } from '../../core/agents/AgentIds';
+import { truncateTitleOnWordBoundary } from '../../core/prompt/titleLength';
 import { getHiddenProviderCommandSet } from '../../core/providers/commands/hiddenCommands';
 import { providerCatalog } from '../../core/providers/ProviderCatalog';
 import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
@@ -34,6 +35,7 @@ import { TabBar } from './tabs/TabBar';
 import { TabManager } from './tabs/TabManager';
 import type { ClosedTabSnapshot, TabData, TabId } from './tabs/types';
 import { normalizeMaxTabs } from './tabs/types';
+import { closeTopmostImageViewer } from './ui/imageViewerStack';
 import { ContextUsageMeter, getNextPermissionMode } from './ui/InputToolbar';
 import { requestTabRename } from './ui/RenameTabModal';
 import { buildAssistantResponseMetadata } from './utils/assistantResponseMetadata';
@@ -82,6 +84,27 @@ const HISTORY_ICON_PATHS = [
 ];
 
 let historyDialogSequence = 0;
+
+/** A tab title may run to `MAX_TAB_TITLE_LENGTH`; a menu heading that long stretches the menu. */
+export const MAX_TAB_MENU_HEADING_LENGTH = 40;
+
+/**
+ * A shortened heading must still surface the whole name: two tabs can share the first
+ * `MAX_TAB_MENU_HEADING_LENGTH` characters and would otherwise be indistinguishable here.
+ *
+ * The cut goes through the shared title truncation so a heading ends the way every other
+ * shortened title does — on a word boundary, never on half a surrogate pair.
+ */
+export function buildTabMenuHeading(title: string): string | DocumentFragment {
+  if (title.length <= MAX_TAB_MENU_HEADING_LENGTH) return title;
+
+  const shortened = truncateTitleOnWordBoundary(title, MAX_TAB_MENU_HEADING_LENGTH);
+  return createFragment((fragment) => {
+    const span = createSpan({ text: shortened, attr: { 'aria-label': title } });
+    setTooltip(span, title, { placement: 'top' });
+    fragment.appendChild(span);
+  });
+}
 
 function appendHistoryHeaderIcon(container: HTMLElement): void {
   container.empty();
@@ -580,7 +603,7 @@ export class GrimoireView extends ItemView {
     const menu = new Menu();
 
     menu.addItem(item => item
-      .setTitle(getTabTitle(tab, this.plugin).toUpperCase())
+      .setTitle(buildTabMenuHeading(getTabTitle(tab, this.plugin)))
       .setIsLabel(true));
     menu.addItem(item => item
       .setTitle(`${t('chat.ui.tabs.closeTab')} (${hotkey})`)
@@ -598,6 +621,20 @@ export class GrimoireView extends ItemView {
     menu.addItem(item => item
       .setTitle(t('chat.ui.tabs.rename'))
       .onClick(() => { void this.renameTab(tabId); }));
+    const titleController = tab.controllers.conversationController;
+    if (titleController?.isAutoTitleEnabled()) {
+      const conversationId = tab.conversationId;
+      const canAutoRename = titleController.canSuggestTitle(conversationId);
+      menu.addItem(item => item
+        .setTitle(t('chat.ui.tabs.autoRename'))
+        .setDisabled(!canAutoRename)
+        .onClick(() => {
+          if (!canAutoRename || !conversationId) return;
+          void titleController.regenerateTitle(conversationId).catch(() => {
+            new Notice(t('chat.ui.tabs.autoRenameFailed'));
+          });
+        }));
+    }
     menu.addItem(item => item
       .setTitle(t('chat.ui.tabs.duplicate'))
       .setDisabled(!manager.canCreateTab())
@@ -609,7 +646,13 @@ export class GrimoireView extends ItemView {
     const manager = this.tabManager;
     const tab = manager?.getTab(tabId);
     if (!manager || !tab) return;
-    const title = await requestTabRename(this.app, getTabTitle(tab, this.plugin));
+    const controller = tab.controllers.conversationController;
+    const conversationId = tab.conversationId;
+    const title = await requestTabRename(
+      this.app,
+      getTabTitle(tab, this.plugin),
+      controller && conversationId ? { controller, conversationId } : null,
+    );
     if (title === null) return;
     await manager.renameTab(tabId, title);
   }
@@ -1017,6 +1060,11 @@ export class GrimoireView extends ItemView {
     this.scope.register([], 'Escape', (e: KeyboardEvent) => {
       if (e.isComposing) return;
       if (!e.defaultPrevented) {
+        // A full-size image spoken for this Escape: closing it must not also
+        // cost the user the turn that is streaming behind it.
+        if (closeTopmostImageViewer()) {
+          return false;
+        }
         const activeTab = this.tabManager?.getActiveTab();
         if (activeTab?.state.isStreaming) {
           activeTab.controllers.inputController?.cancelStreaming();

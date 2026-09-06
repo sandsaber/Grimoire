@@ -25,6 +25,7 @@ import {
   normalizeLatexDelimiters,
 } from '../../../utils/markdownMath';
 import { findRewindContext } from '../rewind';
+import { closeTopmostImageViewer, registerOpenImageViewer } from '../ui/imageViewerStack';
 import { renderVaultSearchSources } from '../ui/VaultSearchSources';
 import { getAssistantResponseProviderLabel } from '../utils/assistantResponseMetadata';
 import { localizeReasoningLevel } from '../utils/reasoningDisplay';
@@ -955,7 +956,7 @@ export class MessageRenderer {
    * Shows full-size image in modal overlay.
    */
   showFullImage(image: ImageAttachment): void {
-    const dataUri = `data:${image.mediaType};base64,${image.data}`;
+    const dataUri = this.imageSrc(image);
 
     const ownerDocument = this.messagesEl.ownerDocument ?? window.document;
     const overlay = ownerDocument.body.createDiv({ cls: 'grimoire-image-modal-overlay' });
@@ -977,29 +978,53 @@ export class MessageRenderer {
       onActivate: () => close(),
     });
 
+    // See the same handler in ImageContext: the stack decides which viewer
+    // closes, and consuming the key here keeps it from also cancelling the
+    // streaming turn behind the overlay.
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        close();
+      if (e.key !== 'Escape') {
+        return;
       }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeTopmostImageViewer();
     };
 
+    const unregisterViewer = registerOpenImageViewer(() => close());
+
     const close = () => {
-      ownerDocument.removeEventListener('keydown', handleEsc);
+      unregisterViewer();
+      ownerDocument.removeEventListener('keydown', handleEsc, true);
       overlay.remove();
     };
 
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close();
     });
-    ownerDocument.addEventListener('keydown', handleEsc);
+    ownerDocument.addEventListener('keydown', handleEsc, true);
   }
 
   /**
    * Sets image src from attachment data.
    */
   setImageSrc(imgEl: HTMLImageElement, image: ImageAttachment): void {
-    const dataUri = `data:${image.mediaType};base64,${image.data}`;
-    imgEl.setAttribute('src', dataUri);
+    imgEl.setAttribute('src', this.imageSrc(image));
+  }
+
+  /**
+   * Prefers the stored file over a data URI: the browser then caches one URL
+   * instead of the renderer rebuilding a megabyte of base64 on every click,
+   * and the image still resolves when the in-memory copy was never refilled.
+   */
+  private imageSrc(image: ImageAttachment): string {
+    if (image.hash) {
+      const stored = this.plugin.storage?.attachments?.resourcePath(image.hash, image.mediaType);
+      if (stored) {
+        return stored;
+      }
+    }
+
+    return `data:${image.mediaType};base64,${image.data}`;
   }
 
   // ============================================

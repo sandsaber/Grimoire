@@ -393,6 +393,10 @@
         "name": "Tab name",
         "charactersLeft": "{count} characters left",
         "resetName": "Reset to current name",
+        "autoRename": "Auto-rename",
+        "autoRenaming": "Generating a title…",
+        "autoRenameNeedsMessage": "Send a message first — there is nothing to name yet",
+        "autoRenameFailed": "Could not generate a title",
         "duplicate": "Duplicate",
         "duplicateTitle": "Copy of {title}",
         "duplicateFailed": "Failed to duplicate tab",
@@ -867,7 +871,7 @@
     },
     "refreshModels": {
       "name": "Refresh models",
-      "desc": "Ask Claude Code for its current model list. Grimoire otherwise re-checks only when the CLI or its environment changes.",
+      "desc": "Ask {provider} for its current model list. Grimoire otherwise re-checks only when the CLI or its environment changes.",
       "button": "Refresh",
       "done": "Model list refreshed: {count} models."
     },

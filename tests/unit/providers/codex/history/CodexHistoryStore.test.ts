@@ -1023,6 +1023,96 @@ describe('CodexHistoryStore', () => {
       expect(messages[0].displayContent).toBeUndefined();
     });
 
+    it('should keep a Codex image input out of the displayed user message', () => {
+      const imageTag = '<image name=[Image #1] path="/tmp/grimoire-codex-images-ab12/1-photo.png">';
+      const content = [
+        JSON.stringify({
+          timestamp: '2026-03-27T00:00:00.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'user',
+            content: [
+              { type: 'input_text', text: imageTag },
+              { type: 'input_image', image_url: 'data:image/png;base64,AAAA' },
+              { type: 'input_text', text: '</image>' },
+              {
+                type: 'input_text',
+                text: 'What is on this photo?\n<excluded_folders>\n  <folder>Climate</folder>\n</excluded_folders>',
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-27T00:00:01.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'A cat.' }],
+          },
+        }),
+      ].join('\n');
+
+      const messages = parseCodexSessionContent(content);
+
+      expect(messages[0]).toMatchObject({
+        role: 'user',
+        displayContent: 'What is on this photo?',
+      });
+      expect(messages[0].content).toContain(imageTag);
+    });
+
+    it('should keep every Codex image input out of the displayed user message', () => {
+      const content = [
+        JSON.stringify({
+          timestamp: '2026-03-27T00:00:00.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'user',
+            content: [
+              { type: 'input_text', text: '<image name=[Image #1] path="/tmp/a/1-one.png">' },
+              { type: 'input_text', text: '</image>' },
+              { type: 'input_text', text: '<image name=[Image #2] path="/tmp/a/2-two.png">' },
+              { type: 'input_text', text: '</image>' },
+              { type: 'input_text', text: 'Compare them.' },
+            ],
+          },
+        }),
+      ].join('\n');
+
+      const messages = parseCodexSessionContent(content);
+
+      expect(messages[0]).toMatchObject({ role: 'user', displayContent: 'Compare them.' });
+    });
+
+    it('should display nothing for a user turn that carried only an image', () => {
+      const content = [
+        JSON.stringify({
+          timestamp: '2026-03-27T00:00:00.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'user',
+            content: [
+              { type: 'input_text', text: '<image name=[Image #1] path="/tmp/a/1-photo.png">' },
+              { type: 'input_text', text: '</image>' },
+              {
+                type: 'input_text',
+                text: '\n<excluded_folders>\n  <folder>Climate</folder>\n</excluded_folders>',
+              },
+            ],
+          },
+        }),
+      ].join('\n');
+
+      const messages = parseCodexSessionContent(content);
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toMatchObject({ role: 'user', displayContent: '' });
+    });
+
     it('should filter out skill wrapper user messages as system-injected', () => {
       const skillText = [
         '<skill>',

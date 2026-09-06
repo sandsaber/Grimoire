@@ -5,6 +5,7 @@ import type { ProviderAgentMentionService } from '../../../app/mentions/Provider
 import type { RelevantNotesService } from '../../../core/context/RelevantNotesService';
 import type { VaultSearchService } from '../../../core/context/VaultSearchService';
 import type { VaultTextIndex } from '../../../core/context/VaultTextIndex';
+import { MAX_TITLE_LENGTH } from '../../../core/prompt/titleLength';
 import type { InstructionRefineService, ProviderId, TitleGenerationService } from '../../../core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { UsageInfo } from '../../../core/types';
@@ -75,7 +76,7 @@ export interface TabManagerInterface {
 export type TabId = string;
 
 /** Keeps custom tab names readable in menus, toasts, and persisted state. */
-export const MAX_TAB_TITLE_LENGTH = 100;
+export const MAX_TAB_TITLE_LENGTH = MAX_TITLE_LENGTH;
 
 export type TabPanelView = 'chat' | 'sources' | 'context';
 

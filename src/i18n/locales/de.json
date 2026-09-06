@@ -393,6 +393,10 @@
         "name": "Tabname",
         "charactersLeft": "Noch {count} Zeichen",
         "resetName": "Aktuellen Namen wiederherstellen",
+        "autoRename": "Automatisch umbenennen",
+        "autoRenaming": "Titel wird generiert…",
+        "autoRenameNeedsMessage": "Sende zuerst eine Nachricht — es gibt noch nichts zu benennen",
+        "autoRenameFailed": "Titel konnte nicht generiert werden",
         "duplicate": "Duplizieren",
         "duplicateTitle": "Kopie von {title}",
         "duplicateFailed": "Tab konnte nicht dupliziert werden",
@@ -867,7 +871,7 @@
     },
     "refreshModels": {
       "name": "Modelle aktualisieren",
-      "desc": "Fragt Claude Code nach der aktuellen Modellliste. Sonst prüft Grimoire nur erneut, wenn sich die CLI oder ihre Umgebung ändert.",
+      "desc": "Fragt {provider} nach der aktuellen Modellliste. Sonst prüft Grimoire nur erneut, wenn sich die CLI oder ihre Umgebung ändert.",
       "button": "Aktualisieren",
       "done": "Modellliste aktualisiert: {count} Modelle."
     },

@@ -1,6 +1,7 @@
 import type { Plugin } from 'obsidian';
 import { Notice } from 'obsidian';
 
+import { AttachmentStore } from '../../core/attachments/AttachmentStore';
 import { SESSIONS_PATH, SessionStorage } from '../../core/bootstrap/SessionStorage';
 import type { SharedAppStorage } from '../../core/bootstrap/storage';
 import { GRIMOIRE_STORAGE_PATH } from '../../core/bootstrap/StoragePaths';
@@ -61,6 +62,7 @@ function normalizeDraftSettings(value: unknown): Record<string, unknown> | undef
 export class SharedStorageService implements SharedAppStorage {
   readonly grimoireSettings: GrimoireSettingsStorage;
   readonly sessions: SessionStorage;
+  readonly attachments: AttachmentStore;
 
   private adapter: VaultFileAdapter;
   private plugin: Plugin;
@@ -70,6 +72,7 @@ export class SharedStorageService implements SharedAppStorage {
     this.adapter = new VaultFileAdapter(plugin.app);
     this.grimoireSettings = new GrimoireSettingsStorage(this.adapter);
     this.sessions = new SessionStorage(this.adapter, new VaultDurableStorage(this.adapter));
+    this.attachments = new AttachmentStore(this.adapter);
   }
 
   async initialize(): Promise<{ grimoire: Record<string, unknown> }> {

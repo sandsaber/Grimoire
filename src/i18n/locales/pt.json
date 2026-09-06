@@ -393,6 +393,10 @@
         "name": "Nome da aba",
         "charactersLeft": "{count} caracteres restantes",
         "resetName": "Restaurar o nome atual",
+        "autoRename": "Renomear automaticamente",
+        "autoRenaming": "Gerando um título…",
+        "autoRenameNeedsMessage": "Envie uma mensagem primeiro — ainda não há nada para nomear",
+        "autoRenameFailed": "Não foi possível gerar o título",
         "duplicate": "Duplicar",
         "duplicateTitle": "Cópia de {title}",
         "duplicateFailed": "Não foi possível duplicar a aba",
@@ -867,7 +871,7 @@
     },
     "refreshModels": {
       "name": "Atualizar modelos",
-      "desc": "Pede ao Claude Code a lista de modelos atual. Caso contrário, o Grimoire só verifica novamente quando a CLI ou o ambiente muda.",
+      "desc": "Pede ao {provider} a lista de modelos atual. Caso contrário, o Grimoire só verifica novamente quando a CLI ou o ambiente muda.",
       "button": "Atualizar",
       "done": "Lista de modelos atualizada: {count} modelos."
     },

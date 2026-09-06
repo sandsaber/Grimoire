@@ -124,6 +124,44 @@ describe('AuxiliaryExecutionOwner', () => {
         title: 'The newer title',
       });
     });
+
+    it('cancels one conversation\'s title and leaves the others running', async () => {
+      // The rename dialog cancels the title it asked for, by conversation id.
+      // The routed service is shared by every tab, so a cancel that emptied
+      // the whole routing table would stop a second tab's title too.
+      const first = abortableRunner();
+      const second = abortableRunner();
+      const runners = [first, second];
+      const service = owner(
+        [['claude', { createRunner: () => runners.shift() ?? second }]],
+        () => 'claude',
+      ).titleGenerationService();
+
+      const firstCallback = jest.fn();
+      const secondCallback = jest.fn();
+      const firstTitle = service.generateTitle('conv-1', 'first', firstCallback);
+      const secondTitle = service.generateTitle('conv-2', 'second', secondCallback);
+
+      service.cancel('conv-1');
+      await firstTitle;
+
+      expect(first.aborted).toBe(true);
+      expect(second.aborted).toBe(false);
+      // A cancelled generation is a superseded one: its answer, even the
+      // failure, is dropped rather than written over what the caller did next.
+      expect(firstCallback).not.toHaveBeenCalled();
+
+      await second.answer('The second title');
+      await secondTitle;
+      expect(secondCallback).toHaveBeenCalledWith('conv-2', {
+        success: true,
+        title: 'The second title',
+      });
+
+      // Cancelling what is not running is not an error, and touches nothing.
+      service.cancel('conv-1');
+      service.cancel('conv-none');
+    });
   });
 
   describe('a provider that contributes no auxiliary source', () => {
@@ -204,6 +242,35 @@ describe('AuxiliaryExecutionOwner', () => {
     });
   });
 });
+
+/** A runner that answers when told, and fails its query when the signal aborts. */
+function abortableRunner(): AuxQueryRunner & {
+  answer: (text: string) => Promise<void>;
+  readonly aborted: boolean;
+} {
+  let release: ((text: string) => void) | null = null;
+  let fail: ((error: Error) => void) | null = null;
+  let aborted = false;
+  const pending = new Promise<string>((resolve, reject) => {
+    release = resolve;
+    fail = reject;
+  });
+  return {
+    get aborted() { return aborted; },
+    async query(config) {
+      config.abortController?.signal.addEventListener('abort', () => {
+        aborted = true;
+        fail?.(new Error('aborted'));
+      });
+      return pending;
+    },
+    reset() {},
+    answer: async text => {
+      release?.(text);
+      await pending;
+    },
+  };
+}
 
 function deferredRunner(): AuxQueryRunner & { answer: (text: string) => Promise<void> } {
   let release: ((text: string) => void) | null = null;

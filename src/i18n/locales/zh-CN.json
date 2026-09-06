@@ -393,6 +393,10 @@
         "name": "标签页名称",
         "charactersLeft": "还可输入 {count} 个字符",
         "resetName": "恢复当前名称",
+        "autoRename": "自动重命名",
+        "autoRenaming": "正在生成标题…",
+        "autoRenameNeedsMessage": "请先发送一条消息，目前还没有可命名的内容",
+        "autoRenameFailed": "无法生成标题",
         "duplicate": "复制",
         "duplicateTitle": "{title} 的副本",
         "duplicateFailed": "无法复制标签页",
@@ -867,7 +871,7 @@
     },
     "refreshModels": {
       "name": "刷新模型",
-      "desc": "向 Claude Code 请求当前模型列表。否则 Grimoire 仅在 CLI 或其环境变化时重新检查。",
+      "desc": "向 {provider} 请求当前模型列表。否则 Grimoire 仅在 CLI 或其环境变化时重新检查。",
       "button": "刷新",
       "done": "模型列表已刷新：共 {count} 个模型。"
     },

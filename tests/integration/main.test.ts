@@ -1341,6 +1341,18 @@ describe('GrimoirePlugin', () => {
     });
   });
 
+  describe('getConversationTitles', () => {
+    it('should return the title of every conversation', async () => {
+      await plugin.onload();
+
+      const conv = await plugin.createConversation();
+      await plugin.renameConversation(conv.id, 'Release checklist');
+
+      expect(plugin.getConversationTitles()).toContain('Release checklist');
+      expect(plugin.getConversationTitles()).toHaveLength(plugin.getConversationList().length);
+    });
+  });
+
   describe('loadSettings with conversations', () => {
     it('should load saved conversations from metadata files', async () => {
       const timestamp = Date.now();

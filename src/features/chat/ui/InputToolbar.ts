@@ -60,19 +60,62 @@ function formatModelFallbackLabel(model: string): string {
     .replace(/\b\w/g, letter => letter.toUpperCase());
 }
 
-function formatModelButtonLabel(label: string): string {
-  const trimmed = label.trim();
-  const slashIndex = trimmed.lastIndexOf('/');
-  if (slashIndex <= 0 || slashIndex >= trimmed.length - 1) {
-    return trimmed;
+/**
+ * The last `/` that separates a vendor prefix from the model name, or -1.
+ *
+ * A slash inside a bracketed segment belongs to that segment's own text rather
+ * than separating anything: Qwen names its ModelStudio models
+ * `[ModelStudio Token Plan for Global/Intl] qwen3.7-plus`, and cutting there
+ * leaves half a bracket on each side.
+ */
+function findModelVendorSeparator(label: string): number {
+  let depth = 0;
+  let separator = -1;
+
+  for (let index = 0; index < label.length; index += 1) {
+    const char = label[index];
+    if (char === '[' || char === '(') {
+      depth += 1;
+    } else if (char === ']' || char === ')') {
+      depth = Math.max(0, depth - 1);
+    } else if (char === '/' && depth === 0) {
+      separator = index;
+    }
   }
 
-  return trimmed.slice(slashIndex + 1).trim() || trimmed;
+  return separator;
 }
 
+/** Splits `[qualifier] model` into its two parts, or null when that is not the shape. */
+function splitLeadingQualifier(label: string): { detail: string; label: string } | null {
+  if (!label.startsWith('[')) {
+    return null;
+  }
+
+  const end = label.indexOf(']');
+  if (end <= 1) {
+    return null;
+  }
+
+  const detail = label.slice(1, end).trim();
+  const modelLabel = label.slice(end + 1).trim();
+  return detail && modelLabel ? { detail, label: modelLabel } : null;
+}
+
+/**
+ * A model label can name the plan or vendor it comes from, either as a
+ * `<vendor>/<model>` prefix (`MiniMax Token Plan (minimax.io)/MiniMax-M2.7`) or as
+ * a leading `[qualifier]` (Qwen's `[Z.AI] GLM-5.2`). Both are the same thing to a
+ * reader: the model's name, and where it comes from.
+ */
 function splitModelOptionLabel(label: string): { detail: string | null; label: string } {
   const trimmed = label.trim();
-  const slashIndex = trimmed.lastIndexOf('/');
+  const qualified = splitLeadingQualifier(trimmed);
+  if (qualified) {
+    return qualified;
+  }
+
+  const slashIndex = findModelVendorSeparator(trimmed);
   if (slashIndex <= 0 || slashIndex >= trimmed.length - 1) {
     return { detail: null, label: trimmed };
   }
@@ -83,6 +126,11 @@ function splitModelOptionLabel(label: string): { detail: string | null; label: s
     detail: detail || null,
     label: modelLabel || trimmed,
   };
+}
+
+/** The collapsed button shows the model name alone; the qualifier lives in the dropdown. */
+function formatModelButtonLabel(label: string): string {
+  return splitModelOptionLabel(label).label;
 }
 
 const PLAN_USAGE_WARN_THRESHOLD = 80;

@@ -1,7 +1,7 @@
 import {
   buildTitleGenerationPrompt,
+  buildTitleGenerationSystemPrompt,
   parseTitleGenerationResponse,
-  TITLE_GENERATION_SYSTEM_PROMPT,
 } from '../prompt/titleGeneration';
 import type {
   TitleGenerationCallback,
@@ -45,7 +45,7 @@ export class QueryBackedTitleGenerationService implements TitleGenerationService
       const text = await runner.query({
         abortController,
         model: this.options.resolveModel?.(),
-        systemPrompt: TITLE_GENERATION_SYSTEM_PROMPT,
+        systemPrompt: buildTitleGenerationSystemPrompt(),
       }, buildTitleGenerationPrompt(userMessage));
       const title = parseTitleGenerationResponse(text);
       await this.safeCallback(
@@ -68,7 +68,16 @@ export class QueryBackedTitleGenerationService implements TitleGenerationService
     }
   }
 
-  cancel(): void {
+  cancel(conversationId?: string): void {
+    if (conversationId !== undefined) {
+      const active = this.activeGenerations.get(conversationId);
+      if (!active) return;
+      active.abortController.abort();
+      active.runner.reset();
+      this.activeGenerations.delete(conversationId);
+      return;
+    }
+
     for (const active of this.activeGenerations.values()) {
       active.abortController.abort();
       active.runner.reset();

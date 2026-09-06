@@ -222,14 +222,17 @@ export interface AcpLoadSessionResponse {
   models?: AcpSessionModelState | null;
   modes?: AcpSessionModeState | null;
   /**
-   * Optional, because a real agent omits it.
+   * Optional, because a real agent omits it: `session/load` speaks about the
+   * session the client named, so an agent need not repeat its id.
    *
    * OpenCode 1.18.18 answers `session/load` with `configOptions` and nothing
    * else — the load is confirmed by succeeding, not by echoing the id it was
-   * given. Declared required, it made every resume look like a load that had
-   * returned some other session.
+   * given. Grok Build 1.0.13 answers with `models` and `_meta` alone and
+   * carries the id only under `_meta.sessionId`. Declared required, it made
+   * every resume look like a load that had returned some other session, and a
+   * runtime that binds to this field binds to `undefined`.
    */
-  sessionId?: AcpSessionId;
+  sessionId?: AcpSessionId | null;
 }
 
 export interface AcpListSessionsRequest {

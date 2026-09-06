@@ -69,10 +69,30 @@ function cloneMessagesForMetadata(
   }
 
   try {
-    return JSON.parse(JSON.stringify(messages)) as ChatMessage[];
+    const cloned = JSON.parse(JSON.stringify(messages)) as ChatMessage[];
+    return dropStoredImageData(cloned);
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Leaves out the bytes of attachments the store already holds.
+ *
+ * Metadata is rewritten whole on every conversation update, so a megabyte of
+ * base64 here is a megabyte written again on each of them. An attachment
+ * without a hash keeps its data - that is the only copy there is.
+ */
+function dropStoredImageData(messages: ChatMessage[]): ChatMessage[] {
+  for (const message of messages) {
+    for (const image of message.images ?? []) {
+      if (image.hash) {
+        image.data = '';
+      }
+    }
+  }
+
+  return messages;
 }
 
 export function clonePersistedMessages(

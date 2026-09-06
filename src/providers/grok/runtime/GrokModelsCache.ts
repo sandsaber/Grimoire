@@ -1,6 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { parse as parseToml } from 'smol-toml';
+
 import { sameDiscoveredModels, sameStringList } from '../../../utils/collections';
 import { expandHomePath } from '../../../utils/path';
 import { updateGrokDiscoveryState } from '../discoveryState';
@@ -17,6 +19,7 @@ import { getGrokProviderSettings, updateGrokProviderSettings } from '../settings
 import { resolveGrokDataDir } from './GrokPaths';
 
 export const GROK_MODELS_CACHE_FILE = 'models_cache.json';
+export const GROK_CONFIG_FILE = 'config.toml';
 
 export interface GrokNativeModelCatalog {
   defaultModelId: string | null;
@@ -35,10 +38,17 @@ export function resolveNativeGrokDataDir(
   return resolveGrokDataDir(withoutManagedHome);
 }
 
-export function resolveGrokModelsCachePaths(params: {
-  env?: NodeJS.ProcessEnv;
-  managedGrokHomePath?: string | null;
-} = {}): string[] {
+/**
+ * Every Grok home Grimoire may read from, in priority order: the native data
+ * dir, the managed home it launches the CLI with, and an explicit `GROK_HOME`.
+ */
+function resolveGrokHomeFilePaths(
+  fileName: string,
+  params: {
+    env?: NodeJS.ProcessEnv;
+    managedGrokHomePath?: string | null;
+  },
+): string[] {
   const env = params.env ?? process.env;
   const paths: string[] = [];
   const seen = new Set<string>();
@@ -51,17 +61,31 @@ export function resolveGrokModelsCachePaths(params: {
     paths.push(resolved);
   };
 
-  push(path.join(resolveNativeGrokDataDir(env), GROK_MODELS_CACHE_FILE));
+  push(path.join(resolveNativeGrokDataDir(env), fileName));
   const managedHome = params.managedGrokHomePath?.trim();
   if (managedHome) {
-    push(path.join(expandHomePath(managedHome), GROK_MODELS_CACHE_FILE));
+    push(path.join(expandHomePath(managedHome), fileName));
   }
   const grokHome = env.GROK_HOME?.trim();
   if (grokHome) {
-    push(path.join(expandHomePath(grokHome), GROK_MODELS_CACHE_FILE));
+    push(path.join(expandHomePath(grokHome), fileName));
   }
 
   return paths;
+}
+
+export function resolveGrokModelsCachePaths(params: {
+  env?: NodeJS.ProcessEnv;
+  managedGrokHomePath?: string | null;
+} = {}): string[] {
+  return resolveGrokHomeFilePaths(GROK_MODELS_CACHE_FILE, params);
+}
+
+export function resolveGrokConfigPaths(params: {
+  env?: NodeJS.ProcessEnv;
+  managedGrokHomePath?: string | null;
+} = {}): string[] {
+  return resolveGrokHomeFilePaths(GROK_CONFIG_FILE, params);
 }
 
 export function readGrokNativeModelCatalog(params: {
@@ -70,12 +94,22 @@ export function readGrokNativeModelCatalog(params: {
 } = {}): GrokNativeModelCatalog {
   const env = params.env ?? process.env;
   const models: GrokDiscoveredModel[] = [];
+  // Config-declared models come first because `mergeGrokDiscoveredModels` keeps the
+  // first entry for a rawId, and the CLI resolves models in that same order: a
+  // `[model."<id>"]` table outranks the prefetched cloud catalog, which outranks the
+  // built-in defaults. The cloud-sourced models_cache.json never contains locally
+  // defined models at all, so without this the runtime catalog drops the user's local
+  // Ollama slot on every ensureReady and the selected model silently falls back to the
+  // frontier default.
+  for (const configPath of resolveGrokConfigPaths(params)) {
+    models.push(...readGrokConfigModelDefinitionsFile(configPath));
+  }
   for (const cachePath of resolveGrokModelsCachePaths(params)) {
     models.push(...readGrokModelsCacheFile(cachePath).models);
   }
 
   const configuredDefault = readGrokConfigDefaultModel(
-    path.join(resolveNativeGrokDataDir(env), 'config.toml'),
+    path.join(resolveNativeGrokDataDir(env), GROK_CONFIG_FILE),
   );
   const normalized = mergeGrokDiscoveredModels(models);
   return {
@@ -251,6 +285,52 @@ export function parseGrokConfigDefaultModel(toml: string): string | null {
 
   const match = modelsSection[1]?.match(/^\s*default\s*=\s*"([^"]+)"/m);
   return match?.[1]?.trim() || null;
+}
+
+/**
+ * Extract locally declared models from a Grok `config.toml` — the `[model."<id>"]`
+ * tables the CLI merges into `grok models` but never writes into the
+ * cloud-backed `models_cache.json`. Grimoire needs them in the native catalog so
+ * a user-selected local model (e.g. an Ollama slot) survives catalog hydration.
+ */
+export function parseGrokConfigModelDefinitions(toml: string): GrokDiscoveredModel[] {
+  let parsed: unknown;
+  try {
+    parsed = parseToml(toml);
+  } catch {
+    return [];
+  }
+
+  if (!isPlainObject(parsed) || !isPlainObject(parsed.model)) {
+    return [];
+  }
+
+  const models: GrokDiscoveredModel[] = [];
+  for (const [rawId, entry] of Object.entries(parsed.model)) {
+    const id = rawId.trim();
+    // Only `[model.<id>]` tables declare a model; a stray scalar under `[model]`
+    // is not one.
+    if (!id || !isPlainObject(entry)) {
+      continue;
+    }
+
+    const label = readNonEmptyString(entry.name) ?? formatGrokCatalogLabel(id);
+    const description = readNonEmptyString(entry.description);
+    models.push({
+      ...(description ? { description } : {}),
+      label,
+      rawId: id,
+    });
+  }
+  return models;
+}
+
+function readGrokConfigModelDefinitionsFile(filePath: string): GrokDiscoveredModel[] {
+  try {
+    return parseGrokConfigModelDefinitions(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return [];
+  }
 }
 
 export function mergeGrokDiscoveredModels(

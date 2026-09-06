@@ -1,11 +1,12 @@
 import '@/providers';
 
 import { createMockEl } from '@test/helpers/mockElement';
-import { Notice, Scope, setIcon } from 'obsidian';
+import { Menu, Notice, Scope, setIcon } from 'obsidian';
 
 import { GrimoireView } from '@/features/chat/GrimoireView';
 
 const MockScope = Scope as typeof Scope & { instances: Scope[] };
+const MockMenu = Menu as unknown as typeof Menu & { instances: any[] };
 
 function createViewHarness(options: {
   canCreateTab: boolean;
@@ -773,4 +774,80 @@ describe('GrimoireView orchestrator wiring', () => {
     expect(onPlanDetected).toBeInstanceOf(Function);
     expect(isOrchestratorMode()).toBe(false);
   });
+});
+
+describe('GrimoireView tab context menu auto-rename', () => {
+  function createMenuHarness(options: {
+    enabled?: boolean;
+    canSuggest?: boolean;
+    hasController?: boolean;
+    title?: string;
+  } = {}) {
+    const regenerateTitle = jest.fn().mockResolvedValue(undefined);
+    const controller = {
+      isAutoTitleEnabled: jest.fn().mockReturnValue(options.enabled ?? true),
+      canSuggestTitle: jest.fn().mockReturnValue(options.canSuggest ?? true),
+      regenerateTitle,
+    };
+    const tab = {
+      id: 'tab-1',
+      conversationId: 'conv-1',
+      titleOverride: options.title ?? 'Tab One',
+      controllers: {
+        conversationController: (options.hasController ?? true) ? controller : null,
+      },
+    };
+    const view = Object.create(GrimoireView.prototype);
+    view.app = {};
+    view.plugin = {
+      settings: { enableAutoTitleGeneration: options.enabled ?? true },
+      getConversationSync: jest.fn().mockReturnValue(null),
+    };
+    view.tabManager = {
+      getTab: jest.fn().mockReturnValue(tab),
+      getTabIds: jest.fn().mockReturnValue(['tab-1', 'tab-2']),
+      canCreateTab: jest.fn().mockReturnValue(true),
+    };
+
+    MockMenu.instances.length = 0;
+    view.showTabContextMenu('tab-1', {});
+
+    const menu = MockMenu.instances[MockMenu.instances.length - 1];
+    const item = menu.items.find((entry: any) => entry.title === 'Auto-rename');
+    return { item, regenerateTitle, controller, menu };
+  }
+
+  it('offers auto-rename for a tab with a conversation', () => {
+    const { item, regenerateTitle } = createMenuHarness();
+
+    expect(item).toBeDefined();
+    expect(item?.disabled).toBe(false);
+
+    item?.clickHandler?.();
+
+    expect(regenerateTitle).toHaveBeenCalledWith('conv-1');
+  });
+
+  it('hides auto-rename when the setting is off', () => {
+    expect(createMenuHarness({ enabled: false }).item).toBeUndefined();
+  });
+
+  it('hides auto-rename when the tab has no controller', () => {
+    expect(createMenuHarness({ hasController: false }).item).toBeUndefined();
+  });
+
+  it('disables auto-rename when there is nothing to name yet', () => {
+    const { item, regenerateTitle } = createMenuHarness({ canSuggest: false });
+
+    expect(item?.disabled).toBe(true);
+    expect(regenerateTitle).not.toHaveBeenCalled();
+  });
+
+  it('heads the menu with the tab title as the user wrote it', () => {
+    const { menu } = createMenuHarness({ title: 'Объяснить логику Grimoire' });
+
+    expect(menu.items[0].title).toBe('Объяснить логику Grimoire');
+  });
+
+  // The shortened form needs a DOM; it is covered in tabMenuHeading.test.ts (jsdom).
 });

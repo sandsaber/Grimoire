@@ -179,7 +179,9 @@ export function attachAntigravityImages(
     return noop;
   }
 
-  const usable = images.filter((image) => image.mediaType.startsWith('image/'));
+  // Without bytes there is nothing to write: `Buffer.from('', 'base64')` would
+  // put a zero-byte file in front of agy and call it a screenshot.
+  const usable = images.filter((image) => image.mediaType.startsWith('image/') && !!image.data);
   if (usable.length === 0) {
     return noop;
   }

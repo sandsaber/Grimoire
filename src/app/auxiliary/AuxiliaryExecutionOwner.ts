@@ -164,7 +164,18 @@ class RoutedTitleGenerationService implements TitleGenerationService {
     }
   }
 
-  cancel(): void {
+  cancel(conversationId?: string): void {
+    if (conversationId !== undefined) {
+      // Only that conversation's: the service it routed to may be shared with
+      // none, but the routing table is shared with every tab, and cancelling
+      // through the whole of it took every other title down with this one.
+      const service = this.activeGenerations.get(conversationId);
+      if (!service) return;
+      this.activeGenerations.delete(conversationId);
+      service.cancel(conversationId);
+      return;
+    }
+
     const services = new Set(this.activeGenerations.values());
     this.activeGenerations.clear();
     for (const service of services) {

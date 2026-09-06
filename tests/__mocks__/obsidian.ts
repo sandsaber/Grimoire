@@ -212,6 +212,13 @@ export class ButtonComponent {
     return this;
   }
 
+  setDisabled(disabled: boolean): this {
+    if (this.buttonEl) {
+      this.buttonEl.disabled = disabled;
+    }
+    return this;
+  }
+
   onClick(handler: () => void | Promise<void>): this {
     this.buttonEl?.addEventListener?.('click', handler);
     return this;

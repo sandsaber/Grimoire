@@ -1,5 +1,5 @@
+import { getCliBinaryFingerprint } from '../../../core/providers/cliBinaryFingerprint';
 import type { ClaudeProviderSettings } from '../settings';
-import { getClaudeCliBinaryFingerprint } from './claudeCliBinaryFingerprint';
 
 /**
  * How long a discovery that found nothing is left alone before it is tried
@@ -27,7 +27,7 @@ export function buildClaudeCatalogCacheKey(
   cliPath: string,
 ): string {
   return JSON.stringify({
-    cliBinary: getClaudeCliBinaryFingerprint(cliPath),
+    cliBinary: getCliBinaryFingerprint(cliPath),
     cliPath,
     enableChrome: settings.enableChrome,
     environmentHash: settings.environmentHash,

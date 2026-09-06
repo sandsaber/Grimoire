@@ -99,7 +99,9 @@ export function buildCodexTurnInput(sources: CodexTurnInputSources): CodexTurnIn
       directory = scratch.createDirectory();
       for (let index = 0; index < images.length; index += 1) {
         const image = images[index];
-        if (!image.mediaType.startsWith('image/')) {
+        // No bytes means no attachment: writing `Buffer.from('', 'base64')`
+        // would hand Codex a zero-byte file as though it were an image.
+        if (!image.mediaType.startsWith('image/') || !image.data) {
           continue;
         }
 

@@ -393,6 +393,10 @@
         "name": "分頁名稱",
         "charactersLeft": "還可輸入 {count} 個字元",
         "resetName": "還原目前名稱",
+        "autoRename": "自動重新命名",
+        "autoRenaming": "正在產生標題…",
+        "autoRenameNeedsMessage": "請先傳送一則訊息，目前還沒有可命名的內容",
+        "autoRenameFailed": "無法產生標題",
         "duplicate": "複製",
         "duplicateTitle": "{title} 的副本",
         "duplicateFailed": "無法複製分頁",
@@ -867,7 +871,7 @@
     },
     "refreshModels": {
       "name": "重新整理模型",
-      "desc": "向 Claude Code 請求目前的模型清單。否則 Grimoire 僅在 CLI 或其環境變更時重新檢查。",
+      "desc": "向 {provider} 請求目前的模型清單。否則 Grimoire 僅在 CLI 或其環境變更時重新檢查。",
       "button": "重新整理",
       "done": "模型清單已重新整理：共 {count} 個模型。"
     },

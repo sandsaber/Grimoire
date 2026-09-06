@@ -5,7 +5,7 @@
     "no caller, which is what the main sync produced three times.",
     "",
     "The 50 left are what a deletion pass decided to keep, and they fall in four kinds.",
-    "1. Recorded orphans with an owner. ContextIngestionService, i18n/constants and",
+    "1. Recorded orphans with an owner. ContextIngestionService and",
     "   acp/history/sqliteModule are in tests/unit/architecture/presentationParityManifest.ts",
     "   with a reason and an owner outside this migration. Check that manifest before",
     "   deleting anything here - one of them was deleted and restored for this reason.",
@@ -75,6 +75,12 @@
     "src/features/chat/tabs/tabSettings.ts": [
       "hasStartedConversation",
       "TabCreateOptions"
+    ],
+    "src/core/attachments/imageScaling.ts": [
+      "shouldRescale"
+    ],
+    "src/features/chat/ui/imageViewerStack.ts": [
+      "resetOpenImageViewers"
     ],
     "src/i18n/constants.ts": [
       "DEFAULT_LOCALE",

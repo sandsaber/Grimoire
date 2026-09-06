@@ -1,3 +1,4 @@
+import { carryOverImageAttachments } from '../../../core/attachments/carryOverImages';
 import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
 import type { ProviderConversationHistoryService } from '../../../core/providers/types';
 import type { Conversation } from '../../../core/types';
@@ -65,7 +66,7 @@ export class GrokConversationHistoryService implements ProviderConversationHisto
       return { outcome: 'partial', reason: 'localTranscriptAhead' };
     }
 
-    conversation.messages = messages;
+    conversation.messages = carryOverImageAttachments(conversation.messages, messages);
     this.hydratedKeys.set(conversation.id, hydrationKey);
     return { outcome: 'complete' };
   }

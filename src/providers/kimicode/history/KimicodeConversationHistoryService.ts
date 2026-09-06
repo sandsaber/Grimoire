@@ -1,3 +1,4 @@
+import { carryOverImageAttachments } from '../../../core/attachments/carryOverImages';
 import type { ProviderHistoryHydration } from '../../../core/providers/ProviderModule';
 import type { ProviderConversationHistoryService } from '../../../core/providers/types';
 import type { Conversation } from '../../../core/types';
@@ -40,7 +41,7 @@ export class KimicodeConversationHistoryService implements ProviderConversationH
         : { outcome: 'absent' };
     }
 
-    conversation.messages = messages;
+    conversation.messages = carryOverImageAttachments(conversation.messages, messages);
     this.hydratedKeys.set(conversation.id, hydrationKey);
     return { outcome: 'complete' };
   }

@@ -342,7 +342,8 @@ export function initializeContextManagers(tab: TabData, plugin: GrimoirePlugin):
         tab.renderer?.scrollToBottomIfNeeded();
       },
     },
-    dom.contextRowEl
+    dom.contextRowEl,
+    plugin.storage?.attachments,
   );
 }
 

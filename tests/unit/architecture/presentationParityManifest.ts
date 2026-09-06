@@ -987,10 +987,4 @@ export const ORPHANED_MODULES: OrphanRecord[] = [
       'Document ingestion (markdown, PDF) with no consumer anywhere in src. Its DocumentIngestor contract in core/context/types.ts is referenced only by this file.',
     owner: 'Product decision — never wired; keep or delete outside the migration.',
   },
-  {
-    module: 'src/i18n/constants.ts',
-    reason:
-      'Locale metadata for staged i18n work that has no production consumer on this branch.',
-    owner: 'i18n foundation (`origin/pr/01-i18n-foundation`) — outside this migration.',
-  },
 ];

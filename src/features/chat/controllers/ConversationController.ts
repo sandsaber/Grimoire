@@ -2,6 +2,7 @@ import { Menu, Notice, setIcon, setTooltip } from 'obsidian';
 
 import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
 
+import { buildFallbackTitle } from '../../../core/prompt/fallbackTitle';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderId, TitleGenerationService } from '../../../core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
@@ -87,6 +88,14 @@ type SaveOptions = {
 };
 
 export type HistoryConversationOpenState = 'closed' | 'open' | 'current';
+
+export type TitleSuggestion =
+  | { ok: true; title: string }
+  | { ok: false; reason: 'disabled' | 'no-messages' | 'no-service' | 'failed' };
+
+type TitleSuggestionSource =
+  | { ok: true; userContent: string; service: TitleGenerationService }
+  | { ok: false; reason: 'disabled' | 'no-messages' | 'no-service' };
 
 type HistoryRenderOptions = {
   onSelectConversation: (id: string) => Promise<void>;
@@ -1273,62 +1282,129 @@ export class ConversationController {
 
   /** Generates a fallback title from the first message (used when AI fails). */
   generateFallbackTitle(firstMessage: string): string {
-    const firstSentence = firstMessage.split(/[.!?\n]/)[0].trim();
-    const autoTitle = firstSentence.substring(0, 50);
-    const suffix = firstSentence.length > 50 ? '...' : '';
-    return `${autoTitle}${suffix}`;
+    const existingTitles = this.collectExistingTitles();
+    const title = buildFallbackTitle(firstMessage, { existingTitles });
+    if (title) {
+      return title;
+    }
+
+    // Nothing but host context blocks: keep a stable, localised label rather than
+    // leaving the conversation nameless in the history list.
+    return buildFallbackTitle(t('chat.ui.view.conversation'), { existingTitles });
   }
 
-  /** Regenerates AI title for a conversation. */
+  /** Titles already in use, so a new conversation does not duplicate one of them. */
+  private collectExistingTitles(): string[] {
+    try {
+      return this.deps.plugin.getConversationTitles()
+        .filter((title): title is string => typeof title === 'string');
+    } catch {
+      return [];
+    }
+  }
+
+  /** True when the user has auto title generation switched on. */
+  isAutoTitleEnabled(): boolean {
+    return !!this.deps.plugin.settings.enableAutoTitleGeneration;
+  }
+
+  /**
+   * Synchronous gate for auto-rename controls. Reads the in-memory conversation, because
+   * context menus are built synchronously and cannot await.
+   */
+  canSuggestTitle(conversationId: string | null): boolean {
+    if (!conversationId) return false;
+    return this.resolveTitleSource(this.deps.plugin.getConversationSync(conversationId)).ok;
+  }
+
+  /**
+   * Forwards cancellation to the active provider's title service, scoped to one
+   * conversation so a caller cannot abort a generation it did not start.
+   */
+  cancelTitleSuggestion(conversationId: string): void {
+    this.deps.getTitleGenerationService()?.cancel(conversationId);
+  }
+
+  /**
+   * Generates a title for a conversation and returns it. Never writes to the conversation
+   * and never rejects: every failure is reported as a reason.
+   */
+  async suggestTitle(conversationId: string): Promise<TitleSuggestion> {
+    const conversation = await this.deps.plugin.getConversationById(conversationId);
+    const source = this.resolveTitleSource(conversation);
+    if (!source.ok) return source;
+
+    return new Promise<TitleSuggestion>((resolve) => {
+      let settled = false;
+      const settle = (suggestion: TitleSuggestion): void => {
+        if (settled) return;
+        settled = true;
+        resolve(suggestion);
+      };
+
+      void source.service.generateTitle(
+        conversationId,
+        source.userContent,
+        async (_convId, result) => {
+          settle(result.success
+            ? { ok: true, title: result.title }
+            : { ok: false, reason: 'failed' });
+        },
+      ).then(
+        () => settle({ ok: false, reason: 'failed' }),
+        () => settle({ ok: false, reason: 'failed' }),
+      );
+    });
+  }
+
+  /** Shared gates for both the synchronous check and the actual generation. */
+  private resolveTitleSource(conversation: Conversation | null): TitleSuggestionSource {
+    if (!this.isAutoTitleEnabled()) return { ok: false, reason: 'disabled' };
+
+    const firstUserMsg = conversation?.messages.find(m => m.role === 'user');
+    if (!conversation || !firstUserMsg) return { ok: false, reason: 'no-messages' };
+
+    const service = this.deps.getTitleGenerationService();
+    if (!service) return { ok: false, reason: 'no-service' };
+
+    return {
+      ok: true,
+      userContent: firstUserMsg.displayContent || firstUserMsg.content,
+      service,
+    };
+  }
+
+  /** Regenerates and saves the AI title for a conversation. */
   async regenerateTitle(conversationId: string): Promise<void> {
     const { plugin } = this.deps;
-    if (!plugin.settings.enableAutoTitleGeneration) return;
+    const conversation = await plugin.getConversationById(conversationId);
+    if (!conversation) return;
+    // Gate on the conversation we just loaded rather than the sync accessor: same object in
+    // production, and it keeps this path independent of which accessor a caller warmed up.
+    if (!this.resolveTitleSource(conversation).ok) return;
 
-    // Title generation is delegated to the active provider service
-    const fullConv = await plugin.getConversationById(conversationId);
-    if (!fullConv || fullConv.messages.length < 1) return;
+    // Remember the title so a manual rename during generation wins over the model.
+    const expectedTitle = conversation.title;
 
-    const titleService = this.deps.getTitleGenerationService();
-    if (!titleService) return;
-
-    // Find first user message by role (not by index)
-    const firstUserMsg = fullConv.messages.find(m => m.role === 'user');
-    if (!firstUserMsg) return;
-
-    const userContent = firstUserMsg.displayContent || firstUserMsg.content;
-
-    // Store current title to check if user renames during generation
-    const expectedTitle = fullConv.title;
-
-    // Set pending status before starting generation
     await plugin.updateConversation(conversationId, { titleGenerationStatus: 'pending' });
     this.updateHistoryDropdown();
 
-    // Fire async AI title generation
-    await titleService.generateTitle(
-      conversationId,
-      userContent,
-      async (convId, result) => {
-        // Check if conversation still exists and user hasn't manually renamed
-        const currentConv = await plugin.getConversationById(convId);
-        if (!currentConv) return;
+    const suggestion = await this.suggestTitle(conversationId);
 
-        // Only apply AI title if user hasn't manually renamed (title still matches expected)
-        const userManuallyRenamed = currentConv.title !== expectedTitle;
+    const currentConv = await plugin.getConversationById(conversationId);
+    if (!currentConv) return;
 
-        if (result.success && !userManuallyRenamed) {
-          await plugin.renameConversation(convId, result.title);
-          await plugin.updateConversation(convId, { titleGenerationStatus: 'success' });
-        } else if (!userManuallyRenamed) {
-          // Keep existing title, mark as failed (only if user hasn't renamed)
-          await plugin.updateConversation(convId, { titleGenerationStatus: 'failed' });
-        } else {
-          // User manually renamed, clear the status (user's choice takes precedence)
-          await plugin.updateConversation(convId, { titleGenerationStatus: undefined });
-        }
-        this.updateHistoryDropdown();
-      }
-    );
+    if (currentConv.title !== expectedTitle) {
+      // User renamed it manually while we were generating: their choice wins.
+      await plugin.updateConversation(conversationId, { titleGenerationStatus: undefined });
+    } else if (suggestion.ok) {
+      await plugin.renameConversation(conversationId, suggestion.title);
+      await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
+    } else {
+      await plugin.updateConversation(conversationId, { titleGenerationStatus: 'failed' });
+    }
+
+    this.updateHistoryDropdown();
   }
 
   /** Formats a timestamp for display. */

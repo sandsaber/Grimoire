@@ -421,20 +421,43 @@ function extractCodexReplayPrompt(text: string): string {
   return trimmed.slice(latestUserBoundary + CODEX_REPLAY_USER_BOUNDARY.length).trim();
 }
 
+/**
+ * Codex records a `localImage` input as an `<image name=... path="...">...</image>`
+ * wrapper in the persisted user turn. Grimoire sends its attachments ahead of the
+ * prompt, so the wrappers are a prefix - and the path inside points at a temp file
+ * that is deleted once the turn ends.
+ */
+const CODEX_IMAGE_INPUT_PATTERN = /^\s*<image\b[^>]*>(?:[\s\S]*?<\/image>)?/;
+
+function stripCodexImageInputs(text: string): string {
+  let remaining = text;
+  for (;;) {
+    const stripped = remaining.replace(CODEX_IMAGE_INPUT_PATTERN, '');
+    if (stripped === remaining) return remaining;
+    remaining = stripped;
+  }
+}
+
 function extractCodexDisplayContent(text: string): string | undefined {
   if (!text) return undefined;
 
-  const xmlContent = extractContentBeforeXmlContext(text);
+  // Showing the wrapper would put a dead temp path where the user's own words
+  // belong, and would stop the hydrated turn from matching the stored one - which
+  // is what carries the attachment.
+  const withoutImages = stripCodexImageInputs(text);
+  const carriedImages = withoutImages !== text;
+
+  const xmlContent = extractContentBeforeXmlContext(withoutImages);
   if (xmlContent !== undefined) {
     return xmlContent;
   }
 
-  const bracketMatch = text.match(CODEX_BRACKET_CONTEXT_PATTERN);
+  const bracketMatch = withoutImages.match(CODEX_BRACKET_CONTEXT_PATTERN);
   if (bracketMatch?.index !== undefined) {
-    return text.substring(0, bracketMatch.index).trim();
+    return withoutImages.substring(0, bracketMatch.index).trim();
   }
 
-  return undefined;
+  return carriedImages ? withoutImages.trim() : undefined;
 }
 
 function extractMessageText(content: PersistedMessagePart[] | undefined): string {

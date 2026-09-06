@@ -393,6 +393,10 @@
         "name": "Nombre de la pestaña",
         "charactersLeft": "Quedan {count} caracteres",
         "resetName": "Restablecer el nombre actual",
+        "autoRename": "Renombrar automáticamente",
+        "autoRenaming": "Generando un título…",
+        "autoRenameNeedsMessage": "Envía primero un mensaje: todavía no hay nada que nombrar",
+        "autoRenameFailed": "No se pudo generar el título",
         "duplicate": "Duplicar",
         "duplicateTitle": "Copia de {title}",
         "duplicateFailed": "No se pudo duplicar la pestaña",
@@ -867,7 +871,7 @@
     },
     "refreshModels": {
       "name": "Actualizar modelos",
-      "desc": "Pide a Claude Code su lista de modelos actual. De lo contrario, Grimoire solo vuelve a comprobar cuando cambia la CLI o su entorno.",
+      "desc": "Pide a {provider} su lista de modelos actual. De lo contrario, Grimoire solo vuelve a comprobar cuando cambia la CLI o su entorno.",
       "button": "Actualizar",
       "done": "Lista de modelos actualizada: {count} modelos."
     },

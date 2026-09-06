@@ -1,5 +1,6 @@
-> **Executed twice.** First at the M6 gate — `dc8389d`, PR #107. Again on 2026-09-03, against
+> **Executed three times.** First at the M6 gate — `dc8389d`, PR #107. Again on 2026-09-03, against
 > `origin/main` at `93a93dea`: eighteen commits, of which five touched a file this migration deleted.
+> And on 2026-09-06, against `6e17f6ce` (release 1.3.2): sixteen commits, four of which did.
 > The numbers below are the *first* sync's and are kept as the method, not as a current count —
 > regenerate them before the next one. The classification is three lines of shell:
 >
@@ -18,6 +19,13 @@
 > **recorded**, because `CodexTurnInput.ts` here never had the bug; the two content conflicts resolved
 > toward this branch, which had the wider path redaction and the shared `isRecord`. The journal entry
 > for that commit carries the reasoning.
+>
+> What the third found: the ACP session-bind fix was **recorded** — `ManagedAcpExecutionBackend`
+> already binds to the id it asked for; Codex's zero-byte attachment guard was **ported** onto
+> `CodexTurnInput.ts`; Claude's title-service diffs were already `QueryBackedTitleGenerationService`,
+> but the routed service in front of it ignored the conversation id `main`'s rename dialog passes,
+> and that seam was **ported**. Two architecture gates fired on `main`'s own additions, which is what
+> they are for.
 
 # Syncing `main` into `providers-migration`
 

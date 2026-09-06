@@ -120,6 +120,26 @@ describe('Codex turn input', () => {
     expect(bundle.input).toEqual([{ type: 'text', text: 'read this', text_elements: [] }]);
   });
 
+  it('leaves out an attachment whose bytes never arrived', () => {
+    // An attachment stored in the vault carries no bytes until it is hydrated.
+    // One that could not be - its file is gone - would otherwise be written as
+    // a zero-byte file and handed to Codex as though it were an image.
+    const { scratch, written } = recordingScratch();
+
+    const bundle = buildCodexTurnInput({
+      text: 'look',
+      images: [
+        { data: '', mediaType: 'image/png', name: 'gone.png' },
+        { data: Buffer.from('one').toString('base64'), mediaType: 'image/png', name: 'here.png' },
+      ],
+      toTargetPath: identityTarget,
+      scratch,
+    });
+
+    expect(written.size).toBe(1);
+    expect(bundle.input.filter(element => element.type === 'localImage')).toHaveLength(1);
+  });
+
   it('asks for no scratch directory when the turn carries no images', () => {
     const { scratch, created } = recordingScratch();
 

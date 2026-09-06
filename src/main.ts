@@ -31,6 +31,7 @@ import {
 } from './app/execution/local/LocalShellExecution';
 import { DEFAULT_GRIMOIRE_SETTINGS } from './app/settings/defaultSettings';
 import { SharedStorageService } from './app/storage/SharedStorageService';
+import { collectReferencedHashes, hydrateImageAttachments } from './core/attachments/hydrateImages';
 import type { UnreadableConversation } from './core/bootstrap/SessionStorage';
 import {
   applyAssistantResponseMetadataToMessages,
@@ -1137,6 +1138,9 @@ export default class GrimoirePlugin extends Plugin {
     // conversation whose transcript could not be loaded: without this it looks
     // exactly like a conversation with nothing in it.
     this.historyHydration.set(conversation.id, hydration);
+    // Attachment bytes are left out of metadata, so they come back here rather
+    // than for every conversation in the vault at startup.
+    await hydrateImageAttachments(conversation.messages, this.storage.attachments);
     applyVaultSearchContextsToMessages(
       conversation.messages,
       conversation.vaultSearchContexts,
@@ -1222,6 +1226,7 @@ export default class GrimoirePlugin extends Plugin {
 
     await this.storage.sessions.deleteMetadata(id);
     this.historyHydration.delete(id);
+    await this.collectAttachmentGarbage();
 
     for (const view of this.getAllViews()) {
       const tabManager = view.getTabManager();
@@ -1323,19 +1328,22 @@ export default class GrimoirePlugin extends Plugin {
       conversation,
       conversationMetadataFields(safeUpdates),
     );
+  }
 
-    // Clear image data from memory after save (data is persisted by SDK).
-    // Skip for pending forks: their deep-cloned images aren't in SDK storage yet.
-    const conversationState = providerCatalog()
-      .declarations(conversation.providerId).conversationState;
-    if (!conversationState?.isPendingFork(conversation)) {
-      for (const msg of conversation.messages) {
-        if (msg.images) {
-          for (const img of msg.images) {
-            img.data = '';
-          }
-        }
-      }
+  /**
+   * Drops stored attachment files nothing references any more.
+   *
+   * The reachable set is read from metadata rather than from the in-memory
+   * conversations: transcript hydration replaces a conversation's messages with
+   * provider-derived ones that carry no hash, so memory is not a complete
+   * record of what is still referenced.
+   */
+  private async collectAttachmentGarbage(): Promise<void> {
+    try {
+      const metadata = await this.storage.sessions.listMetadata();
+      await this.storage.attachments.collectGarbage(collectReferencedHashes(metadata));
+    } catch {
+      // Reclaiming disk is never worth failing a delete over.
     }
   }
 
@@ -1394,6 +1402,14 @@ export default class GrimoirePlugin extends Plugin {
       usagePercentage: c.usage?.percentage,
       titleGenerationStatus: c.titleGenerationStatus,
     }));
+  }
+
+  /**
+   * Titles only. Callers that just need uniqueness would otherwise pay for the
+   * preview, model label and source count of every conversation.
+   */
+  getConversationTitles(): string[] {
+    return this.conversations.map(c => c.title);
   }
 
   async persistTabManagerState(state: AppTabManagerState): Promise<void> {

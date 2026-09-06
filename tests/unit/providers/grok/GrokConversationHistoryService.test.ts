@@ -72,4 +72,28 @@ describe('GrokConversationHistoryService', () => {
     expect(conversation.messages).toHaveLength(2);
     expect(conversation.messages[1]?.content).toBe('First answer');
   });
+
+  it('keeps a stored image attachment when the native log replaces the turn', async () => {
+    const stored = createMessage('msg-1', 'user', 'describe this');
+    stored.images = [{
+      data: '',
+      hash: 'a'.repeat(64),
+      id: 'img-1',
+      mediaType: 'image/png',
+      name: 'cat.png',
+      size: 1024,
+      source: 'paste',
+    }];
+    const conversation = createConversation([stored, createMessage('msg-2', 'assistant', 'A cat.')]);
+    loadGrokSessionMessagesMock.mockResolvedValue([
+      createMessage('grok-user-2', 'user', 'describe this'),
+      createMessage('grok-assistant-3', 'assistant', 'A cat.'),
+    ]);
+
+    await new GrokConversationHistoryService().hydrateConversationHistory(conversation, '/tmp/vault');
+
+    expect(conversation.messages).toHaveLength(2);
+    expect(conversation.messages[0].id).toBe('grok-user-2');
+    expect(conversation.messages[0].images?.[0].hash).toBe('a'.repeat(64));
+  });
 });

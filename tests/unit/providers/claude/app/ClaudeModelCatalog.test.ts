@@ -1,15 +1,15 @@
+import { getCliBinaryFingerprint } from '@/core/providers/cliBinaryFingerprint';
 import { createClaudeModelCatalog } from '@/providers/claude/app/ClaudeModelCatalog';
-import { getClaudeCliBinaryFingerprint } from '@/providers/claude/cli/claudeCliBinaryFingerprint';
 import { probeRuntimeModels } from '@/providers/claude/commands/probeRuntimeModels';
 import { getClaudeProviderSettings, updateClaudeProviderSettings } from '@/providers/claude/settings';
 
 jest.mock('@/providers/claude/commands/probeRuntimeModels', () => ({ probeRuntimeModels: jest.fn() }));
-jest.mock('@/providers/claude/cli/claudeCliBinaryFingerprint', () => ({
-  getClaudeCliBinaryFingerprint: jest.fn().mockReturnValue(''),
+jest.mock('@/core/providers/cliBinaryFingerprint', () => ({
+  getCliBinaryFingerprint: jest.fn().mockReturnValue(''),
 }));
 
 const mockedProbe = jest.mocked(probeRuntimeModels);
-const mockedBinaryFingerprint = jest.mocked(getClaudeCliBinaryFingerprint);
+const mockedBinaryFingerprint = jest.mocked(getCliBinaryFingerprint);
 
 function createPlugin(settings: Record<string, unknown>, saveSettings = jest.fn().mockResolvedValue(undefined)) {
   return {

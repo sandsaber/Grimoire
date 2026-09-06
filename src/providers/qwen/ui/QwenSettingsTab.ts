@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { Setting } from 'obsidian';
+import { Notice, Setting } from 'obsidian';
 
 import { renderEnvironmentSettingsSection } from '../../../features/settings/ui/EnvironmentSettingsSection';
 import { McpSettingsManager } from '../../../features/settings/ui/McpSettingsManager';
@@ -106,6 +106,48 @@ export const qwenSettingsTabRenderer: ProviderSettingsTabRenderer = {
       cliPathInputEl = text.inputEl;
       updateCliPathValidation(currentValue, text.inputEl);
     });
+
+    // --- Models ---
+
+    new Setting(container).setName(t('settings.models')).setHeading();
+
+    // A settled catalog is never re-probed in the background, and the binary
+    // fingerprint only notices an upgrade that changed the file Grimoire resolved.
+    // This is the one place a user can ask the CLI for its current list.
+    new Setting(container)
+      .setName(t('settings.refreshModels.name'))
+      .setDesc(t('settings.refreshModels.desc', { provider: 'Qwen Code' }))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.refreshModels.button'))
+          .onClick(async () => {
+            const catalog = qwenWorkspace?.modelCatalog;
+            if (!catalog) {
+              return;
+            }
+
+            button.setDisabled(true);
+            try {
+              await catalog.refreshModels({
+                force: true,
+                plugin: context.plugin,
+                settings: settingsBag,
+              });
+              const modelCount = getQwenProviderSettings(settingsBag).discoveredModels.length;
+              if (modelCount === 0) {
+                new Notice(t('settings.provider.loadModelsFailed'));
+                return;
+              }
+
+              context.refreshModelSelectors();
+              new Notice(t('settings.refreshModels.done', { count: modelCount }));
+            } catch {
+              new Notice(t('settings.provider.loadModelsFailed'));
+            } finally {
+              button.setDisabled(false);
+            }
+          });
+      });
 
     const advancedContainer = context.renderAdvancedSection(container, {
       count: 5,

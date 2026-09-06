@@ -393,6 +393,10 @@
         "name": "タブ名",
         "charactersLeft": "残り{count}文字",
         "resetName": "現在の名前に戻す",
+        "autoRename": "自動で名前を付ける",
+        "autoRenaming": "タイトルを生成中…",
+        "autoRenameNeedsMessage": "まずメッセージを送信してください。名前を付ける対象がありません",
+        "autoRenameFailed": "タイトルを生成できませんでした",
         "duplicate": "複製",
         "duplicateTitle": "{title} のコピー",
         "duplicateFailed": "タブを複製できませんでした",
@@ -867,7 +871,7 @@
     },
     "refreshModels": {
       "name": "モデルを更新",
-      "desc": "Claude Code に現在のモデル一覧を問い合わせます。通常、Grimoire は CLI やその環境が変わったときにのみ再確認します。",
+      "desc": "{provider} に現在のモデル一覧を問い合わせます。通常、Grimoire は CLI やその環境が変わったときにのみ再確認します。",
       "button": "更新",
       "done": "モデル一覧を更新しました：{count} 件のモデル。"
     },

@@ -393,6 +393,10 @@
         "name": "Nom de l’onglet",
         "charactersLeft": "{count} caractères restants",
         "resetName": "Rétablir le nom actuel",
+        "autoRename": "Renommer automatiquement",
+        "autoRenaming": "Génération du titre…",
+        "autoRenameNeedsMessage": "Envoyez d’abord un message : il n’y a encore rien à nommer",
+        "autoRenameFailed": "Impossible de générer le titre",
         "duplicate": "Dupliquer",
         "duplicateTitle": "Copie de {title}",
         "duplicateFailed": "Impossible de dupliquer l’onglet",
@@ -867,7 +871,7 @@
     },
     "refreshModels": {
       "name": "Actualiser les modèles",
-      "desc": "Demande à Claude Code sa liste de modèles actuelle. Sinon, Grimoire ne revérifie que lorsque la CLI ou son environnement change.",
+      "desc": "Demande à {provider} sa liste de modèles actuelle. Sinon, Grimoire ne revérifie que lorsque la CLI ou son environnement change.",
       "button": "Actualiser",
       "done": "Liste des modèles actualisée : {count} modèles."
     },

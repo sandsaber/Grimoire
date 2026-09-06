@@ -216,8 +216,8 @@ describe('TitleGenerationService', () => {
       });
     });
 
-    it('should truncate titles longer than 50 characters', async () => {
-      const longTitle = 'A'.repeat(60);
+    it('should truncate titles longer than the shared title budget', async () => {
+      const longTitle = 'A'.repeat(200);
       setMockMessages([
         { type: 'system', subtype: 'init', session_id: 'test-session' },
         {
@@ -234,7 +234,7 @@ describe('TitleGenerationService', () => {
 
       expect(callback).toHaveBeenCalledWith('conv-123', {
         success: true,
-        title: 'A'.repeat(47) + '...',
+        title: 'A'.repeat(97) + '...',
       });
     });
 
@@ -438,6 +438,38 @@ describe('TitleGenerationService', () => {
 
       // Should have been called with cancelled error or completed
       expect(callback).toHaveBeenCalled();
+    });
+
+    it('should abort only the conversation it is given', async () => {
+      setMockMessages([
+        { type: 'system', subtype: 'init', session_id: 'test-session' },
+        { type: 'assistant', message: { content: [{ type: 'text', text: 'Title' }] } },
+        { type: 'result' },
+      ]);
+
+      // Both entries are registered before the first await, so the map holds the two
+      // controllers while the generations are still in flight.
+      const first = service.generateTitle('conv-1', 'msg1', jest.fn());
+      const second = service.generateTitle('conv-2', 'msg2', jest.fn());
+      const active = (service as unknown as {
+        activeGenerations: Map<string, { abortController: AbortController }>;
+      }).activeGenerations;
+      const firstController = active.get('conv-1')?.abortController;
+      const secondController = active.get('conv-2')?.abortController;
+
+      // One service is shared by every conversation a tab has opened, so cancelling one
+      // must not take the other down with it.
+      service.cancel('conv-1');
+
+      expect(firstController?.signal.aborted).toBe(true);
+      expect(secondController?.signal.aborted).toBe(false);
+      expect(active.has('conv-1')).toBe(false);
+
+      service.cancel();
+
+      expect(secondController?.signal.aborted).toBe(true);
+
+      await Promise.all([first, second]);
     });
   });
 

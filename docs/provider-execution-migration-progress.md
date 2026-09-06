@@ -34,7 +34,7 @@ Journal rules that keep this true:
 
 - Migration branch: `providers-migration`
 - Baseline: `main` at 1.1.6 (`b08e4bd`)
-- Last synced with `main`: `dc8389d` (PR #107), merged at the M6 gate; the previous sync was 1.1.7 (`0f84b41`) at M0a
+- Last synced with `main`: `6e17f6ce` (release 1.3.2) on 2026-09-06; before it `93a93dea` on 2026-09-03, `dc8389d` (PR #107) at the M6 gate, and 1.1.7 (`0f84b41`) at M0a
 - M0a, M0b (for the four proof providers), M1, M2-proofs, and M2-adapter are complete; M2-flips is in
   progress. The status table below carries the checkpoint commits; the **Current blocker** section at
   the bottom is the single resume pointer and overrides anything above it.
@@ -8721,12 +8721,84 @@ travels from production rather than echoing back the input.
 Gates: unit 567 suites / 9,009 tests, integration 161, typecheck, `eslint`, `build:release`, and
 `main.js` and `styles.css` unchanged by the comment edit.
 
+### `main` synced at 1.3.2, and three of four ports were already here (this commit)
+
+**Sixteen commits, `origin/main` at `6e17f6ce`, and the decision surface was four.** The method is
+`docs/provider-execution-main-sync.md`, run again: of the sixteen, four touched a file this
+migration deleted, and the question for each is whether the migrated path has the same bug. Nine
+deletions resolve as deletions — the six `ChatRuntime`s, `ClaudeTitleGenerationService`, and the two
+runtime test files — and seventeen content conflicts take both sides, except where noted.
+
+**The ACP session-bind fix (`170d26c7`) is recorded, not ported.** `main` found that `session/load`
+need not echo the session id — Grok Build 1.0.13 carries it only under `_meta.sessionId` — and that
+five runtimes bound `this.sessionId` to `undefined` on a load that had succeeded, so a resumed Grok
+conversation had never once worked. `ManagedAcpExecutionBackend.ensureSessionBinding` already binds
+to the id it asked for, and did so since OpenCode 1.18.18 answered a load with `configOptions` and
+nothing else; it checks an echoed id only for being *another* session. What came across is the type:
+`sessionId?: AcpSessionId | null`, which that method already tolerated.
+
+**The Codex zero-byte guard (`73509489`) is ported.** With attachments in the vault, an image reaches
+the provider without bytes until it is hydrated, and one whose file is gone stays empty; the legacy
+runtime wrote `Buffer.from('', 'base64')` and handed Codex a zero-byte file called a screenshot.
+`CodexTurnInput.ts` had the same line. The guard is one clause, and the row that holds it fails
+without it.
+
+**Claude's title service (`2e589bc8`, `c681a60a`) was already `QueryBackedTitleGenerationService`,
+except for one seam.** Both diffs to the deleted file — the shared prompt helpers, and `cancel` taking
+a conversation id — are what the query-backed service already does. But the plugin hands surfaces the
+*routed* service in `AuxiliaryExecutionOwner`, and its `cancel()` took no id: `main`'s rename dialog
+calls `cancel(conversationId)`, which here would have cancelled every open tab's title to stop one.
+Ported, and the test that holds it opens two conversations, cancels one, and reads the other's
+answer. A cancelled generation's callback is dropped, which is the routed service's standing rule for
+a superseded one.
+
+**Two files kept both sides with a correction each.** `GrokLaunchArtifacts.ts` gains `main`'s
+user-config sync into the auxiliary home beside this branch's auxiliary profiles; `main`'s comment
+cites `resolveGrokAuxPermissionMode`, which is `resolveGrokAuxiliaryPermissionMode` here.
+`rename-tab.css` takes `main`'s layout — the controls are flex siblings, because Chromium paints an
+input's overflowing text across its own padding — with its literals read as tokens, and its private
+spin keyframe replaced by the system's `grimoire-spin`.
+
+**Three of `main`'s tests were written against the deleted shape.** The Claude history test mocked
+`ProviderWorkspaceRegistry`, which is gone; the toolbar tests set `callbacks.getUIConfig` where this
+branch's mock is `getChatUI`; the title test read an `AbortController` from a map that here holds the
+run. Each is adapted, none weakened.
+
+**Two architecture gates fired, and both were right.** `exportConsumers` named `shouldRescale` and
+`resetOpenImageViewers`: `main` shipped both with tests and no production caller, which is the exact
+case the gate exists for. Recorded in the baseline rather than deleted — they are `main`'s to prune.
+`presentationParity` found `src/i18n/constants.ts` restored: the title prompt now reads the locale
+from it, so the orphan record is removed and the module is owned by the feature that reached it.
+
+**`database is locked` again**, once, at suite load in the first full run, and not in the three
+after. Still the shared `--localstorage-file` noted on 2026-09-03; still written down, not chased.
+
+Gates: unit 587 suites / 9,234 tests, integration 162, typecheck, `eslint`, `build:release`. Plugin
+version is 1.3.2 with the sync.
+
 ## Current blocker
 
 **Single resume pointer. Everything below this line is the current state; nothing above it
 overrides it.**
 
-Active branch: `providers-migration`. Last synced with `main`: `dc8389d` (PR #107), at the M6 gate.
+Active branch: `providers-migration`. Last synced with `main`: `6e17f6ce` (release 1.3.2), on 2026-09-06.
+
+### Where the session of 2026-09-06 ended
+
+**`main` is synced at 1.3.2 (`6e17f6ce`), committed and pushed.** Sixteen commits; four touched
+deleted files; one port each for Codex and the routed title service, one recorded as already
+present, and `main`'s tests adapted to this branch's shape. The entry above the blocker line carries
+the reasoning. Full gate green: unit 9,234 / 9,234 across 587 suites, integration 162, `tsc`,
+`lint`, `build:release`.
+
+**What the sync left for a person**: nothing wired blind. The vault attachment store came across
+whole and typechecks against the execution path, and the hydration seam is the one `main` uses —
+`InputController` refills bytes before dispatch, `main.ts` after transcript hydration — but no image
+turn has run through the composition against a real CLI since. Codex and Antigravity are the
+providers that write files from those bytes; their next live matrix is where this is certified.
+
+**The previous pointer stands otherwise**: Gemini's rows on a fresh quota, MiMoCode's row 7, and the
+owner's vault matrix, as recorded under 2026-09-03.
 
 ### Where the session of 2026-09-04 ended
 

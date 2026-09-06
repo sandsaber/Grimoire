@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { Setting } from 'obsidian';
+import { Notice, Setting } from 'obsidian';
 
 import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import { renderEnvironmentSettingsSection } from '../../../features/settings/ui/EnvironmentSettingsSection';
@@ -223,6 +223,54 @@ export const codexSettingsTabRenderer: ProviderSettingsTabRenderer = {
     // --- Models ---
 
     new Setting(container).setName(t('settings.models')).setHeading();
+
+    // A settled catalog is never re-probed in the background, and the binary
+    // fingerprint only notices an upgrade that changed the file Grimoire resolved.
+    // This is the one place a user can ask the app-server for its current list.
+    new Setting(container)
+      .setName(t('settings.refreshModels.name'))
+      .setDesc(t('settings.refreshModels.desc', { provider: 'Codex' }))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.refreshModels.button'))
+          .onClick(async () => {
+            const catalog = codexWorkspace?.modelCatalog;
+            if (!catalog) {
+              return;
+            }
+
+            button.setDisabled(true);
+            try {
+              await catalog.refreshModels({
+                force: true,
+                plugin: context.plugin,
+                settings: settingsBag,
+              });
+              const modelCount = getCodexProviderSettings(settingsBag).discoveredModels.length;
+              if (modelCount === 0) {
+                new Notice(t('settings.provider.loadModelsFailed'));
+                return;
+              }
+
+              // A release can retire a model the user had selected, so reconcile before
+              // the pickers are redrawn rather than leaving them on a dead id.
+              const previousModel = typeof settingsBag.model === 'string' ? settingsBag.model : '';
+              reconcileActiveCodexModelSelection();
+              const didReconcileTitleModel = ProviderSettingsCoordinator
+                .reconcileTitleGenerationModelSelection(settingsBag);
+              if (didReconcileTitleModel || settingsBag.model !== previousModel) {
+                await context.plugin.saveSettings();
+              }
+
+              context.refreshModelSelectors();
+              new Notice(t('settings.refreshModels.done', { count: modelCount }));
+            } catch {
+              new Notice(t('settings.provider.loadModelsFailed'));
+            } finally {
+              button.setDisabled(false);
+            }
+          });
+      });
 
     const SUMMARY_OPTIONS: { value: string; label: string }[] = [
       { value: 'auto', label: t('settings.providerTabs.codex.reasoning.auto') },

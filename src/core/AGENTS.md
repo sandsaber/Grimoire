@@ -6,6 +6,8 @@
 
 - `runtime/` defines neutral chat runtime contracts — prepared turns, query options, approvals, session updates — and `runtime/execution/` the presentation adapter over the kernel. The `ChatRuntime` interface itself is deleted.
 - `providers/` defines registries, capabilities, model routing, environment, settings projection, and workspace-service contracts.
+- `attachments/` owns the content-addressed store for image attachment bytes, plus the scaling
+  policy applied before they are stored. Provider-neutral: every provider reads the same files.
 - `bootstrap/` owns provider-neutral session metadata storage and shared app-storage contracts.
 - `debug/` owns sanitized file logging. Debug logs must be opt-in and must not include prompts, answers, note content, paths, environment values, or secrets.
 - `mcp/` owns provider-neutral MCP config parsing, testing, and coordination.
