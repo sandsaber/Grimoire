@@ -110,20 +110,22 @@
   padding-inline-start: var(--grimoire-space-8);
 }
 
+/* A step's number, set as one: monospace, quiet, no medal around it. */
 .grimoire-orchestrator-plan-number {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-inline-start: -8px;
-  border: 1px solid var(--grimoire-line-2);
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-panel-2);
-  color: var(--grimoire-workbench-faint);
-  box-shadow: var(--grimoire-lift-1);
+  width: var(--grimoire-icon-m);
+  height: auto;
+  margin-inline-start: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-faint);
+  box-shadow: none;
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-medium);
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-orchestrator-plan-number.is-selected {
@@ -250,8 +252,8 @@ button.grimoire-orchestrator-plan-task-toggle:focus-visible {
   width: 7px;
   height: 7px;
   flex: 0 0 auto;
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-workbench-faint);
+  border-radius: var(--grimoire-radius-circle);
+  background: var(--grimoire-ink-faint);
 }
 
 

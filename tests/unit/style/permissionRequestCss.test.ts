@@ -27,7 +27,8 @@ describe('permission request CSS', () => {
     expect(getRule(css, '.grimoire-permission-request::before'))
       .toContain('var(--grimoire-accent-line)');
     expect(getRule(css, '.grimoire-permission-shield')).toContain('var(--grimoire-accent-wash)');
-    expect(getRule(css, '.grimoire-permission-tool')).toContain('border-radius: var(--grimoire-radius-pill)');
+    // A command is machine text on the code ground, not a pill.
+    expect(getRule(css, '.grimoire-permission-tool')).toContain('background: var(--grimoire-code)');
     const target = getRule(css, '.grimoire-permission-target');
     expect(target).toContain('background: var(--grimoire-sink)');
     expect(target).toContain('box-shadow: inset 2px 0 0 var(--grimoire-accent-line)');

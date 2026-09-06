@@ -194,7 +194,7 @@
   width: 4px;
   height: 4px;
   margin-left: var(--grimoire-space-4);
-  border-radius: var(--grimoire-radius-pill);
+  border-radius: var(--grimoire-radius-circle);
   background: var(--grimoire-ink-faint);
   vertical-align: 1px;
 }

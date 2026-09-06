@@ -192,16 +192,16 @@
 
 .grimoire-tool-show-all {
   flex-shrink: 0;
-  border: 1px solid var(--grimoire-line-2);
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-raise-2);
-  color: var(--grimoire-workbench-muted);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: none;
+  color: var(--grimoire-ink-muted);
   cursor: pointer;
   font-family: var(--grimoire-face);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
-  padding: var(--grimoire-space-6) var(--grimoire-space-12);
+  padding: var(--grimoire-space-4) var(--grimoire-space-8);
 }
 
 .grimoire-tool-show-all:hover,
@@ -471,13 +471,13 @@
 }
 
 .grimoire-tool-count-chip {
-  padding: var(--grimoire-space-2) var(--grimoire-space-6);
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-raise-2);
-  color: var(--grimoire-workbench-faint);
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-faint);
   font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
   white-space: nowrap;
 }

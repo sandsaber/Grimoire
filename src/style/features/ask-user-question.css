@@ -432,14 +432,17 @@
 }
 
 .grimoire-tool-io-qa-tag {
-  padding: var(--grimoire-space-2) var(--grimoire-space-8);
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-accent-wash);
-  color: var(--grimoire-accent-text);
-  box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
-  font-weight: var(--grimoire-weight-semibold);
-  font-size: var(--grimoire-text-xs);
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-faint);
+  box-shadow: none;
+  font-family: var(--grimoire-mono);
+  font-weight: var(--grimoire-weight-normal);
+  font-size: var(--grimoire-text-2xs);
+  letter-spacing: var(--grimoire-label-tracking);
   line-height: 1.4;
+  text-transform: uppercase;
 }
 
 /* ── Permission request (unified docked style) ── */
@@ -534,6 +537,7 @@
 }
 
 .grimoire-permission-tool {
+  /* The command a permission is about: machine text on the code ground. */
   display: inline-flex;
   flex: 0 0 auto;
   grid-column: 2;
@@ -544,14 +548,12 @@
   max-width: 100%;
   padding: var(--grimoire-space-4) var(--grimoire-space-8);
   overflow: hidden;
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-sink);
-  color: var(--grimoire-workbench-muted);
-  box-shadow: inset 0 0 0 1px var(--grimoire-line);
+  border-radius: var(--grimoire-radius-1);
+  background: var(--grimoire-code);
+  color: var(--grimoire-ink-muted);
+  box-shadow: none;
   font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
-  line-height: 1.25;
+  font-size: var(--grimoire-text-xs);
   white-space: normal;
 }
 

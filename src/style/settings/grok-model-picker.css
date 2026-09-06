@@ -103,7 +103,7 @@
 .grimoire-grok-model-picker-selected-badge {
   font-size: var(--grimoire-text-xs);
   padding: 1px var(--grimoire-space-6);
-  border-radius: var(--grimoire-radius-pill);
+  border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-hover);
   color: var(--grimoire-ink-muted);
   text-transform: uppercase;
@@ -351,7 +351,7 @@
 .grimoire-grok-model-picker-row-badge {
   font-size: var(--grimoire-text-xs);
   padding: 1px var(--grimoire-space-6);
-  border-radius: var(--grimoire-radius-pill);
+  border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-hover);
   color: var(--grimoire-ink-muted);
   text-transform: uppercase;
