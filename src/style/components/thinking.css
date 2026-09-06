@@ -1,6 +1,12 @@
+/*
+ * Reasoning is an aside, and it is set like one: faint, upright, at the size of
+ * the chrome around it. It was the accent in italics — the loudest colour in
+ * the system on the part of a turn the reader most often skips.
+ */
 .grimoire-thinking {
-  color: var(--grimoire-accent);
-  font-style: italic;
+  color: var(--grimoire-ink-faint);
+  font-style: normal;
+  font-size: var(--grimoire-text-s);
   padding: var(--grimoire-space-4) 0;
   text-align: start;
   animation: grimoire-pulse 1.4s ease-in-out infinite;
@@ -11,7 +17,8 @@
 }
 
 .grimoire-thinking-hint {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-style: normal;
   font-variant-numeric: tabular-nums;
 }
@@ -74,21 +81,33 @@
 
 .grimoire-thinking-label {
   flex: 1;
-  font-size: var(--grimoire-text-m);
-  font-weight: var(--grimoire-weight-medium);
-  color: var(--grimoire-accent);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-normal);
+  color: var(--grimoire-ink-faint);
+  transition: color var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-thinking-header:hover .grimoire-thinking-label {
+  color: var(--grimoire-ink-muted);
+}
+
+.grimoire-thinking-header svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
 }
 
 /* Thinking block content - tree-branch style */
+/* The same hairline a run of tool steps hangs on, at the same offset. */
 .grimoire-thinking-content {
   padding: var(--grimoire-space-4) 0;
-  padding-inline-start: var(--grimoire-space-24);
-  font-size: var(--grimoire-text-m);
-  line-height: 1.5;
-  color: var(--text-muted);
+  padding-inline-start: var(--grimoire-space-14);
+  font-size: var(--grimoire-text-s);
+  line-height: var(--grimoire-leading-body);
+  color: var(--grimoire-ink-muted);
   max-height: 400px;
   overflow-y: auto;
-  border-inline-start: 2px solid var(--background-modifier-border);
+  border-inline-start: 1px solid var(--grimoire-line);
   margin-inline-start: var(--grimoire-space-6);
 }
 
@@ -110,6 +129,6 @@
 }
 
 .grimoire-thinking-content code {
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-s);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-inline-code);
 }

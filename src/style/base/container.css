@@ -128,62 +128,72 @@
 .grimoire-panel-section-heading {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: baseline;
   gap: var(--grimoire-space-8);
   min-height: 30px;
-  color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
-  letter-spacing: 0.14em;
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: var(--grimoire-section-tracking);
   line-height: 1;
   text-transform: uppercase;
 }
 
 .grimoire-panel-section-count {
-  color: var(--grimoire-workbench-ghost);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
-  letter-spacing: 0;
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: var(--grimoire-section-tracking);
   line-height: 1;
-  text-transform: none;
+  text-transform: uppercase;
 }
 
+/*
+ * All / Linked / Current. A segmented control that fills the width turns three
+ * words into three buttons the size of the panel; these are three words, and
+ * the active one is underlined by the same accent rule that marks a tab.
+ */
 .grimoire-source-filters {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--grimoire-space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--grimoire-space-2);
   margin-bottom: var(--grimoire-space-4);
 }
 
 .grimoire-source-filters button.grimoire-source-filter {
   appearance: none;
-  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  height: var(--grimoire-segment-h);
   min-width: 0;
+  padding: 0 var(--grimoire-space-8);
   border: 0;
-  border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-raise);
-  color: var(--grimoire-workbench-faint);
+  border-bottom: 1.5px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-muted);
   font-family: inherit;
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-medium);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
   box-shadow: none;
   text-align: center;
-  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease), box-shadow var(--grimoire-duration) var(--grimoire-ease);
+  transition: color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-source-filters button.grimoire-source-filter:hover {
-  background: var(--grimoire-raise-2);
-  color: var(--grimoire-workbench-muted);
+  background: none;
+  color: var(--grimoire-ink);
   box-shadow: none;
 }
 
 .grimoire-source-filters button.grimoire-source-filter.is-active {
-  background: var(--grimoire-accent-wash);
-  color: var(--grimoire-accent-text);
-  box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
+  border-bottom-color: var(--grimoire-accent);
+  background: none;
+  color: var(--grimoire-ink);
+  box-shadow: none;
 }
 
 .grimoire-context-summary {
