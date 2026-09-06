@@ -110,12 +110,12 @@
   justify-content: center;
   max-width: 92px;
   box-sizing: border-box;
-  height: 28px;
+  height: var(--grimoire-hit-l);
   overflow: hidden;
   padding: 0 var(--grimoire-space-8);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-raise);
+  background: none;
   color: var(--grimoire-workbench-muted);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-xs);
@@ -126,7 +126,7 @@
 }
 
 .grimoire-container--chat-window .grimoire-thinking-gears:hover .grimoire-thinking-current {
-  background: var(--grimoire-raise-2);
+  background: var(--grimoire-hover);
   color: var(--text-normal);
 }
 
@@ -152,7 +152,7 @@
 .grimoire-container--chat-window .grimoire-thinking-gear {
   display: flex;
   align-items: center;
-  min-height: 28px;
+  min-height: var(--grimoire-hit-l);
   padding: 0 var(--grimoire-space-8);
   border-radius: var(--grimoire-radius-1);
   font-weight: var(--grimoire-weight-normal);

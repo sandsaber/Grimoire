@@ -31,7 +31,7 @@ describe('input.css', () => {
     expect(modelStackRule).toContain('flex: 0 1 auto');
     expect(modelStackRule).toContain('width: fit-content');
     expect(modelStackRule).not.toContain('border-inline-end');
-    expect(sendRule).toContain('margin-inline-start: auto');
+    expect(sendRule).toContain('margin-inline-start: var(--grimoire-space-4)');
     expect(css).toContain('@container grimoire-composer (max-width: 520px)');
     expect(css).toMatch(/@container grimoire-composer \(max-width: 520px\)[\s\S]*?\.grimoire-input-toolbar-config-actions[\s\S]*?flex-wrap: wrap/);
     expect(css).toContain('@container grimoire-composer (max-width: 380px)');
@@ -47,29 +47,61 @@ describe('input.css', () => {
     expect(contextRule).toContain('padding: 0 var(--grimoire-space-2) var(--grimoire-space-4)');
   });
 
-  it('uses a borderless soft-accent send button with a deeper hover surface', () => {
+  it('spends the one filled action a surface gets on send', () => {
     const css = readInputCss();
     const sendRule = getRule(css, '.grimoire-container--chat-window button.grimoire-send-button');
-    const hoverRule = getRule(css, '.grimoire-container--chat-window button.grimoire-send-button:hover');
+    const disabledRule = getRule(css, '.grimoire-container--chat-window button.grimoire-send-button:disabled');
 
     expect(sendRule).toContain('border: 0');
-    expect(sendRule).toContain('background: var(--grimoire-accent-wash)');
-    expect(sendRule).toContain('color: var(--grimoire-accent-text)');
-    expect(hoverRule).toContain('background: color-mix(in srgb, var(--grimoire-accent) 22%, transparent)');
-    expect(hoverRule).toContain('filter: none');
+    expect(sendRule).toContain('width: var(--grimoire-hit-l)');
+    expect(sendRule).toContain('background: var(--grimoire-accent)');
+    expect(sendRule).toContain('color: var(--grimoire-accent-contrast)');
+    // Nothing to send is an inert square, not a dimmed accent.
+    expect(disabledRule).toContain('background: var(--grimoire-line)');
+    expect(disabledRule).toContain('color: var(--grimoire-ink-faint)');
   });
 
-  it('matches the stop control to the compact toolbar button system', () => {
+  it('makes stop the same square, in the same place', () => {
     const css = readInputCss();
+    const sendRule = getRule(css, '.grimoire-container--chat-window button.grimoire-send-button');
     const stopRule = getRule(css, '.grimoire-container--chat-window button.grimoire-stop-button');
     const hiddenRule = getRule(css, '.grimoire-container--chat-window button.grimoire-stop-button.grimoire-hidden');
-    const hoverRule = getRule(css, '.grimoire-container--chat-window button.grimoire-stop-button:hover');
 
-    expect(stopRule).toContain('width: 28px');
-    expect(stopRule).toContain('border: 1px solid transparent');
-    expect(stopRule).toContain('border-radius: var(--grimoire-radius-2)');
-    expect(stopRule).toContain('background: var(--grimoire-raise)');
+    for (const declaration of [
+      'width: var(--grimoire-hit-l)',
+      'height: var(--grimoire-hit-l)',
+      'border-radius: var(--grimoire-radius-1)',
+      'background: var(--grimoire-accent)',
+      'color: var(--grimoire-accent-contrast)',
+    ]) {
+      expect(sendRule).toContain(declaration);
+      expect(stopRule).toContain(declaration);
+    }
     expect(hiddenRule).toContain('display: none');
-    expect(hoverRule).toContain('background: color-mix(in srgb, var(--grimoire-error) 10%, transparent)');
+  });
+
+  it('draws the composer card with one line, and moves that line on focus', () => {
+    const css = readInputCss();
+    const cardRule = getRule(css, '.grimoire-input-wrapper');
+    const focusRule = getRule(css, '.grimoire-input-wrapper:focus-within');
+    const budgetRule = getRule(css, '.grimoire-input-wrapper.is-over-budget');
+
+    expect(cardRule).toContain('border: 1px solid var(--grimoire-line)');
+    expect(cardRule).toContain('border-radius: var(--grimoire-radius-3)');
+    // Focus used to add an accent border, an inset highlight and an outer ring:
+    // three effects saying one thing about a box the cursor is inside.
+    expect(focusRule).toContain('border-color: var(--grimoire-line-3)');
+    expect(focusRule).toContain('box-shadow: none');
+    expect(budgetRule).toContain('border-color: var(--grimoire-error-line)');
+  });
+
+  it('hangs an attachment chip on a hairline rather than a wash', () => {
+    const css = readInputCss();
+    const chipRule = getRule(css, '.grimoire-file-chip');
+
+    expect(chipRule).toContain('height: var(--grimoire-chip-h)');
+    expect(chipRule).toContain('border: 1px solid var(--grimoire-accent-line)');
+    expect(chipRule).toContain('border-radius: var(--grimoire-radius-1)');
+    expect(chipRule).toContain('background: none');
   });
 });

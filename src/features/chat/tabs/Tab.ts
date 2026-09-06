@@ -895,9 +895,11 @@ function initializeInputToolbar(
   setIcon(dom.stopButtonEl, 'square');
   dom.sendButtonEl = sendActionsEl.createEl('button', {
     cls: 'grimoire-send-button',
-    text: t('chat.ui.composer.send'),
     attr: { type: 'button', 'aria-label': t('chat.ui.composer.sendMessage') },
   });
+  // The one filled action this surface is allowed, and it is a glyph: a verb
+  // that is always the same verb is learnt once, and Enter sends anyway.
+  setIcon(dom.sendButtonEl, 'arrow-up');
   syncComposerStopButton(tab);
 
   tab.ui.modelSelector = toolbarComponents.modelSelector;

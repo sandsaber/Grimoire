@@ -130,12 +130,12 @@
   justify-content: center;
   box-sizing: border-box;
   width: 28px;
-  height: 28px;
+  height: var(--grimoire-hit-l);
   min-width: 28px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-raise);
+  background: none;
   color: var(--grimoire-workbench-muted);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-xs);
@@ -159,7 +159,7 @@
 }
 
 .grimoire-container--chat-window .grimoire-external-context-icon-wrapper:hover {
-  background: var(--grimoire-raise-2);
+  background: var(--grimoire-hover);
   color: var(--text-normal);
 }
 

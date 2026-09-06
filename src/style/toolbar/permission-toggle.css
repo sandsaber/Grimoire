@@ -23,13 +23,13 @@
   justify-content: center;
   box-sizing: border-box;
   max-width: 92px;
-  height: 28px;
+  height: var(--grimoire-hit-l);
   min-width: 0;
   overflow: hidden;
   padding: 0 var(--grimoire-space-8);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-raise);
+  background: none;
   color: var(--grimoire-workbench-muted);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-xs);
@@ -41,14 +41,14 @@
 }
 
 .grimoire-permission-label:hover {
-  background: var(--grimoire-raise-2);
+  background: var(--grimoire-hover);
   color: var(--text-normal);
 }
 
 .grimoire-permission-label.active,
 .grimoire-permission-label.plan-active,
 .grimoire-permission-gears.open .grimoire-permission-label {
-  border-color: var(--grimoire-accent-line);
+  border-color: transparent;
   background: var(--grimoire-accent-wash);
   color: var(--grimoire-accent-text);
 }
@@ -82,7 +82,7 @@
 .grimoire-permission-option {
   display: flex;
   align-items: center;
-  min-height: 28px;
+  min-height: var(--grimoire-hit-l);
   padding: 0 var(--grimoire-space-8);
   border-radius: var(--grimoire-radius-1);
   color: var(--text-muted);

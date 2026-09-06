@@ -116,15 +116,15 @@
 .grimoire-container--chat-window .grimoire-mcp-selector-icon {
   box-sizing: border-box;
   width: 28px;
-  height: 28px;
+  height: var(--grimoire-hit-l);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-raise);
+  background: none;
   color: var(--grimoire-workbench-muted);
 }
 
 .grimoire-container--chat-window .grimoire-mcp-selector-icon-wrapper:hover .grimoire-mcp-selector-icon {
-  background: var(--grimoire-raise-2);
+  background: var(--grimoire-hover);
   color: var(--text-normal);
 }
 

@@ -12,18 +12,32 @@ function getRule(css: string, selector: string): string {
 }
 
 describe('history.css', () => {
-  it('opens history as a full chat-pane sheet', () => {
+  it('hangs history off the control that opened it, not over the conversation', () => {
     const css = readHistoryCss();
 
+    // It was a sheet inset 13px on all four sides, so looking for another
+    // conversation meant losing sight of this one.
     const menuRule = getRule(css, '.grimoire-history-menu');
     expect(menuRule).toContain('position: absolute');
-    expect(menuRule).toContain('left: 13px');
-    expect(menuRule).toContain('right: 13px');
-    expect(menuRule).toContain('top: 13px');
-    expect(menuRule).toContain('bottom: 13px');
+    expect(menuRule).toContain('top: calc(var(--grimoire-header-h) + var(--grimoire-space-4))');
+    expect(menuRule).toContain('right: var(--grimoire-space-8)');
+    expect(menuRule).toContain('bottom: auto');
+    expect(menuRule).toContain('left: auto');
+    expect(menuRule).toContain('width: min(320px, calc(100% - var(--grimoire-space-16)))');
+    expect(menuRule).toContain('box-shadow: var(--grimoire-lift-1)');
     expect(getRule(css, '.grimoire-history-menu.visible')).toContain('display: grid');
     expect(getRule(css, '.grimoire-history-close')).toContain('display: inline-grid');
     expect(css).not.toContain('.grimoire-history-btn[aria-expanded="true"]');
+  });
+
+  it('marks the open conversation with a rule rather than a fill', () => {
+    const css = readHistoryCss();
+
+    const rowRule = getRule(css, '.grimoire-history-item');
+    expect(rowRule).toContain('height: 36px');
+    expect(rowRule).toContain('border-left: 1.5px solid transparent');
+    expect(getRule(css, '.grimoire-history-item.active'))
+      .toContain('border-left-color: var(--grimoire-accent)');
   });
 
   it('styles the redesigned search and grouped history list', () => {

@@ -1,17 +1,24 @@
+/*
+ * History is a popover hanging off the control that opened it, not a sheet
+ * covering the conversation behind it. Looking for another conversation is not
+ * a reason to lose sight of this one.
+ */
 .grimoire-history-menu {
   position: absolute;
-  top: 13px;
-  right: 13px;
-  bottom: 13px;
-  left: 13px;
+  top: calc(var(--grimoire-header-h) + var(--grimoire-space-4));
+  right: var(--grimoire-space-8);
+  bottom: auto;
+  left: auto;
   z-index: 40;
   display: none;
+  box-sizing: border-box;
+  width: min(320px, calc(100% - var(--grimoire-space-16)));
+  max-height: min(520px, calc(100% - var(--grimoire-header-h) - var(--grimoire-space-24)));
   overflow: hidden;
-  border: 1px solid var(--grimoire-accent-line);
-  border-radius: var(--grimoire-radius-3);
-  background: var(--grimoire-plane);
-  box-shadow:
-    var(--grimoire-lift-2);
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-2);
+  background: var(--grimoire-ground);
+  box-shadow: var(--grimoire-lift-1);
 }
 
 .grimoire-history-menu.visible {
@@ -22,16 +29,17 @@
 .grimoire-history-header {
   display: flex;
   align-items: center;
+  height: var(--grimoire-hit-l);
   gap: var(--grimoire-space-8);
-  padding: var(--grimoire-space-12) var(--grimoire-space-12);
-  border-bottom: 1px solid var(--grimoire-line);
+  padding: var(--grimoire-space-4) var(--grimoire-space-4) 0 var(--grimoire-space-12);
+  border-bottom: 0;
 }
 
 .grimoire-history-title {
   min-width: 0;
-  color: var(--text-normal);
-  font-size: var(--grimoire-text-m);
-  font-weight: var(--grimoire-weight-semibold);
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
   line-height: 1.2;
 }
 
@@ -40,13 +48,13 @@
 }
 
 .grimoire-history-count {
-  padding: var(--grimoire-space-4) var(--grimoire-space-6);
-  border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-raise-2);
-  color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
 }
 
@@ -100,8 +108,9 @@
 .grimoire-history-search {
   display: flex;
   align-items: center;
+  height: var(--grimoire-list-row-h);
   gap: var(--grimoire-space-8);
-  padding: var(--grimoire-space-8) var(--grimoire-space-12);
+  padding: 0 var(--grimoire-space-12);
   border-bottom: 1px solid var(--grimoire-line);
 }
 
@@ -119,12 +128,14 @@
 .grimoire-history-search-input {
   min-width: 0;
   flex: 1 1 auto;
+  height: 100%;
+  padding: 0;
   border: 0;
   box-shadow: none;
   outline: 0;
   background: transparent;
-  color: var(--text-normal);
-  font-size: var(--grimoire-text-m);
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
   line-height: 1.2;
 }
 
@@ -141,7 +152,7 @@
 .grimoire-history-list {
   min-height: 0;
   overflow: hidden auto;
-  padding: var(--grimoire-space-8);
+  padding: var(--grimoire-space-4) var(--grimoire-space-8) var(--grimoire-space-8);
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb-bg, var(--grimoire-line-2)) transparent;
 }
@@ -156,12 +167,12 @@
 }
 
 .grimoire-history-group-label {
-  padding: var(--grimoire-space-8) var(--grimoire-space-8) var(--grimoire-space-6);
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  padding: var(--grimoire-space-10) var(--grimoire-space-8) var(--grimoire-space-4);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-bold);
-  letter-spacing: 0.12em;
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: var(--grimoire-label-tracking);
   line-height: 1;
   text-transform: uppercase;
 }
@@ -205,13 +216,15 @@
 .grimoire-history-item {
   position: relative;
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--grimoire-space-12);
+  height: 36px;
+  gap: var(--grimoire-space-10);
   min-width: 0;
   width: 100%;
-  padding: var(--grimoire-space-8) var(--grimoire-space-8);
-  border-radius: var(--grimoire-radius-2);
+  padding: 0 var(--grimoire-space-8);
+  border-left: 1.5px solid transparent;
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   outline: 0;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
@@ -219,11 +232,13 @@
 
 .grimoire-history-item:hover,
 .grimoire-history-item:focus-visible {
-  background: var(--grimoire-raise-2);
+  background: var(--grimoire-hover);
 }
 
+/* The conversation already open: a rule, which is what the accent draws. */
 .grimoire-history-item.active {
   cursor: default;
+  border-left-color: var(--grimoire-accent);
   background: transparent;
 }
 
@@ -239,9 +254,9 @@
 
 .grimoire-history-item-title {
   overflow: hidden;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-semibold);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -249,7 +264,8 @@
 
 .grimoire-history-item-meta {
   overflow: hidden;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -257,10 +273,10 @@
 }
 
 .grimoire-history-item-time {
-  color: var(--grimoire-workbench-ghost);
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-bold);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
   white-space: nowrap;
   transition: opacity var(--grimoire-duration) var(--grimoire-ease);

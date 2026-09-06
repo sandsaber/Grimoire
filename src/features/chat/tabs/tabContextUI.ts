@@ -190,9 +190,18 @@ export function syncBoundStatus(tab: TabData, plugin: GrimoirePlugin): void {
   }));
 }
 
-export function syncComposerStopButton(tab: TabData, hasSubagentActivity = false): void {
-  const shouldShow = tab.state.isStreaming && hasSubagentActivity;
-  tab.dom.stopButtonEl?.toggleClass('grimoire-hidden', !shouldShow);
+/**
+ * Send and Stop are one square that changes what it does.
+ *
+ * Stop used to appear only once a subagent was seen working, beside a Send
+ * that stayed enabled — so during an ordinary turn there was no way to stop it
+ * from the composer at all, and during a subagent turn there were two primary
+ * actions where the design allows one.
+ */
+export function syncComposerStopButton(tab: TabData, _hasSubagentActivity = false): void {
+  const streaming = tab.state.isStreaming;
+  tab.dom.stopButtonEl?.toggleClass('grimoire-hidden', !streaming);
+  tab.dom.sendButtonEl?.toggleClass('grimoire-hidden', streaming);
 }
 
 export function appendContextSummaryRow(

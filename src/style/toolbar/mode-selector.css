@@ -31,13 +31,13 @@
   justify-content: center;
   max-width: 82px;
   box-sizing: border-box;
-  height: 28px;
+  height: var(--grimoire-hit-l);
   min-width: 0;
   overflow: hidden;
   padding: 0 var(--grimoire-space-6);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-raise);
+  background: none;
   color: var(--grimoire-workbench-muted);
   font-family: var(--font-monospace);
   font-size: var(--grimoire-text-xs);
@@ -54,7 +54,7 @@
 }
 
 .grimoire-container--chat-window .grimoire-mode-label:not(.active):hover {
-  background: var(--grimoire-raise-2);
+  background: var(--grimoire-hover);
   color: var(--text-normal);
 }
 

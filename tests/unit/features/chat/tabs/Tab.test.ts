@@ -24,6 +24,7 @@ import {
   type TabCreateOptions,
   wireTabInputEvents,
 } from '@/features/chat/tabs/Tab';
+import { syncComposerStopButton } from '@/features/chat/tabs/tabContextUI';
 import { getTabPermissionMode } from '@/features/chat/tabs/tabSettings';
 import { setLocale } from '@/i18n/i18n';
 import {
@@ -1965,7 +1966,7 @@ describe('Tab - UI Initialization', () => {
       expect(tab.dom.selectionIndicatorEl!.style.display).toBe('none');
     });
 
-    it('should keep the stop button hidden for normal streaming', () => {
+    it('swaps send for stop in place, and back', () => {
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -1978,16 +1979,27 @@ describe('Tab - UI Initialization', () => {
       expect(tab.dom.stopButtonEl?.getAttribute('title')).toBeNull();
       expect(setIcon).toHaveBeenCalledWith(tab.dom.stopButtonEl, 'square');
 
+      // Send is a glyph, not a word: a verb that is always the same verb is
+      // learnt once, and Enter sends anyway.
+      expect(tab.dom.sendButtonEl?.textContent).toBe('');
+      expect(setIcon).toHaveBeenCalledWith(tab.dom.sendButtonEl, 'arrow-up');
+
       const actionGroup = tab.dom.inputContainerEl.querySelector('.grimoire-send-actions');
       expect(actionGroup?.hasClass('grimoire-send-actions')).toBe(true);
       expect(actionGroup?.children[actionGroup.children.length - 2]).toBe(tab.dom.stopButtonEl);
       expect(actionGroup?.children[actionGroup.children.length - 1]).toBe(tab.dom.sendButtonEl);
 
+      // One square, two jobs. Stop used to wait for a subagent to be seen
+      // working, so an ordinary turn could not be stopped from the composer.
       tab.state.isStreaming = true;
-      expect(tab.dom.stopButtonEl?.hasClass('grimoire-hidden')).toBe(true);
+      syncComposerStopButton(tab);
+      expect(tab.dom.stopButtonEl?.hasClass('grimoire-hidden')).toBe(false);
+      expect(tab.dom.sendButtonEl?.hasClass('grimoire-hidden')).toBe(true);
 
       tab.state.isStreaming = false;
+      syncComposerStopButton(tab);
       expect(tab.dom.stopButtonEl?.hasClass('grimoire-hidden')).toBe(true);
+      expect(tab.dom.sendButtonEl?.hasClass('grimoire-hidden')).toBe(false);
     });
 
     it('should create SlashCommandDropdown', () => {

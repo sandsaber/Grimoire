@@ -52,7 +52,7 @@ describe('chat toolbar selector CSS', () => {
       expect(permissionMenu).toContain(declaration);
     }
     for (const declaration of [
-      'min-height: 28px',
+      'min-height: var(--grimoire-hit-l)',
       'padding: 0 var(--grimoire-space-8)',
       'border-radius: var(--grimoire-radius-1)',
       'font-weight: var(--grimoire-weight-normal)',
