@@ -5,7 +5,7 @@
 ## Current Scope
 
 - Gemini is opt-in and disabled by default.
-- Chat execution runs through the kernel: `GeminiExecution` (`src/providers/gemini/execution/`) owns the backend, the permission bridge and the isolated metadata session, and `ApplicationRuntime.createRuntimeFor('gemini')` reaches it through the composition. `GeminiChatRuntime` is gone — see `docs/provider-execution-migration-progress.md` for the flip.
+- Chat execution runs through the kernel: `GeminiExecution` (`src/providers/gemini/execution/`) owns the backend, the permission bridge and the isolated metadata session, and `ApplicationRuntime.createRuntimeFor('gemini')` reaches it through the composition.
 - Per-turn prompts include Grimoire context from the active note, editor selection, browser selection, canvas selection, vault search, and project workspace.
 - Model and mode discovery come from the reply to `session/new`, which answers with `models` and `modes` and no config options at all, and are stored in provider settings for the UI. Grimoire's three permission modes and the CLI's four (`default`, `autoEdit`, `yolo`, `plan`) are translated in `modes.ts`; neither set may be forwarded as the other.
 - Auxiliary workflows such as title generation, instruction refinement, and inline edit are unsupported until a Gemini auxiliary runner exists.

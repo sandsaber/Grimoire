@@ -5,7 +5,7 @@
 ## Current Scope
 
 - Qwen is opt-in and disabled by default.
-- Chat execution runs through the kernel: `QwenExecution` (`src/providers/qwen/execution/`) owns the backend, the permission bridge, the question bridge and the isolated metadata session, and `ApplicationRuntime.createRuntimeFor('qwen')` reaches it through the composition. `QwenChatRuntime` is gone — see `docs/provider-execution-migration-progress.md` for the flip.
+- Chat execution runs through the kernel: `QwenExecution` (`src/providers/qwen/execution/`) owns the backend, the permission bridge, the question bridge and the isolated metadata session, and `ApplicationRuntime.createRuntimeFor('qwen')` reaches it through the composition.
 - `AskUserQuestion` is carried as a `kind: 'question'` interaction, the first of that kind in the product. Its answers ride on `InteractionResolution.payload`, which is never persisted; a question caught mid-resolution by a reload is cancelled rather than replayed.
 - Per-turn prompts include Grimoire context from the active note, editor selection, browser selection, canvas selection, vault search, and project workspace.
 - Model and mode discovery come from the reply to `session/new` and are stored in provider settings for the UI. The mode a session *reports when it opens* is recorded and never adopted: only a `current_mode_update` moves the toolbar, and it is translated on the way — `Tab.ts` expects already-normalized Grimoire modes.

@@ -13,9 +13,8 @@ import type {
 /**
  * The contract a built-in provider contributes to the application.
  *
- * Every row of `docs/provider-contribution-inventory.md` has a typed slot here,
- * even where the consumer does not move until M3 or M5, because a contribution
- * with nowhere to go is a contribution silently dropped at a cutover.
+ * Every contribution a provider makes has a typed slot here, because a
+ * contribution with nowhere to go is a contribution silently dropped.
  *
  * Two rules keep it honest:
  *

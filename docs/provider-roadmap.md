@@ -2,18 +2,17 @@
 
 This file tracks future provider integrations and the implementation sequence for agents working on Grimoire. It is not a promise that every listed provider is ready to ship; each provider still needs current runtime discovery before code is written.
 
-> **Architecture status. The migration is done.** `ChatRuntime`, `registration.ts` and every
-> `*ChatRuntime` are deleted, and both provider registries with them. A new provider is **declared
-> once** in `src/providers/BuiltInProviderCatalog.ts` and implements an **execution backend** that
-> the kernel drives, presented by `ExecutionChatRuntimeAdapter`; its workspace slots come from
-> `ApplicationRuntime.workspaceFor(providerId)`. The canonical architecture is
-> [`provider-execution-migration-plan.md`](provider-execution-migration-plan.md), with reasoning in
-> [`provider-architecture-research.md`](provider-architecture-research.md) and what actually landed
-> in [`provider-execution-migration-progress.md`](provider-execution-migration-progress.md).
+> **Architecture.** A provider is **declared once** in `src/providers/BuiltInProviderCatalog.ts`
+> and implements an **execution backend** that the kernel drives, presented to chat surfaces by
+> `ExecutionChatRuntimeAdapter`; its workspace slots come from
+> `ApplicationRuntime.workspaceFor(providerId)`. What the kernel guarantees a surface, and what a
+> backend must therefore provide, is in
+> [`provider-execution-adapter-contract.md`](provider-execution-adapter-contract.md); what the kernel
+> may write to a vault is in
+> [`provider-execution-persistence-decisions.md`](provider-execution-persistence-decisions.md).
 >
 > The checklist below is the **shape**, not the wiring: what a provider must decide and record
-> before code is written still holds, and the files it produces are named in the plan's "Adding a
-> provider" rules rather than here.
+> before code is written.
 
 ## Provider Implementation Checklist
 
@@ -36,7 +35,7 @@ This file tracks future provider integrations and the implementation sequence fo
 4. Keep storage boundaries explicit.
    - Use provider-native files only when preserving CLI compatibility.
    - Use `.grimoire/<provider>/` for Grimoire-owned data.
-   - Do not add legacy migrations unless a migration milestone explicitly asks for them.
+   - Do not add legacy migrations unless a release explicitly asks for them.
 5. Add focused tests before broad release work.
    - the catalog declaration and default enablement
    - settings projection and normalization
@@ -47,7 +46,7 @@ This file tracks future provider integrations and the implementation sequence fo
    - **the wiring, not only the module.** A provider's helper can be complete,
      tested and called by nothing: assert on what the backend is launched with
      and what chunks a tab receives, which is the one thing a module test cannot
-     say. Every defect the `main` sync recovery found had green module tests.
+     say. Every wiring defect found so far had green module tests.
 
 ## Current Integration Notes
 

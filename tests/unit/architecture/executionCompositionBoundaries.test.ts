@@ -381,9 +381,8 @@ describe('execution composition boundaries', () => {
     const source = read(MODULE_PATH);
 
     /**
-     * Every row of `docs/provider-contribution-inventory.md` and the slot that
-     * carries it. A contribution with no slot is how the v1 cutover lost most
-     * of the product.
+     * Every provider contribution and the slot that carries it. A contribution
+     * with no slot is how a rewrite loses product without noticing.
      */
     // `path` names the module the owner interface lives in, for the rows whose
     // home turned out not to be the provider module at all.

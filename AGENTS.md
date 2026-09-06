@@ -36,7 +36,7 @@ OpenCode and MiMoCode intentionally mirror each other closely; when changing lau
 - **Both provider registries are deleted.** A provider's runtime comes from `ApplicationRuntime.createRuntimeFor(providerId)`, its declarations and capabilities from `ProviderCatalog`, and its workspace slots from `ApplicationRuntime.workspaceFor(providerId)`. The legacy workspace services that back some of those slots are built at load by `ProviderWorkspaceManager` and held on `ApplicationRuntime` — reached with a plugin, by `maybeGet<Provider>WorkspaceServices(plugin)`, never through a global.
 - Feature code must consume provider-neutral contracts. Do not read provider-specific `Conversation.providerState` fields directly from `src/features/`.
 - Preserve provider-native behavior first. Prefer adapting official CLI/runtime semantics over reimplementing provider features inside Grimoire.
-- Use `.grimoire/` for Grimoire-owned vault data. Do not add legacy storage migration behavior unless a migration milestone explicitly asks for it.
+- Use `.grimoire/` for Grimoire-owned vault data. Do not add legacy storage migration behavior unless a release explicitly asks for it.
 
 ## Key Paths
 
@@ -148,7 +148,7 @@ Grimoire puts *inside* a row, never `.setting-item` and its parts.
 | `.grimoire/sessions/*.meta.json` | Provider-neutral session metadata, written as a versioned record: `{ schemaVersion, recordId, revision, updatedAt, payload }`, where `payload` is the conversation. A file written before the envelope existed is read as revision 1 and rewritten in place at the next write, never renamed. A writer applies the fields it changed rather than the whole conversation it holds |
 | `.grimoire/attachments/<sha256>.<ext>` | Image attachment bytes, addressed by content and shared by every provider |
 | `.grimoire/logs/YYYY-MM-DD.jsonl` | Optional sanitized debug logs, written only when Advanced debug logging is enabled |
-| `.grimoire/control/**` | Grimoire-owned execution lifecycle control records: ownership, generations, state-machine positions, terminals, dispatch intents, and recovery evidence. Never a second provider transcript, and never prompts, secrets, or raw payloads. Written from the Antigravity flip onward, by the kernel the plugin constructs at load and shuts down at unload; retention, deletion, versioning, and redaction are decided in [`docs/provider-execution-persistence-decisions.md`](docs/provider-execution-persistence-decisions.md). These files are inert to the legacy runtime path, which is what makes reverting a shipped flip safe |
+| `.grimoire/control/**` | Grimoire-owned execution lifecycle control records: ownership, generations, state-machine positions, terminals, dispatch intents, and recovery evidence. Never a second provider transcript, and never prompts, secrets, or raw payloads. Written by the execution kernel the plugin constructs at load and shuts down at unload; retention, deletion, versioning, and redaction are decided in [`docs/provider-execution-persistence-decisions.md`](docs/provider-execution-persistence-decisions.md). A plugin build that does not read these files must neither depend on them nor break on their presence, which is what makes a downgrade safe |
 | `.grimoire/mcp/<provider>.json` | Grimoire-owned MCP servers injected into ACP sessions for OpenCode, Grok Build, MiMoCode, Kimi Code, Qwen Code, and Gemini CLI |
 | `.grimoire/claude/statusline-usage.json` | Claude Code status-line usage snapshot used to hydrate plan-limit indicators |
 | `.claude/settings.json` | Claude Code-compatible project settings and permissions |
@@ -185,7 +185,7 @@ The `_grimoire` MCP metadata key and `grimoire-*` internal OpenCode IDs are impl
 - When work is tied to an issue or ticket, include its identifier in the branch name or commit message. Prefer the commit message when committing directly to an existing branch.
 - Local test Obsidian vault: set `OBSIDIAN_VAULT` in `.env.local` (gitignored) to your vault path so `npm run build` / `npm run build:release` copy artifacts there automatically. When copying a local build for manual testing, install Grimoire into `<vault>/.obsidian/plugins/grimoire`.
 - For provider integrations, inspect real runtime output before normalizing event shapes. Real transcripts and wire traces beat guessed schemas.
-- For future provider work and implementation sequencing, read `docs/provider-execution-migration-plan.md` first — it is the canonical execution architecture and defines when the old runtime path is frozen — then `docs/provider-roadmap.md` for the current integration path. Check `docs/provider-execution-migration-progress.md` for the active milestone before adding new provider directories. The `ChatRuntime` seam is deleted; a provider's presentation contract is `ExecutionChatRuntimeAdapter`.
+- For future provider work, read `docs/provider-roadmap.md` for the integration path and `docs/provider-execution-adapter-contract.md` for what the execution kernel guarantees a chat surface. A provider implements an execution backend that the kernel drives; its presentation contract is `ExecutionChatRuntimeAdapter`, and there is no other runtime seam to implement.
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands

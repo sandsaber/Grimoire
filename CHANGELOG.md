@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.0.0 - 2026-09-06
+
+The provider runtime is rebuilt on an execution kernel. Every provider runs through it, and what a chat surface draws is read from the kernel's record of a turn rather than from whether the provider stopped talking. Existing conversations, settings, and provider-owned files are read as they are; nothing needs migrating.
+
+### Changed
+
+- Every turn now ends in exactly one recorded outcome - succeeded, failed, cancelled, interrupted, rejected before dispatch, or unknown. A connection that drops mid-answer no longer renders as a finished reply, and a turn whose fate the provider never confirmed is shown as a warning instead of being drawn as success.
+- A turn that never reached the provider - a permission check that refuses on the default mode, a session the CLI would not open - now says so in the conversation, where before it left an empty assistant message.
+- Cancelling a turn dispatches the cancel and waits for the provider to confirm it stopped. The interruption is drawn at once, as before; what changed is that the record of the turn is no longer written until the provider has actually answered.
+- The plugin follows the vault's theme and accent colour on every surface. The accent had been a fixed violet on thirty-two of them, because Obsidian defines no accent triple and the fallback was silently used. Scrollbars, hovers, menus, and backdrops no longer carry dark-only colours into light themes, and the settings sheet is drawn with Obsidian's own controls.
+- Nineteen clickable elements that only a mouse could reach - including a modal that offered a choice the keyboard could only decline - now have a role, a name, a tab stop, and Enter/Space handling.
+- Session metadata in `.grimoire/sessions/` is written as a versioned record. A file written before the envelope existed is read as revision 1 and rewritten in place at its next write, never renamed. A writer applies only the fields it changed, so two views of one conversation no longer overwrite each other's edits.
+
+### Added
+
+- `.grimoire/control/` holds the kernel's lifecycle records: which run owns which process, generations, state, terminals, and the evidence needed to recover after a crash or a quit mid-turn. They carry no prompts, no transcripts, no secrets, and no provider payloads, and deleting a conversation deletes its records with it. An older plugin build ignores the directory, so a downgrade is safe.
+- A run left `dispatching` or `running` by a quit is classified honestly at the next load instead of being shown as still running.
+- Agent work started from a conversation is durable: a restart shows what became of it rather than forgetting it.
+
+### Fixed
+
+- Grok Build's context meter, Kimi Code's, and Qwen Code's read usage from the turn that produced it, so the meter no longer lags a turn behind or stays empty on a provider that reports usage only after the prompt returns.
+- Resuming an OpenCode session no longer opens a fresh session on every reload. OpenCode answers `session/load` with its config options and no session id, and requiring the echo turned every resume into "the agent returned another session".
+- Stopping the title generation for one tab no longer stops it for every other open tab.
+
 ## 1.3.2 - 2026-09-06
 
 ### Added

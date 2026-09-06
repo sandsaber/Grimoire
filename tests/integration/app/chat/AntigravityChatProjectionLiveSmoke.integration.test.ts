@@ -19,11 +19,10 @@ import { AntigravityExecution } from '@/providers/antigravity/execution/Antigrav
 import { updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
 
 /**
- * The Antigravity chat projection flip, against a real `agy`.
+ * The Antigravity chat projection, against a real `agy`.
  *
- * `docs/chat-projection-flip-smoke-matrix.md` splits into rows a person has to
- * watch and rows that can be driven. This is the driven half for the first
- * provider on the list: a turn submitted the way a tab submits one, run by the
+ * A live smoke matrix splits into rows a person has to watch and rows that can
+ * be driven. This is the driven half for the smallest provider: a turn submitted the way a tab submits one, run by the
  * kernel over a real CLI, drawn by the real render target, and read back out of
  * a real record store.
  *
