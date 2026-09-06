@@ -169,10 +169,16 @@ export class ChatProjectionRenderer {
     this.target.reset({
       conversationId: projection.conversationId,
       title: projection.title,
-      messages: withoutTurnAnswers(projection),
+      messages: withoutUnsavedTurnAnswers(projection),
     });
     for (const turn of projection.turns) {
-      this.openTurn(turn);
+      // A saved turn is already represented by its durable assistant message.
+      // Replaying its transient blocks after a full reset would draw the same
+      // answer twice; removing the durable message instead makes the answer
+      // disappear when those transient blocks are no longer renderable.
+      if (turn.persistence !== 'saved') {
+        this.openTurn(turn);
+      }
     }
     for (const interaction of projection.interactions) {
       if (isOpenInteraction(interaction)) {
@@ -371,8 +377,10 @@ function turnAnswerIds(projection: ChatProjection): Set<string> {
   return new Set(projection.turns.map(turn => turn.assistantMessageId));
 }
 
-function withoutTurnAnswers(projection: ChatProjection): readonly ChatMessage[] {
-  const answered = turnAnswerIds(projection);
+function withoutUnsavedTurnAnswers(projection: ChatProjection): readonly ChatMessage[] {
+  const answered = new Set(projection.turns
+    .filter(turn => turn.persistence !== 'saved')
+    .map(turn => turn.assistantMessageId));
   return answered.size === 0
     ? projection.messages
     : projection.messages.filter(message => !answered.has(message.id));

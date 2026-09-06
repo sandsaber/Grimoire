@@ -257,6 +257,52 @@ describe('chat projection renderer', () => {
     ]);
   });
 
+  it('keeps a saved turn answer when a later transcript rewrite forces a redraw', () => {
+    const target = recordingTarget();
+    const renderer = new ChatProjectionRenderer(target);
+    let projection = started(createChatProjection(conversation([message('msg-1', 'user', 'Hi')]), 1));
+    projection = envelope(projection, 1, {
+      kind: 'output-delta',
+      channel: 'assistant',
+      text: 'Hello.',
+    });
+    projection = envelope(projection, 2, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    projection = reduceChatProjection(projection, {
+      kind: 'turn-completed',
+      runId: RUN_ID,
+      conversation: conversation([
+        message('msg-1', 'user', 'Hi'),
+        message('assistant-1', 'assistant', 'Hello.'),
+      ]),
+      revision: 2,
+      completedAt: 20,
+    });
+    renderer.render(projection);
+    target.calls.splice(0);
+
+    renderer.render(reduceChatProjection(projection, {
+      kind: 'conversation-loaded',
+      conversation: conversation([
+        message('msg-1-reloaded', 'user', 'Hi'),
+        message('assistant-1', 'assistant', 'Hello.'),
+      ]),
+      revision: 3,
+    }));
+
+    const reset = target.calls.find(call => call.method === 'reset');
+    expect(reset?.args[0]).toEqual(expect.objectContaining({
+      messages: [
+        expect.objectContaining({ id: 'msg-1-reloaded' }),
+        expect.objectContaining({ id: 'assistant-1' }),
+      ],
+    }));
+    expect(methods(target)).not.toContain('beginTurn');
+  });
+
   it('shows an interaction while it is open and takes it away when it is answered', () => {
     const target = recordingTarget();
     const renderer = new ChatProjectionRenderer(target);
