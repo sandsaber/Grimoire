@@ -226,15 +226,15 @@
   bottom: calc(100% + 8px);
   left: 0;
   box-sizing: border-box;
-  width: min(360px, calc(100vw - 24px));
-  max-width: min(360px, calc(100vw - 24px));
-  max-height: min(44vh, 320px);
+  width: min(320px, calc(100vw - 24px));
+  max-width: min(320px, calc(100vw - 24px));
+  max-height: min(52vh, 420px);
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
   margin-bottom: 0;
-  padding: var(--grimoire-space-4);
-  gap: var(--grimoire-space-2);
+  padding: var(--grimoire-space-6);
+  gap: 0;
   border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-ground);
@@ -257,24 +257,29 @@
   background: var(--grimoire-workbench-border-strong);
 }
 
+/*
+ * A band with a rule under it, not a bordered field inside a bordered panel.
+ * The panel already encloses this; a second box says nothing the first did not.
+ */
 .grimoire-model-search {
   position: sticky;
   top: 0;
   z-index: 2;
-  flex: 0 0 34px;
+  flex: 0 0 36px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   box-sizing: border-box;
   gap: var(--grimoire-space-8);
-  height: 34px;
-  min-height: 34px;
-  max-height: 34px;
-  margin: 0;
-  padding: 0 var(--grimoire-space-8);
-  border: 1px solid var(--grimoire-line);
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-plane);
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  margin: calc(-1 * var(--grimoire-space-6)) calc(-1 * var(--grimoire-space-6)) var(--grimoire-space-6);
+  padding: 0 var(--grimoire-space-10);
+  border: 0;
+  border-bottom: 1px solid var(--grimoire-line);
+  border-radius: 0;
+  background: var(--grimoire-ground);
   overflow: hidden;
 }
 
@@ -340,15 +345,16 @@
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--grimoire-space-8);
-  min-height: var(--grimoire-hit-l);
-  padding: var(--grimoire-space-4) var(--grimoire-space-6);
+  height: 30px;
+  min-height: 30px;
+  padding: 0 var(--grimoire-space-8);
   border: 0;
-  border-radius: 0;
+  border-radius: var(--grimoire-radius-1);
   background: transparent;
-  color: var(--grimoire-ink);
+  color: var(--grimoire-ink-muted);
   font-family: inherit;
-  font-size: var(--grimoire-text-m);
-  font-weight: var(--grimoire-weight-semibold);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
   line-height: 1;
   box-shadow: none;
   text-align: left;
@@ -356,18 +362,19 @@
 }
 
 .grimoire-model-dropdown button.grimoire-model-group:hover {
-  background: transparent;
+  background: var(--grimoire-hover);
   color: var(--grimoire-ink);
   box-shadow: none;
 }
 
+/* The vendor's own mark, in ink — the disc was a brand colour's last hiding place. */
 .grimoire-model-group-provider-icon {
-  width: 7px;
-  height: 7px;
-  overflow: hidden;
-  border-radius: 50%;
-  color: var(--grimoire-accent);
-  background: currentColor;
+  width: 11px;
+  height: 11px;
+  overflow: visible;
+  border-radius: 0;
+  color: var(--grimoire-ink-muted);
+  background: none;
 }
 
 
@@ -379,8 +386,8 @@
 
 
 
-.grimoire-model-group-provider-icon * {
-  display: none;
+.grimoire-model-group-label {
+  color: var(--grimoire-ink);
 }
 
 .grimoire-model-group-label {
@@ -392,19 +399,19 @@
 
 .grimoire-model-group-count {
   min-width: 1.25em;
-  color: var(--grimoire-workbench-faint);
+  color: var(--grimoire-ink-faint);
   font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-2xs);
+  font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-normal);
   text-align: right;
 }
 
 .grimoire-model-group-chevron {
-  width: 7px;
-  height: 7px;
-  border-right: 1.4px solid currentColor;
-  border-bottom: 1.4px solid currentColor;
-  color: var(--grimoire-workbench-faint);
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--grimoire-ink-faint);
   transform: rotate(45deg);
   transition: transform var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -422,18 +429,23 @@
   display: grid;
 }
 
+/*
+ * What is left of the plan, at the foot of the dialog it constrains. It was a
+ * bordered card floating inside the panel; it is the last band of the panel.
+ */
 .grimoire-plan-usage-readout {
   display: grid;
   gap: var(--grimoire-space-6);
-  margin: var(--grimoire-space-2) 0 var(--grimoire-space-4);
-  padding: var(--grimoire-space-8) var(--grimoire-space-8);
-  border: 1px solid var(--grimoire-line-3);
-  border-radius: var(--grimoire-radius-2);
+  margin: var(--grimoire-space-6) calc(-1 * var(--grimoire-space-6)) calc(-1 * var(--grimoire-space-6));
+  padding: var(--grimoire-space-10) var(--grimoire-space-14) var(--grimoire-space-12);
+  border: 0;
+  border-top: 1px solid var(--grimoire-line);
+  border-radius: 0;
   background: none;
 }
 
 .grimoire-plan-usage-readout.is-warning {
-  background: color-mix(in srgb, var(--grimoire-warn) 9%, var(--grimoire-raise));
+  background: none;
 }
 
 .grimoire-plan-usage-readout-header,
@@ -462,37 +474,40 @@
 }
 
 .grimoire-plan-usage-readout-plan {
-  color: var(--grimoire-accent-text);
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-bold);
-  text-transform: uppercase;
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-face);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
+  text-transform: none;
 }
 
 .grimoire-plan-usage-readout-caption,
 .grimoire-plan-usage-readout-reset {
-  color: var(--grimoire-workbench-faint);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-plan-usage-readout-row {
-  grid-template-columns: 58px minmax(74px, 1fr) auto auto;
+  grid-template-columns: 52px minmax(74px, 1fr) auto auto;
   gap: var(--grimoire-space-8);
 }
 
 .grimoire-plan-usage-readout-label {
-  color: var(--grimoire-workbench-muted);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-bold);
+  color: var(--grimoire-ink-muted);
+  font-family: var(--grimoire-face);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-normal);
 }
 
+/* A 2px rule that happens to be filled: a progress bar is a line, not a trough. */
 .grimoire-plan-usage-readout-track {
   display: block;
   min-width: 0;
-  height: 6px;
+  height: 2px;
   overflow: hidden;
   border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-hover);
+  background: var(--grimoire-line);
 }
 
 .grimoire-plan-usage-readout-fill {
@@ -508,10 +523,10 @@
 }
 
 .grimoire-plan-usage-readout-value {
-  min-width: 35px;
-  color: var(--grimoire-ink);
+  min-width: 28px;
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-bold);
+  font-weight: var(--grimoire-weight-normal);
   text-align: right;
 }
 
@@ -574,8 +589,8 @@
 
 .grimoire-model-option-detail {
   color: var(--grimoire-ink-muted);
-  font-size: var(--grimoire-text-2xs);
-  line-height: 1.2;
+  font-size: var(--grimoire-text-s);
+  line-height: 1.3;
   white-space: nowrap;
 }
 
@@ -590,16 +605,25 @@
   font-weight: var(--grimoire-weight-normal);
 }
 
+/*
+ * A model is a name and what choosing it costs you, indented under its
+ * provider. The chosen one carries the accent as a leading rule — the same
+ * mark a history row and a decision choice carry — instead of being a filled
+ * block with a tick, which made every list in the plugin look different.
+ */
 .grimoire-container--chat-window .grimoire-model-option {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  min-height: 38px;
-  padding: var(--grimoire-space-4) var(--grimoire-space-8) var(--grimoire-space-4) var(--grimoire-space-20);
-  border: 1px solid transparent;
-  border-radius: var(--grimoire-radius-1);
-  color: var(--grimoire-workbench-muted);
-  font-size: var(--grimoire-text-s);
+  min-height: 0;
+  margin-left: var(--grimoire-space-2);
+  /* Lands the name under the group label above it: 2 margin + 1.5 rule + 24. */
+  padding: var(--grimoire-space-6) var(--grimoire-space-8) var(--grimoire-space-6) var(--grimoire-space-24);
+  border: 0;
+  border-left: 1.5px solid transparent;
+  border-radius: 0 var(--grimoire-radius-1) var(--grimoire-radius-1) 0;
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-container--chat-window .grimoire-model-option::after {
@@ -632,16 +656,11 @@
 }
 
 .grimoire-container--chat-window .grimoire-model-option.selected {
-  border-color: transparent;
-  background: var(--grimoire-accent-wash);
-  color: var(--grimoire-accent-text);
+  border-left-color: var(--grimoire-accent);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
-.grimoire-container--chat-window .grimoire-model-option.selected::after {
-  content: "\2713";
-  color: var(--grimoire-accent);
-  font-size: var(--grimoire-text-m);
-}
 
 .grimoire-container--chat-window .grimoire-model-provider-icon {
   display: none;
