@@ -688,8 +688,11 @@ export class GrimoireSettingTab extends PluginSettingTab {
         cls: 'grimoire-settings-provider-card-name',
         text: this.getProviderDisplayName(providerId),
       });
+      // A CLI Grimoire cannot find is the one fact on this card that changes
+      // what the reader has to do next, so it is the one thing here in colour.
+      const detected = Boolean(this.plugin.getResolvedProviderCliPath?.(providerId));
       copy.createDiv({
-        cls: 'grimoire-settings-provider-card-meta',
+        cls: `grimoire-settings-provider-card-meta${detected ? '' : ' is-missing'}`,
         text: this.getProviderStatusText(providerId),
       });
 

@@ -8,6 +8,7 @@ import { resetOpenImageViewers } from '@/features/chat/ui/imageViewerStack';
 
 jest.mock('obsidian', () => ({
   Notice: jest.fn(),
+  setIcon: jest.fn(),
 }));
 
 // Mock document.createElementNS for SVG elements created in setupDragAndDrop

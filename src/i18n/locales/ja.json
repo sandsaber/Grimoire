@@ -255,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "最新メッセージへ移動",
-        "placeholder": "Grimoireに編集、検索、比較、生成、またはコマンド実行を依頼...",
+        "placeholder": "Grimoire に質問…",
         "send": "送信",
         "sendMessage": "メッセージを送信",
         "stopResponse": "応答を停止",
@@ -304,6 +304,9 @@
         "permissionSafe": "安全",
         "permissionAuto": "自動",
         "permissionPlan": "計画",
+        "permissionSafeDetail": "編集とコマンドを毎回確認します",
+        "permissionAutoDetail": "編集とコマンドを確認なしで実行します",
+        "permissionPlanDetail": "計画を承認するまで読み取り専用です",
         "effortLevels": {
           "low": "低",
           "medium": "中",
@@ -328,6 +331,8 @@
         "absolutePathRequired": "絶対パスが必要です。使用法: /add-dir /absolute/path",
         "duplicate": "このフォルダはすでに外部コンテキストとして追加されています。",
         "selectTitle": "外部コンテキストを選択",
+        "selectFileTitle": "外部ファイルを選択",
+        "selectFolderTitle": "外部フォルダを選択",
         "pickerFailed": "フォルダ選択を開けませんでした。",
         "conflictInside": "“{path}”は追加できません — 既存のパス“{existing}”内にあります",
         "conflictContains": "“{path}”は追加できません — 既存のパス“{existing}”を含みます",
@@ -402,7 +407,6 @@
         "groupFromVault": "保管庫から",
         "fileCount": "{count} 件",
         "summaryCost": "約 {tokens} · ウィンドウの {percent}%",
-        "more": "他 {count} 件",
         "overBudget": "{count} 件 · 約 {tokens} はこのモデルのウィンドウを超えます",
         "overBudgetBy": "約 {tokens} 超過",
         "windowShare": "この送信後でウィンドウの {percent}%",
@@ -416,8 +420,8 @@
         "pickerPlaceholder": "保管庫を検索",
         "pickerHint": "⏎ 追加 · ⇥ 開いたまま",
         "quickOpenFile": "開いているファイル",
-        "quickSelection": "現在の選択",
-        "quickClipboard": "クリップボード",
+        "quickBrowseFile": "外部ファイル…",
+        "quickBrowseFolder": "外部フォルダ…",
         "detailExternal": "保管庫の外",
         "detailOpenNote": "開いているノート",
         "folderDetail": "ノート {count} 件"
@@ -460,8 +464,6 @@
         "conversationCompacted": "会話を圧縮しました",
         "sessionRestarted": "新しいセッション",
         "sessionRestartedHint": "エージェントが前のセッションを復元できなかったため、この会話は新しいセッションで続きます。上のメッセージはそのコンテキストに含まれていません。必要な内容は伝え直すか、新しいタブで始めてください。",
-        "completed": "完了",
-        "duration": "* {flavor}、{duration}",
         "copied": "コピーしました！",
         "renderFailed": "メッセージ内容をレンダリングできませんでした。",
         "copyMessage": "メッセージをコピー",
@@ -574,17 +576,17 @@
         "shellCommand": "シェルコマンド"
       },
       "plan": {
-        "requestedPermissions": "要求された権限:",
-        "approveCurrentSession": "承認（現在のセッション）",
-        "continueFeedbackPlaceholder": "計画を続けるためのフィードバックを入力...",
-        "keyboardHints": "矢印キーで移動 · Enterで選択 · Escでキャンセル",
+        "requestedPermissions": "要求された権限",
+        "approveCurrentSession": "このセッションで承認",
+        "continueFeedbackPlaceholder": "計画を修正するフィードバック…",
+        "keyboardHints": "↑↓ 移動 · ⏎ 選択 · esc キャンセル",
         "complete": "計画完了",
         "reviewBeforeProceeding": "続行前に計画を確認",
         "label": "計画",
         "expand": "計画を展開",
         "collapse": "計画を折りたたむ",
         "implement": "実装",
-        "reviseFeedbackPlaceholder": "計画を修正するためのフィードバックを入力..."
+        "reviseFeedbackPlaceholder": "計画を修正するフィードバック…"
       },
       "images": {
         "dropHere": "ここに画像をドロップ",
@@ -632,6 +634,7 @@
         "runningEllipsis": "実行中...",
         "completed": "完了",
         "blocked": "ブロック済み",
+        "unfinished": "未完了",
         "error": "エラー",
         "orphaned": "孤立",
         "inProgress": "進行中",
@@ -705,10 +708,12 @@
         "queryCountOne": "{count}件のクエリ",
         "queryCountMany": "{count}件のクエリ",
         "stepCountOne": "{count}ステップ",
-        "stepCountMany": "{count}ステップ"
+        "stepCountMany": "{count}ステップ",
+        "resultSkipped": "スキップ",
+        "resultStopped": "中断"
       },
       "responseMetadata": {
-        "effort": "推論量 {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -1568,6 +1573,7 @@
     "newTab": "新しいタブ",
     "newSession": "新しいセッション（現在のタブ）",
     "closeCurrentTab": "現在のタブを閉じる",
+    "manageContext": "コンテキストを管理",
     "switchToTab": "タブ {index} に切り替え",
     "environmentRestartFailed": "環境の変更は適用されましたが、影響を受けた {count} 個のタブを再起動できませんでした。",
     "environmentAppliedRebuild": "環境変数を適用しました。次のメッセージでセッションを再構築します。",
@@ -1575,6 +1581,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "組み込み",
+        "vault": "保管庫",
+        "user": "ユーザー",
+        "system": "システム",
+        "runtime": "実行時"
+      },
       "noMatches": "一致するコマンドはありません"
     },
     "resumeConversation": {

@@ -9,7 +9,7 @@ import type { TabDOMElements, TabPanelView } from './types';
 const PANEL_ICONS: Record<TabPanelView, string> = {
   chat: 'message-square',
   sources: 'book-open',
-  context: 'box',
+  context: 'layers',
 };
 
 /**
@@ -58,8 +58,30 @@ export function buildTabDOM(contentEl: HTMLElement): TabDOMElements {
   const chatPanelButtonEl = createPanelButton('chat', t('chat.ui.view.chat'));
   const sourcesPanelButtonEl = createPanelButton('sources', t('chat.ui.view.sources'));
   const contextPanelButtonEl = createPanelButton('context', t('chat.ui.view.context'));
-  // The transcript's own controls sit at the other end of the same row.
-  const panelJumpEl = panelSwitchEl.createDiv({ cls: 'grimoire-panel-jump' });
+  /*
+   * The other end of the row belongs to whichever view is open: the transcript's
+   * jump controls in Chat, the source filters in Sources. They were stacked into
+   * the panel below instead, which spent a whole row on three words and left the
+   * switch row half empty.
+   */
+  const panelAsideEl = panelSwitchEl.createDiv({ cls: 'grimoire-panel-aside' });
+  const sourceFiltersEl = panelAsideEl.createDiv({ cls: 'grimoire-source-filters' });
+  sourceFiltersEl.createEl('button', {
+    cls: 'grimoire-source-filter is-active',
+    text: t('chat.ui.view.all'),
+    attr: { type: 'button', 'data-source-filter': 'all', 'aria-pressed': 'true' },
+  });
+  sourceFiltersEl.createEl('button', {
+    cls: 'grimoire-source-filter',
+    text: t('chat.ui.view.linked'),
+    attr: { type: 'button', 'data-source-filter': 'linked', 'aria-pressed': 'false' },
+  });
+  sourceFiltersEl.createEl('button', {
+    cls: 'grimoire-source-filter',
+    text: t('chat.ui.view.current'),
+    attr: { type: 'button', 'data-source-filter': 'current', 'aria-pressed': 'false' },
+  });
+  const panelJumpEl = panelAsideEl.createDiv({ cls: 'grimoire-panel-jump' });
   const chatScrollEl = workbenchGridEl.createDiv({
     cls: 'grimoire-chat-scroll',
     attr: { 'aria-live': 'polite' },
@@ -88,22 +110,6 @@ export function buildTabDOM(contentEl: HTMLElement): TabDOMElements {
   const sourceShownCountEl = sourceHeaderEl.createSpan({
     cls: 'grimoire-panel-section-count',
     text: t('chat.ui.view.shownCount', { count: 0 }),
-  });
-  const sourceFiltersEl = sourceRailEl.createDiv({ cls: 'grimoire-source-filters' });
-  sourceFiltersEl.createEl('button', {
-    cls: 'grimoire-source-filter is-active',
-    text: t('chat.ui.view.all'),
-    attr: { type: 'button', 'data-source-filter': 'all', 'aria-pressed': 'true' },
-  });
-  sourceFiltersEl.createEl('button', {
-    cls: 'grimoire-source-filter',
-    text: t('chat.ui.view.linked'),
-    attr: { type: 'button', 'data-source-filter': 'linked', 'aria-pressed': 'false' },
-  });
-  sourceFiltersEl.createEl('button', {
-    cls: 'grimoire-source-filter',
-    text: t('chat.ui.view.current'),
-    attr: { type: 'button', 'data-source-filter': 'current', 'aria-pressed': 'false' },
   });
   const sourceCardsEl = sourceRailEl.createDiv({ cls: 'grimoire-source-card-stack' });
   const statusPanelContainerEl = sourceRailEl.createDiv({

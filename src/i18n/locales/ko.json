@@ -255,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "최신 메시지로 이동",
-        "placeholder": "Grimoire에게 편집, 검색, 비교, 생성 또는 명령 실행을 요청하세요...",
+        "placeholder": "Grimoire에 질문…",
         "send": "보내기",
         "sendMessage": "메시지 보내기",
         "stopResponse": "응답 중지",
@@ -304,6 +304,9 @@
         "permissionSafe": "안전",
         "permissionAuto": "자동",
         "permissionPlan": "계획",
+        "permissionSafeDetail": "모든 편집과 명령을 확인합니다",
+        "permissionAutoDetail": "편집과 명령을 묻지 않고 실행합니다",
+        "permissionPlanDetail": "계획을 승인할 때까지 읽기 전용입니다",
         "effortLevels": {
           "low": "낮음",
           "medium": "보통",
@@ -328,6 +331,8 @@
         "absolutePathRequired": "경로는 절대 경로여야 합니다. 사용법: /add-dir /absolute/path",
         "duplicate": "이 폴더는 이미 외부 컨텍스트로 추가되어 있습니다.",
         "selectTitle": "외부 컨텍스트 선택",
+        "selectFileTitle": "외부 파일 선택",
+        "selectFolderTitle": "외부 폴더 선택",
         "pickerFailed": "폴더 선택기를 열 수 없습니다.",
         "conflictInside": "“{path}”을(를) 추가할 수 없습니다 — 기존 경로 “{existing}” 내부에 있습니다",
         "conflictContains": "“{path}”을(를) 추가할 수 없습니다 — 기존 경로 “{existing}”을(를) 포함합니다",
@@ -402,7 +407,6 @@
         "groupFromVault": "보관함에서",
         "fileCount": "{count}개",
         "summaryCost": "약 {tokens} · 창의 {percent}%",
-        "more": "{count}개 더",
         "overBudget": "{count}개 · 약 {tokens}이 이 모델의 창을 넘습니다",
         "overBudgetBy": "약 {tokens} 초과",
         "windowShare": "이 메시지 이후 창의 {percent}%",
@@ -416,8 +420,8 @@
         "pickerPlaceholder": "보관함 검색",
         "pickerHint": "⏎ 추가 · ⇥ 열어 두기",
         "quickOpenFile": "열린 파일",
-        "quickSelection": "현재 선택",
-        "quickClipboard": "클립보드",
+        "quickBrowseFile": "외부 파일…",
+        "quickBrowseFolder": "외부 폴더…",
         "detailExternal": "보관함 밖",
         "detailOpenNote": "열린 노트",
         "folderDetail": "노트 {count}개"
@@ -460,8 +464,6 @@
         "conversationCompacted": "대화 압축됨",
         "sessionRestarted": "새 세션",
         "sessionRestartedHint": "에이전트가 이전 세션을 복원하지 못해 이 대화는 새 세션에서 계속됩니다. 위의 메시지는 해당 컨텍스트에 없습니다. 여전히 필요한 내용은 다시 알려주거나 새 탭에서 시작하세요.",
-        "completed": "완료됨",
-        "duration": "* {flavor} · {duration}",
         "copied": "복사됨!",
         "renderFailed": "메시지 콘텐츠를 렌더링하지 못했습니다.",
         "copyMessage": "메시지 복사",
@@ -574,17 +576,17 @@
         "shellCommand": "셸 명령"
       },
       "plan": {
-        "requestedPermissions": "요청된 권한:",
-        "approveCurrentSession": "승인 (현재 세션)",
-        "continueFeedbackPlaceholder": "계획을 계속할 피드백을 입력하세요...",
-        "keyboardHints": "화살표 키로 이동 · Enter로 선택 · Esc로 취소",
+        "requestedPermissions": "요청된 권한",
+        "approveCurrentSession": "이 세션에서 승인",
+        "continueFeedbackPlaceholder": "계획을 수정할 피드백…",
+        "keyboardHints": "↑↓ 이동 · ⏎ 선택 · esc 취소",
         "complete": "계획 완료",
         "reviewBeforeProceeding": "진행하기 전에 계획을 검토하세요",
         "label": "계획",
         "expand": "계획 펼치기",
         "collapse": "계획 접기",
         "implement": "구현",
-        "reviseFeedbackPlaceholder": "계획을 수정할 피드백을 입력하세요..."
+        "reviseFeedbackPlaceholder": "계획을 수정할 피드백…"
       },
       "images": {
         "dropHere": "여기에 이미지를 놓으세요",
@@ -632,6 +634,7 @@
         "runningEllipsis": "실행 중...",
         "completed": "완료됨",
         "blocked": "차단됨",
+        "unfinished": "미완료",
         "error": "오류",
         "orphaned": "연결 끊김",
         "inProgress": "진행 중",
@@ -705,10 +708,12 @@
         "queryCountOne": "쿼리 {count}개",
         "queryCountMany": "쿼리 {count}개",
         "stepCountOne": "단계 {count}개",
-        "stepCountMany": "단계 {count}개"
+        "stepCountMany": "단계 {count}개",
+        "resultSkipped": "건너뜀",
+        "resultStopped": "중단됨"
       },
       "responseMetadata": {
-        "effort": "추론 수준 {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -1568,6 +1573,7 @@
     "newTab": "새 탭",
     "newSession": "새 세션(현재 탭)",
     "closeCurrentTab": "현재 탭 닫기",
+    "manageContext": "컨텍스트 관리",
     "switchToTab": "탭 {index}(으)로 전환",
     "environmentRestartFailed": "환경 변경이 적용되었지만 영향을 받은 탭 {count}개를 다시 시작하지 못했습니다.",
     "environmentAppliedRebuild": "환경 변수가 적용되었습니다. 다음 메시지에서 세션을 다시 만듭니다.",
@@ -1575,6 +1581,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "기본 제공",
+        "vault": "보관함",
+        "user": "사용자",
+        "system": "시스템",
+        "runtime": "런타임"
+      },
       "noMatches": "일치하는 명령이 없습니다"
     },
     "resumeConversation": {

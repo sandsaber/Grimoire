@@ -44,6 +44,7 @@ import {
   renderStoredToolCall,
   renderStoredToolCallGroup,
 } from './ToolCallRenderer';
+import { appendTurnDuration } from './turnDuration';
 import { renderStoredWriteEdit } from './WriteEditRenderer';
 
 export interface RenderContentOptions {
@@ -472,10 +473,6 @@ export class MessageRenderer {
       if (msg.isInterrupt) {
         this.appendInterruptIndicator(contentEl);
       }
-      const displayTime = this.getStoredMessageDisplayTime(msg);
-      if (displayTime !== undefined) {
-        this.applyAssistantCompletionTime(msgEl, displayTime);
-      }
     }
   }
 
@@ -534,7 +531,9 @@ export class MessageRenderer {
     if (msg.content && msg.content.trim().length > 0) return true;
     if (msg.contentBlocks && msg.contentBlocks.length > 0) {
       for (const block of msg.contentBlocks) {
-        if (block.type === 'thinking' && block.content.trim().length > 0) return true;
+        // A redacted block has no words and still says how long it took.
+        if (block.type === 'thinking'
+          && (block.content.trim().length > 0 || block.durationSeconds !== undefined)) return true;
         if (block.type === 'progress' && (block.content.trim().length > 0 || (block.items?.length ?? 0) > 0)) return true;
         if (block.type === 'text' && block.content.trim().length > 0) return true;
         if (block.type === 'context_compacted') return true;
@@ -645,7 +644,6 @@ export class MessageRenderer {
           if (block.phase) classes.push(`grimoire-text-block--${block.phase.replace('_', '-')}`);
           const textEl = contentEl.createDiv({ cls: classes.join(' ') });
           void this.renderContent(textEl, block.content);
-          this.addTextCopyButton(textEl, block.content);
         } else if (block.type === 'tool_use') {
           const toolCall = msg.toolCalls?.find(tc => tc.id === block.toolId);
           if (toolCall) {
@@ -717,26 +715,42 @@ export class MessageRenderer {
       if (msg.content) {
         const textEl = contentEl.createDiv({ cls: 'grimoire-text-block' });
         void this.renderContent(textEl, msg.content);
-        this.addTextCopyButton(textEl, msg.content);
       }
       if (msg.toolCalls) {
         this.renderToolCallSequence(contentEl, msg.toolCalls, msg);
       }
     }
 
-    // Render response duration footer (skip when message contains a compaction boundary)
+    /*
+     * One row under the answer: how long it took, then what can be done with
+     * it. The copy sat inside the last text block, pinned to its bottom edge
+     * with 24px of padding reserved for it, and the duration got a row of its
+     * own below that - two lines and two alignments for three small things.
+     */
+    this.renderResponseFooter(contentEl, msg);
+  }
+
+  /**
+   * The row under an answer, built in one place.
+   *
+   * The turn's own end used to build a second version of it by hand — a
+   * duration and nothing else — so a live answer carried half the row and the
+   * same answer reopened carried all of it. Two builders for one row is how it
+   * drifts, and it drifted.
+   */
+  renderResponseFooter(contentEl: HTMLElement, msg: ChatMessage): void {
+    if (contentEl.querySelector('.grimoire-response-footer')) return;
     const hasCompactBoundary = msg.contentBlocks?.some(b => b.type === 'context_compacted');
-    if (msg.durationSeconds && msg.durationSeconds > 0 && !hasCompactBoundary) {
-      const flavorWord = msg.durationFlavorWord || t('chat.ui.messages.completed');
-      const footerEl = contentEl.createDiv({ cls: 'grimoire-response-footer' });
-      footerEl.createSpan({
-        text: t('chat.ui.messages.duration', {
-          flavor: flavorWord,
-          duration: formatDurationMmSs(msg.durationSeconds),
-        }),
-        cls: 'grimoire-baked-duration',
-      });
-    }
+    const duration = msg.durationSeconds && msg.durationSeconds > 0 && !hasCompactBoundary
+      ? formatDurationMmSs(msg.durationSeconds)
+      : null;
+    const copyText = this.getCopyableText(msg);
+    const finishedAt = this.getStoredMessageDisplayTime(msg);
+    if (!duration && !copyText && finishedAt === undefined) return;
+    const footerEl = contentEl.createDiv({ cls: 'grimoire-response-footer' });
+    if (finishedAt !== undefined) this.appendCompletionTime(footerEl, finishedAt);
+    if (duration) appendTurnDuration(footerEl, duration);
+    if (copyText) this.appendResponseCopyButton(footerEl, copyText);
   }
 
   /**
@@ -1139,6 +1153,57 @@ export class MessageRenderer {
   // Copy Button
   // ============================================
 
+  /** What "copy this answer" copies: the prose, without the tool traffic. */
+  private getCopyableText(msg: ChatMessage): string {
+    const blocks = (msg.contentBlocks ?? [])
+      .flatMap(block => (block.type === 'text' && block.content?.trim()
+        ? [block.content.trim()]
+        : []));
+    if (blocks.length > 0) return blocks.join('\n\n');
+    return msg.content?.trim() ?? '';
+  }
+
+  /** When the turn finished, in the row under it - the same clock the question wears. */
+  private appendCompletionTime(footerEl: HTMLElement, completedAt: number): void {
+    const timeEl = footerEl.createSpan({
+      cls: 'grimoire-message-completion-time',
+      text: this.formatMessageCompletionTime(completedAt),
+    });
+    setTooltip(timeEl, this.formatMessageCompletionTitle(completedAt), { placement: 'top' });
+  }
+
+  private appendResponseCopyButton(footerEl: HTMLElement, markdown: string): void {
+    const copyBtn = footerEl.createSpan({ cls: 'grimoire-response-copy-btn' });
+    const copyLabel = t('chat.ui.messages.copyResponse');
+    setIcon(copyBtn, 'copy');
+    this.setCopyButtonTooltip(copyBtn, copyLabel);
+
+    let feedbackTimeout: number | null = null;
+    copyBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      runRendererAction(async () => {
+        try {
+          await navigator.clipboard.writeText(markdown);
+        } catch {
+          // The clipboard API refuses outside a secure context.
+          return;
+        }
+        if (feedbackTimeout) window.clearTimeout(feedbackTimeout);
+        copyBtn.empty();
+        setIcon(copyBtn, 'check');
+        copyBtn.classList.add('copied');
+        this.setCopyButtonTooltip(copyBtn, t('chat.ui.messages.copied'));
+        feedbackTimeout = window.setTimeout(() => {
+          copyBtn.empty();
+          setIcon(copyBtn, 'copy');
+          copyBtn.classList.remove('copied');
+          this.setCopyButtonTooltip(copyBtn, copyLabel);
+          feedbackTimeout = null;
+        }, 1500);
+      });
+    });
+  }
+
   /**
    * Adds a copy button to a text block.
    * Button keeps a fixed footprint and changes to a check icon on click.
@@ -1194,8 +1259,13 @@ export class MessageRenderer {
 
     const completedAt = msg.completedAt;
     if (completedAt === undefined) return;
+    /*
+     * Only the question carries a clock. The answer's footer says how long it
+     * took, which is the number a reader actually asks about; a wall-clock
+     * stamp a minute after the question said nothing and cost the last text
+     * block 24px of reserved padding to sit in.
+     */
     if (msg.role === 'assistant') {
-      this.applyAssistantCompletionTime(msgEl, completedAt);
       this.liveMessageEls.delete(msg.id);
       return;
     }
@@ -1203,26 +1273,6 @@ export class MessageRenderer {
     this.ensureUserCompletionTime(msgEl, completedAt);
   }
 
-  private applyAssistantCompletionTime(msgEl: HTMLElement, completedAt: number): void {
-    const textBlocks = Array.from(msgEl.querySelectorAll<HTMLElement>('.grimoire-text-block'));
-    for (const textBlock of textBlocks) {
-      textBlock.removeClass('grimoire-text-block--with-completion-time');
-      const completionEl = textBlock.querySelector<HTMLElement>('.grimoire-message-completion-time');
-      completionEl?.setText('');
-    }
-
-    const lastTextBlock = [...textBlocks].reverse().find((textBlock) =>
-      Boolean(textBlock.querySelector('.grimoire-text-copy-btn'))
-    );
-    if (!lastTextBlock) return;
-
-    const completionEl = lastTextBlock.querySelector<HTMLElement>('.grimoire-message-completion-time');
-    if (!completionEl) return;
-
-    completionEl.setText(this.formatMessageCompletionTime(completedAt));
-    setTooltip(completionEl, this.formatMessageCompletionTitle(completedAt), { placement: 'top' });
-    lastTextBlock.addClass('grimoire-text-block--with-completion-time');
-  }
 
   private formatMessageCompletionTime(timestamp: number): string {
     if (!Number.isFinite(timestamp)) return '';
@@ -1339,7 +1389,6 @@ export class MessageRenderer {
     if (!this.getCapabilities().supportsRewind) return;
     const toolbar = this.getOrCreateActionsToolbar(msgEl);
     const btn = toolbar.createSpan({ cls: 'grimoire-message-rewind-btn' });
-    if (toolbar.firstChild !== btn) toolbar.insertBefore(btn, toolbar.firstChild);
     setIcon(btn, 'rotate-ccw');
     btn.setAttribute('aria-label', t('chat.rewind.ariaLabel'));
     btn.addEventListener('click', (e) => {
@@ -1380,7 +1429,6 @@ export class MessageRenderer {
     if (!this.getCapabilities().supportsFork) return;
     const toolbar = this.getOrCreateActionsToolbar(msgEl);
     const btn = toolbar.createSpan({ cls: 'grimoire-message-fork-btn' });
-    if (toolbar.firstChild !== btn) toolbar.insertBefore(btn, toolbar.firstChild);
     setIcon(btn, 'git-fork');
     btn.setAttribute('aria-label', t('chat.fork.ariaLabel'));
     btn.addEventListener('click', (e) => {

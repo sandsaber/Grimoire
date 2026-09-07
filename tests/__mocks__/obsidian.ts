@@ -429,6 +429,12 @@ export class Modal {
     addClass: jest.fn(),
   };
 
+  /**
+   * A real Modal always carries a key scope; the mock did not, so a dialog that
+   * registered a shortcut threw before its first row was drawn.
+   */
+  scope: any = { register: jest.fn(), unregister: jest.fn() };
+
   constructor(app: any) {
     this.app = app;
   }

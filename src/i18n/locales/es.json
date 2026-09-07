@@ -255,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "Ir al mensaje más reciente",
-        "placeholder": "Pídele a Grimoire que edite, busque, compare, genere o ejecute un comando...",
+        "placeholder": "Pregunta a Grimoire…",
         "send": "Enviar",
         "sendMessage": "Enviar mensaje",
         "stopResponse": "Detener respuesta",
@@ -304,6 +304,9 @@
         "permissionSafe": "Seguro",
         "permissionAuto": "Automático",
         "permissionPlan": "Plan",
+        "permissionSafeDetail": "Confirmar cada edición y cada comando",
+        "permissionAutoDetail": "Las ediciones y los comandos se ejecutan sin preguntar",
+        "permissionPlanDetail": "Solo lectura hasta que apruebes un plan",
         "effortLevels": {
           "low": "Bajo",
           "medium": "Medio",
@@ -328,6 +331,8 @@
         "absolutePathRequired": "La ruta debe ser absoluta. Uso: /add-dir /absolute/path",
         "duplicate": "Esta carpeta ya se añadió como contexto externo.",
         "selectTitle": "Seleccionar contexto externo",
+        "selectFileTitle": "Seleccionar un archivo externo",
+        "selectFolderTitle": "Seleccionar una carpeta externa",
         "pickerFailed": "No se pudo abrir el selector de carpetas.",
         "conflictInside": "No se puede añadir “{path}” — está dentro de la ruta existente “{existing}”",
         "conflictContains": "No se puede añadir “{path}” — contiene la ruta existente “{existing}”",
@@ -402,7 +407,6 @@
         "groupFromVault": "De la bóveda",
         "fileCount": "{count} archivos",
         "summaryCost": "~{tokens} · {percent}% de la ventana",
-        "more": "+{count} más",
         "overBudget": "{count} archivos · ~{tokens} excede la ventana de este modelo",
         "overBudgetBy": "~{tokens} de más",
         "windowShare": "{percent}% de la ventana tras este mensaje",
@@ -416,8 +420,8 @@
         "pickerPlaceholder": "Buscar en la bóveda",
         "pickerHint": "⏎ añadir · ⇥ mantener abierto",
         "quickOpenFile": "Archivo abierto",
-        "quickSelection": "Selección actual",
-        "quickClipboard": "Portapapeles",
+        "quickBrowseFile": "Archivo externo…",
+        "quickBrowseFolder": "Carpeta externa…",
         "detailExternal": "fuera de la bóveda",
         "detailOpenNote": "nota abierta",
         "folderDetail": "{count} notas"
@@ -460,8 +464,6 @@
         "conversationCompacted": "Conversación compactada",
         "sessionRestarted": "Nueva sesión",
         "sessionRestartedHint": "El agente no pudo restaurar la sesión anterior, así que esta conversación continúa en una nueva. Los mensajes de arriba no están en su contexto: repite lo que siga haciendo falta o empieza de nuevo en otra pestaña.",
-        "completed": "Listo",
-        "duration": "* {flavor} durante {duration}",
         "copied": "¡Copiado!",
         "renderFailed": "No se pudo renderizar el contenido del mensaje.",
         "copyMessage": "Copiar mensaje",
@@ -574,17 +576,17 @@
         "shellCommand": "comando de shell"
       },
       "plan": {
-        "requestedPermissions": "Permisos solicitados:",
-        "approveCurrentSession": "Aprobar (sesión actual)",
-        "continueFeedbackPlaceholder": "Escribe comentarios para continuar la planificación...",
-        "keyboardHints": "Teclas de flecha para navegar · Intro para seleccionar · Esc para cancelar",
+        "requestedPermissions": "Permisos solicitados",
+        "approveCurrentSession": "Aprobar para esta sesión",
+        "continueFeedbackPlaceholder": "Comentarios para revisar el plan…",
+        "keyboardHints": "↑↓ navegar · ⏎ seleccionar · esc cancelar",
         "complete": "Plan completo",
         "reviewBeforeProceeding": "Revisa el plan antes de continuar",
         "label": "plan",
         "expand": "Expandir plan",
         "collapse": "Contraer plan",
         "implement": "Implementar",
-        "reviseFeedbackPlaceholder": "Escribe comentarios para revisar el plan..."
+        "reviseFeedbackPlaceholder": "Comentarios para revisar el plan…"
       },
       "images": {
         "dropHere": "Suelta la imagen aquí",
@@ -632,6 +634,7 @@
         "runningEllipsis": "En ejecución...",
         "completed": "completado",
         "blocked": "bloqueado",
+        "unfinished": "sin terminar",
         "error": "Error",
         "orphaned": "Huérfano",
         "inProgress": "en curso",
@@ -705,10 +708,12 @@
         "queryCountOne": "{count} consulta",
         "queryCountMany": "{count} consultas",
         "stepCountOne": "{count} paso",
-        "stepCountMany": "{count} pasos"
+        "stepCountMany": "{count} pasos",
+        "resultSkipped": "omitido",
+        "resultStopped": "detenido"
       },
       "responseMetadata": {
-        "effort": "Esfuerzo {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -1568,6 +1573,7 @@
     "newTab": "Nueva pestaña",
     "newSession": "Nueva sesión (en la pestaña actual)",
     "closeCurrentTab": "Cerrar pestaña actual",
+    "manageContext": "Gestionar contexto",
     "switchToTab": "Cambiar a la pestaña {index}",
     "environmentRestartFailed": "Se aplicaron los cambios de entorno, pero no se pudieron reiniciar {count} pestañas afectadas.",
     "environmentAppliedRebuild": "Variables de entorno aplicadas. Las sesiones se reconstruirán con el próximo mensaje.",
@@ -1575,6 +1581,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "Integrado",
+        "vault": "Bóveda",
+        "user": "Usuario",
+        "system": "Sistema",
+        "runtime": "Ejecución"
+      },
       "noMatches": "No hay comandos coincidentes"
     },
     "resumeConversation": {

@@ -294,6 +294,17 @@ export interface TabData {
 
   /** Monotonic guard for overlapping bound-session model selections. */
   modelSelectionGeneration?: number;
+
+  /**
+   * Tells the view that a blank tab's draft settings moved, so the tab bar and
+   * `data.json` catch up. The toolbar gets this as a wiring parameter, but a
+   * keyboard shortcut reaches a tab without going through the toolbar, and the
+   * draft it writes has to persist the same way a click's does.
+   */
+  notifyDraftSettingsChanged?: (
+    providerId: ProviderId,
+    settings: Record<string, unknown>,
+  ) => void | Promise<void>;
 }
 
 export type TabProviderContext = Pick<TabData, 'conversationId' | 'service' | 'providerId' | 'lifecycleState' | 'draftModel' | 'draftSettings'>;

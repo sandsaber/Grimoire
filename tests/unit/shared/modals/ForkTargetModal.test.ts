@@ -11,6 +11,7 @@ jest.mock('obsidian', () => {
     app: any;
     modalEl: any = { addClass: jest.fn() };
     contentEl: any;
+    scope: any = { register: jest.fn(), unregister: jest.fn() };
 
     constructor(app: any) {
       this.app = app;
@@ -44,7 +45,7 @@ jest.mock('obsidian', () => {
   };
 });
 
-function getOptionItems(): Array<{ text: string; click: () => void }> {
+function getOptionItems(): Array<{ key: string; text: string; click: () => void }> {
   const listEl = lastModalInstance.contentEl.children?.find(
     (c: any) => c.hasClass?.('grimoire-fork-target-list'),
   );
@@ -52,12 +53,20 @@ function getOptionItems(): Array<{ text: string; click: () => void }> {
   return (listEl.children || [])
     .filter((c: any) => c.hasClass?.('grimoire-fork-target-option'))
     .map((c: any) => ({
-      text: c.textContent,
+      // The row is a digit and a label now, so its text lives in the second child.
+      key: c.children?.[0]?.textContent ?? '',
+      text: c.children?.[1]?.textContent ?? '',
       click: () => {
         const handler = c._eventListeners?.get('click')?.[0];
         handler?.();
       },
     }));
+}
+
+/** Presses the digit a row is numbered with, the way the dialog registers it. */
+function pressKey(key: string): void {
+  const call = lastModalInstance.scope.register.mock.calls.find((c: any[]) => c[1] === key);
+  call?.[2]({ preventDefault: jest.fn() });
 }
 
 beforeEach(() => {
@@ -90,12 +99,20 @@ describe('ForkTargetModal', () => {
       expect(await result).toBeNull();
     });
 
-    it('should create two list options with correct labels', () => {
+    it('offers the new tab first, and numbers both choices', () => {
       void chooseForkTarget(mockApp);
       const items = getOptionItems();
       expect(items).toHaveLength(2);
-      expect(items[0].text).toBe('Current tab');
-      expect(items[1].text).toBe('New tab');
+      // A fork that replaces the tab it came from is the destructive one, so it
+      // is second: the safe choice is the one under the cursor when it opens.
+      expect(items.map(i => i.text)).toEqual(['New tab', 'Current tab']);
+      expect(items.map(i => i.key)).toEqual(['1', '2']);
+    });
+
+    it('answers the digit beside each choice', async () => {
+      const result = chooseForkTarget(mockApp);
+      pressKey('2');
+      expect(await result).toBe('current-tab');
     });
   });
 });

@@ -177,7 +177,6 @@ function mergeAdjacentAssistantMessages(messages: ChatMessage[]): ChatMessage[] 
     ) {
       previous.content += message.content;
       previous.assistantMessageId = message.assistantMessageId ?? previous.assistantMessageId;
-      previous.durationFlavorWord = message.durationFlavorWord ?? previous.durationFlavorWord;
       previous.durationSeconds = mergeAssistantDurationSeconds(previous, message);
       previous.toolCalls = mergeOptionalArrays(previous.toolCalls, message.toolCalls);
       previous.contentBlocks = mergeOptionalArrays(previous.contentBlocks, message.contentBlocks);

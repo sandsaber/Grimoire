@@ -528,18 +528,23 @@ describe('GrimoireView Escape handling', () => {
 });
 
 describe('GrimoireView permission mode shortcut', () => {
-  function createPermissionShortcutHarness(permissionMode: string) {
+  function createPermissionShortcutHarness(
+    permissionMode: string,
+    tabOverrides: Record<string, unknown> = {},
+  ) {
     const handlers: Array<(event: KeyboardEvent) => void> = [];
     const inputWrapper = createMockEl();
     const activeTab = {
       providerId: 'claude',
-      lifecycleState: 'active',
+      lifecycleState: 'bound_active',
       conversationId: null,
       draftModel: null,
+      draftSettings: null,
       service: null,
       state: { prePlanPermissionMode: null },
       ui: { permissionToggle: { updateDisplay: jest.fn() } },
       dom: { inputWrapper },
+      ...tabOverrides,
     };
     const view = Object.create(GrimoireView.prototype);
 
@@ -595,6 +600,34 @@ describe('GrimoireView permission mode shortcut', () => {
 
     pressShiftTab();
     expect(view.plugin.settings.permissionMode).toBe('normal');
+    expect(activeTab.state.prePlanPermissionMode).toBeNull();
+    // A bound tab reads the shared settings, so it has no draft to grow one.
+    expect(activeTab.draftSettings).toBeNull();
+  });
+
+  /*
+   * A tab that has not sent anything yet keeps its own draft of the composer's
+   * settings, and the toolbar reads that draft. The shortcut wrote the shared
+   * provider settings and left the draft alone, so on the surface where a mode
+   * is most often chosen - a new chat - Shift+Tab moved nothing the eye could
+   * see, and cycled from whatever the last bound tab had left behind.
+   */
+  it('cycles the draft of a blank tab rather than the shared settings', () => {
+    const { activeTab, pressShiftTab, view } = createPermissionShortcutHarness('plan', {
+      draftSettings: { permissionMode: 'normal' },
+      lifecycleState: 'blank',
+    });
+
+    pressShiftTab();
+    expect(activeTab.draftSettings).toMatchObject({ permissionMode: 'full_access' });
+    expect(view.plugin.settings.permissionMode).toBe('full_access');
+
+    pressShiftTab();
+    expect(activeTab.draftSettings).toMatchObject({ permissionMode: 'plan' });
+    expect(activeTab.state.prePlanPermissionMode).toBe('full_access');
+
+    pressShiftTab();
+    expect(activeTab.draftSettings).toMatchObject({ permissionMode: 'normal' });
     expect(activeTab.state.prePlanPermissionMode).toBeNull();
   });
 });

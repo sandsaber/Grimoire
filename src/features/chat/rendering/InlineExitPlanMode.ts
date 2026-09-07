@@ -18,6 +18,7 @@ export class InlineExitPlanMode {
   private planPathPrefix?: string;
   private planContent: string | null = null;
   private planReadError: string | null = null;
+  private onCollapseChange: ((isCollapsed: boolean) => void) | undefined;
 
   private rootEl!: HTMLElement;
   private focusedIndex = 0;
@@ -37,6 +38,14 @@ export class InlineExitPlanMode {
     signal?: AbortSignal,
     renderContent?: RenderContentFn,
     planPathPrefix?: string,
+    /**
+     * Told when the card folds away, because the card stands where the
+     * composer does. Folded, it is a one-line reminder rather than a surface
+     * asking for something — and with the composer still hidden behind it the
+     * pane had no text field at all, which reads as a broken tab rather than as
+     * a decision waiting.
+     */
+    onCollapseChange?: (isCollapsed: boolean) => void,
   ) {
     this.containerEl = containerEl;
     this.input = input;
@@ -44,6 +53,7 @@ export class InlineExitPlanMode {
     this.signal = signal;
     this.renderContent = renderContent;
     this.planPathPrefix = planPathPrefix;
+    this.onCollapseChange = onCollapseChange;
     this.boundKeyDown = (event) => this.handleKeyDown(event);
   }
 
@@ -71,10 +81,12 @@ export class InlineExitPlanMode {
     if (allowedPrompts && Array.isArray(allowedPrompts) && allowedPrompts.length > 0) {
       const permEl = this.rootEl.createDiv({ cls: 'grimoire-plan-permissions' });
       permEl.createDiv({ text: t('chat.ui.plan.requestedPermissions'), cls: 'grimoire-plan-permissions-label' });
-      const listEl = permEl.createEl('ul', { cls: 'grimoire-plan-permissions-list' });
-      for (const perm of allowedPrompts) {
-        listEl.createEl('li', { text: perm.prompt });
-      }
+      // One line under the label rather than a bulleted list: three short
+      // phrases set as list items claimed as much of the card as the plan.
+      permEl.createDiv({
+        cls: 'grimoire-plan-permissions-line',
+        text: allowedPrompts.map(perm => perm.prompt).join(' \u00B7 '),
+      });
     }
 
     const actionsEl = this.rootEl.createDiv({ cls: 'grimoire-ask-list' });
@@ -140,8 +152,9 @@ export class InlineExitPlanMode {
       cls: 'grimoire-plan-subtitle',
     });
 
+    // The tool's name in the meta face. The glyph beside the title already says
+    // which tool this is, so drawing it again in the tag said it twice.
     const pill = head.createDiv({ cls: 'grimoire-plan-tool-pill' });
-    setIcon(pill.createSpan(), getToolIcon(TOOL_ENTER_PLAN_MODE));
     pill.createSpan({ text: t('chat.ui.plan.label'), cls: 'grimoire-plan-tool-label' });
 
     this.collapseBtn = head.createEl('button', {
@@ -173,6 +186,7 @@ export class InlineExitPlanMode {
     }
 
     this.refreshCollapseToggle();
+    this.onCollapseChange?.(isCollapsed);
   }
 
   private refreshCollapseToggle(): void {

@@ -255,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "跳至最新訊息",
-        "placeholder": "請 Grimoire 編輯、搜尋、比較、生成或執行指令…",
+        "placeholder": "問 Grimoire…",
         "send": "傳送",
         "sendMessage": "傳送訊息",
         "stopResponse": "停止回覆",
@@ -304,6 +304,9 @@
         "permissionSafe": "安全",
         "permissionAuto": "自動",
         "permissionPlan": "計畫",
+        "permissionSafeDetail": "每次編輯和指令都先確認",
+        "permissionAutoDetail": "編輯和指令直接執行，不再詢問",
+        "permissionPlanDetail": "在你核准計畫前唯讀",
         "effortLevels": {
           "low": "輕度",
           "medium": "中",
@@ -328,6 +331,8 @@
         "absolutePathRequired": "路徑必須為絕對路徑。用法：/add-dir /absolute/path",
         "duplicate": "此資料夾已新增為外部脈絡。",
         "selectTitle": "選取外部脈絡",
+        "selectFileTitle": "選擇外部檔案",
+        "selectFolderTitle": "選擇外部資料夾",
         "pickerFailed": "無法開啟資料夾選擇器。",
         "conflictInside": "無法新增「{path}」— 它位於既有路徑「{existing}」內",
         "conflictContains": "無法新增「{path}」— 它包含既有路徑「{existing}」",
@@ -402,7 +407,6 @@
         "groupFromVault": "來自保管庫",
         "fileCount": "{count} 個檔案",
         "summaryCost": "約 {tokens} · 佔視窗 {percent}%",
-        "more": "還有 {count} 個",
         "overBudget": "{count} 個檔案 · 約 {tokens} 超出此模型的視窗",
         "overBudgetBy": "超出約 {tokens}",
         "windowShare": "送出後佔視窗 {percent}%",
@@ -416,8 +420,8 @@
         "pickerPlaceholder": "搜尋保管庫",
         "pickerHint": "⏎ 加入 · ⇥ 保持開啟",
         "quickOpenFile": "開啟的檔案",
-        "quickSelection": "目前選取",
-        "quickClipboard": "剪貼簿",
+        "quickBrowseFile": "外部檔案…",
+        "quickBrowseFolder": "外部資料夾…",
         "detailExternal": "保管庫之外",
         "detailOpenNote": "開啟的筆記",
         "folderDetail": "{count} 篇筆記"
@@ -460,8 +464,6 @@
         "conversationCompacted": "對話已壓縮",
         "sessionRestarted": "新工作階段",
         "sessionRestartedHint": "代理無法還原先前的工作階段，因此這段對話會在新的工作階段中繼續。上方的訊息不在它的脈絡中——請重述仍然需要的內容，或在新分頁中重新開始。",
-        "completed": "已完成",
-        "duration": "* {flavor}，持續 {duration}",
         "copied": "已複製！",
         "renderFailed": "無法呈現訊息內容。",
         "copyMessage": "複製訊息",
@@ -574,17 +576,17 @@
         "shellCommand": "shell 指令"
       },
       "plan": {
-        "requestedPermissions": "請求的權限：",
-        "approveCurrentSession": "核准（目前工作階段）",
-        "continueFeedbackPlaceholder": "輸入意見以繼續規劃…",
-        "keyboardHints": "方向鍵可瀏覽 · Enter 可選取 · Esc 可取消",
+        "requestedPermissions": "請求的權限",
+        "approveCurrentSession": "在本次工作階段核准",
+        "continueFeedbackPlaceholder": "修訂計畫的意見…",
+        "keyboardHints": "↑↓ 瀏覽 · ⏎ 選取 · esc 取消",
         "complete": "計畫完成",
         "reviewBeforeProceeding": "繼續前請檢閱計畫",
         "label": "計畫",
         "expand": "展開計畫",
         "collapse": "收合計畫",
         "implement": "實作",
-        "reviseFeedbackPlaceholder": "輸入意見以修訂計畫…"
+        "reviseFeedbackPlaceholder": "修訂計畫的意見…"
       },
       "images": {
         "dropHere": "將圖片拖放至此",
@@ -632,6 +634,7 @@
         "runningEllipsis": "執行中…",
         "completed": "已完成",
         "blocked": "已阻擋",
+        "unfinished": "未完成",
         "error": "錯誤",
         "orphaned": "孤立",
         "inProgress": "進行中",
@@ -705,10 +708,12 @@
         "queryCountOne": "{count} 個查詢",
         "queryCountMany": "{count} 個查詢",
         "stepCountOne": "{count} 個步驟",
-        "stepCountMany": "{count} 個步驟"
+        "stepCountMany": "{count} 個步驟",
+        "resultSkipped": "已略過",
+        "resultStopped": "已停止"
       },
       "responseMetadata": {
-        "effort": "推理強度 {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -1568,6 +1573,7 @@
     "newTab": "新增分頁",
     "newSession": "新增工作階段（目前分頁）",
     "closeCurrentTab": "關閉目前分頁",
+    "manageContext": "管理上下文",
     "switchToTab": "切換至分頁 {index}",
     "environmentRestartFailed": "環境變更已套用，但有 {count} 個受影響的分頁無法重新啟動。",
     "environmentAppliedRebuild": "已套用環境變數。工作階段將在下一則訊息時重建。",
@@ -1575,6 +1581,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "內建",
+        "vault": "保管庫",
+        "user": "使用者",
+        "system": "系統",
+        "runtime": "執行階段"
+      },
       "noMatches": "沒有相符的命令"
     },
     "resumeConversation": {

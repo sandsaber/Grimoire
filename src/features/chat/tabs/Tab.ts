@@ -1005,6 +1005,7 @@ export function initializeTabUI(
   );
 
   initializeInstructionAndTodo(tab, plugin);
+  tab.notifyDraftSettingsChanged = options.onDraftSettingsChanged;
   initializeInputToolbar(
     tab,
     plugin,
@@ -1334,6 +1335,8 @@ export function initializeTabControllers(
       // For one thing only: stopping a turn. The kernel owns the run, so the
       // runtime's own `cancel` acts on a run it never started.
       getProjectionExecution: () => resolveTabProjectionExecution(tab, plugin),
+      // Same order the projection reads it in: whatever bound this tab wins.
+      getBoundConversationId: () => tab.conversationId ?? tab.state.currentConversationId ?? null,
       getActiveProviderSettings: () => getTabSettingsSnapshot(tab, plugin),
       getOrchestratorMode: () => tab.orchestratorMode,
       dismissPendingInlinePrompts: () => tab.controllers.inputController?.dismissPendingApproval(),
@@ -2057,21 +2060,29 @@ async function renderAutoTriggeredTurn(tab: TabData, plugin: GrimoirePlugin, res
   }
 }
 
+/*
+ * The mode moved from somewhere other than the menu - Shift+Tab, or the
+ * provider announcing it left plan mode - and has to land where the menu's own
+ * writes land. It used to commit the shared provider settings directly, which
+ * is right for a bound tab and invisible on a blank one: a tab that has not
+ * sent yet reads its own draft, so the shortcut wrote a value nothing on screen
+ * was reading, and the toolbar redrew the draft it already had.
+ */
 export function updatePlanModeUI(tab: TabData, plugin: GrimoirePlugin, mode: string): void {
   const providerId = getTabProviderId(tab, plugin);
-  const snapshot = getTabSettingsSnapshot(tab, plugin);
-  const permissionMode = providerCatalog().declarations(providerId).chatUI.permissionMode;
-  if (permissionMode?.apply) {
-    permissionMode.apply(mode, snapshot);
-  } else {
-    snapshot.permissionMode = mode;
-  }
-  ProviderSettingsCoordinator.commitProviderSettingsSnapshot(
-    plugin.settings,
-    providerId,
-    snapshot,
+  void updateTabProviderSettings(
+    tab,
+    plugin,
+    (settings) => {
+      const permissionMode = providerCatalog().declarations(providerId).chatUI.permissionMode;
+      if (permissionMode?.apply) {
+        permissionMode.apply(mode, settings);
+      } else {
+        settings.permissionMode = mode;
+      }
+    },
+    tab.notifyDraftSettingsChanged,
   );
-  void plugin.saveSettings();
   tab.ui.permissionToggle?.updateDisplay();
   tab.dom.inputWrapper.toggleClass(
     'grimoire-input-plan-mode',

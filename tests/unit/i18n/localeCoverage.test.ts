@@ -77,6 +77,8 @@ const VERIFIED_IDENTICAL: Readonly<Record<typeof LOCALES[number], readonly strin
     'settings.envSnippets.modal.name',
     'settings.hub.name',
     'settings.providerTabs.codex.reasoning.auto',
+    // "System" is the German word too.
+    'shared.slashCommands.scope.system',
     'settings.slashCommandEditor.agent',
     'settings.slashCommandEditor.skill',
     'settings.slashCommandEditor.skillBadge',

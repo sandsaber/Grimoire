@@ -255,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "Ir para a mensagem mais recente",
-        "placeholder": "Peça ao Grimoire para editar, pesquisar, comparar, gerar ou executar um comando...",
+        "placeholder": "Pergunte ao Grimoire…",
         "send": "Enviar",
         "sendMessage": "Enviar mensagem",
         "stopResponse": "Parar resposta",
@@ -304,6 +304,9 @@
         "permissionSafe": "Seguro",
         "permissionAuto": "Auto",
         "permissionPlan": "Plano",
+        "permissionSafeDetail": "Confirmar cada edição e cada comando",
+        "permissionAutoDetail": "Edições e comandos são executados sem perguntar",
+        "permissionPlanDetail": "Somente leitura até você aprovar um plano",
         "effortLevels": {
           "low": "Baixo",
           "medium": "Médio",
@@ -328,6 +331,8 @@
         "absolutePathRequired": "O caminho deve ser absoluto. Uso: /add-dir /absolute/path",
         "duplicate": "Esta pasta já foi adicionada como contexto externo.",
         "selectTitle": "Selecionar contexto externo",
+        "selectFileTitle": "Selecionar um ficheiro externo",
+        "selectFolderTitle": "Selecionar uma pasta externa",
         "pickerFailed": "Não foi possível abrir o seletor de pastas.",
         "conflictInside": "Não é possível adicionar “{path}” — ele está dentro do caminho existente “{existing}”",
         "conflictContains": "Não é possível adicionar “{path}” — ele contém o caminho existente “{existing}”",
@@ -402,7 +407,6 @@
         "groupFromVault": "Do cofre",
         "fileCount": "{count} arquivos",
         "summaryCost": "~{tokens} · {percent}% da janela",
-        "more": "+{count} a mais",
         "overBudget": "{count} arquivos · ~{tokens} excede a janela deste modelo",
         "overBudgetBy": "~{tokens} além",
         "windowShare": "{percent}% da janela após esta mensagem",
@@ -416,8 +420,8 @@
         "pickerPlaceholder": "Buscar no cofre",
         "pickerHint": "⏎ adicionar · ⇥ manter aberto",
         "quickOpenFile": "Arquivo aberto",
-        "quickSelection": "Seleção atual",
-        "quickClipboard": "Área de transferência",
+        "quickBrowseFile": "Ficheiro externo…",
+        "quickBrowseFolder": "Pasta externa…",
         "detailExternal": "fora do cofre",
         "detailOpenNote": "nota aberta",
         "folderDetail": "{count} notas"
@@ -460,8 +464,6 @@
         "conversationCompacted": "Conversa compactada",
         "sessionRestarted": "Nova sessão",
         "sessionRestartedHint": "O agente não conseguiu restaurar a sessão anterior, portanto esta conversa continua em uma nova. As mensagens acima não estão no contexto dela - repita o que ainda for necessário ou comece do zero em uma nova aba.",
-        "completed": "Concluído",
-        "duration": "* {flavor} por {duration}",
         "copied": "Copiado!",
         "renderFailed": "Não foi possível renderizar o conteúdo da mensagem.",
         "copyMessage": "Copiar mensagem",
@@ -574,17 +576,17 @@
         "shellCommand": "comando de shell"
       },
       "plan": {
-        "requestedPermissions": "Permissões solicitadas:",
-        "approveCurrentSession": "Aprovar (sessão atual)",
-        "continueFeedbackPlaceholder": "Digite o feedback para continuar o planejamento...",
-        "keyboardHints": "Setas para navegar · Enter para selecionar · Esc para cancelar",
+        "requestedPermissions": "Permissões solicitadas",
+        "approveCurrentSession": "Aprovar para esta sessão",
+        "continueFeedbackPlaceholder": "Feedback para revisar o plano…",
+        "keyboardHints": "↑↓ navegar · ⏎ selecionar · esc cancelar",
         "complete": "Plano concluído",
         "reviewBeforeProceeding": "Revise o plano antes de continuar",
         "label": "plano",
         "expand": "Expandir plano",
         "collapse": "Recolher plano",
         "implement": "Implementar",
-        "reviseFeedbackPlaceholder": "Digite o feedback para revisar o plano..."
+        "reviseFeedbackPlaceholder": "Feedback para revisar o plano…"
       },
       "images": {
         "dropHere": "Solte a imagem aqui",
@@ -632,6 +634,7 @@
         "runningEllipsis": "Em execução...",
         "completed": "concluído",
         "blocked": "bloqueado",
+        "unfinished": "inacabado",
         "error": "Erro",
         "orphaned": "Órfão",
         "inProgress": "em andamento",
@@ -705,10 +708,12 @@
         "queryCountOne": "{count} consulta",
         "queryCountMany": "{count} consultas",
         "stepCountOne": "{count} etapa",
-        "stepCountMany": "{count} etapas"
+        "stepCountMany": "{count} etapas",
+        "resultSkipped": "ignorado",
+        "resultStopped": "parado"
       },
       "responseMetadata": {
-        "effort": "Esforço {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -1568,6 +1573,7 @@
     "newTab": "Nova aba",
     "newSession": "Nova sessão (na aba atual)",
     "closeCurrentTab": "Fechar aba atual",
+    "manageContext": "Gerir contexto",
     "switchToTab": "Alternar para a aba {index}",
     "environmentRestartFailed": "As alterações de ambiente foram aplicadas, mas não foi possível reiniciar {count} abas afetadas.",
     "environmentAppliedRebuild": "Variáveis de ambiente aplicadas. As sessões serão recriadas na próxima mensagem.",
@@ -1575,6 +1581,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "Integrado",
+        "vault": "Cofre",
+        "user": "Usuário",
+        "system": "Sistema",
+        "runtime": "Execução"
+      },
       "noMatches": "Nenhum comando correspondente"
     },
     "resumeConversation": {

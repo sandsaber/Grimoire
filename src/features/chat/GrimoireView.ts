@@ -12,7 +12,6 @@ import {
 import { truncateTitleOnWordBoundary } from '../../core/prompt/titleLength';
 import { getHiddenProviderCommandSet } from '../../core/providers/commands/hiddenCommands';
 import { providerCatalog } from '../../core/providers/ProviderCatalog';
-import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
 import type { ProviderId } from '../../core/providers/types';
 import { VIEW_TYPE_GRIMOIRE } from '../../core/types';
 import { t } from '../../i18n/i18n';
@@ -35,6 +34,7 @@ import { getTabProviderId, getTabSettingsSnapshot, getTabTitle, onProviderAvaila
 import { TabBar } from './tabs/TabBar';
 import { applyPanelLabels } from './tabs/tabDOM';
 import { TabManager } from './tabs/TabManager';
+import { getTabPermissionMode } from './tabs/tabSettings';
 import type { ClosedTabSnapshot, TabData, TabId } from './tabs/types';
 import { normalizeMaxTabs } from './tabs/types';
 import { closeTopmostImageViewer } from './ui/imageViewerStack';
@@ -1059,10 +1059,9 @@ export class GrimoireView extends ItemView {
         const toggleConfig = providerCatalog().declarations(providerId)
           .chatUI.permissionMode?.toggle() ?? null;
         if (!toggleConfig) return;
-        const current = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
-          this.plugin.settings,
-          providerId,
-        ).permissionMode as string;
+        // The tab's mode, not the shared one: a blank tab answers from its own
+        // draft, which is what its toolbar shows and what the cycle must start from.
+        const current = getTabPermissionMode(activeTab, this.plugin);
         const next = getNextPermissionMode(current, toggleConfig, capabilities.supportsPlanMode);
         if (current === toggleConfig.planValue) {
           activeTab.state.prePlanPermissionMode = null;

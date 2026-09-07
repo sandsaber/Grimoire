@@ -2539,6 +2539,37 @@ describe('InputController - Message Queue', () => {
       expect(deps.state.isStreaming).toBe(false);
       expect(deps.state.cancelRequested).toBe(false);
     });
+
+    /*
+     * Stopped before the provider said anything, so the turn has no bubble to
+     * say so in — the same hole the failure path already fills. The notice went
+     * nowhere and the transcript kept an empty message between two questions,
+     * which reads as an answer that was there and got lost.
+     */
+    it('gives an interruption somewhere to be said when nothing was drawn', async () => {
+      deps = createSendableDeps();
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockImplementation(() => {
+        return (async function* () {
+          deps.state.cancelRequested = true;
+          // Stopped before any content arrives, so the turn draws nothing.
+          if (deps.state.cancelRequested) return;
+          yield { type: 'text', content: '' };
+        })();
+      });
+      deps.state.currentContentEl = null;
+
+      inputEl = deps.getInputEl();
+      inputEl.value = 'test message';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      expect(deps.renderer.addMessage).toHaveBeenCalled();
+      expect(deps.streamController.appendText).toHaveBeenCalledWith(
+        expect.stringContaining('Interrupted')
+      );
+    });
   });
 
   describe('Duration footer', () => {
@@ -2560,15 +2591,28 @@ describe('InputController - Message Queue', () => {
       inputEl = deps.getInputEl();
       inputEl.value = 'test message';
       controller = new InputController(deps);
+      // The answer has somewhere to be drawn, which is what the row hangs from.
+      deps.state.currentContentEl = createMockEl();
 
       await controller.sendMessage();
 
       const assistantMsg = deps.state.messages.find((m: any) => m.role === 'assistant');
       expect(assistantMsg).toBeDefined();
       expect(assistantMsg!.durationSeconds).toBe(5);
-      expect(assistantMsg!.durationFlavorWord).toBeDefined();
       expect(assistantMsg!.completedAt).toEqual(expect.any(Number));
       expect(deps.renderer.updateMessageCompletionTime).toHaveBeenCalledWith(assistantMsg);
+      /*
+       * The row under the answer is the renderer's, not a second one built by
+       * hand here. The turn used to draw a duration and nothing else, so a live
+       * answer carried half the row the design draws and the same answer
+       * reopened carried all of it — and it is drawn after the blocks close,
+       * because until then the answer's own text is not on the message and
+       * there is nothing to offer a copy of.
+       */
+      expect(deps.renderer.renderResponseFooter).toHaveBeenCalledWith(
+        expect.anything(),
+        assistantMsg,
+      );
 
       jest.spyOn(performance, 'now').mockRestore();
     });

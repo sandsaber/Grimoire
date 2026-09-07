@@ -244,6 +244,50 @@ describe('FileContextManager', () => {
     manager.destroy();
   });
 
+  it('starts a chat on the note the reader is looking at, even from the chat pane', () => {
+    // `getActiveFile()` answers for the active leaf, and opening a new chat in
+    // the main area makes Grimoire that leaf - so a fresh chat attached
+    // nothing at all, and the composer offered no way to say which note it was
+    // about.
+    const app = createMockApp({ files: ['Climate/Blue Carbon.md'] });
+    app.workspace.getActiveFile = jest.fn(() => null);
+    app.workspace.getMostRecentLeaf = jest.fn(() => ({
+      view: { file: createMockTFile('Climate/Blue Carbon.md') },
+    }));
+    const containerEl = createMockEl();
+    const inputEl = createMockEl('textarea');
+    const manager = new FileContextManager(
+      app,
+      containerEl,
+      inputEl,
+      createMockCallbacks()
+    );
+
+    manager.autoAttachActiveFile();
+
+    expect(manager.getCurrentNotePath()).toBe('Climate/Blue Carbon.md');
+    manager.destroy();
+  });
+
+  it('attaches nothing when no leaf holds a file', () => {
+    const app = createMockApp({ files: [] });
+    app.workspace.getActiveFile = jest.fn(() => null);
+    app.workspace.getMostRecentLeaf = jest.fn(() => ({ view: {} }));
+    const containerEl = createMockEl();
+    const inputEl = createMockEl('textarea');
+    const manager = new FileContextManager(
+      app,
+      containerEl,
+      inputEl,
+      createMockCallbacks()
+    );
+
+    manager.autoAttachActiveFile();
+
+    expect(manager.getCurrentNotePath()).toBeNull();
+    manager.destroy();
+  });
+
   it('does not auto-attach files inside an excluded folder', () => {
     const app = createMockApp({
       files: ['Private/secret.md', 'Private Notes/public.md'],

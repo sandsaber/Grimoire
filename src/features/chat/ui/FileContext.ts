@@ -174,9 +174,26 @@ export class FileContextManager {
     this.detachFile(this.currentNotePath);
   }
 
+  /**
+   * The note a new chat starts with.
+   *
+   * `getActiveFile()` answers for the *active leaf*, and when Grimoire itself
+   * is that leaf - which it is the moment a reader opens a new chat in the
+   * main area - the answer is nothing. The note they are looking at is then
+   * the most recent leaf that has one, so ask that before giving up.
+   */
+  private resolveActiveFile(): TFile | null {
+    const active = this.app.workspace.getActiveFile();
+    if (active) return active;
+
+    const recent = this.app.workspace.getMostRecentLeaf?.();
+    const file = (recent?.view as { file?: unknown } | undefined)?.file;
+    return file instanceof TFile ? file : null;
+  }
+
   /** Auto-attaches the currently focused file (for new sessions). */
   autoAttachActiveFile() {
-    const activeFile = this.app.workspace.getActiveFile();
+    const activeFile = this.resolveActiveFile();
     if (activeFile && !this.isExcluded(activeFile)) {
       const normalizedPath = this.normalizePathForVault(activeFile.path);
       if (normalizedPath) {

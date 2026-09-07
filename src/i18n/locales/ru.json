@@ -255,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "К последнему сообщению",
-        "placeholder": "Попросите Grimoire отредактировать, найти, сравнить, сгенерировать или выполнить команду...",
+        "placeholder": "Спросить Grimoire…",
         "send": "Отправить",
         "sendMessage": "Отправить сообщение",
         "stopResponse": "Остановить ответ",
@@ -304,6 +304,9 @@
         "permissionSafe": "Безопасный",
         "permissionAuto": "Авто",
         "permissionPlan": "План",
+        "permissionSafeDetail": "Подтверждать каждую правку и команду",
+        "permissionAutoDetail": "Правки и команды выполняются без вопросов",
+        "permissionPlanDetail": "Только чтение, пока вы не одобрите план",
         "effortLevels": {
           "low": "Низкий",
           "medium": "Средний",
@@ -328,6 +331,8 @@
         "absolutePathRequired": "Путь должен быть абсолютным. Использование: /add-dir /absolute/path",
         "duplicate": "Эта папка уже добавлена как внешний контекст.",
         "selectTitle": "Выбрать внешний контекст",
+        "selectFileTitle": "Выберите внешний файл",
+        "selectFolderTitle": "Выберите внешнюю папку",
         "pickerFailed": "Не удалось открыть выбор папки.",
         "conflictInside": "Невозможно добавить “{path}” — он находится внутри существующего пути “{existing}”",
         "conflictContains": "Невозможно добавить “{path}” — он содержит существующий путь “{existing}”",
@@ -402,7 +407,6 @@
         "groupFromVault": "Из хранилища",
         "fileCount": "файлов: {count}",
         "summaryCost": "~{tokens} · {percent}% окна",
-        "more": "ещё {count}",
         "overBudget": "файлов: {count} · ~{tokens} не помещается в окно этой модели",
         "overBudgetBy": "сверх на ~{tokens}",
         "windowShare": "{percent}% окна после этого сообщения",
@@ -416,8 +420,8 @@
         "pickerPlaceholder": "Поиск по хранилищу",
         "pickerHint": "⏎ добавить · ⇥ не закрывать",
         "quickOpenFile": "Открытый файл",
-        "quickSelection": "Текущее выделение",
-        "quickClipboard": "Буфер обмена",
+        "quickBrowseFile": "Внешний файл…",
+        "quickBrowseFolder": "Внешняя папка…",
         "detailExternal": "вне хранилища",
         "detailOpenNote": "открытая заметка",
         "folderDetail": "заметок: {count}"
@@ -460,8 +464,6 @@
         "conversationCompacted": "Диалог сжат",
         "sessionRestarted": "Новая сессия",
         "sessionRestartedHint": "Агенту не удалось восстановить предыдущую сессию, поэтому диалог продолжается в новой. Сообщения выше не входят в её контекст - повторите то, что всё ещё нужно, или начните заново в новой вкладке.",
-        "completed": "Готово",
-        "duration": "* {flavor} · {duration}",
         "copied": "Скопировано!",
         "renderFailed": "Не удалось отобразить содержимое сообщения.",
         "copyMessage": "Копировать сообщение",
@@ -574,17 +576,17 @@
         "shellCommand": "команда оболочки"
       },
       "plan": {
-        "requestedPermissions": "Запрошенные разрешения:",
-        "approveCurrentSession": "Одобрить (текущий сеанс)",
-        "continueFeedbackPlaceholder": "Введите отзыв, чтобы продолжить планирование...",
-        "keyboardHints": "Стрелки — навигация · Enter — выбрать · Esc — отменить",
+        "requestedPermissions": "Запрошенные разрешения",
+        "approveCurrentSession": "Одобрить для этого сеанса",
+        "continueFeedbackPlaceholder": "Отзыв, чтобы изменить план…",
+        "keyboardHints": "↑↓ навигация · ⏎ выбрать · esc отменить",
         "complete": "План готов",
         "reviewBeforeProceeding": "Проверьте план перед продолжением",
         "label": "план",
         "expand": "Развернуть план",
         "collapse": "Свернуть план",
         "implement": "Реализовать",
-        "reviseFeedbackPlaceholder": "Введите отзыв, чтобы изменить план..."
+        "reviseFeedbackPlaceholder": "Отзыв, чтобы изменить план…"
       },
       "images": {
         "dropHere": "Перетащите изображение сюда",
@@ -632,6 +634,7 @@
         "runningEllipsis": "Выполняется...",
         "completed": "готово",
         "blocked": "заблокировано",
+        "unfinished": "не завершено",
         "error": "Ошибка",
         "orphaned": "Отсоединено",
         "inProgress": "в процессе",
@@ -705,10 +708,12 @@
         "queryCountOne": "Запросов: {count}",
         "queryCountMany": "Запросов: {count}",
         "stepCountOne": "Шагов: {count}",
-        "stepCountMany": "Шагов: {count}"
+        "stepCountMany": "Шагов: {count}",
+        "resultSkipped": "пропущено",
+        "resultStopped": "прервано"
       },
       "responseMetadata": {
-        "effort": "Усилия: {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -1568,6 +1573,7 @@
     "newTab": "Новая вкладка",
     "newSession": "Новая сессия (в текущей вкладке)",
     "closeCurrentTab": "Закрыть текущую вкладку",
+    "manageContext": "Управление контекстом",
     "switchToTab": "Перейти на вкладку {index}",
     "environmentRestartFailed": "Изменения окружения применены, но не удалось перезапустить затронутые вкладки: {count}.",
     "environmentAppliedRebuild": "Переменные окружения применены. Сессии будут пересозданы при следующем сообщении.",
@@ -1575,6 +1581,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "Встроенная",
+        "vault": "Хранилище",
+        "user": "Пользователь",
+        "system": "Система",
+        "runtime": "Среда"
+      },
       "noMatches": "Нет подходящих команд"
     },
     "resumeConversation": {
