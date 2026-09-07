@@ -106,6 +106,11 @@ Grimoire's visual system is **Nordic**, and [`docs/design-system.md`](docs/desig
 canonical description. Read it before changing any surface's appearance, adding a stylesheet, or
 introducing a control.
 
+The drawing that description is of is [`docs/design/Grimoire Nordic.html`](docs/design/Grimoire%20Nordic.html) —
+thirteen screens of the plugin, `1a` through `3c`, in English and in Obsidian's own variables. Open
+it in a browser and compare against a render of the plugin rather than against a reading of its CSS;
+§16 of the design doc says how to build that render, and why it has to include Obsidian's `app.css`.
+
 The rule the whole system rests on: **feature code reads a Grimoire token; only
 `src/style/base/variables.css` reads an Obsidian one.** That is what makes a theme swap a no-op and a
 system change a one-line edit. A colour, size, weight, radius, spacing value, shadow or duration
@@ -121,6 +126,11 @@ Two habits the system exists to enforce, both learned from shipped defects:
   `tests/fixtures/obsidian/theme-tokens.json`, taken from the `app.css` inside the installed `.asar`.
 - **A fallback hides a missing dependency**, so a value that looks considered can be frozen. Prefer no
   fallback on a Grimoire token, and let the gate catch a missing one.
+- **A class alone loses to the host.** Obsidian names elements and attributes — `button:not(…)`,
+  `input[type='text']`, `.modal` — so a correct-looking rule can be present and overruled, and a
+  modifier named by class alone loses to its own element-named base. The table of what to write is
+  in `src/style/AGENTS.md`; the gates cannot see a rule the plugin never wrote, so a render against
+  the real `app.css` is what finds these.
 
 There are no fixed colours. The nine provider brand colours were the last exception, and identity is
 the vendor's own mark drawn in `--grimoire-ink-muted` instead — status is an accent dot beside a

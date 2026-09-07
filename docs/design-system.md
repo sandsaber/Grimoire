@@ -7,6 +7,21 @@ a hairline, a wash and a dot.
 This is the canonical description. Read it before changing any surface's appearance, adding a
 stylesheet, or introducing a control.
 
+**The picture this prose describes is [`docs/design/Grimoire Nordic.html`](design/Grimoire%20Nordic.html)** —
+thirteen screens of the plugin drawn in the system, in English, using nothing but Obsidian's own
+variables. Open it in a browser. Where the prose and the mock disagree about a number, the mock is
+the drawing and this file is the reasoning; say which one you followed and why.
+
+| | | |
+|---|---|---|
+| `1a` Chat sidebar | `1b` Empty tab with history | `1c` Composer states |
+| `2a` Panels | `2b` Conversation states and reasoning | `2c` Model picker and dropdowns |
+| `2d` Decisions | `2e` Modals | `2f` Settings |
+| `2g` Providers and tokens | `3a` Composer with many attachments | `3b` Manage context dialog |
+| `3c` Add from vault | | |
+
+Comparing a surface against it is a render, not a reading — see §16.
+
 ---
 
 ## 1 · Why a token system rather than a skin
@@ -398,10 +413,16 @@ One list over the three places an attachment can come from — the open note, me
 external files. Each had its own view before, and none could see the other two, so "what is attached,
 and what does it cost" was a question the composer could not answer.
 
-- **Composer.** Up to four things it draws chips, each removable where it stands, and a dashed "Add"
-  chip ends the row. The fifth collapses to one row: an accent file glyph, "**9 files**", a monospace
-  "~18.4k · 34% of window", an add control and "Manage" — with the three most recent still visible
-  and the rest behind a "+6 more" that opens the dialog.
+- **Composer.** One attached thing it draws as a chip, removable where it stands, with a dashed "Add"
+  chip and a list control ending the row. The second collapses to one row: an accent file glyph,
+  "**9 files**", a monospace "~18.4k · 34% of window", an add control and "Manage".
+
+  The drawing collapses at the fifth and keeps a second row echoing the three most recent behind a
+  "+6 more". Both were cut against a real sidebar. Four chips wrap to three lines at every width the
+  plugin is actually used at, and the echo row is three names out of five with no remove on them —
+  something to read and nothing to do — that wraps as badly as the chips it replaced. One chip always
+  fits; past it a single line that never wraps says the count and the cost, and the names are in the
+  dialog, which every state now reaches.
 - **Over budget.** The card's border goes `--grimoire-error-line` and the summary becomes a warning
   row naming the overage. **Send stays enabled** — the reader decides, and a file silently dropped is
   a turn that goes out about a file it does not have.
@@ -410,9 +431,27 @@ and what does it cost" was a question the composer could not answer.
   8% accent wash, the grouped list (Vault, then External; insertion order inside a group and nothing
   re-sorted under the reader), and a 48px footer with the budget drawn as a 64 × 4px bar. "Remove
   all" asks once by becoming its own question rather than opening a second dialog over the first.
+
+  **Those 640 are set on `.modal`, not on what it holds.** Obsidian's own `.modal` is 560px wide with
+  16px of padding, so a 640px content box overflowed it by 112px and the host's `overflow: auto` cut
+  the whole right column off: every row's token count, every row's remove cross, Add, and Done. The
+  dialog whose one job is deciding what to keep could not remove a file.
+
+  **It draws no close of its own.** The drawing puts a cross in the header, but the host already
+  draws one over that corner, so the header carried a second one stacked under it. Hiding the host's
+  meant knowing where and when the host builds it — through `.modal` it is not there, and at
+  `onOpen` it does not exist yet. Drawing none needs neither answer; the header reserves
+  `--grimoire-hit-l` at its end so the title clears the host's control, and Escape still closes.
 - **Add picker.** 400px, radius 8. `⏎` adds and closes; `⇥` adds and keeps it open — which is why it
   is not a `SuggestModal`. The matched substring is underlined in the accent. A row for something
-  already attached is highlighted, inert, and says "attached".
+  already attached is highlighted, inert, and says "attached". Its footer offers the open note and
+  the two native dialogs, asked for separately: Windows and Linux cannot show one that returns
+  either a file or a folder, and Electron answers a request for both with the folder picker.
+
+  Opened from the composer it rises above the row; opened from the manage dialog it drops out of that
+  dialog's search band, and is mounted **inside** the dialog. A modal is its own stacking context, so
+  a panel drawn in the composer while the dialog is open lands behind it at any `z-index`, and the
+  control that opened it reads as a button that does nothing.
 - **Costs are estimates and say so.** No provider exposes a tokeniser Grimoire can call before the
   turn is sent, so this reads `stat.size` and divides by four; every surface labels it "est.". An
   unknown cost is an em dash — zero would be a claim that the file is free.
@@ -540,10 +579,65 @@ Scale, before and after: 15 font sizes to a 6-step ladder that scales with the r
 
 ---
 
-## 16 · A specimen you can move
+## 16 · Looking at it
 
-The system renders itself at
+Obsidian cannot be screenshotted from a terminal, and a CSS claim that is only read is a CSS claim
+that is only guessed. Both halves of the comparison can be rendered.
+
+**The mock**: open [`docs/design/Grimoire Nordic.html`](design/Grimoire%20Nordic.html) in a browser,
+or screenshot one screen of it headlessly.
+
+**The plugin**: write an HTML file with two `<style>` blocks — Obsidian's own `app.css` first, the
+built root `styles.css` second — put the plugin's markup under `.grimoire-container--chat-window` on
+a `body.theme-dark`, and
+
+```
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+  --window-size=560,340 --screenshot=shot.png "file://…/harness.html"
+```
+
+For measurements rather than pixels, append a `<script>` that writes `getComputedStyle` results into
+a `data-probe` attribute on `body` and read it back with `--dump-dom`.
+
+**Include `app.css`, not just the theme fixture.** A harness carrying only
+`tests/fixtures/obsidian/theme-tokens.json` shows the plugin as it would look if the host had no
+rules of its own, and the host's rules are what break it: `button:not(.clickable-icon)` and
+`input[type='text']` are element-plus-class weight, so a rule named only `.grimoire-primary-action`
+never wins. Every filled action in the plugin resolved to `rgb(51,51,51)` and every field to
+Obsidian's form-field chrome until the rules named the element too. Take `app.css` from the `.asar`
+the way `scripts/generate-theme-tokens.mjs` does.
+
+This is also how the stray `}` in `tabs.css` was found: it made Chrome discard
+`.grimoire-panel-switch` entirely, and no gate, build or test saw it — only the render did. And the
+manage dialog's missing right-hand column: the harness reported `.modal` at 560 and its content at
+640 before anything was changed, which is the whole diagnosis in two numbers.
+
+### Naming the element is not the end of it
+
+Three more ways the host outranks a rule that looks right, each found in a render rather than in a
+reading:
+
+- **A modifier of an element-named base must name the element too.** `button.grimoire-icon-btn`
+  counts an element and a class, so `.grimoire-icon-btn--small` never reached its own width and
+  height and every small icon button drew at the large size. `designSystem.test.ts` now fails any
+  `.x--m` that sets a property an `element.x` rule also sets.
+- **A field's focus ring is the host's, at `input[type='text']:focus-visible`** — element, attribute
+  and pseudo-class. `box-shadow: none` on `input.grimoire-…` is overruled the moment the field takes
+  focus, which for a panel that focuses its field as it opens is permanent chrome. Answer it with a
+  `:focus` and `:focus-visible` rule of the same weight, and let focus read on the glyph instead: a
+  glyph in the accent is inside the budget, a 2px box around a band drawn flat is not.
+- **A modal is sized on `.modal`.** Sizing `.modal-content` leaves the host's width and padding in
+  place underneath, and the host clips what overflows.
+
+The shape of all four is one thing: the host names elements and attributes, Grimoire names classes,
+and a class alone loses. The gates cannot see a property the plugin never wrote — a missing `:focus`
+rule is not a violation of anything — so the render stays the check that finds these.
+
+### A specimen you can move
+
+The system also renders itself at
 <https://claude.ai/code/artifact/4856c3ff-b400-49c8-afcf-57ff24ab7e32> — every plate on that page is
 built out of these tokens, and the strip at the top writes `--accent-h/s/l` and the theme exactly the
 way Obsidian's Appearance pane does. Nothing on it names a colour, so moving the accent moves the
-whole page. Obsidian cannot be screenshotted from a terminal; this is how the design is looked at.
+whole page.
