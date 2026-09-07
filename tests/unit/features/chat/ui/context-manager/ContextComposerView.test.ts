@@ -38,42 +38,69 @@ function mount(items: ContextItem[], budget = { windowTokens: 0, usedTokens: 0 }
 }
 
 describe('ContextComposerView', () => {
-  it('says nothing when nothing is attached', () => {
+  it('offers Add from an empty composer, and nothing else', () => {
+    // The row hid itself when nothing was attached, so on a fresh chat the
+    // only way to attach a first file was to already know that `@` opens a
+    // picker - the control that says so appeared only once you had.
     const { root } = mount([]);
 
-    expect(root?.hasClass('grimoire-hidden')).toBe(true);
-  });
-
-  it('draws a chip for each of up to four, plus the control that adds a fifth', () => {
-    const { root } = mount([item('a'), item('b'), item('c'), item('d')]);
-
+    expect(root?.hasClass('grimoire-hidden')).toBe(false);
     const chips = root!.querySelectorAll('.grimoire-file-chip');
-    expect(chips).toHaveLength(5);
-    expect(chips[4].hasClass('grimoire-file-chip--add')).toBe(true);
+    expect(chips).toHaveLength(1);
+    expect(chips[0].hasClass('grimoire-file-chip--add')).toBe(true);
     expect(root!.querySelector('.grimoire-context-summary-bar')).toBeNull();
   });
 
-  it('collapses to a summary at the fifth, without losing the count or the cost', () => {
-    // Past four the chip row wraps to three lines and takes the space the
-    // message was going to be written in.
+  it('offers the dialog while the chip still fits', () => {
+    // Manage lives in the summary row, which the single-chip state does not
+    // draw - so with one file attached the dialog had nothing to open it.
+    const { root, callbacks } = mount([item('a')]);
+
+    const manage = root!.querySelector('.grimoire-context-chips-manage');
+    expect(manage).not.toBeNull();
+    manage!.dispatchEvent('click');
+    expect(callbacks.onOpenManager).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no dialog when nothing is attached to manage', () => {
+    const { root } = mount([]);
+
+    expect(root!.querySelector('.grimoire-context-chips-manage')).toBeNull();
+  });
+
+  it('draws the one chip that always fits, plus the control that adds a second', () => {
+    const { root } = mount([item('a')]);
+
+    const chips = root!.querySelectorAll('.grimoire-file-chip');
+    expect(chips).toHaveLength(2);
+    expect(chips[1].hasClass('grimoire-file-chip--add')).toBe(true);
+    expect(root!.querySelector('.grimoire-context-summary-bar')).toBeNull();
+  });
+
+  it('collapses to a summary at the second, without losing the count or the cost', () => {
+    // A second chip is already a row that wraps in a sidebar, and it takes the
+    // space the message was going to be written in.
     const { root } = mount(
-      [item('a'), item('b'), item('c'), item('d'), item('e')],
+      [item('a'), item('b')],
       { windowTokens: 100_000, usedTokens: 0 },
     );
 
     const summary = root!.querySelector('.grimoire-context-summary-bar');
     expect(summary).not.toBeNull();
-    expect(summary!.querySelector('.grimoire-context-summary-count')?.textContent).toBe('5 files');
+    expect(summary!.querySelector('.grimoire-context-summary-count')?.textContent).toBe('2 files');
     expect(summary!.querySelector('.grimoire-context-summary-cost')?.textContent)
-      .toBe('~5.0k · 5% of window');
+      .toBe('~2.0k · 2% of window');
   });
 
-  it('keeps the three most recent visible and counts the rest', () => {
+  it('draws the summary and nothing under it', () => {
+    // The summary used to carry a second row echoing the three most recent
+    // names with no remove on them: something to read, nothing to do, and it
+    // wrapped at every sidebar width.
     const { root } = mount([item('a'), item('b'), item('c'), item('d'), item('e'), item('f')]);
 
-    const recent = root!.querySelector('.grimoire-context-chips--recent');
-    expect(recent!.querySelectorAll('.grimoire-file-chip')).toHaveLength(3);
-    expect(recent!.querySelector('.grimoire-context-more')?.textContent).toBe('+3 more');
+    expect(root!.querySelector('.grimoire-context-summary-bar')).not.toBeNull();
+    expect(root!.querySelectorAll('.grimoire-context-chips')).toHaveLength(0);
+    expect(root!.querySelectorAll('.grimoire-file-chip')).toHaveLength(0);
   });
 
   it('names the overage in the composer, and moves the card border', () => {
@@ -90,22 +117,20 @@ describe('ContextComposerView', () => {
   });
 
   it('removes an attachment from the chip it is drawn as', () => {
-    const { root, store } = mount([item('a'), item('b')]);
+    const { root, store } = mount([item('a')]);
 
-    const remove = root!.querySelectorAll('.grimoire-file-chip-remove')[0];
-    remove.click();
+    root!.querySelectorAll('.grimoire-file-chip-remove')[0].click();
 
-    expect(store.getItems().map(entry => entry.id)).toEqual(['b']);
+    expect(store.getItems()).toHaveLength(0);
   });
 
-  it('reaches the dialog from the summary and from the overflow count alike', () => {
+  it('reaches the dialog from the summary', () => {
     const { root, callbacks } = mount(
       [item('a'), item('b'), item('c'), item('d'), item('e'), item('f')],
     );
 
     root!.querySelector('.grimoire-context-summary-manage')!.click();
-    root!.querySelector('.grimoire-context-more')!.click();
 
-    expect(callbacks.onOpenManager).toHaveBeenCalledTimes(2);
+    expect(callbacks.onOpenManager).toHaveBeenCalledTimes(1);
   });
 });

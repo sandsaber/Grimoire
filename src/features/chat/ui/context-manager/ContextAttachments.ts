@@ -2,7 +2,7 @@ import type { App } from 'obsidian';
 import { TFile, TFolder } from 'obsidian';
 
 import { t } from '../../../../i18n/i18n';
-import { ContextAddPicker } from './ContextAddPicker';
+import { ContextAddPicker, type ContextPickerPlacement } from './ContextAddPicker';
 import { ContextComposerView } from './ContextComposerView';
 import type { ContextBudget, ContextItem } from './contextItems';
 import { type ContextCandidate,ContextManagerModal } from './ContextManagerModal';
@@ -27,10 +27,17 @@ export interface ContextAttachmentsDeps {
   openPath: (path: string) => void;
   /** The composer card, whose border says when this message is over budget. */
   cardEl?: HTMLElement | null;
-  /** The reader's current selection, if any, as a quick source. */
+  /** The note the reader is looking at, as a quick source. */
   attachOpenFile?: () => void;
-  attachSelection?: () => void;
-  attachClipboard?: () => void;
+  /**
+   * The native dialog for a path outside the vault, per target.
+   *
+   * Without it the picker searches only the vault, so the EXTERNAL group the
+   * manage dialog draws had nothing in this surface that could fill it. A file
+   * and a folder are asked for separately because Windows and Linux cannot
+   * show one dialog that returns either.
+   */
+  browseExternal?: (target: 'file' | 'folder') => void;
 }
 
 const OPEN_NOTE_PREFIX = 'open-note:';
@@ -83,6 +90,17 @@ export class ContextAttachments {
     this.picker = null;
     this.view?.destroy();
     this.view = null;
+  }
+
+  /**
+   * Opens the manage dialog from outside the composer.
+   *
+   * The composer only offers a way in past four attachments, which is where
+   * the design draws it - so with two files attached the dialog existed and
+   * nothing could reach it.
+   */
+  manage(): void {
+    this.openManager(this.composerEl);
   }
 
   /** Rebuilds the list from its sources, preserving each source's own order. */
@@ -155,18 +173,29 @@ export class ContextAttachments {
     new ContextManagerModal(this.deps.app, this.store, {
       search: query => this.searchVault(query),
       attach: candidate => this.attach(candidate),
-      openPicker: () => this.openPicker(anchor),
+      openPicker: (mountEl, addButton) => this.openPicker(addButton, mountEl, 'below'),
+      // The dialog empties itself on close, taking a picker it was hosting
+      // with it - and a picker that was removed but not closed leaves its
+      // outside-click listener on the document.
+      onClosed: () => {
+        this.picker?.close();
+        this.picker = null;
+      },
     }, anchor).open();
   }
 
-  private openPicker(anchor: HTMLElement): void {
+  private openPicker(
+    anchor: HTMLElement,
+    parentEl: HTMLElement = this.composerEl,
+    placement: ContextPickerPlacement = 'above',
+  ): void {
     this.picker?.close();
-    this.picker = new ContextAddPicker(this.composerEl, this.store, {
+    this.picker = new ContextAddPicker(parentEl, this.store, {
       search: query => this.searchVault(query),
       attach: candidate => this.attach(candidate),
       identify: candidate => `${VAULT_PREFIX}${candidate.path}`,
       quickSources: () => this.quickSources(),
-    }, anchor);
+    }, anchor, placement);
   }
 
   private quickSources(): Array<{ id: string; label: string; run: () => void }> {
@@ -178,18 +207,16 @@ export class ContextAttachments {
         run: () => this.deps.attachOpenFile?.(),
       });
     }
-    if (this.deps.attachSelection) {
+    if (this.deps.browseExternal) {
       sources.push({
-        id: 'selection',
-        label: t('chat.ui.contextManager.quickSelection'),
-        run: () => this.deps.attachSelection?.(),
+        id: 'browse-file',
+        label: t('chat.ui.contextManager.quickBrowseFile'),
+        run: () => this.deps.browseExternal?.('file'),
       });
-    }
-    if (this.deps.attachClipboard) {
       sources.push({
-        id: 'clipboard',
-        label: t('chat.ui.contextManager.quickClipboard'),
-        run: () => this.deps.attachClipboard?.(),
+        id: 'browse-folder',
+        label: t('chat.ui.contextManager.quickBrowseFolder'),
+        run: () => this.deps.browseExternal?.('folder'),
       });
     }
     return sources;

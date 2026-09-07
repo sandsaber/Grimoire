@@ -33,8 +33,15 @@ export interface ContextManagerCallbacks {
   search: (query: string) => ContextCandidate[];
   /** Attaches one candidate. */
   attach: (candidate: ContextCandidate) => void;
-  /** Opens the add picker, which can stay open across repeated adds. */
-  openPicker: () => void;
+  /**
+   * Opens the add picker inside this dialog, under the search band that owns
+   * the control. It is mounted here rather than in the composer because a
+   * modal is its own stacking context: a panel drawn outside it is drawn
+   * behind it.
+   */
+  openPicker: (mountEl: HTMLElement, anchor: HTMLElement) => void;
+  /** Lets the caller drop a picker this dialog was hosting. */
+  onClosed?: () => void;
 }
 
 const KIND_ICONS: Record<ContextItem['kind'], string> = {
@@ -101,6 +108,7 @@ export class ContextManagerModal extends Modal {
   }
 
   onClose(): void {
+    this.callbacks.onClosed?.();
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.selected.clear();
@@ -110,6 +118,13 @@ export class ContextManagerModal extends Modal {
     this.returnFocusTo?.focus?.();
   }
 
+  /**
+   * Title and count, and no close of its own.
+   *
+   * The host already draws one in this corner, so a second cross in the header
+   * was two crosses stacked - and hiding the host's meant guessing where and
+   * when it builds it. Escape closes the dialog too; `onOpen` registers it.
+   */
   private buildHeader(): void {
     const header = this.contentEl.createDiv({ cls: 'grimoire-context-header' });
     header.createDiv({
@@ -117,13 +132,6 @@ export class ContextManagerModal extends Modal {
       text: t('chat.ui.contextManager.title'),
     });
     this.headerCountEl = header.createDiv({ cls: 'grimoire-context-header-count' });
-    header.createDiv({ cls: 'grimoire-context-header-spacer' });
-    const close = header.createEl('button', {
-      cls: 'grimoire-icon-btn',
-      attr: { type: 'button', 'aria-label': t('common.close') },
-    });
-    setIcon(close, 'x');
-    close.addEventListener('click', () => this.close());
   }
 
   private buildSearchBand(): void {
@@ -148,7 +156,7 @@ export class ContextManagerModal extends Modal {
       text: t('chat.ui.contextManager.add'),
       attr: { type: 'button' },
     });
-    add.addEventListener('click', () => this.callbacks.openPicker());
+    add.addEventListener('click', () => this.callbacks.openPicker(band, add));
   }
 
   private render(): void {
@@ -267,15 +275,15 @@ export class ContextManagerModal extends Modal {
       return;
     }
     for (const candidate of candidates) {
-      const row = list.createDiv({ cls: 'grimoire-context-row grimoire-context-row--candidate' });
-      const icon = row.createSpan({ cls: 'grimoire-context-row-icon' });
+      const row = list.createDiv({ cls: 'grimoire-context-item grimoire-context-item--candidate' });
+      const icon = row.createSpan({ cls: 'grimoire-context-item-icon' });
       setIcon(icon, candidate.folder ? 'folder' : 'file-text');
       markDecorative(icon);
-      row.createSpan({ cls: 'grimoire-context-row-name', text: candidate.name });
-      row.createSpan({ cls: 'grimoire-context-row-detail', text: candidate.detail });
-      row.createDiv({ cls: 'grimoire-context-row-spacer' });
+      row.createSpan({ cls: 'grimoire-context-item-name', text: candidate.name });
+      row.createSpan({ cls: 'grimoire-context-item-detail', text: candidate.detail });
+      row.createDiv({ cls: 'grimoire-context-item-spacer' });
       row.createSpan({
-        cls: 'grimoire-context-row-tokens',
+        cls: 'grimoire-context-item-tokens',
         text: formatTokens(candidate.tokens),
       });
       const add = row.createEl('button', {
@@ -291,7 +299,7 @@ export class ContextManagerModal extends Modal {
     const failed = item.state === 'failed';
     const row = list.createDiv({
       cls: [
-        'grimoire-context-row',
+        'grimoire-context-item',
         failed ? 'is-failed' : '',
         this.selected.has(item.id) ? 'is-selected' : '',
         flash ? 'is-duplicate' : '',
@@ -314,36 +322,43 @@ export class ContextManagerModal extends Modal {
       });
       if (this.selected.has(item.id)) setIcon(checkbox, 'check');
     } else {
-      const alert = row.createSpan({ cls: 'grimoire-context-row-icon is-failed' });
+      const alert = row.createSpan({ cls: 'grimoire-context-item-icon is-failed' });
       setIcon(alert, 'alert-circle');
       markDecorative(alert);
     }
 
     if (!failed) {
-      const icon = row.createSpan({ cls: 'grimoire-context-row-icon' });
+      const icon = row.createSpan({ cls: 'grimoire-context-item-icon' });
       setIcon(icon, KIND_ICONS[item.kind]);
       markDecorative(icon);
     }
 
-    row.createSpan({ cls: 'grimoire-context-row-name', text: item.name });
-    row.createSpan({ cls: 'grimoire-context-row-detail', text: item.detail });
-    row.createDiv({ cls: 'grimoire-context-row-spacer' });
-
+    row.createSpan({ cls: 'grimoire-context-item-name', text: item.name });
+    // The reason a file failed reads next to its name, where its path would
+    // be, not off in the token column - it has no token count to replace.
     if (failed) {
       row.createSpan({
-        cls: 'grimoire-context-row-error',
+        cls: 'grimoire-context-item-error',
         text: item.error ?? t('chat.ui.contextManager.unreadable'),
       });
+    } else {
+      row.createSpan({ cls: 'grimoire-context-item-detail', text: item.detail });
+    }
+    row.createDiv({ cls: 'grimoire-context-item-spacer' });
+
+    if (failed) {
+      // Nothing in the price column: a failed item costs nothing and is only
+      // removable.
     } else if (item.inFlight) {
       // Removable for the *next* message only: the turn already dispatched
       // carries what it carried.
       row.createSpan({
-        cls: 'grimoire-context-row-tokens',
+        cls: 'grimoire-context-item-tokens',
         text: t('chat.ui.contextManager.inFlight'),
       });
     } else {
       row.createSpan({
-        cls: 'grimoire-context-row-tokens',
+        cls: 'grimoire-context-item-tokens',
         text: formatTokens(item.tokens),
       });
     }
@@ -487,7 +502,7 @@ export class ContextManagerModal extends Modal {
   }
 
   private highlightFocusedRow(): void {
-    const rows = this.listEl?.querySelectorAll<HTMLElement>('.grimoire-context-row') ?? [];
+    const rows = this.listEl?.querySelectorAll<HTMLElement>('.grimoire-context-item') ?? [];
     for (const row of Array.from(rows)) {
       row.toggleClass('is-focused', row.dataset.contextId === this.focusedId);
     }

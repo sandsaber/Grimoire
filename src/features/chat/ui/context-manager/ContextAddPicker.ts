@@ -16,6 +16,15 @@ export interface ContextAddPickerCallbacks {
 }
 
 /**
+ * Which side of its anchor the panel opens on.
+ *
+ * Above the composer, below the manage dialog's search band - a dialog is its
+ * own stacking context, so a panel drawn in the composer while the dialog is
+ * open is drawn behind it, and the control that opened it looks broken.
+ */
+export type ContextPickerPlacement = 'above' | 'below';
+
+/**
  * A fast search over the vault that can stay open across repeated adds.
  *
  * Enter adds and closes; Tab adds and keeps the picker open, which is the
@@ -38,8 +47,13 @@ export class ContextAddPicker {
     private readonly store: ContextStore,
     private readonly callbacks: ContextAddPickerCallbacks,
     private readonly returnFocusTo: HTMLElement | null,
+    placement: ContextPickerPlacement = 'above',
   ) {
-    this.rootEl = parentEl.createDiv({ cls: 'grimoire-context-picker' });
+    this.rootEl = parentEl.createDiv({
+      cls: placement === 'below'
+        ? 'grimoire-context-picker grimoire-context-picker--below'
+        : 'grimoire-context-picker',
+    });
     this.rootEl.setAttribute('role', 'dialog');
     this.rootEl.setAttribute('aria-label', t('chat.ui.contextManager.addContext'));
 
@@ -116,10 +130,14 @@ export class ContextAddPicker {
       row.createSpan({
         cls: 'grimoire-context-picker-row-meta',
         // A row for something already in context is inert and says so, rather
-        // than looking addable and doing nothing.
+        // than looking addable and doing nothing. A folder prices what is
+        // inside it and says how much of it there is - "4 notes · 5.2k" -
+        // because its name alone does not say what attaching it costs.
         text: attached
           ? t('chat.ui.contextManager.attached')
-          : formatTokens(candidate.tokens),
+          : candidate.folder && candidate.detail
+            ? `${candidate.detail} · ${formatTokens(candidate.tokens)}`
+            : formatTokens(candidate.tokens),
       });
 
       if (attached) return;
@@ -169,6 +187,9 @@ export class ContextAddPicker {
   private handleKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       event.preventDefault();
+      // Escape closes the panel, not whatever is behind it: unstopped, the
+      // manage dialog's own Escape scope reads the same press and both go.
+      event.stopPropagation();
       this.close();
       return;
     }

@@ -15,9 +15,17 @@ import type { ContextStore } from './ContextStore';
 
 /**
  * Past this many attachments the chip row stops being a row and starts being
- * the composer. Four is where the design draws it; the fifth collapses.
+ * the composer.
+ *
+ * The design draws it at four, with the fifth collapsing to a summary and a
+ * second row echoing the three most recent. In a sidebar that second row wraps
+ * at every width, and what it wraps is three names out of five with no remove
+ * on them - something to read and nothing to do. One is what survived: a
+ * single chip always fits, and past it the summary says the count and the cost
+ * on one line that never wraps. The names live in the dialog, which is now one
+ * control away from every state.
  */
-export const CHIP_THRESHOLD = 4;
+export const CHIP_THRESHOLD = 1;
 
 export interface ContextComposerCallbacks {
   onOpenManager: (anchor: HTMLElement) => void;
@@ -71,8 +79,16 @@ export class ContextComposerView {
     const over = items.length > 0 && isOverBudget(items, budget);
 
     this.callbacks.cardEl?.toggleClass?.('is-over-budget', over);
-    this.rootEl.toggleClass('grimoire-hidden', items.length === 0);
-    if (items.length === 0) return;
+    this.rootEl.removeClass('grimoire-hidden');
+
+    // Add is reachable from an empty composer too. The row hid itself when
+    // nothing was attached, so the only way to attach a first file was to know
+    // that typing `@` opens a picker - and the control that says so appeared
+    // only after you had already found it.
+    if (items.length === 0) {
+      this.appendAddChip(this.rootEl.createDiv({ cls: 'grimoire-context-chips' }));
+      return;
+    }
 
     if (over) {
       this.renderOverBudgetRow(items, budget);
@@ -117,6 +133,27 @@ export class ContextComposerView {
       }
     }
     this.appendAddChip(row);
+    this.appendManageButton(row);
+  }
+
+  /**
+   * The way into the dialog while the chips still fit.
+   *
+   * The drawing puts Manage in the summary row, which only exists past four
+   * attachments - so with two files attached there was no way to open the
+   * dialog at all, and removing one meant hunting its own small cross. Icon
+   * only because the row is dense and repeating, named because that is what
+   * makes an icon a control.
+   */
+  private appendManageButton(row: HTMLElement): void {
+    // The row reserves the corner this is pinned into; see context-manager.css.
+    row.addClass('grimoire-context-chips--managed');
+    const manage = row.createEl('button', {
+      cls: 'grimoire-icon-btn grimoire-icon-btn--small grimoire-context-chips-manage',
+      attr: { type: 'button', 'aria-label': t('chat.ui.contextManager.manage') },
+    });
+    setIcon(manage, 'list');
+    manage.addEventListener('click', () => this.callbacks.onOpenManager(manage));
   }
 
   /** The dashed chip at the end of the row: add is always one click away. */
@@ -174,33 +211,6 @@ export class ContextComposerView {
     markDecorative(manageIcon);
     manage.createSpan({ text: t('chat.ui.contextManager.manage') });
     manage.addEventListener('click', () => this.callbacks.onOpenManager(manage));
-
-    this.renderRecentChips(items);
-  }
-
-  /** The three most recently added, without remove buttons, and the rest as a count. */
-  private renderRecentChips(items: readonly ContextItem[]): void {
-    const row = this.rootEl.createDiv({ cls: 'grimoire-context-chips grimoire-context-chips--recent' });
-    const recent = items.slice(-3);
-    for (const item of recent) {
-      const chip = row.createDiv({ cls: 'grimoire-file-chip grimoire-file-chip--static' });
-      const icon = chip.createSpan({ cls: 'grimoire-file-chip-icon' });
-      setIcon(icon, KIND_ICONS[item.kind]);
-      markDecorative(icon);
-      const name = chip.createSpan({
-        cls: 'grimoire-file-chip-name',
-        text: truncateName(item.name),
-      });
-      name.setAttribute('title', item.path);
-    }
-    const hidden = items.length - recent.length;
-    if (hidden <= 0) return;
-    const more = row.createEl('button', {
-      cls: 'grimoire-context-more',
-      text: t('chat.ui.contextManager.more', { count: hidden }),
-      attr: { type: 'button' },
-    });
-    more.addEventListener('click', () => this.callbacks.onOpenManager(more));
   }
 
   /**

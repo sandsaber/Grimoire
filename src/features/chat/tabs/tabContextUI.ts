@@ -322,6 +322,9 @@ export function initializeContextManagers(tab: TabData, plugin: GrimoirePlugin):
       if (active) tab.ui.fileContextManager?.attachFile?.(active.path);
       tab.ui.contextAttachments?.sync();
     },
+    // The selector redraws this list through its own onChange, so nothing is
+    // synced here: syncing before the dialog returns would draw the old list.
+    browseExternal: target => void tab.ui.externalContextSelector?.openFolderPicker(target),
   });
   dom.eventCleanups.push(() => tab.ui.contextAttachments?.destroy());
 
