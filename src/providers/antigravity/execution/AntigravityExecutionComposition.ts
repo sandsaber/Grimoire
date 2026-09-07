@@ -176,6 +176,15 @@ export class AntigravityExecution {
         clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>),
       },
       sessionInstanceIdFactory: () => sessionInstanceId(opaqueId('si')),
+      // Recorded at `info`, not `debug`: a turn that ends without a terminal
+      // frame is the report we could not explain, and the log is the only place
+      // that outlives it. The payload is names, counts, and timings.
+      onDiagnostic: data => this.plugin.recordDebugLog?.({
+        data: { ...data, providerId: 'antigravity' },
+        event: 'antigravity.turn.completion',
+        level: 'info',
+        scope: 'provider.antigravity',
+      }),
     };
     return new AntigravityExecutionBackend(context);
   }

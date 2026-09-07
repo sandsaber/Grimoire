@@ -266,6 +266,71 @@ describe('AntigravityPrintProcessRunner', () => {
     expect(child.terminationModes.length).toBeGreaterThan(0);
   });
 
+  it('keeps the run log when the turn ended without a terminal frame', async () => {
+    // 1.3.2 unlinked the log only after a successful run. It is the only place
+    // `agy` records the real wall-clock cause, so deleting it unconditionally
+    // destroys the evidence for exactly the turns that need explaining (#139).
+    const child = new FakeManagedChild({
+      stdout: ['{"event":"step_update","step_update":{"step_type":"text","text_delta":"hi"}}\n'],
+    });
+    const removeLog = jest.fn().mockResolvedValue(undefined);
+    const runner = new AntigravityPrintProcessRunner({
+      transport: new FakeTransport(child),
+      drainGraceMs: 1,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog,
+    });
+
+    const handle = runner.start({
+      ...INVOCATION,
+      cliCapabilities: { addDir: false, printTimeout: false, streamJson: true },
+    });
+    child.exit.resolve({ code: 0 });
+    await handle.completed;
+
+    expect(removeLog).not.toHaveBeenCalled();
+  });
+
+  it('reports what the CLI sent when a turn ends without a terminal frame', async () => {
+    // The question a hung turn leaves behind is whether no terminal frame was
+    // sent or one was sent in a shape we do not read. Only the wire answers it,
+    // and nothing recorded it: the run record stops updating and the frames are
+    // never logged. Names and counts, never the prompt or the answer.
+    const child = new FakeManagedChild({
+      stdout: [
+        '{"event":"init","init":{}}\n',
+        '{"event":"step_update","step_update":{"step_type":"text","text_delta":"hi"}}\n',
+        '{"event":"some_new_frame","payload":{}}\n',
+      ],
+    });
+    const diagnostics: Array<Record<string, unknown>> = [];
+    const runner = new AntigravityPrintProcessRunner({
+      transport: new FakeTransport(child),
+      drainGraceMs: 1,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog: async () => undefined,
+    });
+
+    const handle = runner.start(
+      { ...INVOCATION, cliCapabilities: { addDir: false, printTimeout: false, streamJson: true } },
+      { onDiagnostic: data => diagnostics.push({ ...data }) },
+    );
+    child.exit.resolve({ code: 0 });
+    await handle.completed;
+
+    const completion = diagnostics.find(entry => 'hasResult' in entry);
+    expect(completion).toMatchObject({
+      endedBy: 'process-exit',
+      frameTotal: 3,
+      hasResult: false,
+      lastFrame: 'some_new_frame',
+    });
+    // The unread frame is named rather than silently dropped: a terminal frame
+    // under a new name would otherwise look exactly like no terminal frame.
+    expect(completion?.frameCounts).toMatchObject({ init: 1, some_new_frame: 1, step_update: 1 });
+    expect(JSON.stringify(completion)).not.toContain('hi');
+  });
+
   it('recovers the Windows transcript only after a successful empty stdout', async () => {
     const child = new FakeManagedChild();
     const recoverTranscript = jest.fn().mockResolvedValue({

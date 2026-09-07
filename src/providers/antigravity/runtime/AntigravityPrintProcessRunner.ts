@@ -117,6 +117,11 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
       shell: launch.shell,
       ...(streamJson ? { stdin: 'pipe' as const } : {}),
     });
+    // What the CLI actually put on the wire, by frame name. Names and timings
+    // only: enough to tell "no terminal frame was sent" from "a terminal frame
+    // was sent in a shape we do not read", which is the one question a turn that
+    // ends without a `result` leaves behind.
+    const frameLog: FrameLog = { counts: new Map(), startedAt: Date.now(), total: 0 };
     const parser = streamJson
       ? createAntigravityStreamJsonParser({
         onEvent: (event) => {
@@ -125,6 +130,13 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
             return;
           }
           hooks.onToolStep?.(event);
+        },
+        onFrame: (name) => {
+          frameLog.total += 1;
+          frameLog.counts.set(name, (frameLog.counts.get(name) ?? 0) + 1);
+          frameLog.lastName = name;
+          frameLog.lastAt = Date.now();
+          frameLog.firstAt ??= frameLog.lastAt;
         },
       })
       : undefined;
@@ -144,7 +156,8 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
       : () => undefined;
     return {
       started: child.started,
-      completed: this.observeCompletion(child, invocation, logFilePath, outputLimit, parser, hooks)
+      completed: this
+        .observeCompletion(child, invocation, logFilePath, outputLimit, parser, hooks, frameLog)
         .finally(stopLiveness),
       outputLimitExceeded: outputLimit.exceeded,
       confirmTerminated: () => child.confirmTerminated(),
@@ -201,10 +214,13 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
     outputLimit: OutputLimitMonitor,
     parser: AntigravityStreamJsonParser | undefined,
     hooks: AntigravityProcessRunnerHooks,
+    frameLog: FrameLog,
   ): Promise<AntigravityProcessOutcome> {
     const stdout = new LimitedBytes(outputLimit);
     const stderr = new LimitedBytes(outputLimit);
     const onActivity = hooks.onActivity;
+    let succeeded = false;
+    let sawResultBeforeWait = false;
     try {
       // The process leaving is the event; the pipes closing is not. A grandchild
       // that outlives `agy` keeps them open, and waiting on them with no
@@ -226,7 +242,8 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
       // that overstayed its own answer is asked to go.
       await Promise.race([drained, child.exited]);
       let exit: { readonly code: number | null; readonly signal?: string } | undefined;
-      if (parser?.getResult()) {
+      sawResultBeforeWait = parser?.getResult() != null;
+      if (sawResultBeforeWait) {
         void child.terminate('graceful');
         exit = await Promise.race([
           child.exited,
@@ -244,6 +261,23 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
       if (parser) {
         parser.end();
         const result = parser.getResult();
+        // The turn is explained here or nowhere: this is the only place that
+        // knows what the CLI actually sent, what ended the wait, and whether a
+        // terminal frame was among it. A turn that ends without a `result` is
+        // otherwise indistinguishable from one whose `result` we failed to read.
+        this.report(hooks, {
+          endedBy: sawResultBeforeWait ? 'result-frame' : (exit ? 'process-exit' : 'drain-grace'),
+          exitCode: exit?.code ?? null,
+          frameCounts: summariseFrames(frameLog.counts),
+          frameTotal: frameLog.total,
+          hasResult: result !== null,
+          lastFrame: frameLog.lastName ?? 'none',
+          msToFirstFrame: frameLog.firstAt === undefined ? null : frameLog.firstAt - frameLog.startedAt,
+          msToLastFrame: frameLog.lastAt === undefined ? null : frameLog.lastAt - frameLog.startedAt,
+          outputLimitExceeded: outputLimit.didExceed,
+          ...(result ? { resultStatus: result.status } : {}),
+        });
+        succeeded = result !== null && (exit?.code ?? 0) === 0 && !outputLimit.didExceed;
         return {
           exitCode: exit?.code ?? 0,
           ...(exit?.signal ? { signal: exit.signal } : {}),
@@ -272,6 +306,7 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
       } else {
         outputLimit.consume(Buffer.byteLength(transcript.output, 'utf8'));
       }
+      succeeded = (exit?.code ?? 0) === 0 && !outputLimit.didExceed;
       return {
         exitCode: exit?.code ?? 0,
         ...(exit?.signal ? { signal: exit.signal } : {}),
@@ -281,9 +316,42 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
         ...(outputLimit.didExceed ? { outputLimitExceeded: true } : {}),
       };
     } finally {
-      await (this.options.removeLog ?? removeLog)(logFilePath).catch(() => undefined);
+      // **A failed run keeps its log.** 1.3.2 unlinked it only after success,
+      // because it is the only place `agy` records the real wall-clock cause of
+      // a turn that went wrong. Deleting it unconditionally deletes the evidence
+      // for exactly the turns that need explaining.
+      if (succeeded) {
+        await (this.options.removeLog ?? removeLog)(logFilePath).catch(() => undefined);
+      } else {
+        this.report(hooks, { keptLogForDiagnosis: true });
+      }
     }
   }
+
+  /** Sanitised structural diagnosis; never carries prompt, answer, or paths. */
+  private report(
+    hooks: AntigravityProcessRunnerHooks,
+    data: Readonly<Record<string, unknown>>,
+  ): void {
+    try {
+      hooks.onDiagnostic?.(data);
+    } catch {
+      // Diagnosis must never change the outcome of the turn it describes.
+    }
+  }
+}
+
+interface FrameLog {
+  readonly counts: Map<string, number>;
+  firstAt?: number;
+  lastAt?: number;
+  lastName?: string;
+  readonly startedAt: number;
+  total: number;
+}
+
+function summariseFrames(counts: ReadonlyMap<string, number>): Record<string, number> {
+  return Object.fromEntries([...counts.entries()].sort((a, b) => b[1] - a[1]));
 }
 
 class OutputLimitMonitor {
