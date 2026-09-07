@@ -24,17 +24,30 @@ describe('input.css', () => {
     const actionsRule = getRule(css, '.grimoire-container--chat-window .grimoire-input-toolbar-actions-row');
     const configRule = getRule(css, '.grimoire-container--chat-window .grimoire-input-toolbar-config-actions');
     const modelStackRule = getRule(css, '.grimoire-container--chat-window .grimoire-model-context-stack');
-    const sendRule = getRule(css, '.grimoire-send-actions');
+    const sendRule = getRule(css, '.grimoire-container--chat-window .grimoire-send-actions');
 
     expect(actionsRule).toContain('flex-wrap: nowrap');
     expect(configRule).toContain('flex: 0 1 auto');
     expect(modelStackRule).toContain('flex: 0 1 auto');
     expect(modelStackRule).toContain('width: fit-content');
     expect(modelStackRule).not.toContain('border-inline-end');
-    expect(sendRule).toContain('margin-inline-start: var(--grimoire-space-4)');
-    expect(css).toContain('@container grimoire-composer (max-width: 520px)');
-    expect(css).toMatch(/@container grimoire-composer \(max-width: 520px\)[\s\S]*?\.grimoire-input-toolbar-config-actions[\s\S]*?flex-wrap: wrap/);
-    expect(css).toContain('@container grimoire-composer (max-width: 380px)');
+    // The free space is spent once, before the action group; Send closes the row
+    // against it rather than floating alone at the far end.
+    expect(configRule).toContain('margin-inline-start: auto');
+    expect(sendRule).toContain('margin-inline-start: 0');
+    // A narrow composer stays on one row and pays for it with what it can
+    // afford to lose - first the meter beside the gauge, then the model's
+    // name. It used to break into two rows at 380px instead, which spent a
+    // whole line of a narrow pane saying nothing the row was not already
+    // saying.
+    expect(css).toMatch(
+      /@container grimoire-composer \(max-width: 300px\)[\s\S]*?\.grimoire-thinking-current \.grimoire-thinking-meter[\s\S]*?display: none/,
+    );
+    expect(css).toMatch(
+      /@container grimoire-composer \(max-width: 520px\)[\s\S]*?\.grimoire-input-toolbar-config-actions[\s\S]*?flex-wrap: nowrap/,
+    );
+    // Past this there is nothing left to drop, so the row does break.
+    expect(css).toContain('@container grimoire-composer (max-width: 200px)');
     expect(css).toContain('grid-template-areas:');
     expect(css).toContain('"model model"');
     expect(css).toContain('"controls send"');

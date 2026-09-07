@@ -4,20 +4,16 @@
   max-width: 90vw;
 }
 
+/*
+ * The fields a transport needs, as more rows in the same list.
+ *
+ * They sat in a tinted box before, which said "these are different" about
+ * settings that are not: a command is as much part of the server as its name.
+ * The host's own row rule separates them, like every other row in the dialog.
+ */
 .grimoire-mcp-type-fields {
-  margin: var(--grimoire-space-12) 0;
-  padding: var(--grimoire-space-12);
-  background: var(--grimoire-plane);
-  border-radius: var(--grimoire-radius-2);
-}
-
-.grimoire-mcp-type-fields .setting-item {
-  padding: var(--grimoire-space-8) 0;
-  border-top: none;
-}
-
-.grimoire-mcp-type-fields .setting-item:first-child {
-  padding-top: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .grimoire-mcp-cmd-setting,
@@ -34,28 +30,29 @@
 
 .grimoire-mcp-cmd-textarea,
 .grimoire-mcp-env-textarea {
+  box-sizing: border-box;
   width: 100%;
   min-height: 50px;
-  resize: vertical;
-  font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-s);
-  padding: var(--grimoire-space-8);
-  border-radius: var(--grimoire-radius-1);
+  padding: var(--grimoire-space-6) var(--grimoire-space-10);
   border: 1px solid var(--grimoire-line);
-  background: var(--grimoire-ground);
+  border-radius: var(--grimoire-radius-1);
+  background: var(--grimoire-field);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  line-height: var(--grimoire-leading-code);
+  resize: vertical;
 }
 
 .grimoire-mcp-cmd-textarea:focus,
 .grimoire-mcp-env-textarea:focus {
   border-color: var(--grimoire-accent);
+  box-shadow: var(--grimoire-focus-ring);
   outline: none;
 }
 
 .grimoire-mcp-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--grimoire-space-8);
-  margin-top: var(--grimoire-space-16);
+  margin-top: var(--grimoire-space-8);
 }
 
 /* MCP Test Modal */

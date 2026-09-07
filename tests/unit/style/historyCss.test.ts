@@ -26,7 +26,10 @@ describe('history.css', () => {
     expect(menuRule).toContain('width: min(320px, calc(100% - var(--grimoire-space-16)))');
     expect(menuRule).toContain('box-shadow: var(--grimoire-lift-1)');
     expect(getRule(css, '.grimoire-history-menu.visible')).toContain('display: grid');
-    expect(getRule(css, '.grimoire-history-close')).toContain('display: inline-grid');
+    // No header band, so no close button in one: the panel opens on its search
+    // row and closes on an outside click or Escape.
+    expect(css).not.toContain('.grimoire-history-close');
+    expect(getRule(css, '.grimoire-history-footer')).toContain('border-top: 1px solid var(--grimoire-line)');
     expect(css).not.toContain('.grimoire-history-btn[aria-expanded="true"]');
   });
 
@@ -38,6 +41,11 @@ describe('history.css', () => {
     expect(rowRule).toContain('border-left: 1.5px solid transparent');
     expect(getRule(css, '.grimoire-history-item.active'))
       .toContain('border-left-color: var(--grimoire-accent)');
+    // Open in another tab is the same rule at the accent's border weight, not
+    // the hover ground: a row nobody was pointing at looked pointed at.
+    const openElsewhere = getRule(css, '.grimoire-history-item.is-open:not(.active)');
+    expect(openElsewhere).toContain('border-left-color: var(--grimoire-accent-line)');
+    expect(openElsewhere).toContain('background: transparent');
   });
 
   it('styles the redesigned search and grouped history list', () => {

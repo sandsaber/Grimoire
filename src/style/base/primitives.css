@@ -9,7 +9,39 @@
  */
 
 /* An icon-only control in dense repeating chrome. Its name lives in aria-label. */
-.grimoire-icon-btn {
+/*
+ * Obsidian paints every button that is not one of its own `.clickable-icon`s:
+ * `button:not(.clickable-icon)` sets a grey --interactive-normal fill, the
+ * --input-shadow inset hairline and --text-normal, at element-plus-class
+ * weight. A rule named only `.grimoire-primary-action` cannot reach that
+ * however late it loads, which is why every filled action in the plugin
+ * resolved to rgb(51,51,51) instead of the accent. This turns the host's
+ * chrome off once, at the same weight and earlier in the sheet, so a
+ * component that wants a surface only has to name the element - and
+ * `designSystem.test.ts` refuses a button rule that does not.
+ */
+button[class*="grimoire-"] {
+  background: none;
+  box-shadow: none;
+  color: inherit;
+}
+
+/*
+ * Obsidian's `.mod-cta` is its word for "the primary action", and its own rule
+ * for it is the same weight as the reset above - so turning the host's chrome
+ * off turned three Save buttons transparent. A call to action is the accent
+ * fill here too; this says so once, above the surfaces that use it.
+ */
+button[class*="grimoire-"].mod-cta {
+  background: var(--grimoire-accent);
+  color: var(--grimoire-accent-contrast);
+}
+
+button[class*="grimoire-"].mod-cta:hover {
+  background: var(--grimoire-accent-hover);
+}
+
+button.grimoire-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -32,12 +64,20 @@
   color: var(--grimoire-ink);
 }
 
-.grimoire-icon-btn--small {
+/*
+ * Named with the element, like the base they modify.
+ *
+ * `button.grimoire-icon-btn` counts an element and a class, so these two -
+ * written as a class alone - lost their own width and height to it however
+ * late they loaded, and every small icon button in the plugin drew at the
+ * large size. tests/unit/style/designSystem.test.ts holds the rule.
+ */
+button.grimoire-icon-btn--small {
   width: var(--grimoire-hit-s);
   height: var(--grimoire-hit-s);
 }
 
-.grimoire-icon-btn--medium {
+button.grimoire-icon-btn--medium {
   width: var(--grimoire-hit-m);
   height: var(--grimoire-hit-m);
 }
@@ -73,7 +113,7 @@
  * The one filled action a surface is allowed. If a second one appears, one of
  * them is not primary.
  */
-.grimoire-primary-action {
+button.grimoire-primary-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -92,6 +132,17 @@
   cursor: pointer;
 }
 
+/*
+ * A glyph inside the one filled action is 12px, because nothing sizes it
+ * otherwise: Obsidian's own `.svg-icon` default is 18px, which put a plus
+ * two-thirds the height of the button beside 12px text on the Add control.
+ */
+.grimoire-primary-action svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
+}
+
 .grimoire-primary-action:hover {
   background: var(--grimoire-accent-hover);
   color: var(--grimoire-accent-contrast);
@@ -105,7 +156,7 @@
 
 /* Uppercase monospace, tracked out: the only label style above a list. */
 .grimoire-group-label {
-  padding: var(--grimoire-space-8) var(--grimoire-space-6) var(--grimoire-space-4);
+  padding: var(--grimoire-space-6) var(--grimoire-space-8) var(--grimoire-space-4);
   color: var(--grimoire-ink-faint);
   font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
@@ -118,6 +169,38 @@
 .grimoire-group-label + .grimoire-group-label,
 .grimoire-context-row + .grimoire-group-label {
   padding-top: var(--grimoire-space-14);
+}
+
+/*
+ * What is chosen, in every menu the composer opens: an accent check before the
+ * word, on the ground a pointer would give it. The same question had three
+ * answers - the reasoning menu filled the row with a 15% accent wash and set
+ * the word in accent, the work-mode menu did the same, and the MCP menu drew a
+ * 16px bordered box with a 20% fill - so no two menus agreed on what "picked"
+ * looks like. The span is written whether or not it holds a glyph, which is
+ * what keeps the names in a column.
+ */
+.grimoire-menu-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--grimoire-icon-2xs);
+  height: var(--grimoire-icon-2xs);
+  color: var(--grimoire-accent);
+}
+
+.grimoire-menu-check svg {
+  width: var(--grimoire-icon-2xs);
+  height: var(--grimoire-icon-2xs);
+  stroke-width: var(--grimoire-stroke-check);
+}
+
+/* A rule between what a menu lists and what it does. */
+.grimoire-menu-separator {
+  height: 1px;
+  margin: var(--grimoire-space-4) 0;
+  background: var(--grimoire-line);
 }
 
 /*

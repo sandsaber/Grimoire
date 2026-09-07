@@ -65,8 +65,10 @@
 
 .grimoire-tab-badge-active {
   border-radius: 0;
-  border-bottom: 1.5px solid var(--grimoire-accent);
-  /* Sits on the header's own rule rather than above it. */
+  /* 2px, not the 1.5px a leading edge gets: this line lands on the header's
+   * own rule and half of it is spent hiding that rule, so at 1.5 it read as a
+   * slightly brighter piece of the rule rather than as a mark. */
+  border-bottom: 2px solid var(--grimoire-accent);
   margin-bottom: -1px;
   background: none;
   color: var(--grimoire-ink);
@@ -178,8 +180,6 @@ button.grimoire-tab-close-toast-undo:focus-visible {
   animation: grimoire-tab-close-toast-countdown 6s linear forwards;
 }
 
-}
-
 /*
  * The panel switch: which view of this tab the reader is in, and the
  * transcript's own three controls at the other end of the same row.
@@ -278,11 +278,28 @@ button.grimoire-tab-close-toast-undo:focus-visible {
   }
 }
 
+/*
+ * The end of the switch row, which belongs to the open view: the transcript's
+ * jump controls in Chat, All / Linked / Current in Sources. One of them is
+ * showing at a time, so the row never has two right-hand groups.
+ */
+.grimoire-panel-aside {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: var(--grimoire-space-8);
+  margin-inline-start: auto;
+}
+
 .grimoire-panel-jump {
   display: flex;
   align-items: center;
   flex: none;
   gap: var(--grimoire-space-2);
+}
+
+.grimoire-tab-chat-window:not([data-panel-view="sources"]) .grimoire-source-filters {
+  display: none;
 }
 
 .grimoire-tab-content-container {

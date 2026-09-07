@@ -73,10 +73,33 @@
 .grimoire-thinking-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-8);
+  gap: var(--grimoire-space-6);
   padding: var(--grimoire-space-4) 0;
   cursor: pointer;
   overflow: hidden;
+}
+
+/*
+ * A row with nothing behind it is a caption, not a control: where the provider
+ * redacted the reasoning, the duration is the whole of what the row says, and a
+ * pointer promising a body it does not have is worse than no promise.
+ */
+.grimoire-thinking-block.is-caption .grimoire-thinking-header {
+  cursor: default;
+  padding-inline-start: var(--grimoire-space-2);
+}
+
+/* The chevron: closed points right, open points down, like every disclosure. */
+.grimoire-thinking-caret {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+  transition: transform var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-thinking-header[aria-expanded="true"] .grimoire-thinking-caret {
+  transform: rotate(90deg);
 }
 
 .grimoire-thinking-label {

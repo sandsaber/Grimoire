@@ -63,7 +63,7 @@
   flex-shrink: 0;
 }
 
-.grimoire-context-alias-input {
+input.grimoire-context-alias-input {
   width: 180px;
   padding: var(--grimoire-space-4) var(--grimoire-space-8);
   font-size: var(--grimoire-text-m);
@@ -78,7 +78,7 @@
   outline: none;
 }
 
-.grimoire-context-limits-input {
+input.grimoire-context-limits-input {
   width: 80px;
   padding: var(--grimoire-space-4) var(--grimoire-space-8);
   font-size: var(--grimoire-text-m);
@@ -235,7 +235,7 @@
   cursor: pointer;
 }
 
-.grimoire-cancel-btn {
+button.grimoire-cancel-btn {
   background: var(--grimoire-line);
   color: var(--grimoire-ink);
 }
@@ -244,7 +244,7 @@
   background: var(--grimoire-line-2);
 }
 
-.grimoire-save-btn {
+button.grimoire-save-btn {
   background: var(--grimoire-accent);
   color: var(--grimoire-accent-contrast);
 }

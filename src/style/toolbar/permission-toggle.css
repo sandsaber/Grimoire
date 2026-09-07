@@ -45,22 +45,31 @@
   color: var(--grimoire-ink);
 }
 
+/* Anything but the default mode is a pressed toggle: an accent glyph on a wash. */
 .grimoire-permission-label.active,
 .grimoire-permission-label.plan-active,
 .grimoire-permission-gears.open .grimoire-permission-label {
   border-color: transparent;
   background: var(--grimoire-accent-wash);
-  color: var(--grimoire-accent-text);
+  color: var(--grimoire-accent);
 }
 
+/*
+ * Anchored to the button's trailing edge, because that is the edge the button
+ * is near: this control lives in the composer's right-hand group, and a 224px
+ * menu hung from its left ran off the pane and took its descriptions with it.
+ */
 .grimoire-permission-options {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 0;
+  inset-inline-end: 0;
+  inset-inline-start: auto;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   min-width: 92px;
+  width: 224px;
+  max-width: calc(100cqw - var(--grimoire-space-16));
   gap: var(--grimoire-space-2);
   padding: var(--grimoire-space-4);
   overflow: hidden;
@@ -79,26 +88,48 @@
   visibility: visible;
 }
 
+/*
+ * A work mode is a name and what it costs you, because "Auto" and "Plan" are
+ * not self-explaining words - the menu listed three of them bare and left the
+ * reader to find out which one stops asking. The check keeps a column of its
+ * own on every row, so the three names line up whichever is set.
+ */
 .grimoire-permission-option {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--grimoire-icon-2xs) minmax(0, 1fr);
   align-items: center;
+  box-sizing: border-box;
+  gap: 0 var(--grimoire-space-6);
   min-height: var(--grimoire-hit-l);
-  padding: 0 var(--grimoire-space-8);
+  padding: var(--grimoire-space-6) var(--grimoire-space-8);
   border-radius: var(--grimoire-radius-1);
   color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-normal);
-  line-height: 1;
-  white-space: nowrap;
+  line-height: 1.35;
   cursor: pointer;
+}
+
+.grimoire-permission-option .grimoire-menu-check {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.grimoire-permission-option-title {
+  grid-column: 2;
+  color: var(--grimoire-ink);
+}
+
+.grimoire-permission-option-detail {
+  grid-column: 2;
+  margin-top: var(--grimoire-space-2);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-permission-option:hover {
   background: var(--grimoire-hover);
-  color: var(--grimoire-ink);
 }
 
 .grimoire-permission-option.selected {
-  background: var(--grimoire-accent-wash);
-  color: var(--grimoire-accent-text);
+  background: var(--grimoire-hover);
 }

@@ -24,6 +24,31 @@
   gap: var(--grimoire-space-6);
 }
 
+/*
+ * The way into the dialog while the chips still fit. The drawing puts Manage
+ * in the summary row, which only exists past four attachments - so with two
+ * files attached there was no way to open the dialog at all.
+ */
+/*
+ * Pinned to the row's corner, and out of its flow.
+ *
+ * In flow it was the last thing on a wrapping row, so in a sidebar narrow
+ * enough that it did not fit beside the chips it dropped to a line of its
+ * own - a whole row spent on one 24px control. The row reserves the width
+ * instead, which keeps a chip from running under it.
+ */
+.grimoire-context-chips--managed {
+  position: relative;
+  padding-inline-end: calc(var(--grimoire-chip-h) + var(--grimoire-space-8));
+}
+
+/* Its size comes from `--small`, which is a hit target and a chip's height. */
+.grimoire-context-chips-manage {
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+}
+
 /* Add is always one control away, whatever else the row is showing. */
 .grimoire-file-chip--add {
   padding: 0 var(--grimoire-space-8);
@@ -39,18 +64,20 @@
   color: var(--grimoire-ink);
 }
 
-/* The three most recent, past the threshold: a reminder, not a control. */
-.grimoire-file-chip--static {
-  cursor: default;
-}
-
+/*
+ * The same line a chip row is, exactly.
+ *
+ * It carried its own vertical padding and a rule under it, so switching from
+ * one chip to two made the whole row taller and took that height out of the
+ * message being written. What is attached should not change how much room
+ * there is to write about it.
+ */
 .grimoire-context-summary-bar {
   display: flex;
   align-items: center;
   min-width: 0;
+  height: var(--grimoire-chip-h);
   gap: var(--grimoire-space-8);
-  padding: var(--grimoire-space-8) var(--grimoire-space-8) var(--grimoire-space-8) var(--grimoire-space-12);
-  border-bottom: 1px solid var(--grimoire-line);
 }
 
 .grimoire-context-summary-icon {
@@ -95,7 +122,7 @@
   flex: 1 1 auto;
 }
 
-.grimoire-context-summary-manage {
+button.grimoire-context-summary-manage {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
@@ -123,24 +150,24 @@
   stroke-width: var(--grimoire-stroke);
 }
 
-.grimoire-context-more {
-  align-self: center;
-  padding: 0 var(--grimoire-space-4);
-  border: 0;
-  background: none;
-  box-shadow: none;
-  color: var(--grimoire-ink-faint);
-  cursor: pointer;
-  font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-xs);
-}
-
-.grimoire-context-more:hover {
-  background: none;
-  color: var(--grimoire-ink);
-}
-
 /* ---- 3b · the manage dialog ---- */
+
+/*
+ * The dialog is sized on the modal, not on what it holds.
+ *
+ * Obsidian's `.modal` is 560px wide with 16px of padding, so a 640px content
+ * box overflowed it by 112px and the host's own `overflow: auto` clipped the
+ * whole right column away: the token count on every row, every row's remove
+ * cross, the Add button and Done. What that cost was a dialog whose entire
+ * job - deciding what to keep - could not be done in it.
+ */
+.grimoire-context-modal {
+  width: min(640px, 92vw);
+  max-width: min(640px, 92vw);
+  height: min(560px, 80vh);
+  padding: 0;
+  overflow: hidden;
+}
 
 .grimoire-context-modal .modal-content {
   padding: 0;
@@ -150,8 +177,8 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  width: min(640px, 92vw);
-  height: min(560px, 80vh);
+  width: 100%;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -161,7 +188,8 @@
   flex: none;
   height: 44px;
   gap: var(--grimoire-space-8);
-  padding: 0 var(--grimoire-space-10) 0 var(--grimoire-space-16);
+  /* Room at the end for the host's close, which sits over this corner. */
+  padding: 0 var(--grimoire-hit-l) 0 var(--grimoire-space-16);
   border-bottom: 1px solid var(--grimoire-line);
 }
 
@@ -180,7 +208,7 @@
 }
 
 .grimoire-context-header-spacer,
-.grimoire-context-row-spacer,
+.grimoire-context-item-spacer,
 .grimoire-context-bulk-spacer,
 .grimoire-context-footer-spacer {
   flex: 1 1 auto;
@@ -189,6 +217,7 @@
 
 /* One field, two jobs: filter what is attached, or type to add from the vault. */
 .grimoire-context-search {
+  position: relative;
   display: flex;
   align-items: center;
   flex: none;
@@ -210,7 +239,7 @@
   stroke-width: var(--grimoire-stroke);
 }
 
-.grimoire-context-search-input {
+input.grimoire-context-search-input {
   flex: 1 1 auto;
   min-width: 0;
   height: 100%;
@@ -225,6 +254,28 @@
 
 .grimoire-context-search-input::placeholder {
   color: var(--grimoire-ink-faint);
+}
+
+/*
+ * No ring around either search field.
+ *
+ * The host draws one at `input[type='text']:focus-visible` - element,
+ * attribute and pseudo-class - which a rule named `input.<class>` cannot
+ * reach, so `box-shadow: none` on the base was overruled the moment the field
+ * took focus. The picker focuses its field as it opens, so that was permanent
+ * chrome around a band both 3b and 3c draw flat. Focus reads on the glyph
+ * instead: a glyph in the accent is inside the budget, a 2px box is not.
+ */
+input.grimoire-context-search-input:focus,
+input.grimoire-context-search-input:focus-visible,
+input.grimoire-context-picker-input:focus,
+input.grimoire-context-picker-input:focus-visible {
+  box-shadow: none;
+}
+
+.grimoire-context-search:focus-within .grimoire-context-search-icon,
+.grimoire-context-picker-search:focus-within .grimoire-context-picker-icon {
+  color: var(--grimoire-accent);
 }
 
 .grimoire-context-search .grimoire-primary-action {
@@ -254,7 +305,7 @@
   font-size: var(--grimoire-text-xs);
 }
 
-.grimoire-context-bulk-clear {
+button.grimoire-context-bulk-clear {
   padding: 0 var(--grimoire-space-6);
   border: 0;
   background: none;
@@ -269,7 +320,7 @@
   color: var(--grimoire-ink);
 }
 
-.grimoire-context-bulk-remove {
+button.grimoire-context-bulk-remove {
   display: inline-flex;
   align-items: center;
   height: var(--grimoire-hit-s);
@@ -304,7 +355,7 @@
   scrollbar-color: var(--grimoire-line-2) transparent;
 }
 
-.grimoire-context-row {
+.grimoire-context-item {
   display: flex;
   align-items: center;
   min-width: 0;
@@ -315,13 +366,13 @@
   cursor: pointer;
 }
 
-.grimoire-context-row:hover,
-.grimoire-context-row.is-focused {
+.grimoire-context-item:hover,
+.grimoire-context-item.is-focused {
   background: var(--grimoire-hover);
 }
 
 /* Selection keeps the wash rather than gaining a colour of its own. */
-.grimoire-context-row.is-selected {
+.grimoire-context-item.is-selected {
   background: var(--grimoire-hover);
 }
 
@@ -329,11 +380,11 @@
  * Adding something already attached flashes the row it is already on, so the
  * count staying the same reads as an answer rather than as nothing happening.
  */
-.grimoire-context-row.is-duplicate {
+.grimoire-context-item.is-duplicate {
   background: var(--grimoire-accent-wash);
 }
 
-.grimoire-context-row.is-failed {
+.grimoire-context-item.is-failed {
   opacity: 0.6;
 }
 
@@ -351,7 +402,7 @@
   cursor: pointer;
 }
 
-.grimoire-context-row.is-selected .grimoire-context-checkbox {
+.grimoire-context-item.is-selected .grimoire-context-checkbox {
   border-color: var(--grimoire-accent);
   background: var(--grimoire-accent);
 }
@@ -362,34 +413,34 @@
   stroke-width: 3;
 }
 
-.grimoire-context-row-icon {
+.grimoire-context-item-icon {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
   color: var(--grimoire-accent);
 }
 
-.grimoire-context-row-icon svg {
+.grimoire-context-item-icon svg {
   width: var(--grimoire-icon-m);
   height: var(--grimoire-icon-m);
   stroke-width: var(--grimoire-stroke);
 }
 
-.grimoire-context-row-icon.is-failed {
+.grimoire-context-item-icon.is-failed {
   color: var(--grimoire-error);
 }
 
-.grimoire-context-row--candidate .grimoire-context-row-icon {
+.grimoire-context-item--candidate .grimoire-context-item-icon {
   color: var(--grimoire-ink-muted);
 }
 
-.grimoire-context-row-name {
+.grimoire-context-item-name {
   flex: none;
   color: var(--grimoire-ink);
   font-size: var(--grimoire-text-s);
 }
 
-.grimoire-context-row-detail {
+.grimoire-context-item-detail {
   min-width: 0;
   overflow: hidden;
   color: var(--grimoire-ink-faint);
@@ -399,7 +450,7 @@
   white-space: nowrap;
 }
 
-.grimoire-context-row-tokens {
+.grimoire-context-item-tokens {
   flex: 0 0 auto;
   color: var(--grimoire-ink-faint);
   font-family: var(--grimoire-mono);
@@ -407,12 +458,17 @@
   white-space: nowrap;
 }
 
-/* A failure names its cause where the price would have been. */
-.grimoire-context-row-error {
-  flex: 0 0 auto;
+/*
+ * A failure names its cause where the path would have been, next to the name
+ * it is about, and carries no token count - it contributes nothing to count.
+ */
+.grimoire-context-item-error {
+  min-width: 0;
+  overflow: hidden;
   color: var(--grimoire-error);
   font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -464,7 +520,7 @@
   white-space: nowrap;
 }
 
-.grimoire-context-remove-all {
+button.grimoire-context-remove-all {
   height: var(--grimoire-hit-l);
   padding: 0 var(--grimoire-space-8);
   border: 0;
@@ -501,6 +557,20 @@
   box-shadow: var(--grimoire-lift-1);
 }
 
+/*
+ * Opened from the manage dialog, the panel drops out of the search band that
+ * holds the control. In the composer it rises instead - and it cannot simply
+ * be drawn in the composer both times, because a modal is its own stacking
+ * context and a panel outside it lands behind it however high its z-index.
+ */
+.grimoire-context-picker--below {
+  top: calc(100% + var(--grimoire-space-4));
+  bottom: auto;
+  left: var(--grimoire-space-12);
+  width: auto;
+  right: var(--grimoire-space-12);
+}
+
 .grimoire-context-picker-search {
   display: flex;
   align-items: center;
@@ -523,7 +593,7 @@
   stroke-width: var(--grimoire-stroke);
 }
 
-.grimoire-context-picker-input {
+input.grimoire-context-picker-input {
   flex: 1 1 auto;
   min-width: 0;
   height: 100%;
@@ -639,8 +709,9 @@
   border-top: 1px solid var(--grimoire-line);
 }
 
-.grimoire-context-picker-quick,
+button.grimoire-context-picker-quick,
 .grimoire-context-picker-sep {
+  height: var(--grimoire-hit-s);
   padding: 0;
   border: 0;
   background: none;

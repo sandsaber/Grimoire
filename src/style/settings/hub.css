@@ -1,10 +1,22 @@
 /* Four-tab settings hub and provider/resource management surfaces. */
 
+/*
+ * Every provider at once, as one table rather than eight cards.
+ *
+ * They were eight tinted tiles in four columns, and the selected one was an 18%
+ * accent fill — a fill per surface is the budget, and this surface spent eight.
+ * A hairline grid holds them instead: one ground, one rule between cells, and
+ * the accent as a single left line on the provider you are configuring.
+ */
 .grimoire-settings-provider-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--grimoire-space-8);
-  margin: var(--grimoire-space-2) 0 var(--grimoire-space-8);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  gap: 1px;
+  margin: var(--grimoire-space-12) 0 var(--grimoire-space-20);
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-2);
+  background: var(--grimoire-line);
 }
 
 .grimoire-settings-provider-hint {
@@ -18,35 +30,30 @@
   align-items: center;
   justify-content: space-between;
   min-width: 0;
-  gap: var(--grimoire-space-8);
-  padding: var(--grimoire-space-8) var(--grimoire-space-8);
+  gap: var(--grimoire-space-12);
+  padding: var(--grimoire-space-12) var(--grimoire-space-14);
   border: 0;
-  border-radius: var(--grimoire-radius-2);
-  background: color-mix(
-    in srgb,
-    var(--setting-items-background, var(--grimoire-plane)) 82%,
-    var(--grimoire-plane)
-  );
+  border-left: 1.5px solid transparent;
+  border-radius: 0;
+  background: var(--grimoire-ground);
   color: var(--grimoire-ink);
   cursor: pointer;
   transition: background-color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-settings-provider-card:hover {
-  background: color-mix(
-    in srgb,
-    var(--setting-items-background, var(--grimoire-plane)) 78%,
-    var(--grimoire-ground)
-  );
+  background: var(--grimoire-hover);
 }
 
+/* Which provider the rows below are about, said with one line. */
 .grimoire-settings-provider-card--active {
   border: 0;
-  background: color-mix(in srgb, var(--grimoire-accent) 18%, var(--grimoire-ground));
+  border-left: 1.5px solid var(--grimoire-accent);
+  background: var(--grimoire-ground);
 }
 
 .grimoire-settings-provider-card--active:hover {
-  background: color-mix(in srgb, var(--grimoire-accent) 13%, var(--grimoire-ground));
+  background: var(--grimoire-hover);
 }
 
 .grimoire-settings-provider-card-copy {
@@ -66,8 +73,8 @@
 .grimoire-settings-provider-card-name {
   overflow: hidden;
   color: var(--grimoire-ink);
-  font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-semibold);
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -75,7 +82,16 @@
 .grimoire-settings-provider-card-meta {
   overflow: hidden;
   color: var(--grimoire-ink-muted);
-  font-size: var(--grimoire-text-2xs);
+  font-size: var(--grimoire-text-s);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A CLI Grimoire cannot find is the one thing on this card worth a colour. */
+.grimoire-settings-provider-card-meta.is-missing {
+  color: var(--grimoire-error);
+  font-size: var(--grimoire-text-s);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -106,36 +122,60 @@
   border-radius: var(--grimoire-radius-2);
 }
 
+/*
+ * Where in the settings you are, as a tab strip on a rule.
+ *
+ * It was a segmented control — pills in a tray, with a raised shadow under the
+ * active one — which is the shape a toggle uses, and these are not toggles: one
+ * of them is always on. A rule and an underline say the same thing quietly.
+ */
 .grimoire-settings-segmented-nav {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
-  gap: var(--grimoire-space-4);
-  margin-bottom: var(--grimoire-space-12);
-  padding: var(--grimoire-space-2);
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-plane);
+  gap: var(--grimoire-space-2);
+  margin-bottom: var(--grimoire-space-8);
+  padding: 0;
+  border-bottom: 1px solid var(--grimoire-line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .grimoire-settings-segmented-nav button {
-  height: auto;
-  padding: var(--grimoire-space-4) var(--grimoire-space-12);
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 32px;
+  margin-bottom: -1px;
+  padding: 0 var(--grimoire-space-10);
   border: 0;
-  border-radius: var(--grimoire-radius-2);
+  /* 2px, matching the chat tab strip: half of this line lands on the rule
+   * under the row, so 1.5 read as a brighter piece of that rule. */
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: transparent;
   box-shadow: none;
   color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-m);
+  transition: color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-settings-segmented-nav button:hover {
-  background: var(--grimoire-hover);
+  background: transparent;
+  box-shadow: none;
   color: var(--grimoire-ink);
 }
 
 .grimoire-settings-segmented-nav button.is-active {
-  background: var(--grimoire-ground);
-  box-shadow: var(--grimoire-lift-1);
+  border-bottom-color: var(--grimoire-accent);
+  background: transparent;
+  box-shadow: none;
   color: var(--grimoire-ink);
+  font-weight: var(--grimoire-weight-medium);
+}
+
+.grimoire-settings-segmented-nav button:focus-visible {
+  box-shadow: var(--grimoire-focus-ring);
+  outline: none;
 }
 
 .grimoire-settings-resource-toolbar {
@@ -171,15 +211,24 @@
   flex-direction: column;
 }
 
+/*
+ * One rule under the column names, and none between the rows.
+ *
+ * A line under every row turns a short list into a ledger and makes the eye
+ * count rules instead of reading names; the hover ground is enough to say which
+ * row the cursor is on.
+ */
 .grimoire-settings-resource-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.8fr) minmax(0, 1fr) 76px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.8fr) 88px;
   align-items: center;
   min-width: 0;
   gap: var(--grimoire-space-12);
-  padding: var(--grimoire-space-8) var(--grimoire-space-6);
-  border-bottom: 1px solid var(--grimoire-line);
+  padding: var(--grimoire-space-8);
+  border-bottom: 0;
+  border-radius: var(--grimoire-radius-1);
   background: transparent;
+  font-size: var(--grimoire-text-s);
 }
 
 .grimoire-settings-resource-row:not(.is-header):hover {
@@ -187,10 +236,14 @@
 }
 
 .grimoire-settings-resource-row.is-header {
-  padding-top: var(--grimoire-space-4);
-  padding-bottom: var(--grimoire-space-6);
+  padding: 0 var(--grimoire-space-8) var(--grimoire-space-6);
+  border-bottom: 1px solid var(--grimoire-line);
+  border-radius: 0;
   color: var(--grimoire-ink-faint);
-  font-size: var(--grimoire-text-s);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  letter-spacing: var(--grimoire-label-tracking);
+  text-transform: uppercase;
 }
 
 .grimoire-settings-resource-name {
@@ -225,43 +278,45 @@
 .grimoire-settings-resource-name-title {
   color: var(--grimoire-ink);
   font-family: var(--grimoire-mono);
-  font-weight: var(--grimoire-weight-semibold);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-settings-resource-description {
-  color: var(--grimoire-ink-faint);
+  color: var(--grimoire-ink-muted);
   font-family: var(--grimoire-face);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-normal);
   line-height: 1.35;
 }
 
+/*
+ * Whether the thing on this row is there: a filled dot, or a ring where one
+ * would be. It was green, amber and blue, which asked the reader to remember a
+ * legend and told a colour-blind reader nothing at all.
+ */
 .grimoire-settings-resource-dot {
+  box-sizing: border-box;
   flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  margin-top: var(--grimoire-space-4);
-  border-radius: 50%;
-  background: var(--grimoire-ink-faint);
+  width: 5px;
+  height: 5px;
+  margin-top: var(--grimoire-space-6);
+  border: 1px solid var(--grimoire-line-3);
+  border-radius: var(--grimoire-radius-circle);
+  background: transparent;
 }
 
 .grimoire-settings-resource-dot.is-available,
-.grimoire-settings-resource-dot.is-connected {
-  background: var(--grimoire-ok);
-}
-
-.grimoire-settings-resource-dot.is-readonly {
-  background: var(--grimoire-warn);
-}
-
+.grimoire-settings-resource-dot.is-connected,
 .grimoire-settings-resource-dot.is-native {
+  border-color: var(--grimoire-accent);
   background: var(--grimoire-accent);
 }
 
 .grimoire-settings-resource-source {
-  color: var(--grimoire-ink-faint);
+  color: var(--grimoire-ink-muted);
   font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-s);
+  font-size: var(--grimoire-text-xs);
 }
 
 .grimoire-settings-resource-provider {
@@ -272,22 +327,33 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--grimoire-space-4);
+  gap: 0;
+  color: var(--grimoire-ink-faint);
 }
 
-.grimoire-settings-resource-edit,
-.grimoire-settings-resource-delete {
+button.grimoire-settings-resource-edit,
+button.grimoire-settings-resource-delete {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
+  box-sizing: border-box;
+  height: var(--grimoire-hit-s);
   border: 0;
   border-radius: var(--grimoire-radius-2);
   background: transparent;
   box-shadow: none;
   color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
+}
+
+/* Edit is a glyph in a square; delete is the word, which needs room to be one. */
+button.grimoire-settings-resource-edit {
+  width: var(--grimoire-hit-s);
+  padding: 0;
+}
+
+button.grimoire-settings-resource-delete {
+  padding: 0 var(--grimoire-space-6);
 }
 
 .grimoire-settings-resource-edit:hover {
@@ -385,17 +451,13 @@
   display: block;
 }
 
-@media (max-width: 1100px) {
-  .grimoire-settings-provider-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
+/*
+ * Two columns, at every width a settings pane actually has. The ladder used to
+ * read 2 at the base, 3 under 1100px and 2 again under 760px - so the pane got
+ * *more* columns as it got narrower, and since Obsidian's settings window is
+ * under 1100px the card grid was three-wide everywhere but the mock.
+ */
 @media (max-width: 760px) {
-  .grimoire-settings-provider-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .grimoire-settings-resource-row {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.3fr) 76px;
   }

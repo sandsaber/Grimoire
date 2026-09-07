@@ -41,6 +41,19 @@ function getExactRule(css: string, selector: string): string {
 }
 
 describe('messages.css', () => {
+  it('keeps the question a plane at the weight that reaches it', () => {
+    // `.grimoire-container--chat-window .grimoire-message` flattens every
+    // message to no padding and no radius, and it outranks
+    // `.grimoire-message-user` - so the question came out as a full-bleed grey
+    // band with its text against the pane's edge. Merging the two as
+    // "duplicates" is what removed the counterweight.
+    const css = readFileSync('src/style/components/messages.css', 'utf8');
+    const scoped = getExactRule(css, '.grimoire-container--chat-window .grimoire-message-user');
+
+    expect(scoped).toContain('padding: var(--grimoire-space-10) var(--grimoire-space-12)');
+    expect(scoped).toContain('border-radius: var(--grimoire-radius-2)');
+  });
+
   it('keeps wide assistant markdown from expanding the chat pane', () => {
     const css = readMessagesCss();
 
@@ -161,38 +174,31 @@ describe('messages.css', () => {
     expect(css).not.toContain('inset-inline-start: 62px');
   });
 
-  it('uses compact activity spacing and reserves a small completion-time row', () => {
+  it('puts what can be done with an answer on one row under it', () => {
+    // The copy was pinned inside the last text block and the duration sat on a
+    // row of its own below it - two lines and two alignments for three small
+    // things, where the design has one row: how long it took, then the action.
     const css = readMessagesCss();
     const contentRule = getRule(
       css,
       '.grimoire-container--chat-window .grimoire-message-assistant .grimoire-message-content'
     );
-    const completionRule = getRule(css, '.grimoire-text-block--with-completion-time');
+    const footerRule = getExactRule(css, '.grimoire-response-footer');
+    const copyRule = getExactRule(css, '.grimoire-response-copy-btn');
 
     expect(contentRule).toContain('gap: var(--grimoire-space-8)');
-    expect(completionRule).toContain('padding-bottom: var(--grimoire-space-24)');
-    expect(css).toContain('.grimoire-message-completion-time');
+    expect(footerRule).toContain('display: flex');
+    expect(footerRule).toContain('gap: var(--grimoire-space-2)');
+    expect(copyRule).toContain('width: var(--grimoire-hit-s)');
+    // Nothing reserves a row inside the prose for a stamp any more.
+    expect(css).not.toContain('grimoire-text-block--with-completion-time');
   });
 
-  it('separates provider metadata from the response and anchors assistant time to the response edge', () => {
+  it('separates provider metadata from the response', () => {
     const css = readMessagesCss();
     const metadataRule = getExactRule(css, '.grimoire-assistant-response-meta');
-    const completionRule = getExactRule(
-      css,
-      '.grimoire-text-block > .grimoire-message-completion-time'
-    );
 
     expect(metadataRule).toContain('margin-bottom: var(--grimoire-space-4)');
-    expect(completionRule).toContain('inset-inline-start: 32px');
-    expect(completionRule).toContain('pointer-events: auto');
-    expect(completionRule).not.toContain('inset-inline-end: 42px');
-
-    const finalCopyRule = getExactRule(
-      css,
-      '.grimoire-text-block--with-completion-time > .grimoire-text-copy-btn'
-    );
-    expect(finalCopyRule).toContain('inset-inline-start: 0');
-    expect(finalCopyRule).toContain('inset-inline-end: auto');
   });
 
   it('does not render a second standalone scroll-to-bottom control', () => {

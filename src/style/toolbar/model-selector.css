@@ -60,6 +60,57 @@
   box-shadow: none;
 }
 
+.grimoire-container--chat-window .grimoire-model-label {
+  overflow: hidden;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Under 380px the model's name gives way to its mark. The name is the longest
+ * string in the toolbar and the one whose absence costs least: the mark still
+ * says which vendor, and the dropdown says the rest.
+ *
+ * It lived in input.css, which also set the button's width there — two sheets
+ * owning one control, and the later one silently deciding its shape.
+ */
+/*
+ * The 96px floor holds the button still while model names change length. With
+ * the name gone there is nothing to hold still, and the floor became 49px of
+ * empty button between the provider's mark and the gauge beside it - so it
+ * goes wherever the name goes, on the selector as well as on the button.
+ */
+@container grimoire-chat (max-width: 380px) {
+  .grimoire-container--chat-window .grimoire-model-btn,
+  .grimoire-container--chat-window .grimoire-model-selector {
+    min-width: 0;
+  }
+
+  .grimoire-container--chat-window .grimoire-model-label {
+    display: none;
+  }
+}
+
+/*
+ * The composer answers for itself too. The pane can be wide while the composer
+ * is not - a sources panel beside it, a wide window with a narrow chat - and
+ * the toolbar has to stay one row either way, so the name goes when the row
+ * runs out of room whichever measurement noticed first.
+ */
+@container grimoire-composer (max-width: 260px) {
+  .grimoire-container--chat-window .grimoire-model-btn,
+  .grimoire-container--chat-window .grimoire-model-selector {
+    min-width: 0;
+  }
+
+  .grimoire-container--chat-window .grimoire-model-label {
+    display: none;
+  }
+}
+
 .grimoire-container--chat-window .grimoire-model-selector.open .grimoire-model-btn {
   border: 0;
   background: var(--grimoire-hover);
@@ -151,6 +202,23 @@
   transition: width 0.5s var(--grimoire-ease);
 }
 
+/*
+ * What is left of the plan, narrowing: the bar is a picture of the number
+ * beside it, so it goes first and the number stays; past that the badge goes
+ * too, and the reader still has it in the model menu's own footer.
+ */
+@container grimoire-composer (max-width: 380px) {
+  .grimoire-container--chat-window .grimoire-plan-usage-badge-meter {
+    display: none;
+  }
+}
+
+@container grimoire-composer (max-width: 260px) {
+  .grimoire-container--chat-window .grimoire-plan-usage-badge {
+    display: none;
+  }
+}
+
 .grimoire-plan-usage-badge.is-hot .grimoire-plan-usage-badge-label,
 .grimoire-plan-usage-badge.is-hot .grimoire-plan-usage-badge-value {
   color: var(--grimoire-warn);
@@ -171,28 +239,21 @@
   white-space: nowrap;
 }
 
+/*
+ * The vendor's own mark at 12px. It was forced to a 7px filled disc with its
+ * paths hidden, so the composer said "a provider" where the design says which
+ * one — and the disc was the last place a brand colour had to hide in.
+ */
 .grimoire-container--chat-window .grimoire-model-button-provider-icon {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   border: 0;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-
-
-
-
-
-
-
-
-
-.grimoire-container--chat-window .grimoire-model-button-provider-icon * {
-  display: none;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-model-dropdown {
@@ -377,22 +438,10 @@
   background: none;
 }
 
-
-
-
-
-
-
-
-
-
-.grimoire-model-group-label {
-  color: var(--grimoire-ink);
-}
-
 .grimoire-model-group-label {
   min-width: 0;
   overflow: hidden;
+  color: var(--grimoire-ink);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -406,18 +455,27 @@
   text-align: right;
 }
 
+/*
+ * A disclosure chevron is the lucide glyph, pointing right when the group is
+ * closed and down when it is open. It used to be a 6px box with two borders
+ * rotated 45 degrees; when the glyph became real, the box stayed, and every
+ * group header drew an svg inside a rotated bordered square.
+ */
 .grimoire-model-group-chevron {
-  width: 6px;
-  height: 6px;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  border: 0;
   color: var(--grimoire-ink-faint);
-  transform: rotate(45deg);
-  transition: transform var(--grimoire-duration) var(--grimoire-ease);
+  transform: none;
 }
 
-.grimoire-model-group-section.is-open .grimoire-model-group-chevron {
-  transform: rotate(225deg);
+.grimoire-model-group-chevron svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-model-group-options {
@@ -600,8 +658,8 @@
 }
 
 .grimoire-model-option.selected {
-  background: color-mix(in srgb, var(--grimoire-accent) 15%, transparent);
-  color: var(--grimoire-accent);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
   font-weight: var(--grimoire-weight-normal);
 }
 
@@ -696,7 +754,7 @@
 
 .grimoire-model-catalog-loading::before {
   animation: grimoire-spin 0.9s linear infinite;
-  border: 2px solid color-mix(in srgb, var(--grimoire-accent) 20%, transparent);
+  border: 2px solid var(--grimoire-line);
   border-top-color: var(--grimoire-accent);
   border-radius: 50%;
   content: '';

@@ -94,14 +94,6 @@ body.grimoire-dragging-ns {
   min-height: 0;
 }
 
-.grimoire-input-nav-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-width: 0;
-}
-
 /* Header mode: hide nav row above input (content moved to header) */
 .grimoire-container--header-mode .grimoire-input-nav-row {
   display: none;
@@ -176,11 +168,9 @@ body.grimoire-dragging-ns {
   border-top: 0;
 }
 
-.grimoire-file-chip-icon svg,
 .grimoire-file-chip {
   display: inline-flex;
   align-items: center;
-
   gap: var(--grimoire-space-6);
   height: var(--grimoire-chip-h);
   padding: 0 var(--grimoire-space-4) 0 var(--grimoire-space-8);
@@ -213,18 +203,26 @@ body.grimoire-dragging-ns {
   color: inherit;
 }
 
-.grimoire-file-chip-remove {
+button.grimoire-file-chip-remove {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   width: var(--grimoire-icon-l);
   height: var(--grimoire-icon-l);
+  padding: 0;
   border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   color: var(--grimoire-ink-faint);
   font-size: var(--grimoire-text-s);
   line-height: 1;
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-file-chip-remove svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-file-chip-remove:hover {
@@ -234,15 +232,6 @@ body.grimoire-dragging-ns {
 
 .grimoire-file-chip:hover {
   background: var(--grimoire-hover);
-}
-
-.grimoire-relevant-notes-container {
-  display: flex;
-  align-items: center;
-  width: auto;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
 }
 
 .grimoire-relevant-notes-slot:empty {
@@ -296,12 +285,12 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-relevant-note:hover {
-  background: color-mix(in srgb, var(--grimoire-accent) 10%, transparent);
+  background: var(--grimoire-hover);
   color: var(--grimoire-ink);
 }
 
 .grimoire-relevant-note:active {
-  background: color-mix(in srgb, var(--grimoire-accent) 14%, transparent);
+  background: var(--grimoire-accent-wash-weak);
 }
 
 .grimoire-relevant-notes-more {
@@ -357,7 +346,7 @@ body.grimoire-dragging-ns {
   gap: var(--grimoire-space-4);
 }
 
-.grimoire-queue-indicator-action {
+button.grimoire-queue-indicator-action {
   flex: 0 0 auto;
   padding: 1px var(--grimoire-space-8);
   border: 0;
@@ -377,7 +366,7 @@ body.grimoire-dragging-ns {
   text-decoration: none;
 }
 
-.grimoire-queue-indicator-icon-action {
+button.grimoire-queue-indicator-icon-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -529,6 +518,13 @@ body.grimoire-dragging-ns {
   row-gap: var(--grimoire-space-4);
 }
 
+/*
+ * What the message carries, gathered at the end of the row next to Send.
+ *
+ * They used to follow the model straight on, so the toolbar read as one long
+ * left-hand run of controls with the whole right half empty and Send alone out
+ * there. The eye now has two groups: who answers, and what goes with it.
+ */
 .grimoire-container--chat-window .grimoire-input-toolbar-config-actions {
   display: flex;
   flex: 0 1 auto;
@@ -536,6 +532,12 @@ body.grimoire-dragging-ns {
   align-items: center;
   min-width: 0;
   gap: var(--grimoire-space-4);
+  margin-inline-start: auto;
+}
+
+/* The free space is spent once, before the group; Send closes the row. */
+.grimoire-container--chat-window .grimoire-send-actions {
+  margin-inline-start: 0;
 }
 
 .grimoire-container--chat-window .grimoire-model-context-stack {
@@ -546,56 +548,49 @@ body.grimoire-dragging-ns {
   overflow: visible;
 }
 
-.grimoire-container--chat-window .grimoire-model-btn {
-  min-width: 96px;
-  max-width: min(100%, 260px);
-  border-radius: var(--grimoire-radius-1);
-}
-
-/*
- * Under 380px the model's name gives way to its mark. The name is the longest
- * string in the toolbar and the one whose absence costs least: the mark still
- * says which vendor, and the dropdown says the rest.
- */
-@container grimoire-chat (max-width: 380px) {
-  .grimoire-container--chat-window .grimoire-model-btn {
-    min-width: 0;
-  }
-
-  .grimoire-container--chat-window .grimoire-model-label {
-    display: none;
-  }
-}
-
-.grimoire-container--chat-window .grimoire-model-label {
-  overflow: hidden;
-  color: var(--grimoire-ink);
-  font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .grimoire-container--chat-window .grimoire-input-toolbar .grimoire-context-meter,
 .grimoire-container--chat-window .grimoire-project-workspace-selector {
   display: none;
 }
 
+/*
+ * Send sits at the far end of the toolbar. `auto` is what puts it there; a
+ * fixed 4px left it packed against the control before it with the rest of the
+ * row empty to its right.
+ */
 .grimoire-send-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 0;
-  margin-inline-start: var(--grimoire-space-4);
+  margin-inline-start: auto;
+  padding-inline-start: var(--grimoire-space-4);
+}
+
+/*
+ * A narrow composer keeps its toolbar on one row, and pays for it by spending
+ * what it can afford to lose - first the meter beside the gauge, then the
+ * model's name. It used to break into two rows instead, which cost a whole
+ * line of the pane to say nothing new: the level is in the control's name and
+ * the model's is one glyph away.
+ */
+@container grimoire-composer (max-width: 300px) {
+  .grimoire-container--chat-window .grimoire-thinking-current .grimoire-thinking-meter {
+    display: none;
+  }
 }
 
 @container grimoire-composer (max-width: 520px) {
   .grimoire-container--chat-window .grimoire-input-toolbar-config-actions {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 }
 
-@container grimoire-composer (max-width: 380px) {
+/*
+ * Past this there is nothing left to drop, so the row does break - model over
+ * controls and Send, rather than an overflowing single line.
+ */
+@container grimoire-composer (max-width: 200px) {
   .grimoire-container--chat-window .grimoire-input-toolbar-actions-row {
     display: grid;
     grid-template-areas:

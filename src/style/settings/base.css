@@ -66,7 +66,7 @@
   display: none;
 }
 
-.grimoire-settings-tab-scroll {
+button.grimoire-settings-tab-scroll {
   display: none;
   align-items: center;
   justify-content: center;
@@ -311,9 +311,9 @@
 .grimoire-provider-disabled-notice {
   margin: var(--grimoire-space-12) 0 var(--grimoire-space-4);
   padding: var(--grimoire-space-12) var(--grimoire-space-16);
-  border: 1px solid color-mix(in srgb, var(--grimoire-accent) 42%, transparent);
+  border: 1px solid var(--grimoire-accent-line);
   border-radius: var(--grimoire-radius-2);
-  background: color-mix(in srgb, var(--grimoire-accent) 7%, transparent);
+  background: var(--grimoire-accent-wash-weak);
 }
 
 .grimoire-provider-disabled-notice p {
@@ -526,7 +526,7 @@
 }
 
 /* Unified icon action buttons for settings */
-.grimoire-settings-action-btn {
+button.grimoire-settings-action-btn {
   display: flex;
   align-items: center;
   justify-content: center;

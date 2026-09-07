@@ -167,7 +167,7 @@
   flex-shrink: 0;
 }
 
-.grimoire-mcp-action-btn {
+button.grimoire-mcp-action-btn {
   display: flex;
   align-items: center;
   justify-content: center;

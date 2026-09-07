@@ -113,16 +113,23 @@
   gap: var(--grimoire-space-12);
 }
 
+/*
+ * Sources and Context are cards; the transcript is not.
+ *
+ * A panel is a list of one kind of thing with a heading over it, and on the
+ * window's own ground with no edge it read as loose text floating under the
+ * switch row. The transcript stays unframed because it is the page itself.
+ */
 .grimoire-sources-panel,
 .grimoire-context-panel {
   display: grid;
   align-content: start;
   gap: var(--grimoire-space-8);
   overflow: hidden;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  padding: var(--grimoire-space-16) var(--grimoire-space-20) var(--grimoire-space-20);
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-2);
+  background: var(--grimoire-ground);
 }
 
 .grimoire-panel-section-heading {
@@ -159,7 +166,6 @@
   display: flex;
   align-items: center;
   gap: var(--grimoire-space-2);
-  margin-bottom: var(--grimoire-space-4);
 }
 
 .grimoire-source-filters button.grimoire-source-filter {
@@ -283,41 +289,32 @@
   gap: 0;
 }
 
-.grimoire-context-section,
-.grimoire-note-memory-card,
+/*
+ * The context section is the file-context feature's; it is styled there.
+ *
+ * A memory row is separated by a rule because the rows say different kinds of
+ * thing; a source row is not, because they are all the same kind and the rules
+ * only add stripes to a list the eye already reads as a list.
+ */
 .grimoire-source-card {
   border: 0;
-  border-top: 1px solid var(--grimoire-line);
-  border-radius: 0;
+  border-radius: var(--grimoire-radius-1);
   background: transparent;
 }
 
-.grimoire-context-section {
-  padding: var(--grimoire-space-8) 0;
-}
-
-.grimoire-context-section-title {
-  margin-bottom: var(--grimoire-space-6);
-  color: var(--grimoire-ink);
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-bold);
-}
-
+/*
+ * Nothing here yet, and more of what is: a line, not a dashed box in the middle
+ * of the panel. A dotted rectangle around one sentence is a drop target, and
+ * nothing is dropped here.
+ */
 .grimoire-context-empty,
 .grimoire-source-empty,
 .grimoire-source-more {
-  color: var(--grimoire-workbench-muted);
-  font-size: var(--grimoire-text-xs);
+  padding: var(--grimoire-space-6) 0;
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
   line-height: 1.35;
-}
-
-.grimoire-source-empty,
-.grimoire-source-more {
-  align-self: center;
-  margin-top: var(--grimoire-space-6);
-  padding: var(--grimoire-space-8);
-  border: 1px dashed var(--grimoire-workbench-border);
-  border-radius: var(--grimoire-radius-1);
+  text-align: start;
 }
 
 .grimoire-source-card-stack button.grimoire-note-memory-card,
@@ -333,7 +330,6 @@
   gap: var(--grimoire-space-2) var(--grimoire-space-8);
   padding: var(--grimoire-space-8) var(--grimoire-space-4);
   border-width: 0;
-  border-top-width: 1px;
   color: var(--grimoire-ink);
   font: inherit;
   line-height: normal;
@@ -346,6 +342,7 @@
 }
 
 .grimoire-source-card-stack button.grimoire-note-memory-card {
+  border-top-width: 1px;
   grid-template-columns: minmax(0, 1fr) max-content;
   grid-template-areas:
     "title badge"
@@ -372,8 +369,8 @@
   display: block;
   overflow: hidden;
   max-width: 100%;
-  font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-semibold);
+  font-size: var(--grimoire-text-m);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -390,14 +387,18 @@
 .grimoire-source-card-dot {
   grid-area: dot;
   align-self: center;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--grimoire-workbench-faint);
+  box-sizing: border-box;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--grimoire-line-3);
+  border-radius: var(--grimoire-radius-circle);
+  background: transparent;
 }
 
+/* The note you have open, marked the way every other state in the plugin is. */
 .grimoire-source-card[data-source-kind="current"] .grimoire-source-card-dot {
-  background: var(--grimoire-ok);
+  border-color: var(--grimoire-accent);
+  background: var(--grimoire-accent);
 }
 
 .grimoire-note-memory-path,
@@ -420,31 +421,51 @@
 .grimoire-source-card-path {
   grid-area: path;
   min-width: 0;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
 }
 
+/*
+ * How close a note is, as a line filled to the score with the number beside it.
+ *
+ * It was a filled accent chip per row: on a panel of six notes that is six
+ * fills, where the budget is one, and the eye reads six labels before it reads
+ * a single file name.
+ */
 .grimoire-source-card-score {
   grid-area: score;
-  align-self: center;
-  max-width: 84px;
-  min-width: 34px;
-  height: auto;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: var(--grimoire-space-4) var(--grimoire-space-6);
+  align-self: center;
+  height: auto;
+  gap: var(--grimoire-space-8);
+  padding: 0;
   border: 0;
-  border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-accent-wash);
-  color: var(--grimoire-accent-text);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-muted);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
-.grimoire-source-card[data-source-kind="current"] .grimoire-source-card-score {
-  background: color-mix(in srgb, var(--grimoire-ok) 13%, transparent);
-  color: var(--grimoire-ok);
-  text-transform: uppercase;
+.grimoire-source-card-score::before {
+  width: 44px;
+  height: 1.5px;
+  flex: 0 0 auto;
+  border-radius: var(--grimoire-radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--grimoire-accent) calc(var(--grimoire-source-score, 0) * 1%),
+    var(--grimoire-line) calc(var(--grimoire-source-score, 0) * 1%)
+  );
+  content: "";
+}
+
+/* A note that is open has no score to draw, so it says so and shows no line. */
+.grimoire-source-card-score:not([style*="--grimoire-source-score"])::before {
+  display: none;
 }
 
 .grimoire-note-memory-badge {
@@ -457,9 +478,9 @@
   align-items: center;
   justify-content: center;
   padding: 0 var(--grimoire-space-6);
-  border: 1px solid color-mix(in srgb, var(--grimoire-accent) 46%, transparent);
+  border: 1px solid var(--grimoire-accent-line);
   border-radius: var(--grimoire-radius-1);
-  background: color-mix(in srgb, var(--grimoire-accent) 13%, transparent);
+  background: var(--grimoire-accent-wash);
   color: var(--grimoire-ink);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-bold);

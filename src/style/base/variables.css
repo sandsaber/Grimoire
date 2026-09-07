@@ -113,6 +113,8 @@ body {
   --grimoire-tool-row-h: 26px;
   --grimoire-segment-h: 26px;
   --grimoire-list-row-h: 34px;
+  /* A field or a dialog button: taller than the chrome, because it is typed into. */
+  --grimoire-field-h: 30px;
 
   /* Radius — the theme's, so a square-cornered theme stays square. */
   --grimoire-radius-1: var(--radius-s, 4px);
@@ -164,6 +166,7 @@ body {
    * line of 12px text, 14px is the chrome default, 16px is the header. The
    * heavier stroke is for a check, which reads as a hairline at 1.75.
    */
+  --grimoire-icon-2xs: 11px;
   --grimoire-icon-s: 12px;
   --grimoire-icon-m: 14px;
   --grimoire-icon-l: 16px;

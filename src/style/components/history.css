@@ -26,83 +26,45 @@
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
-.grimoire-history-header {
+/*
+ * Emptying the whole history, at the foot of the list rather than in a header
+ * band above it: it was the loudest thing on the panel, in red, beside a count
+ * nobody acts on and a title for a thing the reader had just opened.
+ */
+.grimoire-history-footer {
   display: flex;
   align-items: center;
-  height: var(--grimoire-hit-l);
-  gap: var(--grimoire-space-8);
-  padding: var(--grimoire-space-4) var(--grimoire-space-4) 0 var(--grimoire-space-12);
-  border-bottom: 0;
-}
-
-.grimoire-history-title {
-  min-width: 0;
-  color: var(--grimoire-ink);
-  font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
-  line-height: 1.2;
-}
-
-.grimoire-history-header-spacer {
-  flex: 1 1 auto;
-}
-
-.grimoire-history-count {
-  padding: 0;
-  border-radius: 0;
-  background: none;
-  color: var(--grimoire-ink-faint);
-  font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-normal);
-  line-height: 1;
-}
-
-.grimoire-history-delete-all {
+  flex: none;
   padding: var(--grimoire-space-4) var(--grimoire-space-6);
+  border-top: 1px solid var(--grimoire-line);
+}
+
+button.grimoire-history-delete-all {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--grimoire-hit-s);
+  padding: 0 var(--grimoire-space-6);
   border: 0;
   border-radius: var(--grimoire-radius-1);
-  background: transparent;
-  color: var(--grimoire-error);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-history-delete-all:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--grimoire-error) 14%, transparent);
+  background: var(--grimoire-error-wash);
   color: var(--grimoire-error);
 }
 
 .grimoire-history-delete-all:disabled {
-  color: var(--grimoire-ink-faint);
+  color: var(--grimoire-ink-ghost);
   cursor: default;
-}
-
-.grimoire-history-close {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--grimoire-radius-1);
-  background: transparent;
-  color: var(--grimoire-workbench-faint);
-  cursor: pointer;
-  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
-}
-
-.grimoire-history-close:hover {
-  background: var(--grimoire-hover);
-  color: var(--grimoire-ink);
-}
-
-.grimoire-history-close svg {
-  width: 15px;
-  height: 15px;
 }
 
 .grimoire-history-search {
@@ -125,7 +87,7 @@
   height: 14px;
 }
 
-.grimoire-history-search-input {
+input.grimoire-history-search-input {
   min-width: 0;
   flex: 1 1 auto;
   height: 100%;
@@ -216,7 +178,7 @@
 .grimoire-history-item {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
   align-items: center;
   height: 36px;
   gap: var(--grimoire-space-10);
@@ -242,14 +204,20 @@
   background: transparent;
 }
 
+/*
+ * Open in another tab: the same rule the current one wears, at the weight the
+ * accent uses for a border. It was the hover ground, so a row nobody was
+ * pointing at looked permanently pointed at - and on a list of twelve, one of
+ * them always did.
+ */
 .grimoire-history-item.is-open:not(.active) {
-  background: var(--grimoire-hover);
+  border-left-color: var(--grimoire-accent-line);
+  background: transparent;
 }
 
 .grimoire-history-item-content {
   display: grid;
   min-width: 0;
-  gap: var(--grimoire-space-2);
 }
 
 .grimoire-history-item-title {
@@ -262,22 +230,23 @@
   white-space: nowrap;
 }
 
-.grimoire-history-item-meta {
+/*
+ * The stamp yields to the title, not the other way round. A model label can
+ * arrive as a whole billing path, and an `auto` track took every pixel it
+ * asked for - so "Describe the image" became "Describe th…" to make room for
+ * "Z.AI Coding Plan/GLM-5.3-Flash", and a row whose title had not generated
+ * yet read as a model name and nothing else.
+ */
+.grimoire-history-item-time {
+  min-width: 0;
+  max-width: 96px;
   overflow: hidden;
   color: var(--grimoire-ink-faint);
   font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-xs);
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.grimoire-history-item-time {
-  color: var(--grimoire-ink-faint);
-  font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-xs);
+  font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-normal);
   line-height: 1;
+  text-overflow: ellipsis;
   white-space: nowrap;
   transition: opacity var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -312,32 +281,47 @@
   pointer-events: auto;
 }
 
-.grimoire-action-btn {
+/*
+ * What can be done to a row: glyphs, and the word for the one that cannot be
+ * taken back. They were 26px chips on a raised ground, so hovering a row put
+ * three filled boxes where its title had been.
+ */
+.grimoire-action-btn,
+button.grimoire-action-btn {
   display: inline-grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  box-sizing: border-box;
+  width: var(--grimoire-hit-s);
+  height: var(--grimoire-hit-s);
   padding: 0;
   border: 0;
   border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-raise);
+  background: none;
+  box-shadow: none;
   color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-s);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-action-btn:hover {
-  background: var(--grimoire-raise-2);
+  background: var(--grimoire-hover);
   color: var(--grimoire-ink);
 }
 
 .grimoire-action-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
+}
+
+button.grimoire-delete-btn {
+  width: auto;
+  padding: 0 var(--grimoire-space-6);
 }
 
 .grimoire-delete-btn:hover {
-  background: color-mix(in srgb, var(--grimoire-error) 16%, transparent);
+  background: none;
   color: var(--grimoire-error);
 }
 

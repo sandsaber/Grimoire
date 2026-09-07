@@ -73,7 +73,7 @@
   flex: 0 0 auto;
   overflow: visible;
   padding: 0;
-  gap: var(--grimoire-space-12);
+  gap: var(--grimoire-space-20);
 }
 
 .grimoire-bound-status {
@@ -169,8 +169,19 @@
   border-radius: var(--grimoire-radius-2);
 }
 
-/* Reserve room for the time/action row positioned below the question. */
+/*
+ * The plane again, at the weight that reaches it.
+ *
+ * `.grimoire-container--chat-window .grimoire-message` flattens every message
+ * to no padding and no radius, and it outranks `.grimoire-message-user` - so
+ * the question came out as a full-bleed grey band with its text against the
+ * pane's edge. The rule above is the shape; this is the one that wins.
+ *
+ * The trailing margin reserves room for the time/action row under it.
+ */
 .grimoire-container--chat-window .grimoire-message-user {
+  padding: var(--grimoire-space-10) var(--grimoire-space-12);
+  border-radius: var(--grimoire-radius-2);
   margin-bottom: var(--grimoire-space-24);
 }
 
@@ -351,27 +362,6 @@
   white-space: nowrap;
 }
 
-.grimoire-text-block > .grimoire-message-completion-time {
-  position: absolute;
-  bottom: 7px;
-  inset-inline-start: 32px;
-  display: none;
-  pointer-events: auto;
-}
-
-.grimoire-text-block--with-completion-time {
-  padding-bottom: var(--grimoire-space-24);
-}
-
-.grimoire-text-block--with-completion-time > .grimoire-message-completion-time {
-  display: inline-block;
-}
-
-.grimoire-text-block--with-completion-time > .grimoire-text-copy-btn {
-  inset-inline-start: 0;
-  inset-inline-end: auto;
-}
-
 .grimoire-text-block+.grimoire-tool-call {
   margin-top: var(--grimoire-space-8);
 }
@@ -480,16 +470,75 @@
   background: var(--grimoire-workbench-border-strong);
 }
 
-/* Response duration footer - styled as another line of content */
+/*
+ * How long the turn took: a clock and a mono duration, in the faintest ink.
+ *
+ * It replaced an italic sentence built from a random word — "* Roasted for 19s"
+ * — which read as prose, so the one fact in the footer was the part of it the
+ * eye reached last.
+ */
 .grimoire-response-footer {
-  margin-top: var(--grimoire-space-8);
+  display: flex;
+  align-items: center;
+  gap: var(--grimoire-space-2);
+  margin-top: var(--grimoire-space-6);
+}
+
+/* The reading and the actions, with the design's six pixels between them. */
+.grimoire-response-footer .grimoire-baked-duration {
+  margin-inline-end: var(--grimoire-space-6);
+}
+
+/* The same 24px square the question's own actions use, on the same row. */
+.grimoire-response-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: var(--grimoire-hit-s);
+  height: var(--grimoire-hit-s);
+  border-radius: var(--grimoire-radius-1);
+  color: var(--grimoire-ink-faint);
+  cursor: pointer;
+  transition: color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-response-copy-btn svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-response-copy-btn:hover {
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
+}
+
+.grimoire-response-copy-btn.copied {
+  color: var(--grimoire-accent-text);
 }
 
 .grimoire-baked-duration {
-  color: var(--grimoire-ink-muted);
-  font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
-  font-style: italic;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--grimoire-space-4);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.grimoire-baked-duration-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.grimoire-baked-duration-icon svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
 }
 
 /*
@@ -536,7 +585,16 @@
   color: var(--grimoire-accent-text);
 }
 
-.grimoire-user-msg-actions .grimoire-message-completion-time {
+/*
+ * The time is a word in the row, not a 24px hit target: the blanket `span`
+ * rule above squeezed it into one and centred it there. Six pixels separate
+ * the reading from the actions, which is what the design puts between them.
+ */
+.grimoire-user-msg-actions .grimoire-message-completion-time,
+.grimoire-response-footer .grimoire-message-completion-time {
+  width: auto;
+  height: auto;
+  margin-inline-end: var(--grimoire-space-6);
   cursor: default;
   color: var(--grimoire-ink-faint);
 }
@@ -576,31 +634,26 @@
   text-align: center;
 }
 
-.grimoire-container--chat-window .grimoire-messages {
-  gap: var(--grimoire-space-20);
-  padding: 0;
-}
-
+/*
+ * The greeting is a line above the transcript, not a stage the transcript
+ * begins after.
+ *
+ * It was a 160px block that centred itself in whatever space was left, so a
+ * conversation with messages in it still opened on an empty band and the first
+ * message started halfway down the pane.
+ */
 .grimoire-container--chat-window .grimoire-welcome {
-  min-height: 160px;
-  padding: var(--grimoire-space-16) var(--grimoire-space-8);
+  display: block;
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0;
+  text-align: start;
 }
 
 .grimoire-container--chat-window .grimoire-welcome-greeting {
   max-width: 100%;
-  font-size: var(--grimoire-text-l);
-}
-
-.grimoire-container--chat-window .grimoire-message {
-  padding: 0;
-  border-radius: 0;
-}
-
-.grimoire-container--chat-window .grimoire-message-user {
-  max-width: 100%;
-  align-self: stretch;
-  padding: var(--grimoire-space-10) var(--grimoire-space-12);
-  border-radius: var(--grimoire-radius-2);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-container--chat-window .grimoire-message-assistant {

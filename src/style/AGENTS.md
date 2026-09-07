@@ -29,8 +29,10 @@
 
 ## The Nordic token layer
 
-[`docs/design-system.md`](../../docs/design-system.md) is the canonical description; this is the
-working reference for editing files in this directory.
+[`docs/design-system.md`](../../docs/design-system.md) is the canonical description and
+[`docs/design/Grimoire Nordic.html`](../../docs/design/Grimoire%20Nordic.html) is the drawing it is
+of; this is the working reference for editing files in this directory. A change to a surface is
+checked by rendering it beside the mock, not by reading the rule you just wrote.
 
 **`base/variables.css` is the only file that reads an Obsidian variable.** Everything else reads a
 Grimoire token. The layer is defined on `body`, not on `.grimoire-container`, because settings tabs
@@ -95,6 +97,30 @@ after adding a dependency on a host variable, and after an app upgrade. It takes
 — `body`, `.theme-light`, `.theme-dark` — because collecting every declaration in the file picks up
 component-scoped ones and makes `--background-modifier-border` resolve to `transparent` on both
 themes.
+
+## Outranking the host
+
+Obsidian names elements and attributes; Grimoire names classes; a class alone loses. Every rule below
+replaced a shipped defect, and every one of them was found by rendering the surface with the real
+`app.css` — see §16 of [`docs/design-system.md`](../../docs/design-system.md) for how to build that
+render and read measurements out of it.
+
+| The host's rule | Weight | Write |
+|---|---|---|
+| `button:not(.clickable-icon)` | element + class | `button.grimoire-…` |
+| `input[type='text']` | element + attribute | `input.grimoire-…` |
+| `input[type='text']:focus`, `:focus-visible` | element + attribute + pseudo | `input.grimoire-…:focus`, `:focus-visible` |
+| `.modal` (width, padding) | class, on the modal itself | size `.grimoire-…-modal`, not its `.modal-content` |
+
+And one that is Grimoire against itself: **a modifier of an element-named base must name the element
+too.** `button.grimoire-icon-btn` outweighs `.grimoire-icon-btn--small`, so that modifier never
+reached its own width and height and every small icon button drew at the large size. The gate for it
+is `lets a modifier outrank the base it modifies` in `tests/unit/style/designSystem.test.ts`.
+
+Two things the gates cannot do for you. They only see properties the plugin actually wrote, so a
+missing `:focus` rule is not a violation of anything — nothing will tell you the host is drawing a
+ring you did not ask for. And they compare text, not pixels: a rule can be present, correct and
+overruled. Render the surface.
 
 ## Obsidian community CSS review
 

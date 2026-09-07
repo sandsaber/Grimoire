@@ -25,6 +25,14 @@ function stripComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
+function listSourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap(entry => {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) return listSourceFiles(path);
+    return path.endsWith('.ts') ? [path] : [];
+  });
+}
+
 const CSS_FILES = listCssFiles(STYLE_ROOT).sort();
 const MODULE_FILES = CSS_FILES.filter(file => file !== TOKENS_FILE);
 
@@ -167,6 +175,305 @@ describe('Nordic design system', () => {
     expect(strays).toEqual([]);
   });
 
+  it('closes every block it opens', () => {
+    // A stray `}` is not a typo the build reports: `build-css` concatenates, and
+    // the browser recovers from it by discarding the rule that follows. One in
+    // tabs.css swallowed `.grimoire-panel-switch` whole, so the panel rail fell
+    // back to `display: block` and the transcript's jump controls dropped onto a
+    // row of their own — visible in the plugin, invisible in every gate.
+    const unbalanced: string[] = [];
+    for (const file of CSS_FILES) {
+      const css = read(file);
+      const opened = (css.match(/\{/g) ?? []).length;
+      const closed = (css.match(/\}/g) ?? []).length;
+      if (opened !== closed) unbalanced.push(`${file}: ${opened} open, ${closed} closed`);
+    }
+
+    expect(unbalanced).toEqual([]);
+  });
+
+  it('gives every selector exactly one sheet', () => {
+    // Two sheets writing the same selector is a rule nobody owns: whichever the
+    // build imports last decides, silently. It had happened twice — an old
+    // `.grimoire-input-nav-content` in input.css flattened the header's tab
+    // strip so the active underline floated in mid-air, and the context
+    // manager's list row took the composer's `.grimoire-context-row`, leaving an
+    // empty 34px band above the textarea in every chat.
+    const owners = new Map<string, Set<string>>();
+    for (const file of CSS_FILES) {
+      for (const block of read(file).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selector = block[1].split(/\s+/).join(' ').trim();
+        if (!selector.startsWith('.grimoire')) continue;
+        const sheets = owners.get(selector) ?? new Set<string>();
+        sheets.add(file);
+        owners.set(selector, sheets);
+      }
+    }
+
+    const shared: string[] = [];
+    for (const [selector, sheets] of owners) {
+      if (sheets.size > 1) shared.push(`${selector}: ${[...sheets].sort().join(', ')}`);
+    }
+
+    expect(shared.sort()).toEqual([]);
+  });
+
+  it('gives every selector one rule in its own sheet', () => {
+    // The cross-sheet check above cannot see a selector written twice in the
+    // same file, and one was: `.grimoire-model-group-label` held its colour in
+    // one block and its truncation in another, ten blank lines apart, because a
+    // scripted edit had removed what sat between them. Two blocks for one
+    // selector is one of them waiting to be edited and not take effect.
+    // Rules inside an at-rule are skipped: a media query overriding a selector
+    // it also sets at the top level is the point of a media query.
+    const repeated: string[] = [];
+    for (const file of CSS_FILES) {
+      const css = read(file);
+      const seen = new Map<string, number>();
+      let depth = 0;
+      let start = 0;
+      for (let index = 0; index < css.length; index += 1) {
+        const char = css[index];
+        if (char === '{') {
+          if (depth === 0) {
+            const selector = css.slice(start, index).split(/\s+/).join(' ').trim();
+            if (selector.startsWith('.grimoire')) {
+              seen.set(selector, (seen.get(selector) ?? 0) + 1);
+            }
+          }
+          depth += 1;
+        } else if (char === '}') {
+          depth = Math.max(0, depth - 1);
+          if (depth === 0) start = index + 1;
+        }
+      }
+      for (const [selector, count] of seen) {
+        if (count > 1) repeated.push(`${file}: ${selector} \u00d7 ${count}`);
+      }
+    }
+
+    expect(repeated.sort()).toEqual([]);
+  });
+
+  it('outranks the host on every field it paints', () => {
+    // The same trap as the buttons, one element over: Obsidian styles
+    // `input[type='text']` and its siblings with a form-field ground, a
+    // border and its own height, which is element-plus-attribute weight. The
+    // manage-context dialog's borderless search band came back as a filled,
+    // bordered Obsidian field until its rule named the element too.
+    const fieldClasses = new Set<string>();
+    for (const file of listSourceFiles('src')) {
+      const source = readFileSync(file, 'utf8');
+      for (const match of source.matchAll(/createEl\(\s*'input'\s*,\s*\{([\s\S]{0,600}?)\}/g)) {
+        const cls = /cls:\s*(\[[^\]]*\]|'[^']*')/.exec(match[1]);
+        if (!cls) continue;
+        for (const token of cls[1].match(/[A-Za-z0-9_-]+/g) ?? []) {
+          if (token.startsWith('grimoire-')) fieldClasses.add(token);
+        }
+      }
+    }
+    expect(fieldClasses.size).toBeGreaterThan(10);
+
+    const painted = new Set([
+      'background', 'background-color', 'border', 'border-color', 'border-width',
+      'box-shadow', 'color', 'height', 'padding',
+    ]);
+    const outranked: string[] = [];
+    for (const file of CSS_FILES) {
+      for (const rule of read(file).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const sets = rule[2]
+          .split(';')
+          .some(declaration => painted.has(declaration.split(':')[0]?.trim() ?? ''));
+        if (!sets) continue;
+        const parts = rule[1].split(',').map(part => part.split(/\s+/).join(' ').trim());
+        for (const trimmed of parts) {
+          if (!/^\.[\w-]+$/.test(trimmed)) continue;
+          if (!fieldClasses.has(trimmed.slice(1))) continue;
+          if (parts.includes(`input${trimmed}`)) continue;
+          outranked.push(`${file}: ${trimmed}`);
+        }
+      }
+    }
+
+    expect([...new Set(outranked)].sort()).toEqual([]);
+  });
+
+  it('outranks the host on every button it paints', () => {
+    // Obsidian styles `button:not(.clickable-icon)` with a grey
+    // --interactive-normal fill, its inset-border shadow and --text-normal.
+    // That selector counts an element and a class, so a rule written as
+    // `.grimoire-primary-action` cannot reach it however late it loads: every
+    // filled action in the plugin resolved to rgb(51,51,51) rather than the
+    // accent, and every flat one carried a fill and a hairline. A rule that
+    // paints a button has to name the element too.
+    const buttonClasses = new Set<string>();
+    for (const file of listSourceFiles('src')) {
+      const source = readFileSync(file, 'utf8');
+      for (const match of source.matchAll(/createEl\(\s*'button'\s*,\s*\{([\s\S]{0,600}?)\}/g)) {
+        const cls = /cls:\s*(\[[^\]]*\]|'[^']*')/.exec(match[1]);
+        if (!cls) continue;
+        for (const token of cls[1].match(/[A-Za-z0-9_-]+/g) ?? []) {
+          if (token.startsWith('grimoire-')) buttonClasses.add(token);
+        }
+      }
+    }
+    expect(buttonClasses.size).toBeGreaterThan(20);
+
+    const painted = new Set(['background', 'background-color', 'box-shadow', 'color']);
+    const outranked: string[] = [];
+    for (const file of CSS_FILES) {
+      for (const rule of read(file).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const sets = rule[2]
+          .split(';')
+          .some(declaration => painted.has(declaration.split(':')[0]?.trim() ?? ''));
+        if (!sets) continue;
+        const parts = rule[1].split(',').map(part => part.split(/\s+/).join(' ').trim());
+        for (const trimmed of parts) {
+          if (!/^\.[\w-]+$/.test(trimmed)) continue;
+          if (!buttonClasses.has(trimmed.slice(1))) continue;
+          // A class that also lands on a div keeps its bare selector and adds
+          // the qualified twin beside it, which is enough to win.
+          if (parts.includes(`button${trimmed}`)) continue;
+          outranked.push(`${file}: ${trimmed}`);
+        }
+      }
+    }
+
+    expect([...new Set(outranked)].sort()).toEqual([]);
+  });
+
+  it('lets a modifier outrank the base it modifies', () => {
+    // The other half of the same trap. `button.grimoire-icon-btn` counts an
+    // element and a class, so `.grimoire-icon-btn--small` - named by class
+    // alone - never reached its own width and height, and every small icon
+    // button in the plugin drew at the large size. The two pixels that cost
+    // were visible: a control pinned beside a chip sat lower than the chip.
+    type Base = { selector: string; element: string; properties: Set<string> };
+    const bases = new Map<string, Base>();
+    const rules: Array<{ file: string; parts: string[]; properties: Set<string> }> = [];
+
+    for (const file of CSS_FILES) {
+      for (const rule of read(file).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const parts = rule[1].split(',').map(part => part.split(/\s+/).join(' ').trim());
+        const properties = new Set(rule[2]
+          .split(';')
+          .map(declaration => declaration.split(':')[0]?.trim() ?? '')
+          .filter(Boolean));
+        rules.push({ file, parts, properties });
+        for (const part of parts) {
+          const qualified = /^([a-z]+)\.([\w-]+)$/.exec(part);
+          if (!qualified) continue;
+          const existing = bases.get(qualified[2]);
+          if (existing) {
+            for (const property of properties) existing.properties.add(property);
+            continue;
+          }
+          bases.set(qualified[2], {
+            selector: part,
+            element: qualified[1],
+            properties: new Set(properties),
+          });
+        }
+      }
+    }
+    expect(bases.size).toBeGreaterThan(0);
+
+    const losing: string[] = [];
+    for (const { file, parts, properties } of rules) {
+      for (const part of parts) {
+        const bare = /^\.([\w-]+--[\w-]+)$/.exec(part);
+        if (!bare) continue;
+        const modifier = bare[1];
+        for (const [name, base] of bases) {
+          if (!modifier.startsWith(`${name}--`)) continue;
+          const contested = [...properties].filter(property => base.properties.has(property));
+          if (contested.length === 0) continue;
+          // Naming the element beside the bare selector is enough to win.
+          if (parts.includes(`${base.element}${part}`)) continue;
+          losing.push(`${file}: ${part} loses ${contested.sort().join(', ')} to ${base.selector}`);
+        }
+      }
+    }
+
+    expect([...new Set(losing)].sort()).toEqual([]);
+  });
+
+  it('leaves no drawn chevron where a real one was put', () => {
+    // `.grimoire-model-group-chevron` was a 6px box with two borders rotated
+    // 45 degrees. When the glyph became a lucide `chevron-right`, the box
+    // stayed - so every model-group header drew an svg inside a rotated,
+    // bordered square, and the arrow came out bent. A class that a rule turns
+    // into a triangle is a glyph the CSS is drawing itself, so nothing may
+    // also put an icon in it.
+    const drawn = new Set<string>();
+    for (const file of CSS_FILES) {
+      for (const rule of read(file).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const body = rule[2];
+        if (!/transform:\s*rotate\(/.test(body)) continue;
+        if (!/border-(right|bottom|width)\s*:/.test(body)) continue;
+        for (const selector of rule[1].split(',')) {
+          if (selector.includes('::')) continue;
+          const last = selector.split(/\s+/).filter(Boolean).at(-1) ?? '';
+          for (const cls of last.match(/\.grimoire-[\w-]+/g) ?? []) drawn.add(cls.slice(1));
+        }
+      }
+    }
+
+    const boxedIcons: string[] = [];
+    for (const file of listSourceFiles('src')) {
+      const source = readFileSync(file, 'utf8');
+      for (const cls of drawn) {
+        const holder = new RegExp(`createSpan\\(\\{\\s*cls:\\s*'${cls}'\\s*\\}\\)`);
+        if (!holder.test(source)) continue;
+        if (!new RegExp(`setIcon\\(\\w*[Cc]hevron\\w*`).test(source)) continue;
+        boxedIcons.push(`${file}: .${cls}`);
+      }
+    }
+
+    expect(boxedIcons).toEqual([]);
+  });
+
+  it('sizes and colours a glyph, and never boxes one', () => {
+    // `.grimoire-file-chip-icon svg` had been left at the head of the chip's
+    // own rule, so every 12px file glyph in the composer inherited the chip's
+    // 24px height, its padding and its 40% accent border - a bordered box
+    // around a bordered box, on every attachment. An svg takes width, height,
+    // stroke and colour; a box is the element around it.
+    const boxed: string[] = [];
+    for (const file of CSS_FILES) {
+      const css = read(file);
+      for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const selectors = rule[1].split(',').map(part => part.split(/\s+/).join(' ').trim());
+        if (!selectors.some(selector => /(^|\s)svg(:[a-z-]+)?$/.test(selector))) continue;
+        for (const declaration of rule[2].split(';')) {
+          const [property, value] = declaration.split(':').map(part => part?.trim());
+          if (!property || !value) continue;
+          if (!/^(border|padding|background)/.test(property)) continue;
+          if (['none', 'transparent', '0'].includes(value)) continue;
+          boxed.push(`${file}: ${selectors.join(', ')} -> ${property}: ${value}`);
+        }
+      }
+    }
+
+    expect(boxed).toEqual([]);
+  });
+
+  it('spends the accent at the alphas the token layer names', () => {
+    // The budget is a 40% border, a 12% wash and an 8% wash. Fourteen feature
+    // declarations had written their own alpha instead - 7, 10, 13, 14, 15, 20,
+    // 42, 46 - which is how a system with three accent surfaces ends up with
+    // eight that no two surfaces share. The mix belongs in the token layer; a
+    // sheet reads --grimoire-accent-line, -wash or -wash-weak.
+    const literal: string[] = [];
+    for (const file of MODULE_FILES) {
+      for (const match of read(file).matchAll(/color-mix\([^)]*var\(--grimoire-accent\)\s*\d+%/g)) {
+        literal.push(`${file}: ${match[0]}`);
+      }
+    }
+
+    expect(literal).toEqual([]);
+  });
+
   it('leaves Obsidian settings chrome to Obsidian', () => {
     // A `.setting-item` rule that is not scoped under a Grimoire class restyles
     // the host's own settings rows, which is what plugin review penalises.
@@ -226,5 +533,39 @@ describe('Nordic design system', () => {
     }
 
     expect(leaks).toEqual([]);
+  });
+});
+
+/*
+ * A utility that hides has to outweigh the component rules it hides.
+ *
+ * Order only decides a tie, and `.grimoire-hidden` written once is a single
+ * class — it loses outright to any component rule with two. The composer has
+ * one, so it could not be hidden at all, and the plan card that is appended
+ * after it (and only looks like a replacement because the composer goes away)
+ * was drawn underneath the text field. Repeating the class is what buys the
+ * weight; `!important` is not available, and the review gate is right about that.
+ */
+describe('visibility utilities', () => {
+  const css = readFileSync('src/style/accessibility.css', 'utf8');
+
+  it('outweighs a two-class component rule', () => {
+    expect(css).toContain('.grimoire-hidden.grimoire-hidden {');
+  });
+
+  it('is not undone by the component rule that shipped broken', () => {
+    // The composer is the element this was found on: a two-class rule sets its
+    // display, and the plan card takes its place only by hiding it.
+    const input = readFileSync('src/style/components/input.css', 'utf8');
+    const composerRule = input.match(
+      /\.grimoire-container--chat-window \.grimoire-composer-shell \{[^}]*\}/,
+    )?.[0] ?? '';
+
+    expect(composerRule).toContain('display: grid');
+
+    // And order still has to back the weight up: a tie goes to the last rule.
+    const index = readFileSync('src/style/index.css', 'utf8');
+    expect(index.indexOf('accessibility.css'))
+      .toBeGreaterThan(index.indexOf('components/input.css'));
   });
 });

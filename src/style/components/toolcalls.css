@@ -6,8 +6,17 @@
   box-sizing: border-box;
   width: calc(100% - 44px);
   max-width: calc(100% - 44px);
-  margin: var(--grimoire-space-2) 0;
+  margin: 0;
   justify-self: start;
+}
+
+/*
+ * Steps of one run sit 2px apart; the message grid's 8px gap is the distance
+ * between blocks of different kinds, and a run of steps is one block. The pull
+ * is negative because the gap belongs to the grid, not to the step.
+ */
+.grimoire-container--chat-window .grimoire-message-content > .grimoire-tool-call + .grimoire-tool-call {
+  margin-top: calc(-1 * var(--grimoire-space-6));
 }
 
 .grimoire-tool-header {
@@ -128,6 +137,11 @@
   color: var(--grimoire-warn);
 }
 
+/* Absence, not a warning: nobody refused this, the turn ended underneath it. */
+.grimoire-tool-status.status-unfinished {
+  color: var(--grimoire-ink-faint);
+}
+
 /* Tool call content - border style (like thinking block) */
 .grimoire-tool-content {
   padding: var(--grimoire-space-4) 0;
@@ -190,8 +204,10 @@
   padding: 0;
 }
 
-.grimoire-tool-show-all {
+button.grimoire-tool-show-all {
   flex-shrink: 0;
+  box-sizing: border-box;
+  height: var(--grimoire-hit-m);
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background: none;
@@ -351,8 +367,14 @@
   background: var(--grimoire-line);
 }
 
+/*
+ * A step that follows a step reaches its rule up through the gap between them —
+ * 2px of its own margin and 2px of the one above — so a run of steps hangs on
+ * one unbroken line. It used to reach 8px, a distance nothing here spans, and
+ * the line arrived in pieces.
+ */
 .grimoire-tool-step + .grimoire-tool-step::before {
-  top: calc(-1 * var(--grimoire-space-8));
+  top: calc(-1 * var(--grimoire-space-2));
 }
 
 .grimoire-tool-step > .grimoire-tool-header {
@@ -408,6 +430,16 @@
   color: var(--grimoire-error);
 }
 
+/*
+ * Not an error and not a refusal: the turn ended before this tool reported.
+ * Nothing went wrong and nobody decided anything, so it reads as absence — the
+ * quietest ink on the row — where `blocked` reads as the red of a "no".
+ */
+.grimoire-tool-step.is-unfinished .grimoire-tool-icon-tile {
+  background: none;
+  color: var(--grimoire-ink-faint);
+}
+
 .grimoire-tool-step .grimoire-tool-name {
   color: var(--grimoire-ink);
   font-family: var(--grimoire-face);
@@ -436,6 +468,20 @@
 
 .grimoire-tool-result:empty {
   display: none;
+}
+
+/*
+ * A step that failed says why in the result, and that is the one place in the
+ * row the error colour belongs — the glyph beside it is already red, and a
+ * reader who cannot see red still gets the sentence.
+ */
+.grimoire-tool-step.is-error .grimoire-tool-result,
+.grimoire-tool-step.is-blocked .grimoire-tool-result {
+  color: var(--grimoire-error);
+}
+
+.grimoire-tool-step.is-unfinished .grimoire-tool-result {
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-tool-step.is-awaiting .grimoire-tool-result {

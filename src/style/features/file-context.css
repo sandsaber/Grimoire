@@ -5,10 +5,10 @@
   bottom: 100%;
   left: 0;
   right: 0;
+  box-sizing: border-box;
   margin-bottom: var(--grimoire-space-4);
-  background: var(--grimoire-plane);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  padding: var(--grimoire-space-4);
+  background: var(--grimoire-ground);
   border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   box-shadow: var(--grimoire-lift-1);
@@ -31,11 +31,19 @@
   z-index: 10001;
 }
 
+/*
+ * A note is a name and where it lives, on one line: the same 30px row the
+ * model groups and the MCP list use. It was a two-line stack with the name set
+ * in the accent, which spent the accent on every row of a list of forty.
+ */
 .grimoire-mention-item {
   display: flex;
   align-items: center;
+  box-sizing: border-box;
+  height: 30px;
   gap: var(--grimoire-space-8);
-  padding: var(--grimoire-space-8) var(--grimoire-space-12);
+  padding: 0 var(--grimoire-space-8);
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -53,23 +61,25 @@
 }
 
 .grimoire-mention-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-mention-path {
-  font-size: var(--grimoire-text-m);
-  color: var(--grimoire-ink);
+  min-width: 0;
   overflow: hidden;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .grimoire-mention-empty {
-  padding: var(--grimoire-space-12);
-  text-align: center;
-  color: var(--grimoire-ink-muted);
-  font-size: var(--grimoire-text-m);
+  padding: var(--grimoire-space-6) var(--grimoire-space-8);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-xs);
 }
 
 /* Scrollbar for mention dropdown */
@@ -97,16 +107,20 @@
 
 .grimoire-mention-text {
   display: flex;
-  flex-direction: column;
-  gap: var(--grimoire-space-2);
+  align-items: baseline;
+  gap: var(--grimoire-space-8);
   min-width: 0;
   flex: 1;
 }
 
 .grimoire-mention-name {
-  font-size: var(--grimoire-text-m);
-  font-weight: var(--grimoire-weight-medium);
-  color: var(--grimoire-accent);
+  flex: 0 0 auto;
+  overflow: hidden;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Context file items in @-mention dropdown */
@@ -147,8 +161,8 @@
 }
 
 .grimoire-mention-name-agent-folder {
-  color: var(--grimoire-accent-text);
-  font-weight: var(--grimoire-weight-semibold);
+  color: var(--grimoire-ink);
+  font-weight: var(--grimoire-weight-medium);
 }
 
 /* Agent items in @-mention dropdown (inside @Agents/) */
@@ -203,14 +217,26 @@
   min-width: 0;
 }
 
+/*
+ * One section per source of context, separated by a rule.
+ *
+ * Half of this rule used to live in container.css and half here, so the section
+ * had two owners and whichever sheet loaded last decided its type size.
+ */
 .grimoire-context-section {
   display: flex;
   flex-direction: column;
   gap: var(--grimoire-space-8);
   min-width: 0;
+  padding: var(--grimoire-space-8) 0;
+  border: 0;
+  border-top: 1px solid var(--grimoire-line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .grimoire-context-section-title {
+  margin-bottom: var(--grimoire-space-6);
   color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-bold);
@@ -232,7 +258,12 @@
   font: inherit;
 }
 
+/* A memory row: separated from the next by a rule, because they differ in kind. */
 .grimoire-note-memory-card {
+  border: 0;
+  border-top: 1px solid var(--grimoire-line);
+  border-radius: 0;
+  background: transparent;
   cursor: pointer;
 }
 

@@ -53,10 +53,14 @@
   opacity: 1;
 }
 
+/* Hung from the button's trailing edge, like every other menu in this group:
+ * centred on a control that sits near the pane's right edge put half of it
+ * outside the pane. */
 .grimoire-mcp-selector-dropdown {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  inset-inline-end: 0;
+  inset-inline-start: auto;
+  transform: none;
   bottom: 100%;
   margin-bottom: var(--grimoire-space-4);
   min-width: 200px;
@@ -87,12 +91,21 @@
   visibility: visible;
 }
 
+/*
+ * The same uppercase monospace label every other menu puts above its list. It
+ * was a semibold sentence on a rule, which made one menu in the composer look
+ * like a different product's menu.
+ */
 .grimoire-mcp-selector-header {
-  padding: var(--grimoire-space-8) var(--grimoire-space-12);
-  font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-semibold);
-  color: var(--grimoire-ink-muted);
-  border-bottom: 1px solid var(--grimoire-line);
+  padding: var(--grimoire-space-6) var(--grimoire-space-8) var(--grimoire-space-4);
+  border: 0;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: var(--grimoire-label-tracking);
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .grimoire-mcp-selector-list {
@@ -100,12 +113,11 @@
   overflow-y: auto;
 }
 
+/* Nothing to list is a quiet line where the list would be, not a centred note. */
 .grimoire-mcp-selector-empty {
-  padding: var(--grimoire-space-16) var(--grimoire-space-12);
-  text-align: center;
-  color: var(--grimoire-ink-muted);
-  font-size: var(--grimoire-text-s);
-  font-style: italic;
+  padding: var(--grimoire-space-6) var(--grimoire-space-8);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-xs);
 }
 
 .grimoire-container--chat-window .grimoire-mcp-selector {
@@ -137,16 +149,28 @@
 
 .grimoire-container--chat-window .grimoire-mcp-selector-dropdown {
   bottom: calc(100% + 8px);
-  border-color: var(--grimoire-workbench-border-strong);
-  background: var(--grimoire-plane);
+  box-sizing: border-box;
+  padding: var(--grimoire-space-4);
+  border-color: var(--grimoire-line);
+  background: var(--grimoire-ground);
   box-shadow: var(--grimoire-lift-1);
 }
 
+/*
+ * A server is on or it is off, and the check says which. The row used to be a
+ * 10% accent wash carrying a 16px bordered box with a 20% fill inside it -
+ * three accent surfaces for one boolean, and none of them the check every
+ * other menu uses.
+ */
 .grimoire-mcp-selector-item {
   display: flex;
   align-items: center;
-  padding: var(--grimoire-space-8) var(--grimoire-space-12);
+  box-sizing: border-box;
+  min-height: var(--grimoire-hit-l);
+  padding: 0 var(--grimoire-space-8);
   gap: var(--grimoire-space-8);
+  border-radius: var(--grimoire-radius-1);
+  color: var(--grimoire-ink-muted);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -156,28 +180,25 @@
 }
 
 .grimoire-mcp-selector-item.enabled {
-  background: color-mix(in srgb, var(--grimoire-accent) 10%, transparent);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-mcp-selector-check {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--grimoire-line);
-  border-radius: var(--grimoire-radius-1);
+  flex: 0 0 auto;
+  width: var(--grimoire-icon-2xs);
+  height: var(--grimoire-icon-2xs);
+  border: 0;
+  background: none;
   color: var(--grimoire-accent);
 }
 
-.grimoire-mcp-selector-item.enabled .grimoire-mcp-selector-check {
-  background: color-mix(in srgb, var(--grimoire-accent) 20%, transparent);
-  border-color: var(--grimoire-accent);
-}
-
 .grimoire-mcp-selector-check svg {
-  width: 12px;
-  height: 12px;
+  width: var(--grimoire-icon-2xs);
+  height: var(--grimoire-icon-2xs);
+  stroke-width: var(--grimoire-stroke-check);
 }
 
 .grimoire-mcp-selector-item-info {
@@ -190,9 +211,10 @@
 }
 
 .grimoire-mcp-selector-item-name {
-  font-size: var(--grimoire-text-s);
-  color: var(--grimoire-ink);
   overflow: hidden;
+  color: inherit;
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -202,8 +224,8 @@
   font-weight: var(--grimoire-weight-semibold);
   padding: 1px var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
-  background: color-mix(in srgb, var(--grimoire-accent) 20%, transparent);
-  color: var(--grimoire-accent);
+  background: var(--grimoire-accent-wash);
+  color: var(--grimoire-accent-text);
   flex-shrink: 0;
   margin-left: auto;
 }

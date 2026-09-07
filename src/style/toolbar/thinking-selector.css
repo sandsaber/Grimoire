@@ -83,8 +83,8 @@
 }
 
 .grimoire-thinking-gear.selected {
-  background: color-mix(in srgb, var(--grimoire-accent) 15%, transparent);
-  color: var(--grimoire-accent);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
   font-weight: var(--grimoire-weight-medium);
 }
 
@@ -104,25 +104,58 @@
   display: none;
 }
 
+/*
+ * How much thinking, as a gauge and a meter of four dots. The level is one of
+ * a small ordered set, so a filled-to-here meter says "third of four" at a
+ * glance where the word "high" needs the other three names to mean anything.
+ */
 .grimoire-container--chat-window .grimoire-thinking-current {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  max-width: 92px;
+  max-width: none;
   box-sizing: border-box;
   height: var(--grimoire-hit-l);
-  overflow: hidden;
+  gap: var(--grimoire-space-6);
+  overflow: visible;
   padding: 0 var(--grimoire-space-8);
-  border: 1px solid transparent;
-  border-radius: var(--grimoire-radius-2);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
   background: none;
-  color: var(--grimoire-workbench-muted);
-  font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-normal);
+  color: var(--grimoire-ink-muted);
   line-height: 1;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.grimoire-thinking-gauge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.grimoire-thinking-gauge svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-thinking-meter {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--grimoire-space-2);
+}
+
+.grimoire-thinking-meter-dot {
+  width: 3px;
+  height: 3px;
+  flex: 0 0 auto;
+  border-radius: var(--grimoire-radius-circle);
+  background: var(--grimoire-line-3);
+}
+
+.grimoire-thinking-meter-dot.is-filled {
+  background: var(--grimoire-accent);
 }
 
 .grimoire-container--chat-window .grimoire-thinking-gears:hover .grimoire-thinking-current {
@@ -131,9 +164,9 @@
 }
 
 .grimoire-container--chat-window .grimoire-thinking-gears.open .grimoire-thinking-current {
-  border-color: var(--grimoire-accent-line);
-  background: var(--grimoire-accent-wash);
-  color: var(--grimoire-accent-text);
+  border-color: transparent;
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-container--chat-window .grimoire-thinking-options {
@@ -152,6 +185,8 @@
 .grimoire-container--chat-window .grimoire-thinking-gear {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--grimoire-space-8);
   min-height: var(--grimoire-hit-l);
   padding: 0 var(--grimoire-space-8);
   border-radius: var(--grimoire-radius-1);
@@ -159,8 +194,38 @@
   line-height: 1;
 }
 
+/*
+ * The open menu says what each level costs, not only which one is set: every
+ * row carries its own meter, so "medium" reads as two of four before you have
+ * read the other three names. The row that is set carries the accent as a
+ * check and as its own filled dots - it is not a filled block.
+ */
+.grimoire-thinking-gear-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--grimoire-space-6);
+  min-width: 0;
+}
+
+/*
+ * Ink against line, not faint against border-focus: those two are four steps
+ * apart in a dark theme, so a meter filled to three of five read as five empty
+ * dots on every row the reader had not picked.
+ */
+.grimoire-thinking-options .grimoire-thinking-meter-dot {
+  background: var(--grimoire-line-3);
+}
+
+.grimoire-thinking-options .grimoire-thinking-meter-dot.is-filled {
+  background: var(--grimoire-ink-muted);
+}
+
+.grimoire-thinking-options .grimoire-thinking-gear.selected .grimoire-thinking-meter-dot.is-filled {
+  background: var(--grimoire-accent);
+}
+
 .grimoire-container--chat-window .grimoire-thinking-gear.selected {
-  background: var(--grimoire-accent-wash);
-  color: var(--grimoire-accent-text);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
   font-weight: var(--grimoire-weight-normal);
 }

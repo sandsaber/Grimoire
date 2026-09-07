@@ -53,12 +53,70 @@ describe('chat toolbar selector CSS', () => {
     }
     for (const declaration of [
       'min-height: var(--grimoire-hit-l)',
-      'padding: 0 var(--grimoire-space-8)',
       'border-radius: var(--grimoire-radius-1)',
       'font-weight: var(--grimoire-weight-normal)',
     ]) {
       expect(thinkingOption).toContain(declaration);
       expect(permissionOption).toContain(declaration);
+    }
+  });
+
+  it('marks what is picked the same way in every menu the composer opens', () => {
+    // One question, three answers: the reasoning menu filled the row with a 15%
+    // accent wash and set the word in accent, the work-mode menu did the same,
+    // and the MCP menu drew a 16px bordered box with a 20% fill inside a 10%
+    // washed row. The row that is picked carries the accent as a check on the
+    // ground a pointer would give it, and nothing else.
+    const thinkingCss = readFileSync('src/style/toolbar/thinking-selector.css', 'utf8');
+    const permissionCss = readFileSync('src/style/toolbar/permission-toggle.css', 'utf8');
+    const mcpCss = readFileSync('src/style/toolbar/mcp-selector.css', 'utf8');
+
+    expect(getRule(
+      thinkingCss,
+      '.grimoire-container--chat-window .grimoire-thinking-gear.selected',
+    )).toContain('background: var(--grimoire-hover)');
+    expect(getRule(permissionCss, '.grimoire-permission-option.selected'))
+      .toContain('background: var(--grimoire-hover)');
+    expect(getRule(mcpCss, '.grimoire-mcp-selector-item.enabled'))
+      .not.toContain('background:');
+
+    // The wash is still spent on the buttons these menus hang from - a mode
+    // that is not the default is a pressed toggle - but never on a row.
+    for (const rule of [
+      getRule(thinkingCss, '.grimoire-container--chat-window .grimoire-thinking-gear.selected'),
+      getRule(thinkingCss, '.grimoire-thinking-gear.selected'),
+      getRule(permissionCss, '.grimoire-permission-option.selected'),
+      getRule(mcpCss, '.grimoire-mcp-selector-item.enabled'),
+      getRule(mcpCss, '.grimoire-mcp-selector-check'),
+    ]) {
+      expect(rule).not.toContain('accent-wash');
+      expect(rule).not.toContain('color-mix');
+    }
+
+    // The check is one glyph at one size, defined once.
+    const check = getRule(readFileSync('src/style/base/primitives.css', 'utf8'), '.grimoire-menu-check');
+    expect(check).toContain('width: var(--grimoire-icon-2xs)');
+    expect(check).toContain('color: var(--grimoire-accent)');
+  });
+
+  it('puts the same uppercase label over every composer menu', () => {
+    const mcpHeader = getRule(
+      readFileSync('src/style/toolbar/mcp-selector.css', 'utf8'),
+      '.grimoire-mcp-selector-header',
+    );
+    const groupLabel = getRule(
+      readFileSync('src/style/base/primitives.css', 'utf8'),
+      '.grimoire-group-label',
+    );
+
+    for (const declaration of [
+      'font-family: var(--grimoire-mono)',
+      'font-size: var(--grimoire-text-2xs)',
+      'letter-spacing: var(--grimoire-label-tracking)',
+      'text-transform: uppercase',
+    ]) {
+      expect(mcpHeader).toContain(declaration);
+      expect(groupLabel).toContain(declaration);
     }
   });
 
@@ -72,8 +130,11 @@ describe('chat toolbar selector CSS', () => {
     // underline can sit on the header's own rule.
     expect(badgeRule).not.toContain('width: 28px');
     expect(badgeRule).toContain('padding: 0 var(--grimoire-space-8)');
+    // 2px, not 1.5: the line lands on the header's own rule and half of it is
+    // spent hiding that rule, so at 1.5 it read as a brighter piece of the
+    // rule rather than as the mark for which tab you are in.
     expect(getRule(tabsCss, '.grimoire-tab-badge-active'))
-      .toContain('border-bottom: 1.5px solid var(--grimoire-accent)');
+      .toContain('border-bottom: 2px solid var(--grimoire-accent)');
     expect(headerButtonRule).toContain('width: var(--grimoire-hit-l)');
     expect(headerButtonRule).toContain('height: var(--grimoire-hit-l)');
   });

@@ -31,6 +31,7 @@ describe('decision cards', () => {
     // plane with a full drop shadow and an accent inset ring.
     for (const [sheet, selector] of [
       [DECISION_SHEETS[0], '.grimoire-ask-form'],
+      [DECISION_SHEETS[0], '.grimoire-permission-request'],
       [DECISION_SHEETS[1], '.grimoire-plan-approval-inline'],
     ] as const) {
       const rule = getRule(read(sheet), selector);
@@ -44,6 +45,7 @@ describe('decision cards', () => {
   it('draws the glyph as a glyph, not as a tinted tile', () => {
     for (const [sheet, selector] of [
       [DECISION_SHEETS[0], '.grimoire-ask-glyph'],
+      [DECISION_SHEETS[0], '.grimoire-permission-shield'],
       [DECISION_SHEETS[1], '.grimoire-plan-glyph'],
     ] as const) {
       const rule = getRule(read(sheet), selector);
@@ -80,5 +82,43 @@ describe('decision cards', () => {
 
     expect(hints).toContain('font-family: var(--grimoire-mono)');
     expect(hints).toContain('font-size: var(--grimoire-text-2xs)');
+  });
+
+  /*
+   * The hint is the last line of the card, not a footer band. It carried a rule
+   * above it and its own padding, so a card whose choices already sat under a
+   * rule ended in two horizontal lines eight pixels apart.
+   */
+  it('ends the plan card on a line of text, not on a second band', () => {
+    const hints = getRule(read(DECISION_SHEETS[1]), '.grimoire-plan-approval-inline .grimoire-ask-hints');
+
+    expect(hints).not.toContain('border-top');
+  });
+
+  /*
+   * The plan is the card's own material, set flush in it. It was a second card
+   * inside the first - its own ring, its own raised ground, its own radius -
+   * which is the one thing screen 2d never does: the decision surface has one
+   * frame, and what is being decided is written inside it.
+   */
+  it('sets the plan flush in the card rather than in a card of its own', () => {
+    const preview = getRule(read(DECISION_SHEETS[1]), '.grimoire-plan-content-preview');
+
+    expect(preview).toContain('background: none');
+    expect(preview).not.toContain('box-shadow: inset');
+    expect(preview).not.toContain('border-radius');
+  });
+
+  /*
+   * One column, one gap: the card's parts are stacked by the card, so a part
+   * that grows or is hidden does not leave a row of padding behind it.
+   */
+  it('stacks the plan card in one column with one gap', () => {
+    const card = getRule(read(DECISION_SHEETS[1]), '.grimoire-plan-approval-inline');
+
+    expect(card).toContain('flex-direction: column');
+    expect(card).toContain('gap: var(--grimoire-space-12)');
+    expect(card).toContain('padding: var(--grimoire-space-14)');
+    expect(card).not.toContain('grid-template-rows');
   });
 });

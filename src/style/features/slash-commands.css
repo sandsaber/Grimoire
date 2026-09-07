@@ -1,14 +1,20 @@
 /* Slash Command Dropdown */
+/*
+ * The same menu surface the composer's other four use: a bordered plane with
+ * four pixels of padding, rows that are their own rounded shapes inside it.
+ * It was a blurred panel whose rows were separated by full-width rules, which
+ * made one list in the composer look like a table and the rest like menus.
+ */
 .grimoire-slash-dropdown {
   display: none;
   position: absolute;
   bottom: 100%;
   left: 0;
   right: 0;
+  box-sizing: border-box;
   margin-bottom: var(--grimoire-space-4);
-  background: var(--grimoire-plane);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  padding: var(--grimoire-space-4);
+  background: var(--grimoire-ground);
   border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   box-shadow: var(--grimoire-lift-1);
@@ -32,14 +38,15 @@
 }
 
 .grimoire-slash-item {
-  padding: var(--grimoire-space-8) var(--grimoire-space-12);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--grimoire-space-2) var(--grimoire-space-12);
+  padding: var(--grimoire-space-6) var(--grimoire-space-8);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
-  border-bottom: 1px solid var(--grimoire-line);
-}
-
-.grimoire-slash-item:last-child {
-  border-bottom: none;
 }
 
 .grimoire-slash-item:hover,
@@ -48,32 +55,47 @@
 }
 
 .grimoire-slash-name {
-  font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
+  min-width: 0;
+  overflow: hidden;
   color: var(--grimoire-ink);
   font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grimoire-slash-hint {
-  font-size: var(--grimoire-text-s);
-  color: var(--grimoire-ink-muted);
   margin-left: var(--grimoire-space-8);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+}
+
+/* Where it came from, in the label style every list in the plugin uses. */
+.grimoire-slash-scope {
+  justify-self: end;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .grimoire-slash-desc {
-  font-size: var(--grimoire-text-xs);
-  color: var(--grimoire-ink-muted);
-  margin-top: var(--grimoire-space-2);
+  grid-column: 1 / -1;
   overflow: hidden;
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .grimoire-slash-empty {
-  padding: var(--grimoire-space-16);
-  text-align: center;
-  color: var(--grimoire-ink-muted);
-  font-size: var(--grimoire-text-m);
+  padding: var(--grimoire-space-6) var(--grimoire-space-8);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-xs);
 }
 
 /* Scrollbar */

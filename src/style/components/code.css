@@ -24,10 +24,6 @@
   margin: 0;
 }
 
-.grimoire-message-content :not(pre) > code {
-  overflow-wrap: anywhere;
-}
-
 /* Code blocks without language - wrap content */
 .grimoire-code-wrapper:not(.has-language) pre {
   white-space: pre-wrap;
@@ -54,6 +50,7 @@
   padding: 1px var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-code);
+  overflow-wrap: anywhere;
 }
 
 /* Clickable language label - positioned outside scroll area */

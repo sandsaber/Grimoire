@@ -100,29 +100,25 @@ describe('settings base CSS', () => {
     expect(nextScrollButtonRule).toContain('margin-inline-start: var(--grimoire-space-4)');
   });
 
-  it('uses borderless provider cards with muted copy and blue selected states', () => {
+  it('marks the selected provider with a line, not a fill', () => {
     const css = readSettingsCss();
     const cardRule = getRule(css, '.grimoire-settings-provider-card');
-    const hoverRule = getRule(css, '.grimoire-settings-provider-card:hover');
     const activeRule = getRule(css, '.grimoire-settings-provider-card--active');
-    const activeHoverRule = getRule(css, '.grimoire-settings-provider-card--active:hover');
     const metaRule = getRule(css, '.grimoire-settings-provider-card-meta');
 
-    expect(cardRule).toContain('border: 0');
-    expect(cardRule).toContain('var(--setting-items-background, var(--grimoire-plane)) 82%');
-    expect(hoverRule).toContain('var(--setting-items-background, var(--grimoire-plane)) 78%');
-    expect(activeRule).toContain('border: 0');
-    expect(activeRule).toContain('var(--grimoire-accent) 18%');
-    expect(activeHoverRule).toContain('var(--grimoire-accent) 13%');
+    // Eight tinted tiles, one of them an 18% accent fill: the budget is one fill
+    // per surface, and a card that is only "selected" has not earned it.
+    expect(cardRule).toContain('background: var(--grimoire-ground)');
+    expect(cardRule).not.toContain('--grimoire-accent');
+    expect(activeRule).toContain('border-left: 1.5px solid var(--grimoire-accent)');
+    expect(activeRule).toContain('background: var(--grimoire-ground)');
     expect(metaRule).toContain('color: var(--grimoire-ink-muted)');
   });
 
   it('styles the provider selection hint as compact muted UI copy', () => {
     const css = readSettingsCss();
-    const gridRule = getRule(css, '.grimoire-settings-provider-grid');
     const hintRule = getRule(css, '.grimoire-settings-provider-hint');
 
-    expect(gridRule).toContain('margin: var(--grimoire-space-2) 0 var(--grimoire-space-8)');
     expect(hintRule).toContain('margin: 0 0 var(--grimoire-space-2)');
     expect(hintRule).toContain('color: var(--grimoire-ink-faint)');
     expect(hintRule).toContain('font-size: var(--grimoire-text-m)');
@@ -188,20 +184,31 @@ describe('settings base CSS', () => {
     expect(settingRule).toContain('max-width: none');
   });
 
-  it('uses four provider columns and keeps row edit/delete actions visible', () => {
+  it('holds the providers in a hairline grid and keeps row actions visible', () => {
     const css = readSettingsCss();
     const providerGridRule = getRule(css, '.grimoire-settings-provider-grid');
     const resourceRowRule = getRule(css, '.grimoire-settings-resource-row');
     const actionRule = getRule(
       css,
-      '.grimoire-settings-resource-edit,\n.grimoire-settings-resource-delete',
+      'button.grimoire-settings-resource-edit,\nbutton.grimoire-settings-resource-delete',
     );
 
-    expect(providerGridRule).toContain('grid-template-columns: repeat(4, minmax(0, 1fr))');
+    // Two columns with a 1px gap over a line-coloured ground: the gap is the rule
+    // between cells, so the grid draws its own table without a border each.
+    expect(providerGridRule).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))');
+    expect(providerGridRule).toContain('gap: 1px');
+    expect(providerGridRule).toContain('background: var(--grimoire-line)');
     expect(resourceRowRule).toContain(
-      'grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.8fr) minmax(0, 1fr) 76px',
+      'grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.8fr) 88px',
     );
     expect(actionRule).toContain('display: inline-flex');
-    expect(actionRule).toContain('width: 28px');
+    expect(actionRule).toContain('height: var(--grimoire-hit-s)');
+    // Edit is a glyph in a square; delete is a word, and a 24px square is not
+    // wide enough to hold one - it spilled over the pencil beside it.
+    expect(getRule(css, 'button.grimoire-settings-resource-edit'))
+      .toContain('width: var(--grimoire-hit-s)');
+    expect(css).toContain(
+      'button.grimoire-settings-resource-delete {\n  padding: 0 var(--grimoire-space-6);\n}',
+    );
   });
 });

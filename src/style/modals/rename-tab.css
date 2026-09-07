@@ -1,3 +1,14 @@
+/*
+ * Rename tab.
+ *
+ * The dialog is the shared shape in `dialog.css`; what is particular to it is
+ * the field row — a title, a way back to the one it had, and an offer to write
+ * one for you — and the count of what is left.
+ *
+ * The controls are flex siblings of the input rather than overlays inside it:
+ * Chromium paints an input's overflowing text across its own padding box, so a
+ * long title reserved for with `padding-right` alone runs underneath them.
+ */
 .grimoire-rename-tab-modal {
   width: min(520px, calc(100vw - 32px));
 }
@@ -6,155 +17,8 @@
   padding-bottom: var(--grimoire-space-16);
 }
 
-.grimoire-rename-tab-form {
-  display: flex;
-  flex-direction: column;
-}
-
-.grimoire-rename-tab-label {
-  margin: var(--grimoire-space-8) var(--grimoire-space-2) var(--grimoire-space-6);
-  color: var(--grimoire-ink-faint);
-  font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-bold);
-  letter-spacing: 0.13em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-.grimoire-rename-tab-field {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--grimoire-space-4);
-  min-width: 0;
-  padding-right: var(--grimoire-space-6);
-  border: 1px solid var(--grimoire-line);
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-ground);
-  box-shadow: 0 0 0 2px transparent;
-  transition: border-color var(--grimoire-duration) var(--grimoire-ease), box-shadow var(--grimoire-duration) var(--grimoire-ease);
-}
-
-.grimoire-rename-tab-field:focus-within {
-  border-color: var(--grimoire-accent);
-  box-shadow: var(--grimoire-focus-ring);
-}
-
-/*
- * The controls are flex siblings rather than absolutely positioned overlays: Chromium
- * paints an input's overflowing text across its own padding box, so reserving room with
- * `padding-right` alone lets a long title run underneath the buttons.
- */
-.grimoire-rename-tab-input {
-  box-sizing: border-box;
-  flex: 1 1 auto;
-  height: 42px;
-  min-width: 0;
-  padding: 0 var(--grimoire-space-4) 0 var(--grimoire-space-12);
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-  box-shadow: none;
-  color: var(--grimoire-ink);
-  font: inherit;
-  line-height: 1;
-}
-
-.grimoire-rename-tab-input:focus {
-  border: 0;
-  box-shadow: none;
-  outline: none;
-}
-
-button.grimoire-rename-tab-reset {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: var(--grimoire-space-6);
-  border: 0;
-  border-radius: var(--grimoire-radius-2);
-  background: transparent;
-  box-shadow: none;
-  color: var(--grimoire-ink-muted);
-}
-
-button.grimoire-rename-tab-reset:hover,
-button.grimoire-rename-tab-reset:focus-visible {
-  background: var(--grimoire-hover);
-  box-shadow: none;
-  color: var(--grimoire-ink);
-}
-
-button.grimoire-rename-tab-reset svg {
-  width: 16px;
-  height: 16px;
-}
-
-button.grimoire-rename-tab-suggest {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: var(--grimoire-space-6);
-  border: 0;
-  border-radius: var(--grimoire-radius-2);
-  background: transparent;
-  box-shadow: none;
-  color: var(--grimoire-ink-muted);
-}
-
-button.grimoire-rename-tab-suggest:hover:not(:disabled),
-button.grimoire-rename-tab-suggest:focus-visible:not(:disabled) {
-  background: var(--grimoire-hover);
-  box-shadow: none;
-  color: var(--grimoire-ink);
-}
-
-button.grimoire-rename-tab-suggest:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 button.grimoire-rename-tab-suggest.is-loading svg {
   animation: grimoire-spin 0.9s linear infinite;
-}
-
-button.grimoire-rename-tab-suggest svg {
-  width: 16px;
-  height: 16px;
-}
-
-.grimoire-rename-tab-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--grimoire-space-12);
-  margin-top: var(--grimoire-space-16);
-}
-
-.grimoire-rename-tab-counter {
-  color: var(--grimoire-ink-faint);
-  font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-semibold);
-  line-height: 1.2;
-}
-
-.grimoire-rename-tab-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--grimoire-space-8);
-}
-
-.grimoire-rename-tab-actions button {
-  min-height: 34px;
-  padding: var(--grimoire-space-6) var(--grimoire-space-12);
 }
 
 @media (max-width: 420px) {

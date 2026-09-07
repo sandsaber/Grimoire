@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 
-function readCss(): string {
-  return readFileSync('src/style/modals/rename-tab.css', 'utf8');
+function readCss(file: string): string {
+  return readFileSync(`src/style/modals/${file}`, 'utf8');
 }
 
 function getRule(css: string, selector: string): string {
@@ -10,40 +10,39 @@ function getRule(css: string, selector: string): string {
   return match?.[1] ?? '';
 }
 
-describe('rename-tab.css', () => {
-  it('keeps the field prominent and the footer compact', () => {
-    const css = readCss();
+describe('the rename dialog', () => {
+  it('keeps its own width and leaves the rest of the shape to every other dialog', () => {
+    const css = readCss('rename-tab.css');
 
     expect(getRule(css, '.grimoire-rename-tab-modal')).toContain('width: min(520px, calc(100vw - 32px))');
-    expect(getRule(css, '.grimoire-rename-tab-field')).toContain('position: relative');
-    expect(getRule(css, '.grimoire-rename-tab-field:focus-within')).toContain(
-      'border-color: var(--grimoire-accent)',
-    );
-    expect(getRule(css, '.grimoire-rename-tab-footer')).toContain('justify-content: space-between');
-  });
-
-  it('lets the flex row, not input padding, reserve space for the field controls', () => {
-    const css = readCss();
-
-    // A Chromium input paints its overflowing text across its own padding box, so
-    // padding cannot keep a long title off the controls: they must be flex siblings.
-    const input = getRule(css, '.grimoire-rename-tab-input');
-    expect(input).toContain('flex: 1 1 auto');
-    expect(input).not.toContain('78px');
-    // The gap the input keeps from its controls is the system's, not a literal.
-    expect(input).toContain('padding: 0 var(--grimoire-space-4) 0 var(--grimoire-space-12)');
-
-    for (const selector of ['button.grimoire-rename-tab-reset', 'button.grimoire-rename-tab-suggest']) {
-      const rule = getRule(css, selector);
-      expect(rule).not.toContain('position: absolute');
-      expect(rule).toContain('flex: 0 0 auto');
-    }
-  });
-
-  it('dims the suggest control while it is disabled or loading', () => {
-    const css = readCss();
-
-    expect(getRule(css, 'button.grimoire-rename-tab-suggest:disabled')).toContain('opacity: 0.45');
+    // Five dialogs had five button heights and four field heights between them.
+    // What is particular to this one is the width and the spinner; the shape it
+    // shares now lives in dialog.css, so a change there reaches all of them.
     expect(getRule(css, 'button.grimoire-rename-tab-suggest.is-loading svg')).toContain('animation:');
+  });
+
+  it('sets the field controls beside the input, never over it', () => {
+    const css = readCss('dialog.css');
+
+    // A Chromium input paints its overflowing text across its own padding box,
+    // so padding cannot keep a long title off the controls beside it: they are
+    // siblings in the row, each holding its own width.
+    expect(getRule(css, '.grimoire-dialog-input')).toContain('flex: 1 1 auto');
+    const control = getRule(css, 'button.grimoire-dialog-field-btn');
+    expect(control).not.toContain('position: absolute');
+    expect(control).toContain('flex: 0 0 auto');
+    expect(control).toContain('width: var(--grimoire-field-h)');
+  });
+
+  it('spends the accent once per dialog, on the action that commits', () => {
+    const css = readCss('dialog.css');
+
+    expect(getRule(css, '.grimoire-dialog-actions button.mod-cta')).toContain(
+      'background: var(--grimoire-accent)',
+    );
+    // Cancel is a border and a word. A second fill would make the two choices
+    // look equally weighted, which is the one thing a dialog must not do.
+    expect(getRule(css, '.grimoire-dialog-actions button')).toContain('background: transparent');
+    expect(getRule(css, 'button.grimoire-dialog-field-btn:disabled')).toContain('opacity: 0.45');
   });
 });

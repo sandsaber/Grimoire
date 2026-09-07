@@ -50,9 +50,21 @@
   border-radius: var(--grimoire-radius-1);
 }
 
-/* Visibility utilities live at the end of the bundle so they win by order. */
+/*
+ * Visibility utilities, last in the bundle so they win by order — and written
+ * twice so they win on weight as well.
+ *
+ * Order only decides a tie. A one-class utility loses outright to any component
+ * rule with two, and the composer has one: `.grimoire-container--chat-window
+ * .grimoire-composer-shell { display: grid }`. So the composer could not be
+ * hidden at all, and a plan card — which is appended after it and only looks
+ * like a replacement because the composer goes away — was drawn underneath the
+ * text field instead of in its place. Repeating the class is what gives a
+ * utility the weight its job needs without `!important`, which the review gate
+ * forbids and which would take the choice away from callers for good.
+ */
 .grimoire-panel-view[hidden],
-.grimoire-hidden {
+.grimoire-hidden.grimoire-hidden {
   display: none;
 }
 

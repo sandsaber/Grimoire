@@ -53,7 +53,8 @@
  * The repeating chrome button. It is icon-only because it repeats and the user
  * learns it once; the name is deferred to the tooltip, never dropped.
  */
-.grimoire-header-btn {
+.grimoire-header-btn,
+button.grimoire-header-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -75,6 +76,28 @@
   color: var(--grimoire-ink);
 }
 
+/*
+ * A button that has been clicked keeps focus, and the host paints a focused
+ * button. That left a permanent box around `+` after every new tab — a control
+ * lit up for no reason the reader can see. Only keyboard focus shows a ring.
+ */
+.grimoire-header-btn:focus {
+  background: none;
+  box-shadow: none;
+  outline: none;
+}
+
+.grimoire-header-btn:focus-visible {
+  background: var(--grimoire-hover);
+  box-shadow: var(--grimoire-focus-ring);
+  color: var(--grimoire-ink);
+  outline: none;
+}
+
+.grimoire-header-btn:focus:hover {
+  background: var(--grimoire-hover);
+}
+
 .grimoire-header-btn svg {
   width: var(--grimoire-icon-l);
   height: var(--grimoire-icon-l);
@@ -86,7 +109,7 @@
  * is inset from the header's rule so it reads as part of the tabs without
  * being one.
  */
-.grimoire-new-tab-btn {
+button.grimoire-new-tab-btn {
   align-self: stretch;
   height: auto;
   margin: var(--grimoire-space-6) 0;

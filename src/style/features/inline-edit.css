@@ -40,14 +40,22 @@
   overflow: visible;
 }
 
-/* Input - fully transparent */
+/*
+ * The one Grimoire surface that lives inside the note.
+ *
+ * Its border is the accent rather than the ordinary line, because it is the
+ * only thing on the page that is listening; a grey box in the middle of prose
+ * reads as part of the prose.
+ */
 .grimoire-inline-input {
+  box-sizing: border-box;
   width: 100%;
-  padding: var(--grimoire-space-4) var(--grimoire-space-8);
+  height: 32px;
+  padding: 0 var(--grimoire-space-10);
   padding-inline-end: 32px;
   border-width: 1px;
   border-style: solid;
-  border-color: var(--grimoire-line);
+  border-color: var(--grimoire-accent);
   border-radius: var(--grimoire-radius-2);
   background: transparent;
   color: var(--grimoire-ink);
@@ -110,40 +118,69 @@
   font-weight: inherit;
 }
 
-/* Deleted text - red strikethrough */
+/*
+ * What the edit would change, shown in the note itself.
+ *
+ * Red and green said "bad" and "good" about a proposal nobody has judged yet.
+ * The old words are struck through in the faintest ink and the new ones carry
+ * the accent — the same wash and underline the plugin uses everywhere else for
+ * "this is the thing being proposed".
+ */
 .grimoire-diff-del {
-  background: color-mix(in srgb, var(--grimoire-error) 22%, transparent);
+  background: none;
+  color: var(--grimoire-ink-faint);
   text-decoration: line-through;
-  color: var(--grimoire-ink-muted);
 }
 
-/* Inserted text - green background */
 .grimoire-diff-ins {
-  background: color-mix(in srgb, var(--grimoire-ok) 22%, transparent);
+  background: var(--grimoire-accent-wash);
+  border-bottom: 1.5px solid var(--grimoire-accent);
 }
 
-/* Accept/Reject buttons inline with diff */
+/* Accept and reject, at the end of the sentence they are about. */
 .grimoire-inline-diff-buttons {
   display: inline-flex;
-  gap: var(--grimoire-space-8);
-  margin-inline-start: var(--grimoire-space-6);
+  align-items: center;
+  gap: var(--grimoire-space-2);
+  margin-inline-start: var(--grimoire-space-4);
+  vertical-align: middle;
   background: none;
 }
 
-.grimoire-inline-diff-btn {
-  padding: var(--grimoire-space-4) var(--grimoire-space-6);
-  border: none;
+button.grimoire-inline-diff-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--grimoire-radius-1);
   background: none;
   box-shadow: none;
   outline: none;
-  font-size: var(--grimoire-text-l);
+  color: var(--grimoire-ink-muted);
   cursor: pointer;
+  font-size: var(--grimoire-text-s);
+  line-height: 1;
 }
 
 .grimoire-inline-diff-btn.reject {
+  border-color: var(--grimoire-line);
+}
+
+.grimoire-inline-diff-btn.reject:hover {
+  border-color: var(--grimoire-error-line);
   color: var(--grimoire-error);
 }
 
+/* Applying is what the widget exists for, so it wears the one fill. */
 .grimoire-inline-diff-btn.accept {
-  color: var(--grimoire-ok);
+  background: var(--grimoire-accent);
+  color: var(--grimoire-accent-contrast);
+}
+
+.grimoire-inline-diff-btn.accept:hover {
+  background: var(--grimoire-accent-hover);
 }

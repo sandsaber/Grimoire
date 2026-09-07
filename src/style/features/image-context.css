@@ -10,25 +10,28 @@
 }
 
 /* Individual image preview chip */
+/* The same chip a file gets: a hairline of accent around a name and its cost. */
 .grimoire-image-chip {
   display: flex;
   align-items: center;
+  box-sizing: border-box;
+  height: 36px;
   gap: var(--grimoire-space-8);
-  padding: var(--grimoire-space-6) var(--grimoire-space-8);
-  background: var(--grimoire-ground);
-  border: 1px solid var(--grimoire-line);
-  border-radius: var(--grimoire-radius-2);
+  padding: 0 var(--grimoire-space-4);
+  background: none;
+  border: 1px solid var(--grimoire-accent-line);
+  border-radius: var(--grimoire-radius-1);
   max-width: 200px;
 }
 
 .grimoire-image-chip:hover {
-  border-color: var(--grimoire-accent);
+  background: var(--grimoire-hover);
 }
 
 /* Image thumbnail */
 .grimoire-image-thumb {
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--grimoire-radius-1);
   overflow: hidden;
   flex-shrink: 0;
@@ -58,50 +61,40 @@
 }
 
 .grimoire-image-size {
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  color: var(--grimoire-ink-muted);
 }
 
 /* Remove button */
-.grimoire-image-remove {
-  position: relative;
+.grimoire-image-remove,
+button.grimoire-image-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: background var(--grimoire-duration) var(--grimoire-ease);
   flex-shrink: 0;
-  font-size: 0; /* Hide text character */
-}
-
-.grimoire-image-remove::before,
-.grimoire-image-remove::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 10px;
-  height: 2px;
-  background: var(--grimoire-ink-muted);
+  padding: 0;
+  border: 0;
   border-radius: var(--grimoire-radius-1);
-  transition: background var(--grimoire-duration) var(--grimoire-ease);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-faint);
+  cursor: pointer;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
-.grimoire-image-remove::before {
-  transform: translate(-50%, -50%) rotate(45deg);
-}
-
-.grimoire-image-remove::after {
-  transform: translate(-50%, -50%) rotate(-45deg);
+.grimoire-image-remove svg {
+  width: var(--grimoire-icon-2xs);
+  height: var(--grimoire-icon-2xs);
+  stroke-width: var(--grimoire-stroke-check);
 }
 
 .grimoire-image-remove:hover {
   background: var(--grimoire-error-ground);
-}
-
-.grimoire-image-remove:hover::before,
-.grimoire-image-remove:hover::after {
-  background: var(--grimoire-accent-contrast);
+  color: var(--grimoire-error);
 }
 
 /* Drop overlay - inside input wrapper */
@@ -111,8 +104,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: color-mix(in srgb, var(--grimoire-accent) 8%, transparent);
-  border: 2px dashed var(--grimoire-accent);
+  background: var(--grimoire-accent-wash-weak);
+  border: 1px dashed var(--grimoire-accent);
   border-radius: var(--grimoire-radius-2);
   display: none;
   align-items: center;
@@ -125,21 +118,33 @@
   display: flex;
 }
 
+/* One line: the glyph in the accent, the words in ink. It was a stacked 32px
+ * arrow over a bold accent sentence, which made a hover state shout. */
 .grimoire-drop-content {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
+  color: var(--grimoire-ink-muted);
+}
+
+.grimoire-drop-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
   color: var(--grimoire-accent);
 }
 
 .grimoire-drop-content svg {
-  opacity: 0.7;
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
+  flex: 0 0 auto;
+  color: var(--grimoire-accent);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-drop-content span {
   font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
+  font-weight: var(--grimoire-weight-normal);
 }
 
 /* Images in Messages (displayed above user bubble) */

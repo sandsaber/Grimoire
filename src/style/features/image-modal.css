@@ -28,7 +28,8 @@
   box-shadow: var(--grimoire-lift-2);
 }
 
-.grimoire-image-modal-close {
+.grimoire-image-modal-close,
+button.grimoire-image-modal-close {
   position: absolute;
   top: -12px;
   right: -12px;

@@ -50,6 +50,7 @@
 @import "./features/orchestrator-plan.css";
 
 /* Modals */
+@import "./modals/dialog.css";
 @import "./modals/instruction.css";
 @import "./modals/mcp-modal.css";
 @import "./modals/fork-target.css";
