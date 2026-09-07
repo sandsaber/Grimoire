@@ -445,6 +445,32 @@ describe('OpencodeExecutionBackend', () => {
       .toEqual(trace.cases.approval);
   });
 
+  it('lets a working turn outlive the inactivity window, and still bounds it absolutely', async () => {
+    // The run timeout was armed once at dispatch and only ever cleared, so a
+    // turn longer than the window died even while it was streaming — ten
+    // minutes of work ended exactly like ten minutes of silence. Shared by
+    // every provider on the managed ACP backend, not just this one.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend);
+    void collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    const armed = fixture.scheduler.pending(60_000);
+    expect(armed).toHaveLength(1);
+    const absolute = fixture.scheduler.pending(30 * 60_000);
+    expect(absolute).toHaveLength(1);
+
+    // The agent says something: the turn is alive.
+    fixture.client.emit(agentText('native-session', 'still working'));
+    await flushPromises();
+
+    const rearmed = fixture.scheduler.pending(60_000);
+    expect(rearmed).toHaveLength(1);
+    expect(rearmed[0]).not.toBe(armed[0]);
+    // The ceiling is not a liveness timer and does not move.
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual(absolute);
+  });
+
   it('cancels a permission prepared after its bounded request already failed closed', async () => {
     const preparation = deferred<ManagedAcpPreparedInteraction>();
     const cancel = jest.fn(async () => ({ outcome: { outcome: 'cancelled' as const } }));
@@ -1276,10 +1302,17 @@ class FakeManagedAcpClient implements ManagedAcpClient {
 
 class FakeScheduler implements ManagedAcpExecutionScheduler {
   private readonly tasks = new Map<object, () => void>();
-  setTimeout(callback: () => void): object {
+  private readonly delays = new Map<object, number>();
+  setTimeout(callback: () => void, ms?: number): object {
     const handle = {};
     this.tasks.set(handle, callback);
+    this.delays.set(handle, ms ?? 0);
     return handle;
+  }
+
+  /** Live timers, so a test can tell a re-armed timer from a surviving one. */
+  pending(ms: number): object[] {
+    return [...this.tasks.keys()].filter(handle => this.delays.get(handle) === ms);
   }
   clearTimeout(handle: unknown): void {
     if (typeof handle === 'object' && handle !== null) this.tasks.delete(handle);

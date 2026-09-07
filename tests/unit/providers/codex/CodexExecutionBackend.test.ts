@@ -975,6 +975,36 @@ describe('CodexExecutionBackend', () => {
       .toHaveLength(1);
   });
 
+  it('lets a working turn outlive the inactivity window, and still bounds it absolutely', async () => {
+    // The run timeout was armed once at dispatch and only ever cleared, so ten
+    // minutes of *work* ended exactly like ten minutes of silence. A turn that
+    // streams the whole time is the healthy case, not the stuck one.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    void collectEvents(session.createRun(request(RUN_1, 'default')));
+    await fixture.connection.waitForCall('turn/start');
+
+    const armed = fixture.scheduler.pending(30_000);
+    expect(armed).toHaveLength(1);
+    const absolute = fixture.scheduler.pending(30 * 60_000);
+    expect(absolute).toHaveLength(1);
+
+    // The provider says something: the turn is alive.
+    fixture.connection.notifyExecution('item/agentMessage/delta', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'message-1',
+      delta: 'still working',
+    });
+    await flushPromises();
+
+    const rearmed = fixture.scheduler.pending(30_000);
+    expect(rearmed).toHaveLength(1);
+    expect(rearmed[0]).not.toBe(armed[0]);
+    // The ceiling is not a liveness timer and does not move.
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual(absolute);
+  });
+
   it('arbitrates output-limit, cancellation, and timeout through one interrupt', async () => {
     const interrupt = deferred<Record<string, never>>();
     const fixture = createFixture({
@@ -1260,6 +1290,11 @@ class ManualScheduler implements CodexExecutionScheduler {
     if (typeof handle === 'object' && handle !== null) {
       this.tasks.delete(handle);
     }
+  }
+
+  /** Live timers, so a test can tell a re-armed timer from a surviving one. */
+  pending(delayMs: number): object[] {
+    return [...this.tasks].filter(([, task]) => task.delay === delayMs).map(([handle]) => handle);
   }
 
   fireDelay(delayMs: number): void {
