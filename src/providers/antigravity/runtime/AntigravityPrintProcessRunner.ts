@@ -228,19 +228,26 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
       // and the tab spins forever. So the streams get a grace period *after*
       // exit and the outcome is built from whatever arrived by then — which is
       // what 1.3.2 did by forcing the streams shut once `close` lagged `exit`.
-      const drained = Promise.all([
-        parser
-          ? consumeFrames(child.stdout, parser, outputLimit, onActivity)
-          : consume(child.stdout, stdout, onActivity),
-        consume(child.stderr, stderr, onActivity),
+      // Kept apart from stderr on purpose. This is the side that carries the
+      // turn: with a parser it returns as soon as the `result` frame is read,
+      // and that has to be able to end the wait on its own.
+      const answered = (parser
+        ? consumeFrames(child.stdout, parser, outputLimit, onActivity)
+        : consume(child.stdout, stdout, onActivity))
         // A pipe that fails after the process already left says nothing about
         // the turn, and must not replace its outcome with a rejection.
-      ]).catch(() => undefined);
-      // **The frame, not the process.** Observed live: `agy` answers and stays
-      // resident, so waiting for it to leave leaves the tab spinning on an
-      // answer it already has. Whichever comes first ends the wait, and a CLI
-      // that overstayed its own answer is asked to go.
-      await Promise.race([drained, child.exited]);
+        .catch(() => undefined);
+      const drained = Promise
+        .all([answered, consume(child.stderr, stderr, onActivity)])
+        .catch(() => undefined);
+      // **The frame, not the process — and not the other pipe either.** Observed
+      // live: `agy` answers and stays resident, holding *both* pipes open. An
+      // `all` of the two therefore stays pending after the answer is complete,
+      // and so does the exit, so a wait on those two alone never ends: the
+      // recorded turn had `init`, two `step_update`, and `result` within 7.6 s
+      // and still hung for eleven minutes (#139). The answer arriving is its own
+      // reason to stop waiting, and a CLI that overstayed it is asked to go.
+      await Promise.race([answered, drained, child.exited]);
       let exit: { readonly code: number | null; readonly signal?: string } | undefined;
       sawResultBeforeWait = parser?.getResult() != null;
       if (sawResultBeforeWait) {
@@ -265,17 +272,20 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
         // knows what the CLI actually sent, what ended the wait, and whether a
         // terminal frame was among it. A turn that ends without a `result` is
         // otherwise indistinguishable from one whose `result` we failed to read.
+        // Field names are the log's own safe-key list, not free choice: a string
+        // under any other key is redacted, and a diagnosis that reads
+        // `[redacted-string]` is the silence it was written to end.
         this.report(hooks, {
-          endedBy: sawResultBeforeWait ? 'result-frame' : (exit ? 'process-exit' : 'drain-grace'),
+          budgetExceeded: outputLimit.didExceed,
           exitCode: exit?.code ?? null,
           frameCounts: summariseFrames(frameLog.counts),
           frameTotal: frameLog.total,
           hasResult: result !== null,
-          lastFrame: frameLog.lastName ?? 'none',
+          messageType: frameLog.lastName ?? 'none',
           msToFirstFrame: frameLog.firstAt === undefined ? null : frameLog.firstAt - frameLog.startedAt,
           msToLastFrame: frameLog.lastAt === undefined ? null : frameLog.lastAt - frameLog.startedAt,
-          outputLimitExceeded: outputLimit.didExceed,
-          ...(result ? { resultStatus: result.status } : {}),
+          reason: sawResultBeforeWait ? 'result-frame' : (exit ? 'process-exit' : 'drain-grace'),
+          ...(result ? { status: result.status } : {}),
         });
         succeeded = result !== null && (exit?.code ?? 0) === 0 && !outputLimit.didExceed;
         return {

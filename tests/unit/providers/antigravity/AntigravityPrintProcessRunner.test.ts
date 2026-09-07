@@ -266,6 +266,35 @@ describe('AntigravityPrintProcessRunner', () => {
     expect(child.terminationModes.length).toBeGreaterThan(0);
   });
 
+  it('ends on the result frame while the CLI holds both pipes open', async () => {
+    // The case every earlier test misses, and the reported hang (#139). Each of
+    // them gives the fake an stderr that *ends*, so the combined drain resolves
+    // and the wait is released by a pipe closing. A resident `agy` closes
+    // neither pipe: the frame consumer returns at `result`, but the drain is an
+    // `all` of both, so it stays pending — and so does the exit. Recorded live:
+    // `init`, two `step_update`, and `result` all arrived by 7.6 s, and the turn
+    // still hung for eleven minutes.
+    const child = new FakeManagedChild();
+    (child as { stdout: AsyncIterable<Uint8Array> }).stdout = residentStdout([
+      '{"event":"result","result":{"status":"SUCCESS","response":"ok","error":null}}\n',
+    ]);
+    (child as { stderr: AsyncIterable<Uint8Array> }).stderr = residentStdout([]);
+    const runner = new AntigravityPrintProcessRunner({
+      transport: new FakeTransport(child),
+      drainGraceMs: 1,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog: async () => undefined,
+    });
+
+    const handle = runner.start({
+      ...INVOCATION,
+      cliCapabilities: { addDir: false, printTimeout: false, streamJson: true },
+    });
+
+    await expect(settledWithin(handle.completed, 250)).resolves.toMatchObject({ stdout: 'ok' });
+    expect(child.terminationModes.length).toBeGreaterThan(0);
+  });
+
   it('keeps the run log when the turn ended without a terminal frame', async () => {
     // 1.3.2 unlinked the log only after a successful run. It is the only place
     // `agy` records the real wall-clock cause, so deleting it unconditionally
@@ -320,10 +349,12 @@ describe('AntigravityPrintProcessRunner', () => {
 
     const completion = diagnostics.find(entry => 'hasResult' in entry);
     expect(completion).toMatchObject({
-      endedBy: 'process-exit',
       frameTotal: 3,
       hasResult: false,
-      lastFrame: 'some_new_frame',
+      // Under the log's safe-key names: anything else reaches the file as
+      // `[redacted-string]`, which is exactly the silence this replaced.
+      messageType: 'some_new_frame',
+      reason: 'process-exit',
     });
     // The unread frame is named rather than silently dropped: a terminal frame
     // under a new name would otherwise look exactly like no terminal frame.
@@ -484,6 +515,37 @@ function chunks(values: readonly string[]): AsyncIterable<Uint8Array> {
       }
     },
   };
+}
+
+/**
+ * Frames on a pipe that never closes, the way a resident CLI leaves them.
+ *
+ * Deliberately different from `chunks`: that helper ends its iteration, which
+ * closes the stream and releases anything waiting on the drain.
+ */
+function residentStdout(values: readonly string[]): AsyncIterable<Uint8Array> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for (const value of values) {
+        yield Buffer.from(value, 'utf8');
+      }
+      await new Promise<never>(() => {});
+    },
+  };
+}
+
+/**
+ * Fails loudly instead of hanging the suite: a run that never settles is the
+ * defect under test, and jest's own timeout would report it as an unhelpful
+ * whole-test expiry rather than as this assertion.
+ */
+function settledWithin<T>(work: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    work,
+    new Promise<never>((_resolve, reject) => {
+      setTimeout(() => reject(new Error(`run did not settle within ${ms}ms`)), ms).unref?.();
+    }),
+  ]);
 }
 
 function deferred<T>() {
