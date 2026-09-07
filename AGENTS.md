@@ -9,7 +9,7 @@ Repository documentation and user-facing product copy should be in English unles
 - `AGENTS.md` is the canonical shared instruction file for coding agents.
 - `CLAUDE.md` files exist so Claude Code can load the same instructions. They should import the nearest `AGENTS.md` and contain only Claude-specific additions.
 - Keep root instructions durable. Put path-specific details in nested `AGENTS.md` files next to the code they govern.
-- If a design handoff directory is named by the user, treat it as the source of truth for that task. Keep temporary handoff/debug artifacts untracked unless the user explicitly asks to commit them.
+- If a design handoff directory is named by the user, treat it as the source of truth for that task. Keep temporary handoff/debug artifacts untracked unless the user explicitly asks to commit them. `docs/design/` is the exception and is checked in: [`Grimoire Nordic.html`](docs/design/Grimoire%20Nordic.html) is the drawing the design system describes, every surface doc links to it, and it is meant to be edited as the design moves — not a scratch artifact to be cleaned up.
 
 ## Provider Directories
 
