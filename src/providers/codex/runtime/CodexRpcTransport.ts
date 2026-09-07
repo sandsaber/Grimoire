@@ -3,6 +3,29 @@ import type { Readable, Writable } from 'stream';
 
 import type { JsonRpcError } from './codexAppServerTypes';
 
+/**
+ * An error the peer answered with, as opposed to one that befell the request.
+ *
+ * The distinction is the whole point of the class. A JSON-RPC error response is
+ * proof that the app-server received the request, decided against it and said
+ * so; a transport failure, a timeout or a process exit prove nothing about
+ * whether the request was acted on. Callers that must classify side effects —
+ * the execution run does — cannot tell those apart from a message string, and
+ * flattening the response into `new Error(err.message)` is what forced the run
+ * to assume the worst for every failed native preparation.
+ */
+export class CodexRpcResponseError extends Error {
+  readonly code: number;
+  readonly data: unknown;
+
+  constructor(error: JsonRpcError) {
+    super(error.message);
+    this.name = 'CodexRpcResponseError';
+    this.code = error.code;
+    this.data = error.data;
+  }
+}
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 interface PendingRequest {
@@ -197,8 +220,7 @@ export class CodexRpcTransport {
     if (pending.timer) window.clearTimeout(pending.timer);
 
     if (msg.error) {
-      const err = msg.error as JsonRpcError;
-      pending.reject(new Error(err.message));
+      pending.reject(new CodexRpcResponseError(msg.error as JsonRpcError));
     } else {
       pending.resolve(msg.result);
     }
