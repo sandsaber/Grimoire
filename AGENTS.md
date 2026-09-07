@@ -111,6 +111,13 @@ thirteen screens of the plugin, `1a` through `3c`, in English and in Obsidian's 
 it in a browser and compare against a render of the plugin rather than against a reading of its CSS;
 §16 of the design doc says how to build that render, and why it has to include Obsidian's `app.css`.
 
+It is checked in and it is meant to be edited. When a surface changes, the drawing and
+[`docs/design-system.md`](docs/design-system.md) move with it. When the implementation deliberately
+departs from the drawing — the composer collapses at one chip rather than four, the manage dialog
+draws no close of its own — say so in the doc and say why, next to what the drawing shows. A
+divergence nobody wrote down is indistinguishable from drift, and the next person to open the file
+has no way to tell which one they are looking at.
+
 The rule the whole system rests on: **feature code reads a Grimoire token; only
 `src/style/base/variables.css` reads an Obsidian one.** That is what makes a theme swap a no-op and a
 system change a one-line edit. A colour, size, weight, radius, spacing value, shadow or duration
