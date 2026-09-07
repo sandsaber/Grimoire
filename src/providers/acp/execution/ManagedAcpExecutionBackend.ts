@@ -51,6 +51,7 @@ import type {
   AcpContentPayload,
   AcpTurnRefusalOrigin,
 } from '@/providers/acp/execution/AcpContentPayload';
+import { AcpStartupError } from '@/providers/acp/execution/AcpStartupError';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
@@ -249,6 +250,18 @@ export interface ManagedAcpExecutionBackendContext {
   readonly interactionIdFactory: () => InteractionId;
   readonly now?: () => number;
   readonly controlTimeoutMs?: number;
+  /**
+   * How long the agent has to answer `initialize` when it is first started.
+   *
+   * Separate from `controlTimeoutMs`, which is a *control* budget: two seconds
+   * is a fair wait for `session/cancel` on a process already running, and it is
+   * not a fair wait for a CLI that is still booting. Measured on the shipped
+   * agents, the handshake alone costs ~0.4 s for `grok agent stdio`, ~1.45 s
+   * for `opencode acp` and `mimo acp`, and ~2.1 s for `gemini --acp` — so the
+   * control budget silently failed every turn of the slower three, before the
+   * prompt was sent and with nothing said about why.
+   */
+  readonly startupTimeoutMs?: number;
   readonly resultCommitTimeoutMs: number;
   readonly recoveryTimeoutMs: number;
   readonly runTimeoutMs: number;
@@ -633,7 +646,17 @@ class ManagedAcpExecutionSession implements ExecutionSession {
   }
 
   async prepare(run: ManagedAcpExecutionRun, invocation: ManagedAcpExecutionInvocation): Promise<void> {
-    await this.ensureClient(invocation);
+    try {
+      await this.ensureClient(invocation);
+    } catch (error) {
+      // The startup is the one failure that happens before there is anything to
+      // ask, so it is the one the session sentences cannot describe. Said here
+      // because this is where the run and the failure are both in scope: the
+      // client is ensured before the binding is opened, so the catch further
+      // down never saw it and the turn reached the tab with no words at all.
+      if (error instanceof AcpStartupError) run.presentTurnRefusal(error.message, 'startup');
+      throw error;
+    }
     if (run.isTerminal) return;
     const generation = this.clientGeneration;
     const opened = await this.openSessionBinding(run, invocation, generation);
@@ -836,11 +859,11 @@ class ManagedAcpExecutionSession implements ExecutionSession {
     const initialized = await completesWithin(
       client.initialize(),
       this.context.scheduler,
-      this.context.controlTimeoutMs ?? 2_000,
+      this.context.startupTimeoutMs ?? 30_000,
     );
     if (!initialized) {
       await this.closeClient();
-      throw new ExecutionDispatchError('Managed ACP initialize timed out.', true);
+      throw new AcpStartupError('Managed ACP initialize timed out.');
     }
     this.context.clientObserver?.onClientReady(client);
   }
@@ -892,6 +915,13 @@ class ManagedAcpExecutionSession implements ExecutionSession {
     } catch (error) {
       if (error instanceof JsonRpcErrorResponse) {
         run.presentTurnRefusal(error.message);
+      } else if (error instanceof AcpStartupError) {
+        // Carried rather than dropped. Only a `JsonRpcErrorResponse` used to
+        // reach the tab, so a startup that never produced one left the run with
+        // no words at all — and the composition then explained the silence with
+        // the sentence it had, about a saved session that may be gone. The
+        // conversation had no saved session; the CLI had not finished starting.
+        run.presentTurnRefusal(error.message, 'startup');
       }
       throw error;
     }

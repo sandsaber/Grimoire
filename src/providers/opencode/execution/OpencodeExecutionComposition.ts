@@ -515,8 +515,8 @@ export class OpencodeExecution {
           // A refused *load* is the one refusal whose words are not the whole
           // answer: the session may be fine and the CLI unusable, so the
           // sentence about starting a new chat has to say what it depends on.
-          if (refused?.origin === 'session-load') {
-            return describeAcpSessionOpenFailure('OpenCode', refused.message);
+          if (refused?.origin) {
+            return describeAcpSessionOpenFailure('OpenCode', refused.message, refused.origin);
           }
           if (refused) {
             return refused.message;

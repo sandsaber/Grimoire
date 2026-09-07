@@ -29,8 +29,13 @@ import type { AcpNewSessionResponse, AcpPromptResponse, AcpSessionNotification }
  * "Authentication required", and then that advice is not merely unhelpful, it
  * is wrong: a new chat fails identically. Neither half can be dropped, so the
  * origin travels and the composition says both, the agent's words first.
+ *
+ * `startup` is the third case and the one with no agent in it at all: the
+ * handshake never finished, so nobody refused and nobody said anything. It
+ * still has to be told apart, because it is the only one where *no* session
+ * was involved and every sentence about sessions is a wrong turn.
  */
-export type AcpTurnRefusalOrigin = 'session-load';
+export type AcpTurnRefusalOrigin = 'session-load' | 'startup';
 
 /** What the agent said, and which refusal it was. */
 export interface AcpTurnRefusal {

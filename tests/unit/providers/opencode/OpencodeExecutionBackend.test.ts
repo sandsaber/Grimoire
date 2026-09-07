@@ -81,6 +81,55 @@ describe('OpencodeExecutionBackend', () => {
     ]).toEqual(trace.cases.initializeNewPrompt);
   });
 
+  // A CLI that is merely slow to come up is not a CLI that refused. Measured
+  // against the shipped agents: `grok agent stdio` answers `initialize` in
+  // ~0.4 s, `opencode acp` and `mimo acp` in ~1.45 s, and `gemini --acp` in
+  // ~2.1 s — against a control budget of 2 s meant for `session/cancel`. The
+  // three slow ones lost every turn before it started.
+  it('gives the startup handshake a budget of its own, not the control timeout', async () => {
+    const client = new FakeManagedAcpClient('native-session');
+    const startup = deferred<void>();
+    client.initializeGate = startup.promise;
+    const fixture = createFixture({ clients: [client] });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => client.initializeCalls === 1);
+
+    // Every timer the control budget could have armed expires. A startup
+    // window of its own is longer, so the handshake is not among them.
+    fixture.scheduler.fireAllUpTo(500);
+    startup.resolve();
+
+    await waitFor(() => client.promptRequests.length === 1);
+    // The turn was sent rather than lost to the control budget.
+    expect(client.initializeCalls).toBe(1);
+    expect(client.promptRequests).toHaveLength(1);
+
+    fixture.client.emit(agentText('native-session', 'OpenCode result'));
+    fixture.client.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+    expectTerminal(await events, 'succeeded', 'completed');
+  });
+
+  it('says the startup never finished rather than blaming a saved session', async () => {
+    const client = new FakeManagedAcpClient('native-session');
+    client.initializeGate = new Promise<void>(() => undefined);
+    const fixture = createFixture({ clients: [client] });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => client.initializeCalls === 1);
+
+    fixture.scheduler.fireLast();
+
+    const refusals = (await events)
+      .map(delivery => delivery.event)
+      .filter(event => event.kind === 'provider-content')
+      .map(event => (event as { payload: { kind: string; origin?: string } }).payload)
+      .filter(payload => payload.kind === 'turn-refused');
+    // Without an origin the composition falls through to the sentence about a
+    // saved session, which a conversation that never had one cannot act on.
+    expect(refusals).toEqual([expect.objectContaining({ origin: 'startup' })]);
+  });
+
   it('forwards every session update the surface is drawn from, including the ones it never reads', async () => {
     const fixture = createFixture();
     const session = await createSession(fixture.backend);
@@ -1196,12 +1245,17 @@ class FakeManagedAcpClient implements ManagedAcpClient {
   closeOutcome: 'confirmed' | 'unconfirmed' = 'confirmed';
   closeOutcomes: Array<'confirmed' | 'unconfirmed'> = [];
   newSessionGate?: Promise<void>;
+  /** Holds the startup handshake, the way a cold CLI holds it. */
+  initializeGate?: Promise<void>;
   newSessionConfigOptions?: unknown[];
   private promptCompletion = deferred<AcpPromptResponse>();
 
   constructor(private readonly createdSessionId: string) {}
 
-  async initialize(): Promise<void> { this.initializeCalls += 1; }
+  async initialize(): Promise<void> {
+    this.initializeCalls += 1;
+    await this.initializeGate;
+  }
   async newSession(request: Parameters<ManagedAcpClient['newSession']>[0]) {
     this.newRequests.push(request);
     await this.newSessionGate;
@@ -1275,10 +1329,13 @@ class FakeManagedAcpClient implements ManagedAcpClient {
 }
 
 class FakeScheduler implements ManagedAcpExecutionScheduler {
-  private readonly tasks = new Map<object, () => void>();
-  setTimeout(callback: () => void): object {
+  // The delay is kept, not just the callback: a budget is only correct
+  // relative to the other budgets, so a test that cannot see how long a timer
+  // was armed for cannot tell the startup window from the control one.
+  private readonly tasks = new Map<object, { readonly run: () => void; readonly delayMs: number }>();
+  setTimeout(callback: () => void, delayMs = 0): object {
     const handle = {};
-    this.tasks.set(handle, callback);
+    this.tasks.set(handle, { run: callback, delayMs });
     return handle;
   }
   clearTimeout(handle: unknown): void {
@@ -1288,13 +1345,21 @@ class FakeScheduler implements ManagedAcpExecutionScheduler {
     const task = this.tasks.entries().next().value;
     if (!task) throw new Error('No timer.');
     this.tasks.delete(task[0]);
-    task[1]();
+    task[1].run();
   }
   fireLast(): void {
     const task = [...this.tasks.entries()].at(-1);
     if (!task) throw new Error('No timer.');
     this.tasks.delete(task[0]);
-    task[1]();
+    task[1].run();
+  }
+  /** Fires every timer a budget of `delayMs` or shorter could have armed. */
+  fireAllUpTo(delayMs: number): void {
+    for (const [handle, task] of [...this.tasks.entries()]) {
+      if (task.delayMs > delayMs) continue;
+      this.tasks.delete(handle);
+      task.run();
+    }
   }
 }
 
