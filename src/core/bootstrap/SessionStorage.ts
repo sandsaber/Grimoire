@@ -61,11 +61,19 @@ function cloneAssistantResponseMetadata(
   return Object.keys(clone).length > 0 ? clone : undefined;
 }
 
+/**
+ * A copy of the transcript fit to store, or `undefined` if it could not be made.
+ *
+ * The two answers used to be one. An empty list and a clone that threw both
+ * came back `undefined`, and on the partial-write path `undefined` is not "no
+ * messages" but *delete the messages that are there* — so a transcript this
+ * function merely failed to copy was removed from the record instead.
+ */
 function cloneMessagesForMetadata(
   messages: ChatMessage[] | undefined,
 ): ChatMessage[] | undefined {
-  if (!messages || messages.length === 0) {
-    return undefined;
+  if (!messages) {
+    return [];
   }
 
   try {
@@ -99,6 +107,14 @@ export function clonePersistedMessages(
   messages: ChatMessage[] | undefined,
 ): ChatMessage[] {
   return cloneMessagesForMetadata(messages) ?? [];
+}
+
+/** What a whole-record write stores: an empty transcript is no transcript. */
+function messagesForWholeRecord(
+  messages: ChatMessage[] | undefined,
+): ChatMessage[] | undefined {
+  const cloned = cloneMessagesForMetadata(messages);
+  return cloned && cloned.length > 0 ? cloned : undefined;
 }
 
 /** A conversation the vault holds and this build must not act on. */
@@ -620,7 +636,7 @@ export class SessionStorage {
       sessionId: conversation.sessionId,
       model: conversation.model,
       providerState: buildPersistedProviderState(conversation),
-      messages: cloneMessagesForMetadata(conversation.messages),
+      messages: messagesForWholeRecord(conversation.messages),
       currentNote: conversation.currentNote,
       externalContextPaths: conversation.externalContextPaths,
       enabledMcpServers: conversation.enabledMcpServers,
@@ -694,11 +710,19 @@ function projectConversationFields(
   const fields: Partial<SessionMetadata> = { updatedAt: conversation.updatedAt };
   for (const field of new Set(changed)) {
     switch (field) {
-      case 'messages':
-        fields.messages = cloneMessagesForMetadata(conversation.messages);
+      case 'messages': {
+        const cloned = cloneMessagesForMetadata(conversation.messages);
+        // A copy that could not be made says nothing about the transcript on
+        // disk, so it must not be spread over it: an absent field here is a
+        // deletion, not a no-op.
+        if (!cloned) {
+          break;
+        }
+        fields.messages = cloned;
         fields.vaultSearchContexts = collectVaultSearchContexts(conversation.messages);
         fields.assistantResponseMetadata = collectAssistantResponseMetadata(conversation.messages);
         break;
+      }
       case 'providerState':
         fields.providerState = buildPersistedProviderState(conversation);
         break;
