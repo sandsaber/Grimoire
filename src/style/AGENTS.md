@@ -131,11 +131,12 @@ Local gate (runs in `npm run review:css` and `prebuild:release`):
 - `scripts/reviewCss.js` — `OBSIDIAN_PARTIAL_CSS_FEATURES` denylist (regex + message matching Obsidian's wording).
 - `scripts/check-review-css.mjs` — fails on `!important` **and** any denylisted feature in `src/style/**` and root `styles.css`.
 
-**Known denylisted feature today**
+**Known denylisted features today**
 
 | Feature | Do not use | Prefer |
 |---------|------------|--------|
 | `css-display-contents` | `display: contents` | Normal flow (`display: block` / `flex` / `grid` on a real box). For marker wrappers (e.g. `.grimoire-workspace-provider-section`), keep a real box and style children with `> .wrapper > …` selectors when needed. |
+| `text-decoration` | The Level 3 longhands — `text-decoration-color/line/style/thickness`, `text-underline-offset/position` — and the multi-value shorthand (`text-decoration: underline dotted`) | Plain `text-decoration: underline \| line-through \| none`, which the sheet uses in eight places and review does not flag. For an underline in a colour of its own, `border-bottom: 1px solid …` on the inline element. |
 
 When Obsidian's CSS lint reports a new partial/unsupported feature:
 

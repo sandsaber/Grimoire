@@ -156,6 +156,38 @@ describe('Obsidian review gate', () => {
     ]);
   });
 
+  it('reports the Level 3 text-decoration longhands, and leaves the plain shorthand alone', () => {
+    // Obsidian flagged `text-decoration-color` on the picker's match underline
+    // while eight plain `text-decoration: underline | line-through | none`
+    // declarations in the same sheet went unmentioned, so the denylist has to
+    // separate the two rather than ban the property.
+    const findings = findPartialCssSupportFeatures([
+      {
+        file: 'src/style/example.css',
+        contents: [
+          '.match {',
+          '  text-decoration: underline;',
+          '  text-decoration-color: var(--grimoire-accent);',
+          '  text-underline-offset: 2px;',
+          '  text-decoration: underline dotted;',
+          '}',
+          '.plain { text-decoration: none; }',
+          '.struck { text-decoration: line-through; }',
+        ].join('\n'),
+      },
+    ]);
+
+    expect(findings.map(finding => ({ line: finding.line, declaration: finding.declaration }))).toEqual([
+      { line: 3, declaration: 'text-decoration-color: var(--grimoire-accent);' },
+      { line: 4, declaration: 'text-underline-offset: 2px;' },
+      { line: 5, declaration: 'text-decoration: underline dotted;' },
+    ]);
+    expect(findings.every(finding => finding.featureId === 'text-decoration')).toBe(true);
+    expect(findings[0].message).toBe(
+      'Unexpected browser feature "text-decoration" is only partially supported by Obsidian 1.11.4',
+    );
+  });
+
   it('reports CSS features that Obsidian review only partially supports', () => {
     const findings = findPartialCssSupportFeatures([
       {

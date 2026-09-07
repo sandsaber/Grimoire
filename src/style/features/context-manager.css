@@ -673,11 +673,17 @@ input.grimoire-context-picker-input {
   white-space: nowrap;
 }
 
-/* What matched, underlined in the accent — a line, which is what it may be. */
+/*
+ * What matched, underlined in the accent — a line, which is what it may be.
+ *
+ * Drawn as a border rather than as a decoration: `text-decoration-color` and
+ * `text-underline-offset` are CSS Text Decoration Level 3, which Obsidian's
+ * review baseline lists as partial. The plain `text-decoration: underline`
+ * shorthand is fine and is what the sheet uses elsewhere; it just cannot carry
+ * a colour of its own.
+ */
 .grimoire-context-picker-match {
-  text-decoration: underline;
-  text-decoration-color: var(--grimoire-accent);
-  text-underline-offset: 2px;
+  border-bottom: 1px solid var(--grimoire-accent);
 }
 
 .grimoire-context-picker-row-spacer {
