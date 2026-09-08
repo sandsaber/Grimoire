@@ -288,8 +288,13 @@ export interface ClaudeExecutionBackendContext {
    * minutes of work ended exactly like ten minutes of silence.
    */
   readonly runTimeoutMs?: number;
-  /** The ceiling a run cannot pass however alive it stays. */
-  readonly runAbsoluteTimeoutMs?: number;
+  /**
+   * The ceiling a run cannot pass however alive it stays, or `0` for none.
+   *
+   * Asked when the run arms it, not read once when the backend is built, so
+   * the setting behind it reaches the next turn without reloading the plugin.
+   */
+  readonly runAbsoluteTimeoutMs?: () => number;
   readonly resultCommitTimeoutMs?: number;
   readonly recoveryTimeoutMs?: number;
   readonly controlTimeoutMs?: number;
@@ -2011,13 +2016,16 @@ class ClaudeExecutionRun implements ExecutionRun {
       this.session.dispatch(invocation.message);
       this.emit({ kind: 'run-started' });
       this.armInactivityTimeout();
-      this.absoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
-        if (this.providerCompletionObserved) {
-          return;
-        }
-        this.timeoutTriggered = true;
-        void this.requestTermination();
-      }, this.context.runAbsoluteTimeoutMs ?? 30 * 60_000);
+      const ceilingMs = this.context.runAbsoluteTimeoutMs?.() ?? 30 * 60_000;
+      if (ceilingMs > 0) {
+        this.absoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
+          if (this.providerCompletionObserved) {
+            return;
+          }
+          this.timeoutTriggered = true;
+          void this.requestTermination();
+        }, ceilingMs);
+      }
     } catch (error) {
       if (this.terminal) {
         return;

@@ -258,8 +258,13 @@ export interface ManagedAcpExecutionBackendContext {
    * ended a working turn exactly like a silent one.
    */
   readonly runTimeoutMs: number;
-  /** The ceiling a run cannot pass however alive it stays. */
-  readonly runAbsoluteTimeoutMs?: number;
+  /**
+   * The ceiling a run cannot pass however alive it stays, or `0` for none.
+   *
+   * Asked when the run arms it, not read once when the backend is built, so
+   * the setting behind it reaches the next turn without reloading the plugin.
+   */
+  readonly runAbsoluteTimeoutMs?: () => number;
   readonly maxResultBytes: number;
   /**
    * Whether a failed `session/load` means the saved session is gone.
@@ -1149,10 +1154,11 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     this.attempt += 1;
     this.recoveringAttempt = undefined;
     this.armInactivityTimeout();
-    if (this.absoluteTimeoutHandle === undefined) {
+    const ceilingMs = this.context.runAbsoluteTimeoutMs?.() ?? 30 * 60_000;
+    if (this.absoluteTimeoutHandle === undefined && ceilingMs > 0) {
       this.absoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
         void this.terminate('timeout');
-      }, this.context.runAbsoluteTimeoutMs ?? 30 * 60_000);
+      }, ceilingMs);
     }
     return this.attempt;
   }

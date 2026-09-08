@@ -70,6 +70,29 @@ export function normalizeMaxTabs(value: unknown): number {
   return Math.max(MIN_TABS, Math.min(MAX_TABS, numeric));
 }
 
+export const DEFAULT_RUN_ABSOLUTE_TIMEOUT_MINUTES = 30;
+export const MAX_RUN_ABSOLUTE_TIMEOUT_MINUTES = 24 * 60;
+
+/**
+ * The run ceiling in minutes, as a stored value can be trusted to be.
+ *
+ * `0` is a value and not an absence: it is how the ceiling is removed, for a
+ * turn that is expected to run for hours. Anything that is not a number is the
+ * absence, and gets the default.
+ */
+export function normalizeRunAbsoluteTimeoutMinutes(value: unknown): number {
+  const numeric = typeof value === 'number' && Number.isFinite(value)
+    ? Math.trunc(value)
+    : DEFAULT_RUN_ABSOLUTE_TIMEOUT_MINUTES;
+
+  return Math.max(0, Math.min(MAX_RUN_ABSOLUTE_TIMEOUT_MINUTES, numeric));
+}
+
+/** The same value as the backends arm their ceiling with; `0` arms nothing. */
+export function resolveRunAbsoluteTimeoutMs(settings: { runAbsoluteTimeoutMinutes?: unknown }): number {
+  return normalizeRunAbsoluteTimeoutMinutes(settings.runAbsoluteTimeoutMinutes) * 60_000;
+}
+
 export const CHAT_VIEW_PLACEMENTS = [
   'right-sidebar',
   'left-sidebar',
@@ -172,6 +195,15 @@ export interface GrimoireSettings {
   advancedSectionsOpen: AdvancedSectionsOpen;
   usageIndicatorsEnabled: boolean;
   debugLoggingEnabled: boolean;
+  /**
+   * How long one turn may run before it is stopped, however alive it stays.
+   *
+   * A ceiling, not a liveness window: a turn is separately stopped after ten
+   * minutes of complete silence, and that is the check meant to catch a stuck
+   * provider. This one bounds a turn that never ends at all, and a long
+   * agentic turn is a legitimate reason to raise it. `0` removes it.
+   */
+  runAbsoluteTimeoutMinutes: number;
 
   // Internationalization
   locale: string;

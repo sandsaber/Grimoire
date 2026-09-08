@@ -20,6 +20,7 @@ import {
   type HiddenProviderCommands,
   normalizeMaxTabs,
   normalizePermissionMode,
+  normalizeRunAbsoluteTimeoutMinutes,
   type ProviderConfigMap,
   type TabBarPosition,
 } from '../../core/types/settings';
@@ -383,6 +384,9 @@ export class GrimoireSettingsStorage {
     const showPanelLabels = normalizeShowPanelLabels(stored.showPanelLabels);
     const usageIndicatorsEnabled = normalizeUsageIndicatorsEnabled(stored.usageIndicatorsEnabled);
     const debugLoggingEnabled = normalizeDebugLoggingEnabled(stored.debugLoggingEnabled);
+    const runAbsoluteTimeoutMinutes = normalizeRunAbsoluteTimeoutMinutes(
+      stored.runAbsoluteTimeoutMinutes,
+    );
     const legacyProviderSettings = {
       ...stored,
       hiddenProviderCommands,
@@ -408,6 +412,7 @@ export class GrimoireSettingsStorage {
       showPanelLabels,
       usageIndicatorsEnabled,
       debugLoggingEnabled,
+      runAbsoluteTimeoutMinutes,
     };
 
     const merged = {

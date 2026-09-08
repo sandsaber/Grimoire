@@ -1,7 +1,10 @@
 import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
 
 import { getDefaultHiddenProviderCommands } from '../../core/providers/commands/hiddenCommands';
-import { type GrimoireSettings } from '../../core/types/settings';
+import {
+  DEFAULT_RUN_ABSOLUTE_TIMEOUT_MINUTES,
+  type GrimoireSettings,
+} from '../../core/types/settings';
 import { builtInProviderCatalog } from '../../providers/BuiltInProviderCatalog';
 import { getBuiltInProviderDefaultConfigs } from '../../providers/defaultProviderConfigs';
 
@@ -51,6 +54,7 @@ export const DEFAULT_GRIMOIRE_SETTINGS: GrimoireSettings = {
   advancedSectionsOpen: {},
   usageIndicatorsEnabled: true,
   debugLoggingEnabled: false,
+  runAbsoluteTimeoutMinutes: DEFAULT_RUN_ABSOLUTE_TIMEOUT_MINUTES,
 
   locale: 'en',
 

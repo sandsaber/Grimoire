@@ -188,8 +188,13 @@ export interface CodexExecutionBackendContext {
    * healthy case, and used to die exactly like a silent one.
    */
   readonly runTimeoutMs?: number;
-  /** The ceiling a run cannot pass however alive it stays. */
-  readonly runAbsoluteTimeoutMs?: number;
+  /**
+   * The ceiling a run cannot pass however alive it stays, or `0` for none.
+   *
+   * Asked when the run arms it, not read once when the backend is built, so
+   * the setting behind it reaches the next turn without reloading the plugin.
+   */
+  readonly runAbsoluteTimeoutMs?: () => number;
   readonly maxResultBytes?: number;
 }
 
@@ -1127,9 +1132,12 @@ class CodexExecutionRun implements ExecutionRun {
       }
       this.turnDispatchStarted = true;
       this.armInactivityTimeout();
-      this.runAbsoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
-        void this.handleTimeout();
-      }, this.context.runAbsoluteTimeoutMs ?? 30 * 60_000);
+      const ceilingMs = this.context.runAbsoluteTimeoutMs?.() ?? 30 * 60_000;
+      if (ceilingMs > 0) {
+        this.runAbsoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
+          void this.handleTimeout();
+        }, ceilingMs);
+      }
       if (invocation.turn.kind === 'compact') {
         this.turnStartedMayEstablish = true;
         await services.connection.request('thread/compact/start', { threadId });

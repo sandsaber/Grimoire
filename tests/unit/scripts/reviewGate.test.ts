@@ -188,6 +188,33 @@ describe('Obsidian review gate', () => {
     );
   });
 
+  it('does not read a minified sheet\'s next rule as a second shorthand value', () => {
+    // The built `styles.css` is one line, and it is scanned: a run of
+    // `build:release` leaves it in the root for the next run's gate to read.
+    // The value has to stop at the brace, or every plain `text-decoration`
+    // in the sheet borrows the next rule's spacing and is reported.
+    const findings = findPartialCssSupportFeatures([
+      {
+        file: 'styles.css',
+        contents: '.a{text-decoration:underline}.b{flex:0 0 auto}'
+          + '.c{text-decoration:none}.d{margin:0 auto}',
+      },
+    ]);
+
+    expect(findings).toEqual([]);
+  });
+
+  it('still reports a multi-value shorthand inside a minified sheet', () => {
+    const findings = findPartialCssSupportFeatures([
+      {
+        file: 'styles.css',
+        contents: '.a{color:red}.b{text-decoration:underline dotted}.c{flex:0 0 auto}',
+      },
+    ]);
+
+    expect(findings.map(finding => finding.featureId)).toEqual(['text-decoration']);
+  });
+
   it('reports CSS features that Obsidian review only partially supports', () => {
     const findings = findPartialCssSupportFeatures([
       {

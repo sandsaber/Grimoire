@@ -40,6 +40,7 @@ import type {
   PreparedChatTurn,
 } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
+import { resolveRunAbsoluteTimeoutMs } from '@/core/types/settings';
 import type GrimoirePlugin from '@/main';
 import { isAcpSessionGone, JsonRpcErrorResponse } from '@/providers/acp';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
@@ -382,6 +383,7 @@ export class GrokExecution {
       resultCommitTimeoutMs: 2_000,
       recoveryTimeoutMs: 2_000,
       runTimeoutMs: 10 * 60_000,
+      runAbsoluteTimeoutMs: () => resolveRunAbsoluteTimeoutMs(this.plugin.settings),
       maxResultBytes: MAX_RESULT_BYTES,
     };
     this.backend = new GrokExecutionBackend(context);

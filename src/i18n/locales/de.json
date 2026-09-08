@@ -764,6 +764,10 @@
       "desc": "Modell zur automatischen Generierung von Konversationstiteln.",
       "auto": "Automatisch (aktiver Anbieter)"
     },
+    "runAbsoluteTimeout": {
+      "name": "Maximale Dauer eines Zuges",
+      "desc": "Minuten, die ein Zug laufen darf, bevor er gestoppt wird — unabhängig davon, wie aktiv er bleibt. Ein stiller Zug wird früher gestoppt, nach zehn Minuten ohne ein Wort. Für lange agentische Arbeit erhöhen oder 0 setzen, um die Obergrenze aufzuheben."
+    },
     "navMappings": {
       "name": "Vim-Style Navigationszuordnungen",
       "desc": "Eine Zuordnung pro Zeile. Format: \"map <Taste> <Aktion>\" (Aktionen: scrollUp, scrollDown, focusInput)."
