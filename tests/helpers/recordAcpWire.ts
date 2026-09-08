@@ -42,6 +42,8 @@ export interface AcpWireRecordingTimings {
   readonly turnMs: number;
   /** After the turn's own result, for whatever trails it. */
   readonly graceMs: number;
+  /** How long a killed CLI is given to leave before it is killed outright. */
+  readonly shutdownMs: number;
 }
 
 const DEFAULT_TIMINGS: AcpWireRecordingTimings = {
@@ -54,6 +56,7 @@ const DEFAULT_TIMINGS: AcpWireRecordingTimings = {
   // Kimi Code sends its `usage_update` after `session/prompt` returns, so
   // stopping at the result would drop the one frame that row is about.
   graceMs: 5_000,
+  shutdownMs: 5_000,
 };
 
 /** One line on the wire, in the shape every recording already uses. */
@@ -239,8 +242,19 @@ export async function recordAcpWire(
   });
   child.kill();
   // Windows keeps a handle on a live process's cwd, so the vault cannot be
-  // removed until the child is actually gone. `kill` only asks.
-  await exited;
+  // removed until the child is actually gone. `kill` only asks — and a CLI
+  // that traps SIGTERM to shut down gracefully answers it in its own time, or
+  // not at all. Every other wait here is bounded; this one is too.
+  await Promise.race([exited, new Promise<void>(resolve => {
+    // Unref'd because the loser of this race is still counting: a ref'd timer
+    // holds the event loop open for the rest of its wait after the child has
+    // already gone, which Jest reports as a handle the run leaked.
+    setTimeout(resolve, timings.shutdownMs).unref();
+  })]);
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGKILL');
+    await exited;
+  }
   rmSync(vault, { force: true, recursive: true });
 
   const fromAgent = exchanges.filter(exchange => exchange.direction === 'server->client');
