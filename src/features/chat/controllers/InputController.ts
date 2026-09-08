@@ -1543,27 +1543,32 @@ export class InputController {
         // Only apply AI title if user hasn't manually renamed (title still matches fallback)
         const userManuallyRenamed = currentConv.title !== expectedTitle;
 
-        if (result.success && !userManuallyRenamed) {
+        // The rename is asked first because it answers for both outcomes: a
+        // title the user has already chosen outranks whatever the model made of
+        // it. Asking it inside each arm instead cost a repeated condition and,
+        // in the failed arm, a `result.success` check the compiler needed and
+        // the run could never take.
+        if (userManuallyRenamed) {
+          // User manually renamed, clear the status (user's choice takes precedence)
+          await plugin.updateConversation(conversationId, { titleGenerationStatus: undefined });
+        } else if (result.success) {
           await plugin.renameConversation(conversationId, result.title, 'model');
           await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
-        } else if (!userManuallyRenamed) {
-          // Keep fallback title, mark as failed (only if user hasn't renamed).
-          // The status is a state; the reason the service gave for it exists
-          // only here, and the log is the one place it survives the tick.
+        } else {
+          // Keep fallback title, mark as failed. The status is a state; the
+          // reason the service gave for it exists only here, and the log is the
+          // one place it survives the tick.
           plugin.recordDebugLog?.({
             data: {
               providerId: this.getActiveProviderId(),
               source: 'auto',
             },
-            ...(result.success ? {} : { error: result.error }),
+            error: result.error,
             event: 'generation.failed',
             level: 'warn',
             scope: 'title',
           });
           await plugin.updateConversation(conversationId, { titleGenerationStatus: 'failed' });
-        } else {
-          // User manually renamed, clear the status (user's choice takes precedence)
-          await plugin.updateConversation(conversationId, { titleGenerationStatus: undefined });
         }
         conversationController.updateHistoryDropdown();
       }
