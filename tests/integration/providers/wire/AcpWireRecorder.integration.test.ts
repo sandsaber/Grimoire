@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -54,7 +54,13 @@ process.stdin.on('data', chunk => {
       } });
     }
     if (request.method === 'session/prompt') {
-      if (mode === 'silent') continue;
+      if (mode === 'stubborn') {
+        // Traps the signal and stays up, the way a CLI with a graceful
+        // shutdown does. The interval keeps the loop alive once stdin ends.
+        process.on('SIGTERM', () => {});
+        setInterval(() => {}, 1000);
+      }
+      if (mode === 'silent' || mode === 'stubborn') continue;
       if (mode === 'answers') {
         send({ jsonrpc: '2.0', method: 'session/update', params: {
           sessionId: 'fake-session',
@@ -86,9 +92,16 @@ describe('the ACP wire recorder', () => {
   });
 
   /** Short enough to keep the suite quick; the recorder's own defaults are minutes. */
-  const timings = { handshakeMs: 200, sessionMs: 400, configMs: 100, turnMs: 4_000, graceMs: 200 };
+  const timings = {
+    handshakeMs: 200,
+    sessionMs: 400,
+    configMs: 100,
+    turnMs: 4_000,
+    graceMs: 200,
+    shutdownMs: 300,
+  };
 
-  function record(mode: 'answers' | 'empty' | 'silent'): Promise<Record<string, unknown>> {
+  function record(mode: 'answers' | 'empty' | 'silent' | 'stubborn'): Promise<Record<string, unknown>> {
     return recordAcpWire({
       providerId: 'fake',
       command: process.execPath,
@@ -143,6 +156,39 @@ describe('the ACP wire recorder', () => {
       + 'What the prompt would have produced is unrecorded, and unknown.',
       'The handshake is evidence; the turn needs a longer wait than this recording gave it.',
     ]);
+  });
+
+  it('stops waiting on a CLI that will not take the hint', async () => {
+    // `kill` only asks, and a CLI with a graceful shutdown can decline. The
+    // recorder used to remove the vault out from under a live process, which
+    // Windows refuses; waiting for the process instead is only safe if the
+    // wait ends. Without the escalation this row hangs until the suite's own
+    // timeout.
+    const vaults = (): string[] => readdirSync(tmpdir())
+      .filter(entry => entry.startsWith('grimoire-fake-wire-'));
+    const before = vaults();
+
+    const recording = await record('stubborn');
+
+    expect(recording.coverage).toBe('partial');
+    expect(vaults()).toEqual(before);
+  });
+
+  it('says which CLI it could not start, and leaves no vault behind', async () => {
+    const vaults = (): string[] => readdirSync(tmpdir())
+      .filter(entry => entry.startsWith('grimoire-fake-wire-'));
+    const before = vaults();
+
+    await expect(recordAcpWire({
+      providerId: 'fake',
+      command: join(workspace, 'no-such-cli'),
+      args: [],
+      transport: 'stdio JSON-RPC 2.0 (fake)',
+      fixturePath,
+      timings,
+    })).rejects.toThrow(/no-such-cli/);
+
+    expect(vaults()).toEqual(before);
   });
 
   it('writes the recording where it was told to', async () => {

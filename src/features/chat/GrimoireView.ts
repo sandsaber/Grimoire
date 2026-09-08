@@ -652,7 +652,10 @@ export class GrimoireView extends ItemView {
       const conversationId = tab.conversationId;
       const canAutoRename = titleController.canSuggestTitle(conversationId);
       menu.addItem(item => item
-        .setTitle(t('chat.ui.tabs.autoRename'))
+        // Same action as the history row's item, so it carries the same name:
+        // one menu called it "auto-rename" and the other "regenerate title",
+        // and a reader looking for the first in the second menu found nothing.
+        .setTitle(t('chat.ui.history.regenerateTitle'))
         .setDisabled(!canAutoRename)
         .onClick(() => {
           if (!canAutoRename || !conversationId) return;

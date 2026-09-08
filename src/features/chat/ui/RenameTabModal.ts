@@ -139,7 +139,7 @@ export class RenameTabModal extends Modal {
             suggestButton.disabled = false;
             suggestButton.removeClass('is-loading');
             setIcon(suggestButton, 'sparkles');
-            setTooltip(suggestButton, t('chat.ui.tabs.autoRename'), { placement: 'top' });
+            setTooltip(suggestButton, t('chat.ui.history.regenerateTitle'), { placement: 'top' });
             updateState();
             input.focus();
             input.select();
@@ -164,14 +164,14 @@ export class RenameTabModal extends Modal {
       cls: 'grimoire-rename-tab-suggest grimoire-dialog-field-btn grimoire-dialog-field-btn--accent',
       attr: {
         type: 'button',
-        'aria-label': t('chat.ui.tabs.autoRename'),
+        'aria-label': t('chat.ui.history.regenerateTitle'),
       },
     });
     button.disabled = !available;
     setIcon(button, 'sparkles');
     setTooltip(
       button,
-      available ? t('chat.ui.tabs.autoRename') : t('chat.ui.tabs.autoRenameNeedsMessage'),
+      available ? t('chat.ui.history.regenerateTitle') : t('chat.ui.tabs.autoRenameNeedsMessage'),
       { placement: 'top' },
     );
     return button;

@@ -5,12 +5,22 @@ import { Menu, Notice } from 'obsidian';
 
 import { ConversationController, type ConversationControllerDeps } from '@/features/chat/controllers/ConversationController';
 import { ChatState } from '@/features/chat/state/ChatState';
+import { requestTabRename } from '@/features/chat/ui/RenameTabModal';
 import { t } from '@/i18n/i18n';
 import { confirm } from '@/shared/modals/ConfirmModal';
 
 jest.mock('@/shared/modals/ConfirmModal', () => ({
   confirm: jest.fn().mockResolvedValue(true),
 }));
+
+jest.mock('@/features/chat/ui/RenameTabModal', () => ({
+  requestTabRename: jest.fn().mockResolvedValue(null),
+}));
+
+const renameModalMock = requestTabRename as jest.Mock;
+
+/** Lets the dialog's promise and the rename that follows it settle. */
+const flushPromises = () => new Promise(resolve => { setImmediate(resolve); });
 
 const mockNotice = Notice as jest.Mock;
 
@@ -936,6 +946,16 @@ describe('ConversationController', () => {
       });
 
       it('should show regenerate button for failed title generation', () => {
+        // The control is drawn only where regeneration can run: a service to
+        // ask and a message to name.
+        deps.getTitleGenerationService = () => ({
+          generateTitle: jest.fn().mockResolvedValue(undefined),
+          cancel: jest.fn(),
+        });
+        (deps.plugin.getConversationSync as jest.Mock).mockReturnValue({
+          id: 'conv-1',
+          messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+        });
         (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
           { id: 'conv-1', providerId: 'claude', title: 'Fallback Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'failed' },
         ]);
@@ -946,6 +966,93 @@ describe('ConversationController', () => {
         const actions = item.querySelector('.grimoire-history-item-actions');
         expect(actions).toBeTruthy();
         expect(actions!.querySelector('.grimoire-history-regenerate-btn')).toBeTruthy();
+      });
+
+      it('draws no regenerate control where regeneration would refuse', () => {
+        // Title generation switched off is one of the gates `regenerateTitle`
+        // refuses on, and it refuses without a word. The row used to draw the
+        // control anyway, on the strength of the title alone: a button that
+        // did nothing and explained nothing.
+        deps.plugin.settings.enableAutoTitleGeneration = false;
+        deps.getTitleGenerationService = () => ({
+          generateTitle: jest.fn().mockResolvedValue(undefined),
+          cancel: jest.fn(),
+        });
+        (deps.plugin.getConversationSync as jest.Mock).mockReturnValue({
+          id: 'conv-1',
+          messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+        });
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          { id: 'conv-1', providerId: 'claude', title: 'Fallback Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleSource: 'fallback' },
+        ]);
+
+        controller.updateHistoryDropdown();
+
+        expect(getHistoryItem(dropdown, 'conv-1').querySelector('.grimoire-history-regenerate-btn'))
+          .toBeNull();
+      });
+
+      it('redraws the popover the view owns, which no tab controller holds', () => {
+        // `getHistoryDropdown` answers null for every tab controller: the
+        // popover belongs to the view and is handed here to be drawn. So this
+        // used to return without drawing, and a title generation that finished
+        // after the list was on screen reached nothing - the spinner it put up
+        // stayed up, on a row nothing was working on.
+        const viewDeps = createMockDeps({ getHistoryDropdown: () => null });
+        const viewController = new ConversationController(viewDeps);
+        const viewDropdown = createMockEl();
+        (viewDeps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          { id: 'conv-1', providerId: 'claude', title: 'Naming it', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'pending' },
+        ]);
+        viewController.renderHistoryDropdown(viewDropdown, {
+          onSelectConversation: jest.fn(),
+          onClose: jest.fn(),
+        });
+        expect(getHistoryItem(viewDropdown, 'conv-1').querySelector('.grimoire-action-loading')).toBeTruthy();
+
+        (viewDeps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          { id: 'conv-1', providerId: 'claude', title: 'A name it was given', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'success', titleSource: 'model' },
+        ]);
+        viewController.updateHistoryDropdown();
+
+        expect(getHistoryItem(viewDropdown, 'conv-1').querySelector('.grimoire-action-loading')).toBeNull();
+      });
+
+      it('marks the row with where its title came from', () => {
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          { id: 'conv-1', providerId: 'claude', title: 'Named by the model', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleSource: 'model' },
+          { id: 'conv-2', providerId: 'claude', title: 'Older conversation', createdAt: 900, lastResponseAt: 900, messageCount: 1, preview: 'Preview' },
+        ]);
+
+        controller.updateHistoryDropdown();
+
+        const marked = getHistoryItem(dropdown, 'conv-1');
+        expect(marked.querySelector('.grimoire-title-source-model')).toBeTruthy();
+        // A conversation older than the field says nothing rather than guessing.
+        expect(getHistoryItem(dropdown, 'conv-2').querySelector('.grimoire-title-source')).toBeNull();
+      });
+
+      it('offers to regenerate a placeholder, whatever the last attempt did', () => {
+        // The control is drawn only where regeneration can run: a service to
+        // ask and a message to name.
+        deps.getTitleGenerationService = () => ({
+          generateTitle: jest.fn().mockResolvedValue(undefined),
+          cancel: jest.fn(),
+        });
+        (deps.plugin.getConversationSync as jest.Mock).mockReturnValue({
+          id: 'conv-1',
+          messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+        });
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          { id: 'conv-1', providerId: 'claude', title: 'Fallback Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'success', titleSource: 'fallback' },
+          { id: 'conv-2', providerId: 'claude', title: 'Named by hand', createdAt: 900, lastResponseAt: 900, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'failed', titleSource: 'manual' },
+        ]);
+
+        controller.updateHistoryDropdown();
+
+        expect(getHistoryItem(dropdown, 'conv-1').querySelector('.grimoire-history-regenerate-btn')).toBeTruthy();
+        // Renamed by hand after a failed generation: their title, not a failure.
+        expect(getHistoryItem(dropdown, 'conv-2').querySelector('.grimoire-history-regenerate-btn')).toBeNull();
       });
 
       it('should not show select click handler on current conversation', () => {
@@ -1281,6 +1388,7 @@ describe('ConversationController', () => {
         expect(menu.items.map(item => item.title)).toEqual([
           'Open in new tab',
           'Open in background tab',
+          'Regenerate title',
           'Rename',
           'Delete',
         ]);
@@ -1311,6 +1419,7 @@ describe('ConversationController', () => {
         const menu = (Menu as typeof Menu & { instances: Array<{ items: Array<{ title: string }> }> }).instances[0];
         expect(menu.items.map(item => item.title)).toEqual([
           'Switch to open session',
+          'Regenerate title',
           'Rename',
           'Delete',
         ]);
@@ -1352,6 +1461,10 @@ describe('ConversationController', () => {
         cancel: jest.fn(),
       };
       deps.getTitleGenerationService = () => mockTitleService;
+      (deps.plugin.getConversationSync as jest.Mock).mockReturnValue({
+        id: 'conv-1',
+        messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+      });
 
       (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
         { id: 'conv-1', providerId: 'claude', title: 'Failed', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'failed' },
@@ -1378,7 +1491,7 @@ describe('ConversationController', () => {
       });
     });
 
-    it('should invoke rename handler from the context menu', () => {
+    it('opens the rename dialog from the context menu, not a field in the row', async () => {
       (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
         { id: 'conv-1', providerId: 'claude', title: 'Test Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview' },
       ]);
@@ -1395,24 +1508,82 @@ describe('ConversationController', () => {
       const renameItem = menu.items.find(entry => entry.title === 'Rename');
       expect(renameItem).toBeDefined();
 
-      const mockInput = createMockEl();
-      (mockInput).type = '';
-      (mockInput).className = '';
-      (mockInput).value = '';
-      (mockInput).focus = jest.fn();
-      (mockInput).select = jest.fn();
-
-      const titleEl = item.querySelector('.grimoire-history-item-title');
-      if (titleEl) {
-        (titleEl).replaceWith = jest.fn();
-      }
-      const createElSpy = jest.spyOn(item, 'createEl').mockReturnValue(mockInput);
+      const createElSpy = jest.spyOn(item, 'createEl');
+      renameModalMock.mockResolvedValue('A name the reader typed');
 
       renameItem!.clickHandler();
+      await flushPromises();
 
-      expect(createElSpy).toHaveBeenCalledWith('input');
-      expect((mockInput).value).toBe('Test Title');
-      expect(titleEl!.replaceWith).toHaveBeenCalledWith(mockInput);
+      // The row is not where a name is edited any more.
+      expect(createElSpy).not.toHaveBeenCalledWith('input');
+      expect(renameModalMock).toHaveBeenCalledWith(
+        deps.plugin.app,
+        'Test Title',
+        expect.objectContaining({ conversationId: 'conv-1' }),
+      );
+      expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'A name the reader typed', 'manual');
+    });
+
+    it('renames nothing when the dialog is cancelled', async () => {
+      // Cancel used to have no button at all: the field in the row committed on
+      // blur, and the blur the closing menu caused wrote a name nobody typed.
+      (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+        { id: 'conv-1', providerId: 'claude', title: 'Test Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview' },
+      ]);
+
+      controller.updateHistoryDropdown();
+
+      const item = getHistoryItem(dropdown, 'conv-1');
+      const renameBtn = item.querySelector('.grimoire-history-rename-btn');
+      renameModalMock.mockResolvedValue(null);
+
+      await renameBtn!._eventListeners!.get('click')![0]({ preventDefault: jest.fn(), stopPropagation: jest.fn() });
+      await flushPromises();
+
+      expect(renameModalMock).toHaveBeenCalled();
+      expect(deps.plugin.renameConversation).not.toHaveBeenCalled();
+    });
+
+    it('does not mark a title manual when the dialog returns the name it was given', async () => {
+      // Opening the dialog and pressing OK on an untouched field is not a
+      // rename, and must not put the manual marker on the row.
+      (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+        { id: 'conv-1', providerId: 'claude', title: 'Test Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview' },
+      ]);
+
+      controller.updateHistoryDropdown();
+
+      const item = getHistoryItem(dropdown, 'conv-1');
+      const renameBtn = item.querySelector('.grimoire-history-rename-btn');
+      renameModalMock.mockResolvedValue('Test Title');
+
+      await renameBtn!._eventListeners!.get('click')![0]({ preventDefault: jest.fn(), stopPropagation: jest.fn() });
+      await flushPromises();
+
+      expect(deps.plugin.renameConversation).not.toHaveBeenCalled();
+    });
+
+    it('says so when the rename cannot be saved', async () => {
+      // The field this dialog replaced ran through `runConversationAction` and
+      // showed a notice when the save failed. Awaiting the dialog with `void`
+      // instead left the failure silent and the rejection unhandled.
+      (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+        { id: 'conv-1', providerId: 'claude', title: 'Test Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview' },
+      ]);
+      (deps.plugin.renameConversation as jest.Mock).mockRejectedValue(new Error('disk is gone'));
+
+      controller.updateHistoryDropdown();
+
+      const item = getHistoryItem(dropdown, 'conv-1');
+      const renameBtn = item.querySelector('.grimoire-history-rename-btn');
+      renameModalMock.mockResolvedValue('A name the reader typed');
+      mockNotice.mockClear();
+
+      await renameBtn!._eventListeners!.get('click')![0]({ preventDefault: jest.fn(), stopPropagation: jest.fn() });
+      await flushPromises();
+
+      expect(deps.plugin.renameConversation).toHaveBeenCalled();
+      expect(mockNotice).toHaveBeenCalled();
     });
 
     it('should delete conversation and reload active when deleting current conversation', async () => {
@@ -1736,7 +1907,7 @@ describe('ConversationController - Title Generation', () => {
 
       await controller.regenerateTitle('conv-1');
 
-      expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'New Generated Title');
+      expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'New Generated Title', 'model');
     });
   });
 
@@ -2413,6 +2584,40 @@ describe('ConversationController - regenerateTitle callback branches', () => {
     });
   });
 
+  it('logs the reason the manual regeneration failed', async () => {
+    const recordDebugLog = jest.fn();
+    (deps.plugin as any).recordDebugLog = recordDebugLog;
+    (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
+      id: 'conv-1',
+      providerId: 'opencode',
+      title: 'Original Title',
+      messages: [
+        { role: 'user', content: 'Hello' },
+        { role: 'assistant', content: 'Hi!' },
+      ],
+    });
+
+    mockTitleService.generateTitle.mockImplementation(
+      async (_convId: string, _user: string, callback: any) => {
+        await callback('conv-1', { success: false, error: 'Failed to parse title from response' });
+      }
+    );
+
+    await controller.regenerateTitle('conv-1');
+
+    expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', {
+      titleGenerationStatus: 'failed',
+    });
+    expect(recordDebugLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'Failed to parse title from response',
+        event: 'generation.failed',
+        level: 'warn',
+        scope: 'title',
+      })
+    );
+  });
+
   it('should clear status when user manually renamed during generation', async () => {
     (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
       id: 'conv-1',
@@ -2912,6 +3117,39 @@ describe('ConversationController title suggestion', () => {
     ).toBe(false);
   });
 
+  it('can suggest while the first turn is still running, before the record is saved', () => {
+    // The record for a conversation whose first turn has not ended yet: created
+    // on send, saved when the answer lands.
+    const { controller, deps } = createTitleHarness({
+      conversation: conversationWithUserMessage({ messages: [] }),
+    });
+    deps.state.currentConversationId = 'conv-1';
+    deps.state.messages = [{ id: 'm1', role: 'user', content: 'how do I dry PETG?', timestamp: 1 } as any];
+
+    expect(controller.canSuggestTitle('conv-1')).toBe(true);
+  });
+
+  it('does not read the live messages of another tab', () => {
+    const { controller, deps } = createTitleHarness({
+      conversation: conversationWithUserMessage({ messages: [] }),
+    });
+    deps.state.currentConversationId = 'conv-2';
+    deps.state.messages = [{ id: 'm1', role: 'user', content: 'not this conversation', timestamp: 1 } as any];
+
+    expect(controller.canSuggestTitle('conv-1')).toBe(false);
+  });
+
+  it('generates from the live message when the record has not caught up', async () => {
+    const { controller, deps, service } = createTitleHarness({
+      conversation: conversationWithUserMessage({ messages: [] }),
+    });
+    deps.state.currentConversationId = 'conv-1';
+    deps.state.messages = [{ id: 'm1', role: 'user', content: 'how do I dry PETG?', timestamp: 1 } as any];
+
+    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: true, title: 'Drying PETG' });
+    expect(service.generateTitle).toHaveBeenCalledWith('conv-1', 'how do I dry PETG?', expect.any(Function));
+  });
+
   it('returns the generated title without touching the conversation', async () => {
     const { controller, deps, service } = createTitleHarness();
 
@@ -2959,7 +3197,10 @@ describe('ConversationController title suggestion', () => {
       },
     });
 
-    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: false, reason: 'failed' });
+    // The provider's reason travels with the outcome: `failed` alone is what
+    // made every distinct failure look the same in the log.
+    await expect(controller.suggestTitle('conv-1'))
+      .resolves.toEqual({ ok: false, reason: 'failed', error: 'boom' });
   });
 
   it('maps a thrown provider error to failed instead of rejecting', async () => {
@@ -2970,7 +3211,8 @@ describe('ConversationController title suggestion', () => {
       },
     });
 
-    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: false, reason: 'failed' });
+    await expect(controller.suggestTitle('conv-1'))
+      .resolves.toEqual({ ok: false, reason: 'failed', error: 'network down' });
   });
 
   it('maps a provider that never calls back to failed', async () => {
@@ -2981,7 +3223,8 @@ describe('ConversationController title suggestion', () => {
       },
     });
 
-    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: false, reason: 'failed' });
+    await expect(controller.suggestTitle('conv-1'))
+      .resolves.toEqual({ ok: false, reason: 'failed', error: 'Title generation returned no result.' });
   });
 
   it('resolves once even if the provider calls back twice', async () => {
@@ -3050,7 +3293,7 @@ describe('ConversationController.regenerateTitle', () => {
     await controller.regenerateTitle('conv-1');
 
     expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', { titleGenerationStatus: 'pending' });
-    expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'Drying PETG');
+    expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'Drying PETG', 'model');
     expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', { titleGenerationStatus: 'success' });
   });
 

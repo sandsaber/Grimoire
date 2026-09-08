@@ -339,13 +339,15 @@ describe('getEnhancedPath', () => {
         const binDirs = existingBinDirs ?? versions.map(v => path.join(nvmDir, 'versions', 'node', v, 'bin'));
 
         jest.spyOn(fs, 'existsSync').mockImplementation(p => binDirs.includes(String(p)));
+        // The mock implements one overload of many; `readFileSync` is generic
+        // over ArrayBufferView, so a string-returning stub no longer overlaps.
         jest.spyOn(fs, 'readFileSync').mockImplementation(((p: string) => {
           const s = String(p);
           for (const [aliasPath, value] of Object.entries(aliasFiles)) {
             if (s === aliasPath) return value;
           }
           throw new Error('not found');
-        }) as typeof fs.readFileSync);
+        }) as unknown as typeof fs.readFileSync);
         jest.spyOn(fs, 'readdirSync').mockImplementation(((p: string) => {
           if (String(p) === path.join(nvmDir, 'versions', 'node')) return versions;
           return [];

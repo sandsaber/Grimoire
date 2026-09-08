@@ -443,7 +443,6 @@
         "name": "タブ名",
         "charactersLeft": "残り{count}文字",
         "resetName": "現在の名前に戻す",
-        "autoRename": "自動で名前を付ける",
         "autoRenaming": "タイトルを生成中…",
         "autoRenameNeedsMessage": "まずメッセージを送信してください。名前を付ける対象がありません",
         "autoRenameFailed": "タイトルを生成できませんでした",
@@ -453,7 +452,8 @@
         "closed": "{title} を閉じました",
         "closedMany": "{count} 個のタブを閉じました",
         "undo": "元に戻す",
-        "restoreFailed": "タブを復元できませんでした"
+        "restoreFailed": "タブを復元できませんでした",
+        "titleSourceFallbackPrefix": "仮題"
       },
       "messages": {
         "interrupted": "中断されました",
@@ -540,7 +540,9 @@
         "openBackgroundTab": "バックグラウンドタブで開く",
         "switchOpenSession": "開いているセッションに切り替え",
         "rename": "名前を変更",
-        "noneToResume": "再開する会話はありません"
+        "noneToResume": "再開する会話はありません",
+        "titleSourceModel": "自動生成",
+        "titleSourceManual": "手動"
       },
       "thinking": {
         "expandAriaLabel": "拡張思考 — クリックして展開",

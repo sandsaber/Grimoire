@@ -443,7 +443,6 @@
         "name": "Tab name",
         "charactersLeft": "{count} characters left",
         "resetName": "Reset to current name",
-        "autoRename": "Auto-rename",
         "autoRenaming": "Generating a title…",
         "autoRenameNeedsMessage": "Send a message first — there is nothing to name yet",
         "autoRenameFailed": "Could not generate a title",
@@ -453,7 +452,8 @@
         "closed": "Closed {title}",
         "closedMany": "Closed {count} tabs",
         "undo": "Undo",
-        "restoreFailed": "Failed to restore tab"
+        "restoreFailed": "Failed to restore tab",
+        "titleSourceFallbackPrefix": "Placeholder"
       },
       "messages": {
         "interrupted": "Interrupted",
@@ -540,7 +540,9 @@
         "openBackgroundTab": "Open in background tab",
         "switchOpenSession": "Switch to open session",
         "rename": "Rename",
-        "noneToResume": "No conversations to resume"
+        "noneToResume": "No conversations to resume",
+        "titleSourceModel": "Auto-generated",
+        "titleSourceManual": "Manual"
       },
       "thinking": {
         "expandAriaLabel": "Extended thinking — click to expand",

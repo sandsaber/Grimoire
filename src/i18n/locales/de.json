@@ -443,7 +443,6 @@
         "name": "Tabname",
         "charactersLeft": "Noch {count} Zeichen",
         "resetName": "Aktuellen Namen wiederherstellen",
-        "autoRename": "Automatisch umbenennen",
         "autoRenaming": "Titel wird generiert…",
         "autoRenameNeedsMessage": "Sende zuerst eine Nachricht — es gibt noch nichts zu benennen",
         "autoRenameFailed": "Titel konnte nicht generiert werden",
@@ -453,7 +452,8 @@
         "closed": "{title} geschlossen",
         "closedMany": "{count} Tabs geschlossen",
         "undo": "Rückgängig",
-        "restoreFailed": "Tab konnte nicht wiederhergestellt werden"
+        "restoreFailed": "Tab konnte nicht wiederhergestellt werden",
+        "titleSourceFallbackPrefix": "Platzhalter"
       },
       "messages": {
         "interrupted": "Unterbrochen",
@@ -540,7 +540,9 @@
         "openBackgroundTab": "In Tab im Hintergrund öffnen",
         "switchOpenSession": "Zu geöffneter Sitzung wechseln",
         "rename": "Umbenennen",
-        "noneToResume": "Keine Unterhaltungen zum Fortsetzen"
+        "noneToResume": "Keine Unterhaltungen zum Fortsetzen",
+        "titleSourceModel": "Automatisch erzeugt",
+        "titleSourceManual": "Manuell"
       },
       "thinking": {
         "expandAriaLabel": "Erweitertes Denken — klicken zum Aufklappen",

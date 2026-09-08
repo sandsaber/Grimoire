@@ -37,6 +37,16 @@ export interface AntigravityStreamJsonParserOptions {
    * frame to hand back, because agy emits `result` last.
    */
   onEvent?: (event: AntigravityStreamEvent) => void;
+  /**
+   * Receives the `event` name of every line the CLI wrote, including names this
+   * parser does not act on and lines it could not parse at all.
+   *
+   * Diagnosis, not behaviour: when a turn ends without a `result`, the only
+   * thing that separates "the CLI never sent one" from "it sent one we did not
+   * recognise" is what actually arrived on the wire. Names only — a frame's
+   * contents are the user's prompt and answer and never leave the parser.
+   */
+  onFrame?: (eventName: string) => void;
 }
 
 export interface AntigravityStreamJsonParser {
@@ -64,6 +74,18 @@ export function createAntigravityStreamJsonParser(
   // run one at a time, so advancing the fallback on `DONE` keeps the pair
   // together and separates the next call.
   let fallbackToolIndex = 0;
+
+  const reportFrame = (eventName: string): void => {
+    if (!options.onFrame) {
+      return;
+    }
+    try {
+      options.onFrame(eventName);
+    } catch {
+      // Diagnosis must never abort parsing: the result frame that carries the
+      // actual answer is still ahead on this stream.
+    }
+  };
 
   const emit = (event: AntigravityStreamEvent): void => {
     if (!options.onEvent) {
@@ -126,6 +148,7 @@ export function createAntigravityStreamJsonParser(
     }
     try {
       const record = JSON.parse(trimmed) as Record<string, unknown>;
+      reportFrame(typeof record.event === 'string' && record.event ? record.event : 'unnamed');
       if (record.event === 'step_update') {
         const step = asRecord(record.step_update);
         if (step) {
@@ -147,6 +170,7 @@ export function createAntigravityStreamJsonParser(
       };
     } catch {
       // Ignore malformed lines; agy owns the wire and partial writes happen.
+      reportFrame('unparsed');
     }
   };
 

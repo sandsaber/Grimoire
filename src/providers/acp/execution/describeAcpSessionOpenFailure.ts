@@ -1,3 +1,5 @@
+import type { AcpTurnRefusalOrigin } from '@/providers/acp/execution/AcpContentPayload';
+
 /**
  * What the tab says when the session a turn needs would not open.
  *
@@ -17,8 +19,21 @@
  * conditioned on it out loud. Nothing is dropped, because in one case the
  * agent's words are the only actionable thing and in the other the advice is.
  */
-export function describeAcpSessionOpenFailure(providerName: string, refusal?: string): string {
+export function describeAcpSessionOpenFailure(
+  providerName: string,
+  refusal?: string,
+  origin?: AcpTurnRefusalOrigin,
+): string {
   const said = refusal?.trim();
+  // No session was opened, refused or resumed here: the agent never finished
+  // starting. Both sentences below are about a session, so both are wrong, and
+  // the advice to start a new chat sends a user to a chat that fails the same
+  // way — which is what a slow CLI produced on every turn it was given.
+  if (origin === 'startup') {
+    return `${providerName} did not finish starting, so this turn never began. `
+      + 'This is not a missing session and a new chat will not help: check that the CLI path in '
+      + `the ${providerName} settings is correct and that the CLI starts.`;
+  }
   if (!said) {
     return `${providerName} could not start this turn. If this conversation was resumed from a `
       + 'saved session, that session may no longer exist — starting a new chat will create one.';

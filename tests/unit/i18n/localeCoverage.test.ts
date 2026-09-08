@@ -86,6 +86,7 @@ const VERIFIED_IDENTICAL: Readonly<Record<typeof LOCALES[number], readonly strin
     'settings.version.name',
   ],
   es: [
+    'chat.ui.history.titleSourceManual',
     'chat.ui.contextUsage.tokens',
     'chat.ui.errors.generic',
     'chat.ui.messages.errorLabel',
@@ -131,6 +132,7 @@ const VERIFIED_IDENTICAL: Readonly<Record<typeof LOCALES[number], readonly strin
     'settings.version.name',
   ],
   pt: [
+    'chat.ui.history.titleSourceManual',
     'chat.ui.contextUsage.tokens',
     'chat.ui.status.aria',
     'chat.ui.subagent.prompt',

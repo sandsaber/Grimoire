@@ -76,6 +76,19 @@ export interface ChatRenderTarget {
   setTitle(title: string): void;
   appendMessage(message: ChatMessage): void;
   beginTurn(turn: ChatTurnView): void;
+  /**
+   * Binds a turn to the answer it already has, drawing nothing.
+   *
+   * `beginTurn` opens a new answer: it creates the assistant message and its
+   * bubble. A saved turn already has both in the transcript a redraw just
+   * reset from, so opening a second one is the duplicate this renderer avoids
+   * by not replaying the turn at all. But a turn nobody registered is a turn
+   * nothing can address later, and `reconcileTurn` is documented to arrive
+   * "sometimes much later" — after a redraw it had nowhere to land and was
+   * dropped in silence, leaving "could not establish whether this run
+   * completed" on screen as the last word.
+   */
+  adoptTurn(turn: ChatTurnView): void;
   /** A new block for this turn. The target finalizes whatever it had open. */
   openTurnBlock(runId: RunId, index: number, item: ChatLiveItem): void;
   /** More text into a block already open at this index. */
@@ -169,9 +182,19 @@ export class ChatProjectionRenderer {
     this.target.reset({
       conversationId: projection.conversationId,
       title: projection.title,
-      messages: withoutTurnAnswers(projection),
+      messages: withoutUnsavedTurnAnswers(projection),
     });
     for (const turn of projection.turns) {
+      // A saved turn is already represented by its durable assistant message.
+      // Replaying its transient blocks after a full reset would draw the same
+      // answer twice; removing the durable message instead makes the answer
+      // disappear when those transient blocks are no longer renderable. So it
+      // is adopted rather than opened: nothing is drawn, and what arrives for
+      // this run afterwards still has a message to arrive at.
+      if (turn.persistence === 'saved') {
+        this.target.adoptTurn(turnView(turn));
+        continue;
+      }
       this.openTurn(turn);
     }
     for (const interaction of projection.interactions) {
@@ -184,12 +207,7 @@ export class ChatProjectionRenderer {
   }
 
   private openTurn(turn: ChatTurnProjection): void {
-    this.target.beginTurn({
-      runId: turn.runId,
-      commandId: turn.commandId,
-      assistantMessageId: turn.assistantMessageId,
-      startedAt: turn.startedAt,
-    });
+    this.target.beginTurn(turnView(turn));
     for (const [index, item] of turn.live.entries()) {
       this.target.openTurnBlock(turn.runId, index, item);
     }
@@ -367,12 +385,23 @@ function extendedText(previous: ChatLiveItem, next: ChatLiveItem): string {
     : next.text.slice(previous.text.length);
 }
 
+function turnView(turn: ChatTurnProjection): ChatTurnView {
+  return {
+    runId: turn.runId,
+    commandId: turn.commandId,
+    assistantMessageId: turn.assistantMessageId,
+    startedAt: turn.startedAt,
+  };
+}
+
 function turnAnswerIds(projection: ChatProjection): Set<string> {
   return new Set(projection.turns.map(turn => turn.assistantMessageId));
 }
 
-function withoutTurnAnswers(projection: ChatProjection): readonly ChatMessage[] {
-  const answered = turnAnswerIds(projection);
+function withoutUnsavedTurnAnswers(projection: ChatProjection): readonly ChatMessage[] {
+  const answered = new Set(projection.turns
+    .filter(turn => turn.persistence !== 'saved')
+    .map(turn => turn.assistantMessageId));
   return answered.size === 0
     ? projection.messages
     : projection.messages.filter(message => !answered.has(message.id));

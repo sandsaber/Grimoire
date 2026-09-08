@@ -17,7 +17,9 @@ import type { ChatState } from '../state/ChatState';
 import type { FileContextManager } from '../ui/FileContext';
 import type { ImageContextManager } from '../ui/ImageContext';
 import type { ExternalContextSelector, McpServerSelector } from '../ui/InputToolbar';
+import { requestTabRename } from '../ui/RenameTabModal';
 import type { StatusPanel } from '../ui/StatusPanel';
+import { appendTitleSourceMark } from '../ui/titleSourceMarker';
 import { getRandomGreeting } from '../utils/greetings';
 
 function runConversationAction(action: () => Promise<void>, failureMessage: string): void {
@@ -99,7 +101,20 @@ export type HistoryConversationOpenState = 'closed' | 'open' | 'current';
 
 export type TitleSuggestion =
   | { ok: true; title: string }
-  | { ok: false; reason: 'disabled' | 'no-messages' | 'no-service' | 'failed' };
+  | {
+    ok: false;
+    reason: 'disabled' | 'no-messages' | 'no-service' | 'failed';
+    /**
+     * What the generation said when it failed, carried for the log.
+     *
+     * The service reports a reason for every failure — a parse that found no
+     * title, a runner that threw, a budget that ran out — and until this field
+     * existed the caller replaced all of them with the word `failed`. A title
+     * that never generates is then indistinguishable from one that generated
+     * badly, in the UI and in the log alike.
+     */
+    error?: string;
+  };
 
 type TitleSuggestionSource =
   | { ok: true; userContent: string; service: TitleGenerationService }
@@ -741,15 +756,40 @@ export class ConversationController {
     }
   }
 
+  /** Where the view last had the history drawn, so a later change can reach it. */
+  private lastHistoryRender: {
+    readonly container: HTMLElement;
+    readonly options: Omit<HistoryRenderOptions, 'onRerender'>;
+  } | null = null;
+
   updateHistoryDropdown(): void {
     const dropdown = this.deps.getHistoryDropdown();
-    if (!dropdown) return;
+    if (dropdown) {
+      this.renderHistoryItems(dropdown, {
+        onSelectConversation: (id) => this.switchTo(id),
+        onClose: () => dropdown.removeClass('visible'),
+        onRerender: () => this.updateHistoryDropdown(),
+      });
+      return;
+    }
 
-    this.renderHistoryItems(dropdown, {
-      onSelectConversation: (id) => this.switchTo(id),
-      onClose: () => dropdown.removeClass('visible'),
-      onRerender: () => this.updateHistoryDropdown(),
-    });
+    /*
+     * A tab's controller owns no dropdown — `getHistoryDropdown` answers null
+     * for every one of them, because the popover belongs to the view and is
+     * handed here to be drawn. So this returned without drawing anything, and
+     * everything a turn learned about a title after the list was on screen
+     * reached nothing: the spinner a regeneration puts up, and the one it takes
+     * down. What the reader saw was the title change and a spinner start, drawn
+     * by a refresh that happened to land between the two, and stay for ever.
+     *
+     * Redrawn where it was last drawn. Not when that container has left the
+     * document: the popover is torn down when it closes, and there is nothing
+     * to say to a node nobody is looking at. Explicitly `false`, because a
+     * container that does not answer the question at all is not a torn-down one.
+     */
+    const last = this.lastHistoryRender;
+    if (!last || last.container.isConnected === false) return;
+    this.renderHistoryDropdown(last.container, last.options);
   }
 
   /**
@@ -924,7 +964,9 @@ export class ConversationController {
     // A conversation whose title never generated still has to be findable, so
     // it says when it happened rather than nothing at all.
     const title = conv.title?.trim() || this.formatDate(this.getHistoryTimestamp(conv));
-    const titleEl = content.createDiv({ cls: 'grimoire-history-item-title', text: title });
+    const titleRow = content.createDiv({ cls: 'grimoire-history-item-title-row' });
+    appendTitleSourceMark(titleRow, conv.titleSource);
+    const titleEl = titleRow.createDiv({ cls: 'grimoire-history-item-title', text: title });
     const meta = this.formatHistoryMeta(conv);
     titleEl.setAttribute('title', meta ? `${title}\n${meta}` : title);
     const modelLabel = conv.modelLabel?.trim();
@@ -1009,7 +1051,16 @@ export class ConversationController {
       const loadingEl = actions.createSpan({ cls: 'grimoire-action-btn grimoire-action-loading' });
       setIcon(loadingEl, 'loader-2');
       loadingEl.setAttribute('aria-label', t('chat.ui.history.generatingTitle'));
-    } else if (conv.titleGenerationStatus === 'failed') {
+    } else if (
+      // Only when it can actually run. The control was drawn on the strength of
+      // the title alone, while `regenerateTitle` refuses on gates the row never
+      // asked about — no service, no user message, title generation switched
+      // off — and refuses silently. What the reader got was a button that did
+      // nothing and said nothing. The menu item beside it has always been
+      // greyed on the same question.
+      this.canSuggestTitle(conv.id)
+      && (conv.titleSource ? conv.titleSource === 'fallback' : conv.titleGenerationStatus === 'failed')
+    ) {
       const regenerateBtn = actions.createEl('button', { cls: 'grimoire-action-btn grimoire-history-regenerate-btn' });
       setIcon(regenerateBtn, 'refresh-cw');
       regenerateBtn.setAttribute('aria-label', t('chat.ui.history.regenerateTitle'));
@@ -1030,7 +1081,10 @@ export class ConversationController {
     renameBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.showRenameInput(item, conv.id, conv.title, options);
+      runConversationAction(
+        () => this.requestRename(conv.id, conv.title, options),
+        t('chat.ui.errors.renameConversationFailed'),
+      );
     });
 
     // Deleting a conversation is the one thing on this row that cannot be
@@ -1229,21 +1283,26 @@ export class ConversationController {
       }
     }
 
-    if (conv.titleGenerationStatus === 'failed') {
-      menu.addItem((menuItem) => menuItem
-        .setTitle(t('chat.ui.history.regenerateTitle'))
-        .onClick(() => {
-          runConversationAction(
-            () => this.regenerateTitle(conv.id),
-            t('chat.ui.errors.regenerateFailed'),
-          );
-        }));
-    }
+    // Offered whatever the title is now. Gating this on a failed generation made
+    // «the model named it, but name it again» reachable only from the tab menu,
+    // and a title one is not happy with is not a failed one.
+    menu.addItem((menuItem) => menuItem
+      .setTitle(t('chat.ui.history.regenerateTitle'))
+      .setDisabled(!this.canSuggestTitle(conv.id))
+      .onClick(() => {
+        runConversationAction(
+          () => this.regenerateTitle(conv.id),
+          t('chat.ui.errors.regenerateFailed'),
+        );
+      }));
 
     menu.addItem((menuItem) => menuItem
       .setTitle(t('chat.ui.history.rename'))
       .onClick(() => {
-        this.showRenameInput(item, conversationId, conv.title, options);
+        runConversationAction(
+          () => this.requestRename(conversationId, conv.title, options),
+          t('chat.ui.errors.renameConversationFailed'),
+        );
       }));
     menu.addItem((menuItem) => menuItem
       .setTitle(t('common.delete'))
@@ -1272,57 +1331,46 @@ export class ConversationController {
     }
   }
 
-  /** Shows inline rename input for a conversation. */
-  private showRenameInput(
-    item: HTMLElement,
+  /**
+   * Renaming a conversation asks the same dialog the tabs ask.
+   *
+   * The name used to be edited in the row itself, and the row is the wrong
+   * place for it: the field inherits the row's width, so a title long enough
+   * to be worth renaming does not fit in the box offered to rename it, and
+   * there is nowhere to put a Cancel button - the only way out was Escape,
+   * unannounced. Worse, a field in a row has to guess when editing ended, and
+   * it guessed on blur; opened from the context menu it was blurred by the
+   * menu closing before it was ever focused, so it committed a name nobody
+   * typed and recorded it as `manual`.
+   *
+   * The dialog has none of these problems because it owns its own space: a
+   * full-width field, Cancel, a reset to the previous name, and a button that
+   * asks the model for one. It already existed - only the history row was not
+   * using it.
+   */
+  private async requestRename(
     convId: string,
     currentTitle: string,
     options: HistoryRenderOptions,
-  ): void {
-    const titleEl = item.querySelector('.grimoire-history-item-title') as HTMLElement;
-    if (!titleEl) return;
-
-    const input = item.createEl('input');
-    input.type = 'text';
-    input.className = 'grimoire-rename-input';
-    input.value = currentTitle;
-
-    titleEl.replaceWith(input);
-    input.focus();
-    input.select();
-    input.addEventListener('click', (event) => event.stopPropagation());
-
-    let settled = false;
-    let cancelled = false;
-    const finishRename = async () => {
-      if (settled) return;
-      settled = true;
-
-      if (cancelled) {
-        options.onRerender();
-        return;
-      }
-
-      const newTitle = input.value.trim() || currentTitle;
-      try {
-        await this.deps.plugin.renameConversation(convId, newTitle);
-      } finally {
-        options.onRerender();
-      }
-    };
-
-    input.addEventListener('blur', () => {
-      runConversationAction(finishRename, t('chat.ui.errors.renameConversationFailed'));
+  ): Promise<void> {
+    const { plugin } = this.deps;
+    const nextTitle = await requestTabRename(plugin.app, currentTitle, {
+      controller: this,
+      conversationId: convId,
     });
-    input.addEventListener('keydown', (e) => {
-      // Check !e.isComposing for IME support (Chinese, Japanese, Korean, etc.)
-      if (e.key === 'Enter' && !e.isComposing) {
-        input.blur();
-      } else if (e.key === 'Escape' && !e.isComposing) {
-        cancelled = true;
-        input.blur();
-      }
-    });
+    // `null` is Cancel, and a name equal to the old one is not a rename: both
+    // leave the title alone, and neither may mark it as manually chosen.
+    if (nextTitle === null || nextTitle === currentTitle) return;
+
+    // Thrown on, not swallowed: both call sites run this through
+    // `runConversationAction`, which is what says so to the reader. Awaiting it
+    // with `void` instead left a failed save silent and the rejection
+    // unhandled - the inline field it replaced did show that notice.
+    try {
+      await plugin.renameConversation(convId, nextTitle, 'manual');
+    } finally {
+      options.onRerender();
+    }
   }
 
   // ============================================
@@ -1410,7 +1458,31 @@ export class ConversationController {
    */
   canSuggestTitle(conversationId: string | null): boolean {
     if (!conversationId) return false;
-    return this.resolveTitleSource(this.deps.plugin.getConversationSync(conversationId)).ok;
+    return this.resolveTitleSource(this.deps.plugin.getConversationSync(conversationId), conversationId).ok;
+  }
+
+  /**
+   * The first user message, from the record or from the tab that is on it.
+   *
+   * A conversation is created when its first message is sent and saved when the
+   * turn that answers it ends, so for the whole of that first turn the record
+   * holds no messages while the tab plainly shows one. Gating on the record
+   * alone disabled auto-rename there and explained it with «needs a message» to
+   * a user looking at their own — and it came back by itself when the answer
+   * landed, which is what made it read as a broken control rather than a wait.
+   *
+   * Only this tab's own conversation is answered from the live state: another
+   * tab's messages are not this controller's to read.
+   */
+  private firstUserMessage(
+    conversation: Conversation | null | undefined,
+    conversationId: string,
+  ): ChatMessage | undefined {
+    const stored = conversation?.messages.find(m => m.role === 'user');
+    if (stored) return stored;
+    const { state } = this.deps;
+    if (state.currentConversationId !== conversationId) return undefined;
+    return state.messages.find(m => m.role === 'user');
   }
 
   /**
@@ -1427,7 +1499,7 @@ export class ConversationController {
    */
   async suggestTitle(conversationId: string): Promise<TitleSuggestion> {
     const conversation = await this.deps.plugin.getConversationById(conversationId);
-    const source = this.resolveTitleSource(conversation);
+    const source = this.resolveTitleSource(conversation, conversationId);
     if (!source.ok) return source;
 
     return new Promise<TitleSuggestion>((resolve) => {
@@ -1444,20 +1516,30 @@ export class ConversationController {
         async (_convId, result) => {
           settle(result.success
             ? { ok: true, title: result.title }
-            : { ok: false, reason: 'failed' });
+            : { ok: false, reason: 'failed', ...(result.error ? { error: result.error } : {}) });
         },
       ).then(
-        () => settle({ ok: false, reason: 'failed' }),
-        () => settle({ ok: false, reason: 'failed' }),
+        // Resolving after the callback settled changes nothing; reaching here
+        // first means the service returned without ever calling back, and that
+        // is its own failure and says so.
+        () => settle({ ok: false, reason: 'failed', error: 'Title generation returned no result.' }),
+        (error: unknown) => settle({
+          ok: false,
+          reason: 'failed',
+          error: error instanceof Error ? error.message : 'Title generation threw.',
+        }),
       );
     });
   }
 
   /** Shared gates for both the synchronous check and the actual generation. */
-  private resolveTitleSource(conversation: Conversation | null): TitleSuggestionSource {
+  private resolveTitleSource(
+    conversation: Conversation | null,
+    conversationId: string,
+  ): TitleSuggestionSource {
     if (!this.isAutoTitleEnabled()) return { ok: false, reason: 'disabled' };
 
-    const firstUserMsg = conversation?.messages.find(m => m.role === 'user');
+    const firstUserMsg = this.firstUserMessage(conversation, conversationId);
     if (!conversation || !firstUserMsg) return { ok: false, reason: 'no-messages' };
 
     const service = this.deps.getTitleGenerationService();
@@ -1477,7 +1559,7 @@ export class ConversationController {
     if (!conversation) return;
     // Gate on the conversation we just loaded rather than the sync accessor: same object in
     // production, and it keeps this path independent of which accessor a caller warmed up.
-    if (!this.resolveTitleSource(conversation).ok) return;
+    if (!this.resolveTitleSource(conversation, conversationId).ok) return;
 
     // Remember the title so a manual rename during generation wins over the model.
     const expectedTitle = conversation.title;
@@ -1494,9 +1576,21 @@ export class ConversationController {
       // User renamed it manually while we were generating: their choice wins.
       await plugin.updateConversation(conversationId, { titleGenerationStatus: undefined });
     } else if (suggestion.ok) {
-      await plugin.renameConversation(conversationId, suggestion.title);
+      await plugin.renameConversation(conversationId, suggestion.title, 'model');
       await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
     } else {
+      // Logged rather than only stored: `failed` in the record is a state, and
+      // the reason behind it lives for one tick unless something writes it down.
+      plugin.recordDebugLog?.({
+        data: {
+          providerId: currentConv.providerId,
+          source: 'manual',
+        },
+        ...(suggestion.error ? { error: suggestion.error } : {}),
+        event: 'generation.failed',
+        level: 'warn',
+        scope: 'title',
+      });
       await plugin.updateConversation(conversationId, { titleGenerationStatus: 'failed' });
     }
 
@@ -1526,6 +1620,7 @@ export class ConversationController {
     container: HTMLElement,
     options: Omit<HistoryRenderOptions, 'onRerender'>,
   ): void {
+    this.lastHistoryRender = { container, options };
     this.renderHistoryItems(container, {
       ...options,
       onRerender: () => this.renderHistoryDropdown(container, options),

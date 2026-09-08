@@ -93,6 +93,29 @@ describe('TabBar', () => {
       expect(containerEl._children[0].querySelector('.grimoire-tab-number')?.textContent).toBe('5');
     });
 
+    it('announces a placeholder title in the label, where a colour cannot be seen', () => {
+      const containerEl = createMockEl();
+      const tabBar = new TabBar(containerEl, createMockCallbacks());
+
+      tabBar.update([createTabBarItem({ index: 2, title: 'My Conversation', titleSource: 'fallback' })]);
+
+      expect(containerEl._children[0].getAttribute('aria-label'))
+        .toBe('Tab 2 · Placeholder · My Conversation');
+    });
+
+    it('leaves a model or hand written title unannounced', () => {
+      const containerEl = createMockEl();
+      const tabBar = new TabBar(containerEl, createMockCallbacks());
+
+      tabBar.update([
+        createTabBarItem({ id: 'tab-1', index: 1, title: 'Named by the model', titleSource: 'model' }),
+        createTabBarItem({ id: 'tab-2', index: 2, title: 'Named by hand', titleSource: 'manual' }),
+      ]);
+
+      expect(containerEl._children[0].getAttribute('aria-label')).toBe('Tab 1 · Named by the model');
+      expect(containerEl._children[1].getAttribute('aria-label')).toBe('Tab 2 · Named by hand');
+    });
+
     it('names a tab by the number it shows and the title it does not', () => {
       const containerEl = createMockEl();
       const callbacks = createMockCallbacks();

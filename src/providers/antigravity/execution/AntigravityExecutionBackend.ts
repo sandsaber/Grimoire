@@ -104,6 +104,14 @@ export interface AntigravityProcessRunnerHooks {
   readonly onToolStep?: (step: unknown) => void;
   /** Any sign the run is alive: a byte on a pipe, or its log file growing. */
   readonly onActivity?: () => void;
+  /**
+   * Sanitised structural facts about how the turn ended, for the log.
+   *
+   * Names, counts, and timings only — never prompt, answer, or paths. The
+   * backend does not read it: it exists so a turn that ends without a terminal
+   * frame leaves behind what it actually received.
+   */
+  readonly onDiagnostic?: (data: Readonly<Record<string, unknown>>) => void;
 }
 
 /** See `inactivityTimeoutMs`; ten minutes is `main`'s measured answer (#70). */
@@ -155,6 +163,8 @@ export interface AntigravityExecutionBackendContext {
   readonly gracefulTerminationMs?: number;
   readonly forcedTerminationMs?: number;
   readonly resultCommitTimeoutMs?: number;
+  /** Sanitised structural diagnosis for the log; see the runner hook. */
+  readonly onDiagnostic?: (data: Readonly<Record<string, unknown>>) => void;
 }
 
 export const ANTIGRAVITY_EXECUTION_DESCRIPTOR: ExecutionBackendDescriptor = Object.freeze({
@@ -374,6 +384,7 @@ class AntigravityExecutionRun implements ExecutionRun {
       const process = this.context.processRunner.start(invocation, {
         onActivity: () => this.armInactivityTimeout(),
         onAssistantText: text => this.publishStreamedText(text),
+        onDiagnostic: data => this.context.onDiagnostic?.(data),
         onToolStep: step => this.publishToolStep(step),
       });
       this.process = process;

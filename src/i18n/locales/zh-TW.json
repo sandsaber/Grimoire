@@ -443,7 +443,6 @@
         "name": "分頁名稱",
         "charactersLeft": "還可輸入 {count} 個字元",
         "resetName": "還原目前名稱",
-        "autoRename": "自動重新命名",
         "autoRenaming": "正在產生標題…",
         "autoRenameNeedsMessage": "請先傳送一則訊息，目前還沒有可命名的內容",
         "autoRenameFailed": "無法產生標題",
@@ -453,7 +452,8 @@
         "closed": "已關閉 {title}",
         "closedMany": "已關閉 {count} 個分頁",
         "undo": "復原",
-        "restoreFailed": "無法還原分頁"
+        "restoreFailed": "無法還原分頁",
+        "titleSourceFallbackPrefix": "占位標題"
       },
       "messages": {
         "interrupted": "已中斷",
@@ -540,7 +540,9 @@
         "openBackgroundTab": "在背景分頁開啟",
         "switchOpenSession": "切換至已開啟的工作階段",
         "rename": "重新命名",
-        "noneToResume": "沒有可繼續的對話"
+        "noneToResume": "沒有可繼續的對話",
+        "titleSourceModel": "自動生成",
+        "titleSourceManual": "手動"
       },
       "thinking": {
         "expandAriaLabel": "延伸思考 — 點擊以展開",

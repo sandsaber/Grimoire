@@ -54,7 +54,23 @@ import {
 } from '../runtime/AntigravityImageAttachments';
 
 /** Combined stdout, stderr, and recovered-transcript ceiling for one run. */
-const OUTPUT_BYTE_LIMIT = 64_000;
+/**
+ * How much one print turn may say before the run is stopped.
+ *
+ * A ceiling on memory, not a budget for an answer: the runner keeps the whole
+ * stream so the transcript can be parsed, so something has to bound it.
+ *
+ * The number matters. It used to be `OUTPUT_BUFFER_LIMIT = 64_000` — the size
+ * of a *sliding* parse buffer (`.slice(-OUTPUT_BUFFER_LIMIT)`), which bounded
+ * memory while letting a turn print without end. Carried over to a cumulative
+ * budget, the same 64 KB stopped meaning "keep the last 64 KB" and started
+ * meaning "kill any turn that says more than 64 KB". A trivial agy probe
+ * already writes ~30 KB of stream-json, so real turns were terminated with
+ * `output-limit` and stored an empty answer under the question that asked for
+ * it.
+ */
+export const ANTIGRAVITY_OUTPUT_BYTE_LIMIT = 16 * 1024 * 1024;
+const OUTPUT_BYTE_LIMIT = ANTIGRAVITY_OUTPUT_BYTE_LIMIT;
 
 /**
  * Antigravity chat execution, assembled from the running plugin.
@@ -160,6 +176,15 @@ export class AntigravityExecution {
         clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>),
       },
       sessionInstanceIdFactory: () => sessionInstanceId(opaqueId('si')),
+      // Recorded at `info`, not `debug`: a turn that ends without a terminal
+      // frame is the report we could not explain, and the log is the only place
+      // that outlives it. The payload is names, counts, and timings.
+      onDiagnostic: data => this.plugin.recordDebugLog?.({
+        data: { ...data, providerId: 'antigravity' },
+        event: 'antigravity.turn.completion',
+        level: 'info',
+        scope: 'provider.antigravity',
+      }),
     };
     return new AntigravityExecutionBackend(context);
   }

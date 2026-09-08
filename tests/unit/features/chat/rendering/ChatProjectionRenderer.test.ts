@@ -52,6 +52,7 @@ function recordingTarget(): ChatRenderTarget & { readonly calls: RecordedCall[] 
     setTitle: record('setTitle'),
     appendMessage: record('appendMessage'),
     beginTurn: record('beginTurn'),
+    adoptTurn: record('adoptTurn'),
     openTurnBlock: record('openTurnBlock'),
     extendTurnText: record('extendTurnText'),
     setTurnState: record('setTurnState'),
@@ -255,6 +256,112 @@ describe('chat projection renderer', () => {
       { method: 'appendMessage', args: [expect.objectContaining({ id: 'msg-3' })] },
       { method: 'setTurnPersistence', args: [RUN_ID, 'saved', undefined] },
     ]);
+  });
+
+  it('keeps a saved turn answer when a later transcript rewrite forces a redraw', () => {
+    const target = recordingTarget();
+    const renderer = new ChatProjectionRenderer(target);
+    let projection = started(createChatProjection(conversation([message('msg-1', 'user', 'Hi')]), 1));
+    projection = envelope(projection, 1, {
+      kind: 'output-delta',
+      channel: 'assistant',
+      text: 'Hello.',
+    });
+    projection = envelope(projection, 2, {
+      kind: 'terminal',
+      terminal: 'succeeded',
+      reason: 'completed',
+    });
+    projection = reduceChatProjection(projection, {
+      kind: 'turn-completed',
+      runId: RUN_ID,
+      conversation: conversation([
+        message('msg-1', 'user', 'Hi'),
+        message('assistant-1', 'assistant', 'Hello.'),
+      ]),
+      revision: 2,
+      completedAt: 20,
+    });
+    renderer.render(projection);
+    target.calls.splice(0);
+
+    renderer.render(reduceChatProjection(projection, {
+      kind: 'conversation-loaded',
+      conversation: conversation([
+        message('msg-1-reloaded', 'user', 'Hi'),
+        message('assistant-1', 'assistant', 'Hello.'),
+      ]),
+      revision: 3,
+    }));
+
+    const reset = target.calls.find(call => call.method === 'reset');
+    expect(reset?.args[0]).toEqual(expect.objectContaining({
+      messages: [
+        expect.objectContaining({ id: 'msg-1-reloaded' }),
+        expect.objectContaining({ id: 'assistant-1' }),
+      ],
+    }));
+    expect(methods(target)).not.toContain('beginTurn');
+  });
+
+  it('leaves a redrawn saved turn something for a late reconciliation to reach', () => {
+    // `reconcileTurn` is documented to arrive "sometimes much later", and it is
+    // the only thing that can replace "could not establish whether this run
+    // completed". A saved turn is not re-opened on redraw, so without adopting
+    // it the surface holds no message for this run and the evidence lands
+    // nowhere — the sentence stays on screen as the last word.
+    const target = recordingTarget();
+    const renderer = new ChatProjectionRenderer(target);
+    let projection = started(createChatProjection(conversation([message('msg-1', 'user', 'Hi')]), 1));
+    projection = envelope(projection, 1, {
+      kind: 'terminal',
+      terminal: 'indeterminate',
+      reason: 'cancellation-unknown',
+    });
+    projection = reduceChatProjection(projection, {
+      kind: 'turn-completed',
+      runId: RUN_ID,
+      conversation: conversation([
+        message('msg-1', 'user', 'Hi'),
+        message('assistant-1', 'assistant', ''),
+      ]),
+      revision: 2,
+      completedAt: 20,
+    });
+    renderer.render(projection);
+
+    // The redraw this PR is about: a transcript rewrite the renderer cannot
+    // express as an increment.
+    projection = reduceChatProjection(projection, {
+      kind: 'conversation-loaded',
+      conversation: conversation([
+        message('msg-1-reloaded', 'user', 'Hi'),
+        message('assistant-1', 'assistant', ''),
+      ]),
+      revision: 3,
+    });
+    renderer.render(projection);
+    expect(methods(target)).toContain('adoptTurn');
+    expect(target.calls.find(call => call.method === 'adoptTurn')?.args[0])
+      .toEqual(expect.objectContaining({ assistantMessageId: 'assistant-1', runId: RUN_ID }));
+    target.calls.splice(0);
+
+    renderer.render(reduceChatProjection(projection, {
+      kind: 'reconciliation-record',
+      record: {
+        reconciliationId: `rec-${'6'.repeat(32)}`,
+        runId: RUN_ID,
+        originalTerminal: 'indeterminate',
+        observedOutcome: 'succeeded',
+        evidence: { kind: 'native-history', evidenceRef: 'thread-1' },
+        recordedAt: 30,
+      },
+    }));
+
+    expect(target.calls).toEqual([{
+      method: 'reconcileTurn',
+      args: [RUN_ID, expect.objectContaining({ observedOutcome: 'succeeded' })],
+    }]);
   });
 
   it('shows an interaction while it is open and takes it away when it is answered', () => {

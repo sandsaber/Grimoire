@@ -1512,7 +1512,7 @@ export class InputController {
 
     // Set immediate fallback title
     const fallbackTitle = conversationController.generateFallbackTitle(userContent);
-    await plugin.renameConversation(state.currentConversationId, fallbackTitle);
+    await plugin.renameConversation(state.currentConversationId, fallbackTitle, 'fallback');
 
     if (!plugin.settings.enableAutoTitleGeneration) {
       return;
@@ -1543,20 +1543,68 @@ export class InputController {
         // Only apply AI title if user hasn't manually renamed (title still matches fallback)
         const userManuallyRenamed = currentConv.title !== expectedTitle;
 
-        if (result.success && !userManuallyRenamed) {
-          await plugin.renameConversation(conversationId, result.title);
-          await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
-        } else if (!userManuallyRenamed) {
-          // Keep fallback title, mark as failed (only if user hasn't renamed)
-          await plugin.updateConversation(conversationId, { titleGenerationStatus: 'failed' });
-        } else {
+        // Said before the status is decided, because the failure is the same
+        // failure either way. A rename during generation clears the status, and
+        // clearing it used to take the reason with it — so the one case where
+        // nothing is left in the record was also the one that wrote no line.
+        // `state` is what became of the status, so a `failed` line beside a
+        // conversation with no failed status still reconciles.
+        if (!result.success) {
+          plugin.recordDebugLog?.({
+            data: {
+              providerId: this.getActiveProviderId(),
+              source: 'auto',
+              state: userManuallyRenamed ? 'user-renamed' : 'failed',
+            },
+            error: result.error,
+            event: 'generation.failed',
+            level: 'warn',
+            scope: 'title',
+          });
+        }
+        // The rename is asked first because it answers for both outcomes: a
+        // title the user has already chosen outranks whatever the model made of
+        // it. Asking it inside each arm instead cost a repeated condition and,
+        // in the failed arm, a `result.success` check the compiler needed and
+        // the run could never take.
+        if (userManuallyRenamed) {
           // User manually renamed, clear the status (user's choice takes precedence)
           await plugin.updateConversation(conversationId, { titleGenerationStatus: undefined });
+        } else if (result.success) {
+          await plugin.renameConversation(conversationId, result.title, 'model');
+          await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
+        } else {
+          // Keep the fallback title, and mark the status the reason above names.
+          await plugin.updateConversation(conversationId, { titleGenerationStatus: 'failed' });
         }
         conversationController.updateHistoryDropdown();
       }
-    ).catch(() => {
-      // Silently ignore title generation errors
+    ).catch(async (error: unknown) => {
+      // The service reports failures through the callback, so reaching here is
+      // the generation breaking outside its own contract. Swallowed as before -
+      // a title must never break a turn - but no longer unobservable.
+      plugin.recordDebugLog?.({
+        data: {
+          providerId: this.getActiveProviderId(),
+          source: 'auto',
+        },
+        error,
+        event: 'generation.threw',
+        level: 'warn',
+        scope: 'title',
+      });
+      // A rejection is an outcome, and it was the one outcome that wrote none.
+      // `pending` is set before the service is asked and the callback is what
+      // clears it, so a service that throws instead of calling back left the
+      // history row spinning on a title nothing was generating - for the life
+      // of the vault, because the status is persisted.
+      //
+      // Only when it is still pending: a callback that already answered has
+      // said something truer than this, and a promise can reject after it.
+      const conversation = await plugin.getConversationById(convId);
+      if (conversation?.titleGenerationStatus !== 'pending') return;
+      await plugin.updateConversation(convId, { titleGenerationStatus: 'failed' });
+      conversationController.updateHistoryDropdown();
     });
   }
 

@@ -1,6 +1,7 @@
 import { executionSessionId, runId, sessionInstanceId } from '@/core/execution/ExecutionIds';
 import type { AntigravityInvocation } from '@/providers/antigravity/execution/AntigravityExecutionBackend';
 import { AntigravityExecutionBackend } from '@/providers/antigravity/execution/AntigravityExecutionBackend';
+import { ANTIGRAVITY_OUTPUT_BYTE_LIMIT } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
 import {
   type AntigravityManagedChildProcess,
   AntigravityPrintProcessRunner,
@@ -190,6 +191,218 @@ describe('AntigravityPrintProcessRunner', () => {
     });
   });
 
+  it('lets a turn print far more than the old buffer size on the configured budget', async () => {
+    // The budget is what the product actually runs with, not a test value: it
+    // used to be a *sliding buffer* size (`.slice(-64_000)`), and carrying the
+    // number over to a cumulative budget turned "keep the last 64 KB" into
+    // "kill any turn that says more than 64 KB". A trivial agy probe already
+    // writes ~30 KB, so real turns died and stored an empty answer.
+    const spoken = 200_000;
+    const child = new FakeManagedChild({
+      stdout: ['x'.repeat(spoken)],
+    });
+    const runner = new AntigravityPrintProcessRunner({
+      transport: new FakeTransport(child),
+      outputByteLimit: ANTIGRAVITY_OUTPUT_BYTE_LIMIT,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog: async () => undefined,
+    });
+    const handle = runner.start(INVOCATION);
+    child.exit.resolve({ code: 0 });
+
+    const outcome = await handle.completed;
+    expect(outcome.outputLimitExceeded).toBeUndefined();
+    expect(outcome.stdout).toHaveLength(spoken);
+  });
+
+  it('finishes a turn whose pipes an orphan still holds after the process exited', async () => {
+    // 1.3.2 gave `close` a grace period after `exit` and then forced the
+    // streams shut, because "an orphaned grandchild holding the pipes would
+    // otherwise hold the whole run hostage". Waiting on the streams with no
+    // deadline brings the hostage back: agy answers, exits, and the tab spins
+    // forever on a pipe nobody will close.
+    const child = new FakeManagedChild();
+    // A stdout that never ends, the way a held pipe behaves.
+    (child as { stdout: AsyncIterable<Uint8Array> }).stdout = {
+      [Symbol.asyncIterator]: () => ({ next: () => new Promise<never>(() => {}) }),
+    } as AsyncIterable<Uint8Array>;
+    const runner = new AntigravityPrintProcessRunner({
+      transport: new FakeTransport(child),
+      outputByteLimit: ANTIGRAVITY_OUTPUT_BYTE_LIMIT,
+      drainGraceMs: 1,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog: async () => undefined,
+      recoverTranscript: async () => ({ output: 'answered', outputLimitExceeded: false }),
+    });
+    const handle = runner.start(INVOCATION);
+    child.exit.resolve({ code: 0 });
+
+    await expect(handle.completed).resolves.toMatchObject({ exitCode: 0 });
+  });
+
+  it('ends a turn on the result frame even when the CLI never leaves', async () => {
+    // Observed live: `agy` answered and stayed resident. Treating process exit
+    // as the end of the turn leaves the tab spinning on an answer it already
+    // has. The turn is over when the last `result` frame arrives.
+    const child = new FakeManagedChild({
+      stdout: [
+        '{"event":"result","result":{"status":"ok","response":"done","error":null}}\n',
+      ],
+    });
+    // `exit` is never resolved: the process outlives its own answer.
+    const runner = new AntigravityPrintProcessRunner({
+      transport: new FakeTransport(child),
+      drainGraceMs: 1,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog: async () => undefined,
+    });
+
+    const handle = runner.start({
+      ...INVOCATION,
+      cliCapabilities: { addDir: false, printTimeout: false, streamJson: true },
+    });
+
+    await expect(handle.completed).resolves.toMatchObject({ stdout: 'done' });
+    expect(child.terminationModes.length).toBeGreaterThan(0);
+  });
+
+  it('ends on the result frame while the CLI holds both pipes open', async () => {
+    // The case every earlier test misses, and the reported hang (#139). Each of
+    // them gives the fake an stderr that *ends*, so the combined drain resolves
+    // and the wait is released by a pipe closing. A resident `agy` closes
+    // neither pipe: the frame consumer returns at `result`, but the drain is an
+    // `all` of both, so it stays pending — and so does the exit. Recorded live:
+    // `init`, two `step_update`, and `result` all arrived by 7.6 s, and the turn
+    // still hung for eleven minutes.
+    const child = new FakeManagedChild();
+    (child as { stdout: AsyncIterable<Uint8Array> }).stdout = residentStdout([
+      '{"event":"result","result":{"status":"SUCCESS","response":"ok","error":null}}\n',
+    ]);
+    (child as { stderr: AsyncIterable<Uint8Array> }).stderr = residentStdout([]);
+    const runner = new AntigravityPrintProcessRunner({
+      transport: new FakeTransport(child),
+      drainGraceMs: 1,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog: async () => undefined,
+    });
+
+    const handle = runner.start({
+      ...INVOCATION,
+      cliCapabilities: { addDir: false, printTimeout: false, streamJson: true },
+    });
+
+    await expect(settledWithin(handle.completed, 250)).resolves.toMatchObject({ stdout: 'ok' });
+    expect(child.terminationModes.length).toBeGreaterThan(0);
+  });
+
+  it('does not leave the grace timer armed when the turn ends before it', async () => {
+    // The grace period is the loser of a race on every turn that ends normally,
+    // and a loser left running is a timer per turn firing into a renderer that
+    // may already be gone. Both neighbours in this provider pair their
+    // `window.setTimeout` with a `clearTimeout`; this one has to as well.
+    // Watched, not replaced: the timers still behave normally, and the invariant
+    // is only that the run cleared every one it armed.
+    const setSpy = jest.spyOn(window, 'setTimeout');
+    const clearSpy = jest.spyOn(window, 'clearTimeout');
+
+    try {
+      const child = new FakeManagedChild({
+        stdout: [
+          '{"event":"result","result":{"status":"ok","response":"done","error":null}}\n',
+        ],
+      });
+      child.exit.resolve({ code: 0 });
+      const runner = new AntigravityPrintProcessRunner({
+        transport: new FakeTransport(child),
+        // Long enough that a leaked timer would outlive the test itself.
+        drainGraceMs: 30_000,
+        createLogPath: () => '/tmp/antigravity.log',
+        removeLog: async () => undefined,
+      });
+
+      const handle = runner.start({
+        ...INVOCATION,
+        cliCapabilities: { addDir: false, printTimeout: false, streamJson: true },
+      });
+
+      // Awaited directly: `settledWithin` arms a timer of its own, and this row
+      // is about every timer the run itself leaves behind.
+      await expect(handle.completed).resolves.toMatchObject({ stdout: 'done' });
+      expect(setSpy.mock.calls.length).toBeGreaterThan(0);
+      expect(clearSpy).toHaveBeenCalledTimes(setSpy.mock.calls.length);
+    } finally {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    }
+  });
+
+  it('keeps the run log when the turn ended without a terminal frame', async () => {
+    // 1.3.2 unlinked the log only after a successful run. It is the only place
+    // `agy` records the real wall-clock cause, so deleting it unconditionally
+    // destroys the evidence for exactly the turns that need explaining (#139).
+    const child = new FakeManagedChild({
+      stdout: ['{"event":"step_update","step_update":{"step_type":"text","text_delta":"hi"}}\n'],
+    });
+    const removeLog = jest.fn().mockResolvedValue(undefined);
+    const runner = new AntigravityPrintProcessRunner({
+      transport: new FakeTransport(child),
+      drainGraceMs: 1,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog,
+    });
+
+    const handle = runner.start({
+      ...INVOCATION,
+      cliCapabilities: { addDir: false, printTimeout: false, streamJson: true },
+    });
+    child.exit.resolve({ code: 0 });
+    await handle.completed;
+
+    expect(removeLog).not.toHaveBeenCalled();
+  });
+
+  it('reports what the CLI sent when a turn ends without a terminal frame', async () => {
+    // The question a hung turn leaves behind is whether no terminal frame was
+    // sent or one was sent in a shape we do not read. Only the wire answers it,
+    // and nothing recorded it: the run record stops updating and the frames are
+    // never logged. Names and counts, never the prompt or the answer.
+    const child = new FakeManagedChild({
+      stdout: [
+        '{"event":"init","init":{}}\n',
+        '{"event":"step_update","step_update":{"step_type":"text","text_delta":"hi"}}\n',
+        '{"event":"some_new_frame","payload":{}}\n',
+      ],
+    });
+    const diagnostics: Array<Record<string, unknown>> = [];
+    const runner = new AntigravityPrintProcessRunner({
+      transport: new FakeTransport(child),
+      drainGraceMs: 1,
+      createLogPath: () => '/tmp/antigravity.log',
+      removeLog: async () => undefined,
+    });
+
+    const handle = runner.start(
+      { ...INVOCATION, cliCapabilities: { addDir: false, printTimeout: false, streamJson: true } },
+      { onDiagnostic: data => diagnostics.push({ ...data }) },
+    );
+    child.exit.resolve({ code: 0 });
+    await handle.completed;
+
+    const completion = diagnostics.find(entry => 'hasResult' in entry);
+    expect(completion).toMatchObject({
+      frameTotal: 3,
+      hasResult: false,
+      // Under the log's safe-key names: anything else reaches the file as
+      // `[redacted-string]`, which is exactly the silence this replaced.
+      messageType: 'some_new_frame',
+      reason: 'process-exit',
+    });
+    // The unread frame is named rather than silently dropped: a terminal frame
+    // under a new name would otherwise look exactly like no terminal frame.
+    expect(completion?.frameCounts).toMatchObject({ init: 1, some_new_frame: 1, step_update: 1 });
+    expect(JSON.stringify(completion)).not.toContain('hi');
+  });
+
   it('recovers the Windows transcript only after a successful empty stdout', async () => {
     const child = new FakeManagedChild();
     const recoverTranscript = jest.fn().mockResolvedValue({
@@ -343,6 +556,37 @@ function chunks(values: readonly string[]): AsyncIterable<Uint8Array> {
       }
     },
   };
+}
+
+/**
+ * Frames on a pipe that never closes, the way a resident CLI leaves them.
+ *
+ * Deliberately different from `chunks`: that helper ends its iteration, which
+ * closes the stream and releases anything waiting on the drain.
+ */
+function residentStdout(values: readonly string[]): AsyncIterable<Uint8Array> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for (const value of values) {
+        yield Buffer.from(value, 'utf8');
+      }
+      await new Promise<never>(() => {});
+    },
+  };
+}
+
+/**
+ * Fails loudly instead of hanging the suite: a run that never settles is the
+ * defect under test, and jest's own timeout would report it as an unhelpful
+ * whole-test expiry rather than as this assertion.
+ */
+function settledWithin<T>(work: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    work,
+    new Promise<never>((_resolve, reject) => {
+      setTimeout(() => reject(new Error(`run did not settle within ${ms}ms`)), ms).unref?.();
+    }),
+  ]);
 }
 
 function deferred<T>() {

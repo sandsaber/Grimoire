@@ -42,6 +42,8 @@ export interface AcpWireRecordingTimings {
   readonly turnMs: number;
   /** After the turn's own result, for whatever trails it. */
   readonly graceMs: number;
+  /** How long a killed CLI is given to leave before it is killed outright. */
+  readonly shutdownMs: number;
 }
 
 const DEFAULT_TIMINGS: AcpWireRecordingTimings = {
@@ -54,6 +56,7 @@ const DEFAULT_TIMINGS: AcpWireRecordingTimings = {
   // Kimi Code sends its `usage_update` after `session/prompt` returns, so
   // stopping at the result would drop the one frame that row is about.
   graceMs: 5_000,
+  shutdownMs: 5_000,
 };
 
 /** One line on the wire, in the shape every recording already uses. */
@@ -150,6 +153,18 @@ export async function recordAcpWire(
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
+  // A command that does not exist emits `error` and never `exit`. Unhandled it
+  // takes the run down; unread it is worse — the recorder wrote a fixture
+  // saying the CLI had refused a session, which is a fact about a CLI that
+  // never ran, in the file someone reads later as evidence.
+  let startupFailure: Error | undefined;
+  child.once('error', error => {
+    startupFailure = error;
+  });
+  // The other half of the same failure: writes to the stdin of a process that
+  // never started fail on their own.
+  child.stdin.on('error', () => {});
+
   let buffered = '';
   child.stdout.on('data', chunk => {
     buffered += String(chunk);
@@ -188,6 +203,10 @@ export async function recordAcpWire(
     },
   });
   await settle(timings.handshakeMs);
+  if (startupFailure) {
+    rmSync(vault, { force: true, recursive: true });
+    throw new Error(`\`${options.command}\` could not be started: ${startupFailure.message}`);
+  }
   send({ jsonrpc: '2.0', id: 2, method: 'session/new', params: { cwd: vault, mcpServers: [] } });
   await settle(timings.sessionMs);
 
@@ -230,7 +249,28 @@ export async function recordAcpWire(
   }
 
   child.stdin.end();
+  const exited = new Promise<void>(resolve => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve();
+      return;
+    }
+    child.once('exit', () => resolve());
+  });
   child.kill();
+  // Windows keeps a handle on a live process's cwd, so the vault cannot be
+  // removed until the child is actually gone. `kill` only asks — and a CLI
+  // that traps SIGTERM to shut down gracefully answers it in its own time, or
+  // not at all. Every other wait here is bounded; this one is too.
+  await Promise.race([exited, new Promise<void>(resolve => {
+    // Unref'd because the loser of this race is still counting: a ref'd timer
+    // holds the event loop open for the rest of its wait after the child has
+    // already gone, which Jest reports as a handle the run leaked.
+    setTimeout(resolve, timings.shutdownMs).unref();
+  })]);
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGKILL');
+    await exited;
+  }
   rmSync(vault, { force: true, recursive: true });
 
   const fromAgent = exchanges.filter(exchange => exchange.direction === 'server->client');

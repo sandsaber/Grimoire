@@ -149,6 +149,8 @@ export interface Conversation {
   usage?: UsageInfo;
   /** Status of AI title generation. */
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
+  /** Where the current title came from. Absent on conversations older than the field. */
+  titleSource?: TitleSource;
   /** UI-enabled MCP servers for this session (context-saving servers activated via selector). */
   enabledMcpServers?: string[];
   /** Whether this conversation asks providers for an approved parallel-worker plan. */
@@ -160,6 +162,16 @@ export interface Conversation {
   /** UI metadata restored after provider-native history hydration. */
   assistantResponseMetadata?: PersistedAssistantResponseMetadata[];
 }
+
+/**
+ * Where a conversation's current title came from.
+ *
+ * Distinct from `titleGenerationStatus`, which describes the last *attempt*:
+ * a conversation renamed by hand after a failed generation keeps `failed` for
+ * ever while its title is nobody's but the user's. This says who wrote what is
+ * shown now, which is the question the UI was answering wrongly.
+ */
+export type TitleSource = 'fallback' | 'model' | 'manual';
 
 /** Lightweight conversation metadata for the history dropdown. */
 export interface ConversationMeta {
@@ -180,6 +192,8 @@ export interface ConversationMeta {
   usagePercentage?: number;
   /** Status of AI title generation. */
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
+  /** Where the current title came from. Absent on conversations older than the field. */
+  titleSource?: TitleSource;
 }
 
 /**
@@ -192,6 +206,8 @@ export interface SessionMetadata {
   providerId?: ProviderId;
   title: string;
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
+  /** Where the current title came from. Absent on conversations older than the field. */
+  titleSource?: TitleSource;
   createdAt: number;
   updatedAt: number;
   lastResponseAt?: number;

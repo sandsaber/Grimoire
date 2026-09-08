@@ -48,10 +48,23 @@ export class NodeAntigravityProcessTransport implements AntigravityProcessTransp
             if (!stdin) {
               return;
             }
-            await new Promise<void>((resolve, reject) => {
+            // **EOF is not conditional on the write succeeding.** Closing only
+            // after the write settles makes the end of input hostage to a
+            // callback that a broken pipe never delivers, and a live `agy` then
+            // holds the turn open waiting for input that will never end. 1.3.2
+            // closed unconditionally; verified live, an `agy` whose stdin stays
+            // open answers and then never leaves.
+            const written = new Promise<void>((resolve, reject) => {
+              // The child can exit before draining stdin, and an unhandled
+              // stream `error` would take the renderer down with it.
+              stdin.once('error', reject);
               stdin.write(text, error => (error ? reject(error) : resolve()));
             });
+            // Issued now rather than in a `finally`: a callback that never
+            // fires never settles the promise either, so awaiting first means
+            // the close never runs at all. `end` flushes what is queued.
             stdin.end();
+            await written;
           },
         }
         : {}),
