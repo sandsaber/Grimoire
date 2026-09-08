@@ -283,9 +283,9 @@ export interface ClaudeExecutionBackendContext {
   /**
    * How long a run may go **without saying anything** before it is stopped.
    *
-   * A liveness window, not a budget for the turn: every event the provider
-   * sends re-arms it. It used to be armed once at dispatch and only cleared,
-   * so ten minutes of work ended exactly like ten minutes of silence.
+   * A liveness window, not a budget for the turn: every event the run produces
+   * re-arms it. It used to be armed once at dispatch and only cleared, so ten
+   * minutes of work ended exactly like ten minutes of silence.
    */
   readonly runTimeoutMs?: number;
   /** The ceiling a run cannot pass however alive it stays. */

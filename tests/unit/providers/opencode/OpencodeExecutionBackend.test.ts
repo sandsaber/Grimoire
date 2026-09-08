@@ -569,6 +569,22 @@ describe('OpencodeExecutionBackend', () => {
     }));
   });
 
+  it('leaves no live timer behind a finished run', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+    fixture.client.emit(agentText('native-session', 'OpenCode result'));
+    fixture.client.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+
+    expectTerminal(await events, 'succeeded', 'completed');
+    await flushPromises();
+    // The terminal event is emitted after both timers are cleared, and the
+    // emit re-arms the window: without a guard the run ends holding one.
+    expect(fixture.scheduler.pending(60_000)).toEqual([]);
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual([]);
+  });
+
   it('rejects dynamic configuration before prompt dispatch', async () => {
     const fixture = createFixture({
       dynamicApply: async () => { throw new Error('configuration failed'); },
@@ -1315,7 +1331,10 @@ class FakeScheduler implements ManagedAcpExecutionScheduler {
     return [...this.tasks.keys()].filter(handle => this.delays.get(handle) === ms);
   }
   clearTimeout(handle: unknown): void {
-    if (typeof handle === 'object' && handle !== null) this.tasks.delete(handle);
+    if (typeof handle === 'object' && handle !== null) {
+      this.tasks.delete(handle);
+      this.delays.delete(handle);
+    }
   }
   fireNext(): void {
     const task = this.tasks.entries().next().value;

@@ -992,6 +992,23 @@ describe('ClaudeExecutionBackend', () => {
     expect(fixture.scheduler.pending(30 * 60_000)).toEqual(absolute);
   });
 
+  it('leaves no live timer behind a finished run', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 'native-session');
+    const events = collectEvents(session.createRun(request('1', 'default')));
+    await waitFor(() => fixture.query.received.length === 1);
+    fixture.query.emit(initMessage('native-session'));
+    fixture.query.emit(resultMessage('message-1', 'answer', 'result-1'));
+
+    expectTerminal(await events, 'succeeded', 'completed');
+    await flushPromises();
+    // The terminal event is emitted after both timers are cleared, and the
+    // emit re-arms the window: the guard in `armInactivityTimeout` is what
+    // keeps a finished run from holding one.
+    expect(fixture.scheduler.pending(60_000)).toEqual([]);
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual([]);
+  });
+
   it('keeps the persistent query usable for the next turn after an acknowledged interrupt', async () => {
     const fixture = createFixture({
       invocations: {

@@ -1018,6 +1018,21 @@ describe('CodexExecutionBackend', () => {
     expect(fixture.scheduler.pending(30 * 60_000)).toEqual(absolute);
   });
 
+  it('leaves no live timer behind a finished run', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    const events = collectEvents(session.createRun(request(RUN_1, 'default')));
+    await fixture.connection.waitForCall('turn/start');
+    fixture.connection.complete('thread-1', 'turn-1', 'answer');
+
+    expectTerminal(await events, 'succeeded', 'completed');
+    await flushPromises();
+    // The terminal event is emitted after both timers are cleared, and the
+    // emit re-arms the window: without a guard the run ends holding one.
+    expect(fixture.scheduler.pending(30_000)).toEqual([]);
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual([]);
+  });
+
   it('arbitrates output-limit, cancellation, and timeout through one interrupt', async () => {
     const interrupt = deferred<Record<string, never>>();
     const fixture = createFixture({

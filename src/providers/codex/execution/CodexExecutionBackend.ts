@@ -1783,8 +1783,18 @@ class CodexExecutionRun implements ExecutionRun {
     return this.turnReconciler;
   }
 
-  /** (Re)starts the silence window, so a talking turn keeps living. */
+  /**
+   * (Re)starts the silence window, so a talking turn keeps living.
+   *
+   * Not past the end of the run: `finish` clears both timers and *then* emits
+   * the terminal event, and the emit is what re-arms this one. Without the
+   * guard every finished run left a live ten-minute timer holding it, and the
+   * completion work after `turn/completed` kept pushing the window out.
+   */
   private armInactivityTimeout(): void {
+    if (this.terminal) {
+      return;
+    }
     if (this.runTimeoutHandle !== undefined) {
       this.context.scheduler.clearTimeout(this.runTimeoutHandle);
     }

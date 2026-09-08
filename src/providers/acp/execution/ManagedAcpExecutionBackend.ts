@@ -1522,8 +1522,15 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     }
   }
 
-  /** (Re)starts the silence window, so a talking turn keeps living. */
+  /**
+   * (Re)starts the silence window, so a talking turn keeps living.
+   *
+   * Not past the end of the run: `finish` clears both timers and *then* emits
+   * the terminal event, and the emit is what re-arms this one. Without the
+   * guard every finished run left a live window behind it.
+   */
   private armInactivityTimeout(): void {
+    if (this.terminal) return;
     if (this.timeoutHandle !== undefined) this.context.scheduler.clearTimeout(this.timeoutHandle);
     this.timeoutHandle = this.context.scheduler.setTimeout(() => {
       void this.terminate('timeout');
