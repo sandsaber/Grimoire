@@ -69,6 +69,7 @@ import type {
   Conversation,
   ConversationMeta,
   GrimoireSettings,
+  TitleSource,
 } from './core/types';
 import {
   VIEW_TYPE_GRIMOIRE,
@@ -1330,17 +1331,26 @@ export default class GrimoirePlugin extends Plugin {
     }
   }
 
-  async renameConversation(id: string, title: string): Promise<void> {
+  /**
+   * @param titleSource Who wrote this title. Omitted leaves the recorded source
+   * alone, which is what a rename with nothing to say about provenance means —
+   * a fork, a duplicate, a restore.
+   */
+  async renameConversation(id: string, title: string, titleSource?: TitleSource): Promise<void> {
     const conversation = this.conversations.find(c => c.id === id);
     if (!conversation) return;
 
     conversation.title = title.trim() || this.generateDefaultTitle();
     conversation.updatedAt = Date.now();
+    if (titleSource) conversation.titleSource = titleSource;
 
     // The title and nothing else. A rename that landed mid-stream used to write
     // the whole conversation this window was holding, which put back the
     // messages it had before the stream started.
-    await this.storage.sessions.updateMetadata(conversation, ['title']);
+    await this.storage.sessions.updateMetadata(
+      conversation,
+      titleSource ? ['title', 'titleSource'] : ['title'],
+    );
 
     for (const view of this.getAllViews()) {
       view.getTabManager()?.notifyConversationRenamed?.(id, conversation.title);
@@ -1438,6 +1448,7 @@ export default class GrimoirePlugin extends Plugin {
       sourceCount: this.getConversationSourceCount(c),
       usagePercentage: c.usage?.percentage,
       titleGenerationStatus: c.titleGenerationStatus,
+      titleSource: c.titleSource,
     }));
   }
 

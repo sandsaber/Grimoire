@@ -18,6 +18,7 @@ import type { FileContextManager } from '../ui/FileContext';
 import type { ImageContextManager } from '../ui/ImageContext';
 import type { ExternalContextSelector, McpServerSelector } from '../ui/InputToolbar';
 import type { StatusPanel } from '../ui/StatusPanel';
+import { appendTitleSourceStar } from '../ui/titleSourceMarker';
 import { getRandomGreeting } from '../utils/greetings';
 
 function runConversationAction(action: () => Promise<void>, failureMessage: string): void {
@@ -919,7 +920,9 @@ export class ConversationController {
     // A conversation whose title never generated still has to be findable, so
     // it says when it happened rather than nothing at all.
     const title = conv.title?.trim() || this.formatDate(this.getHistoryTimestamp(conv));
-    const titleEl = content.createDiv({ cls: 'grimoire-history-item-title', text: title });
+    const titleRow = content.createDiv({ cls: 'grimoire-history-item-title-row' });
+    appendTitleSourceStar(titleRow, conv.titleSource);
+    const titleEl = titleRow.createDiv({ cls: 'grimoire-history-item-title', text: title });
     const meta = this.formatHistoryMeta(conv);
     titleEl.setAttribute('title', meta ? `${title}\n${meta}` : title);
 
@@ -1000,7 +1003,7 @@ export class ConversationController {
       const loadingEl = actions.createSpan({ cls: 'grimoire-action-btn grimoire-action-loading' });
       setIcon(loadingEl, 'loader-2');
       loadingEl.setAttribute('aria-label', t('chat.ui.history.generatingTitle'));
-    } else if (conv.titleGenerationStatus === 'failed') {
+    } else if (conv.titleSource ? conv.titleSource === 'fallback' : conv.titleGenerationStatus === 'failed') {
       const regenerateBtn = actions.createEl('button', { cls: 'grimoire-action-btn grimoire-history-regenerate-btn' });
       setIcon(regenerateBtn, 'refresh-cw');
       regenerateBtn.setAttribute('aria-label', t('chat.ui.history.regenerateTitle'));
@@ -1220,16 +1223,18 @@ export class ConversationController {
       }
     }
 
-    if (conv.titleGenerationStatus === 'failed') {
-      menu.addItem((menuItem) => menuItem
-        .setTitle(t('chat.ui.history.regenerateTitle'))
-        .onClick(() => {
-          runConversationAction(
-            () => this.regenerateTitle(conv.id),
-            t('chat.ui.errors.regenerateFailed'),
-          );
-        }));
-    }
+    // Offered whatever the title is now. Gating this on a failed generation made
+    // «the model named it, but name it again» reachable only from the tab menu,
+    // and a title one is not happy with is not a failed one.
+    menu.addItem((menuItem) => menuItem
+      .setTitle(t('chat.ui.history.regenerateTitle'))
+      .setDisabled(!this.canSuggestTitle(conv.id))
+      .onClick(() => {
+        runConversationAction(
+          () => this.regenerateTitle(conv.id),
+          t('chat.ui.errors.regenerateFailed'),
+        );
+      }));
 
     menu.addItem((menuItem) => menuItem
       .setTitle(t('chat.ui.history.rename'))
@@ -1296,7 +1301,7 @@ export class ConversationController {
 
       const newTitle = input.value.trim() || currentTitle;
       try {
-        await this.deps.plugin.renameConversation(convId, newTitle);
+        await this.deps.plugin.renameConversation(convId, newTitle, 'manual');
       } finally {
         options.onRerender();
       }
@@ -1485,7 +1490,7 @@ export class ConversationController {
       // User renamed it manually while we were generating: their choice wins.
       await plugin.updateConversation(conversationId, { titleGenerationStatus: undefined });
     } else if (suggestion.ok) {
-      await plugin.renameConversation(conversationId, suggestion.title);
+      await plugin.renameConversation(conversationId, suggestion.title, 'model');
       await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
     } else {
       await plugin.updateConversation(conversationId, { titleGenerationStatus: 'failed' });

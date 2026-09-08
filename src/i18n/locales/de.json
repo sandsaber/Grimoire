@@ -453,7 +453,8 @@
         "closed": "{title} geschlossen",
         "closedMany": "{count} Tabs geschlossen",
         "undo": "Rückgängig",
-        "restoreFailed": "Tab konnte nicht wiederhergestellt werden"
+        "restoreFailed": "Tab konnte nicht wiederhergestellt werden",
+        "titleSourceFallbackPrefix": "Platzhalter"
       },
       "messages": {
         "interrupted": "Unterbrochen",
@@ -540,7 +541,10 @@
         "openBackgroundTab": "In Tab im Hintergrund öffnen",
         "switchOpenSession": "Zu geöffneter Sitzung wechseln",
         "rename": "Umbenennen",
-        "noneToResume": "Keine Unterhaltungen zum Fortsetzen"
+        "noneToResume": "Keine Unterhaltungen zum Fortsetzen",
+        "titleSourceFallback": "Platzhalter",
+        "titleSourceModel": "Modell",
+        "titleSourceManual": "Manuell"
       },
       "thinking": {
         "expandAriaLabel": "Erweitertes Denken — klicken zum Aufklappen",

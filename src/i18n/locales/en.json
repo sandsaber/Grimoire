@@ -453,7 +453,8 @@
         "closed": "Closed {title}",
         "closedMany": "Closed {count} tabs",
         "undo": "Undo",
-        "restoreFailed": "Failed to restore tab"
+        "restoreFailed": "Failed to restore tab",
+        "titleSourceFallbackPrefix": "Placeholder"
       },
       "messages": {
         "interrupted": "Interrupted",
@@ -540,7 +541,10 @@
         "openBackgroundTab": "Open in background tab",
         "switchOpenSession": "Switch to open session",
         "rename": "Rename",
-        "noneToResume": "No conversations to resume"
+        "noneToResume": "No conversations to resume",
+        "titleSourceFallback": "Placeholder",
+        "titleSourceModel": "Model",
+        "titleSourceManual": "Manual"
       },
       "thinking": {
         "expandAriaLabel": "Extended thinking — click to expand",

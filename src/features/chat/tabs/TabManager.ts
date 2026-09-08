@@ -10,7 +10,7 @@ import type {
   ProviderId,
 } from '../../../core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
-import type { ChatMessage, Conversation, SlashCommand } from '../../../core/types';
+import type { ChatMessage, Conversation, SlashCommand, TitleSource } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
 import { chooseForkTarget } from '../../../shared/modals/ForkTargetModal';
@@ -510,7 +510,9 @@ export class TabManager implements TabManagerInterface {
     if (!normalized) return;
 
     if (tab.conversationId) {
-      await this.plugin.renameConversation(tab.conversationId, normalized);
+      // Everything that arrives through the rename dialog is the user's, including
+      // a suggestion they accepted there: they read it and pressed save.
+      await this.plugin.renameConversation(tab.conversationId, normalized, 'manual');
       return;
     }
 
@@ -639,6 +641,20 @@ export class TabManager implements TabManagerInterface {
   // ============================================
 
   /** Gets data for rendering the tab bar. */
+  /**
+   * Where this tab's displayed name came from, or nothing when it cannot be told.
+   *
+   * A tab-local name is the user's and outranks whatever the conversation
+   * records: the override is what the bar is showing.
+   */
+  getTabTitleSource(tabId: TabId): TitleSource | undefined {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return undefined;
+    if (tab.titleOverride) return 'manual';
+    if (!tab.conversationId) return undefined;
+    return this.plugin.getConversationSync(tab.conversationId)?.titleSource;
+  }
+
   getTabBarItems(): TabBarItem[] {
     const items: TabBarItem[] = [];
     let index = 1;
@@ -648,6 +664,7 @@ export class TabManager implements TabManagerInterface {
         id: tab.id,
         index: index++,
         title: getTabTitle(tab, this.plugin),
+        titleSource: this.getTabTitleSource(tab.id),
         providerId: getTabProviderId(tab, this.plugin),
         isActive: tab.id === this.activeTabId,
         isStreaming: tab.state.isStreaming,

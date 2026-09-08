@@ -343,6 +343,7 @@ function requireStorableId(id: string): string {
 export const CONVERSATION_METADATA_FIELDS = [
   'title',
   'titleGenerationStatus',
+  'titleSource',
   'lastResponseAt',
   'sessionId',
   'model',
@@ -577,6 +578,7 @@ export class SessionStorage {
         sourceCount: countSessionSources(meta),
         usagePercentage: meta.usage?.percentage,
         titleGenerationStatus: meta.titleGenerationStatus,
+        titleSource: meta.titleSource,
       };
     });
 
@@ -618,6 +620,7 @@ export class SessionStorage {
       orchestratorMode: metadata.orchestratorMode,
       usage: metadata.usage,
       titleGenerationStatus: metadata.titleGenerationStatus,
+      titleSource: metadata.titleSource,
       resumeAtMessageId: metadata.resumeAtMessageId,
       vaultSearchContexts: metadata.vaultSearchContexts,
       assistantResponseMetadata: metadata.assistantResponseMetadata,
@@ -630,6 +633,7 @@ export class SessionStorage {
       providerId: conversation.providerId,
       title: conversation.title,
       titleGenerationStatus: conversation.titleGenerationStatus,
+      titleSource: conversation.titleSource,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       lastResponseAt: conversation.lastResponseAt,

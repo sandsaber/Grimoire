@@ -453,7 +453,8 @@
         "closed": "Вкладка «{title}» закрыта",
         "closedMany": "Закрыто: {count} вкладок",
         "undo": "Отменить",
-        "restoreFailed": "Не удалось восстановить вкладку"
+        "restoreFailed": "Не удалось восстановить вкладку",
+        "titleSourceFallbackPrefix": "Заглушка"
       },
       "messages": {
         "interrupted": "Прервано",
@@ -540,7 +541,10 @@
         "openBackgroundTab": "Открыть в фоновой вкладке",
         "switchOpenSession": "Перейти к открытому сеансу",
         "rename": "Переименовать",
-        "noneToResume": "Нет диалогов для возобновления"
+        "noneToResume": "Нет диалогов для возобновления",
+        "titleSourceFallback": "Заглушка",
+        "titleSourceModel": "Модель",
+        "titleSourceManual": "Вручную"
       },
       "thinking": {
         "expandAriaLabel": "Расширенные размышления — нажмите, чтобы развернуть",

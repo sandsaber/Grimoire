@@ -453,7 +453,8 @@
         "closed": "Se cerró {title}",
         "closedMany": "Se cerraron {count} pestañas",
         "undo": "Deshacer",
-        "restoreFailed": "No se pudo restaurar la pestaña"
+        "restoreFailed": "No se pudo restaurar la pestaña",
+        "titleSourceFallbackPrefix": "Provisional"
       },
       "messages": {
         "interrupted": "Interrumpido",
@@ -540,7 +541,10 @@
         "openBackgroundTab": "Abrir en pestaña en segundo plano",
         "switchOpenSession": "Cambiar a la sesión abierta",
         "rename": "Renombrar",
-        "noneToResume": "No hay conversaciones que reanudar"
+        "noneToResume": "No hay conversaciones que reanudar",
+        "titleSourceFallback": "Provisional",
+        "titleSourceModel": "Modelo",
+        "titleSourceManual": "Manual"
       },
       "thinking": {
         "expandAriaLabel": "Razonamiento extendido — haz clic para expandir",

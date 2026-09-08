@@ -1512,7 +1512,7 @@ export class InputController {
 
     // Set immediate fallback title
     const fallbackTitle = conversationController.generateFallbackTitle(userContent);
-    await plugin.renameConversation(state.currentConversationId, fallbackTitle);
+    await plugin.renameConversation(state.currentConversationId, fallbackTitle, 'fallback');
 
     if (!plugin.settings.enableAutoTitleGeneration) {
       return;
@@ -1544,7 +1544,7 @@ export class InputController {
         const userManuallyRenamed = currentConv.title !== expectedTitle;
 
         if (result.success && !userManuallyRenamed) {
-          await plugin.renameConversation(conversationId, result.title);
+          await plugin.renameConversation(conversationId, result.title, 'model');
           await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
         } else if (!userManuallyRenamed) {
           // Keep fallback title, mark as failed (only if user hasn't renamed)

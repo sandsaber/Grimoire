@@ -453,7 +453,8 @@
         "closed": "{title} fermé",
         "closedMany": "{count} onglets fermés",
         "undo": "Annuler",
-        "restoreFailed": "Impossible de restaurer l’onglet"
+        "restoreFailed": "Impossible de restaurer l’onglet",
+        "titleSourceFallbackPrefix": "Provisoire"
       },
       "messages": {
         "interrupted": "Interrompu",
@@ -540,7 +541,10 @@
         "openBackgroundTab": "Ouvrir dans un onglet en arrière-plan",
         "switchOpenSession": "Basculer vers la session ouverte",
         "rename": "Renommer",
-        "noneToResume": "Aucune conversation à reprendre"
+        "noneToResume": "Aucune conversation à reprendre",
+        "titleSourceFallback": "Provisoire",
+        "titleSourceModel": "Modèle",
+        "titleSourceManual": "Manuel"
       },
       "thinking": {
         "expandAriaLabel": "Réflexion étendue — cliquer pour développer",

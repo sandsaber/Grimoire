@@ -115,7 +115,15 @@ export class TabBar {
     // The tab shows its number, so the number is half of what names it; the
     // title is the other half. No orchestrator or worker variants any more: a
     // worker is a dispatched agent rather than a tab, so no tab is one.
-    return t('chat.ui.tabs.tabLabel', { index: item.index, title: item.title });
+    //
+    // A word rather than the coloured star the menu and the history rows show:
+    // this is an `aria-label`, so it is a string with no DOM to colour, and a
+    // screen reader cannot see a colour anyway. Only the placeholder is called
+    // out — a title the model or the user wrote needs no announcing.
+    const title = item.titleSource === 'fallback'
+      ? `${t('chat.ui.tabs.titleSourceFallbackPrefix')} · ${item.title}`
+      : item.title;
+    return t('chat.ui.tabs.tabLabel', { index: item.index, title });
   }
 
   /** Destroys the tab bar. */

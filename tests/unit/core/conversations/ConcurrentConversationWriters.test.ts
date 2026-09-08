@@ -159,6 +159,25 @@ describe('two writers on one conversation', () => {
     expect(stored.titleGenerationStatus).toBe('success');
   });
 
+  it('carries the title source with the title, and only when a writer names it', async () => {
+    const { storage, read } = createStorage();
+    await storage.createMetadata(storage.toSessionMetadata(conversation()));
+
+    await storage.updateMetadata(
+      conversation({ title: 'About tomatoes', titleSource: 'model' }),
+      ['title', 'titleSource'],
+    );
+    expect(read().titleSource).toBe('model');
+
+    // A writer with nothing to say about provenance — a fork, a restore — must
+    // not blank what the last one recorded.
+    await storage.updateMetadata(conversation({ title: 'About peppers' }), ['title']);
+
+    const stored = read();
+    expect(stored.title).toBe('About peppers');
+    expect(stored.titleSource).toBe('model');
+  });
+
   it('moves the derived fields with the messages they are derived from', async () => {
     const { storage, read } = createStorage();
     await storage.createMetadata(storage.toSessionMetadata(conversation()));

@@ -1,0 +1,45 @@
+/*
+ * The star that says who wrote a conversation's title.
+ *
+ * One rule set for every place the mark appears — the tab context-menu heading,
+ * the history row, the rename dialog — because the colour is the meaning and
+ * three copies of it would drift apart. The tab badge is deliberately not one of
+ * those places: it shows a number, not a name.
+ */
+
+.grimoire-title-source {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--grimoire-title-source-color, var(--grimoire-ink-muted));
+}
+
+.grimoire-title-source .svg-icon {
+  width: 11px;
+  height: 11px;
+}
+
+/* A placeholder is the absence of a title, so it stays quiet. */
+.grimoire-title-source-fallback {
+  --grimoire-title-source-color: var(--grimoire-ink-muted);
+}
+
+.grimoire-title-source-model {
+  --grimoire-title-source-color: var(--grimoire-ok);
+}
+
+.grimoire-title-source-manual {
+  --grimoire-title-source-color: var(--grimoire-accent-text);
+}
+
+.grimoire-history-item-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--grimoire-space-2);
+}
+
+.grimoire-rename-tab-field .grimoire-title-source {
+  margin-inline-end: var(--grimoire-space-2);
+}

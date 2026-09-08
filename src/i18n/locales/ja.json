@@ -453,7 +453,8 @@
         "closed": "{title} を閉じました",
         "closedMany": "{count} 個のタブを閉じました",
         "undo": "元に戻す",
-        "restoreFailed": "タブを復元できませんでした"
+        "restoreFailed": "タブを復元できませんでした",
+        "titleSourceFallbackPrefix": "仮題"
       },
       "messages": {
         "interrupted": "中断されました",
@@ -540,7 +541,10 @@
         "openBackgroundTab": "バックグラウンドタブで開く",
         "switchOpenSession": "開いているセッションに切り替え",
         "rename": "名前を変更",
-        "noneToResume": "再開する会話はありません"
+        "noneToResume": "再開する会話はありません",
+        "titleSourceFallback": "仮題",
+        "titleSourceModel": "モデル",
+        "titleSourceManual": "手動"
       },
       "thinking": {
         "expandAriaLabel": "拡張思考 — クリックして展開",

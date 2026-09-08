@@ -453,7 +453,8 @@
         "closed": "{title} 탭을 닫았습니다",
         "closedMany": "탭 {count}개를 닫았습니다",
         "undo": "실행 취소",
-        "restoreFailed": "탭을 복원하지 못했습니다"
+        "restoreFailed": "탭을 복원하지 못했습니다",
+        "titleSourceFallbackPrefix": "임시 제목"
       },
       "messages": {
         "interrupted": "중단됨",
@@ -540,7 +541,10 @@
         "openBackgroundTab": "백그라운드 탭에서 열기",
         "switchOpenSession": "열린 세션으로 전환",
         "rename": "이름 바꾸기",
-        "noneToResume": "재개할 대화가 없습니다"
+        "noneToResume": "재개할 대화가 없습니다",
+        "titleSourceFallback": "임시 제목",
+        "titleSourceModel": "모델",
+        "titleSourceManual": "수동"
       },
       "thinking": {
         "expandAriaLabel": "확장 사고 — 클릭하여 펼치기",

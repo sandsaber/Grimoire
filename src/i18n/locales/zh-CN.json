@@ -453,7 +453,8 @@
         "closed": "已关闭 {title}",
         "closedMany": "已关闭 {count} 个标签页",
         "undo": "撤销",
-        "restoreFailed": "无法恢复标签页"
+        "restoreFailed": "无法恢复标签页",
+        "titleSourceFallbackPrefix": "占位标题"
       },
       "messages": {
         "interrupted": "已中断",
@@ -540,7 +541,10 @@
         "openBackgroundTab": "在后台标签页中打开",
         "switchOpenSession": "切换到已打开的会话",
         "rename": "重命名",
-        "noneToResume": "没有可恢复的对话"
+        "noneToResume": "没有可恢复的对话",
+        "titleSourceFallback": "占位标题",
+        "titleSourceModel": "模型",
+        "titleSourceManual": "手动"
       },
       "thinking": {
         "expandAriaLabel": "扩展思考内容，点击展开",

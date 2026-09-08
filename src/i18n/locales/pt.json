@@ -453,7 +453,8 @@
         "closed": "A aba {title} foi fechada",
         "closedMany": "{count} abas foram fechadas",
         "undo": "Desfazer",
-        "restoreFailed": "Não foi possível restaurar a aba"
+        "restoreFailed": "Não foi possível restaurar a aba",
+        "titleSourceFallbackPrefix": "Provisório"
       },
       "messages": {
         "interrupted": "Interrompido",
@@ -540,7 +541,10 @@
         "openBackgroundTab": "Abrir em aba em segundo plano",
         "switchOpenSession": "Alternar para a sessão aberta",
         "rename": "Renomear",
-        "noneToResume": "Nenhuma conversa para retomar"
+        "noneToResume": "Nenhuma conversa para retomar",
+        "titleSourceFallback": "Provisório",
+        "titleSourceModel": "Modelo",
+        "titleSourceManual": "Manual"
       },
       "thinking": {
         "expandAriaLabel": "Raciocínio estendido — clique para expandir",

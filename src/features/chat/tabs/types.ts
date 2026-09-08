@@ -8,7 +8,7 @@ import type { VaultTextIndex } from '../../../core/context/VaultTextIndex';
 import { MAX_TITLE_LENGTH } from '../../../core/prompt/titleLength';
 import type { InstructionRefineService, ProviderId, TitleGenerationService } from '../../../core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
-import type { UsageInfo } from '../../../core/types';
+import type { TitleSource, UsageInfo } from '../../../core/types';
 import type { SlashCommandDropdown } from '../../../shared/components/SlashCommandDropdown';
 import type { BrowserSelectionController } from '../controllers/BrowserSelectionController';
 import type { CanvasSelectionController } from '../controllers/CanvasSelectionController';
@@ -396,6 +396,8 @@ export interface TabBarItem {
   /** 1-based index for display. */
   index: number;
   title: string;
+  /** Where `title` came from, when the conversation records it. */
+  titleSource?: TitleSource;
   providerId: ProviderId;
   isActive: boolean;
   isStreaming: boolean;

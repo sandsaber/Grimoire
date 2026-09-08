@@ -13,6 +13,7 @@ import { truncateTitleOnWordBoundary } from '../../core/prompt/titleLength';
 import { getHiddenProviderCommandSet } from '../../core/providers/commands/hiddenCommands';
 import { providerCatalog } from '../../core/providers/ProviderCatalog';
 import type { ProviderId } from '../../core/providers/types';
+import type { TitleSource } from '../../core/types';
 import { VIEW_TYPE_GRIMOIRE } from '../../core/types';
 import { t } from '../../i18n/i18n';
 import type GrimoirePlugin from '../../main';
@@ -40,6 +41,7 @@ import { normalizeMaxTabs } from './tabs/types';
 import { closeTopmostImageViewer } from './ui/imageViewerStack';
 import { ContextUsageMeter, getNextPermissionMode } from './ui/InputToolbar';
 import { requestTabRename } from './ui/RenameTabModal';
+import { appendTitleSourceStar } from './ui/titleSourceMarker';
 import { buildAssistantResponseMetadata } from './utils/assistantResponseMetadata';
 import { recalculateUsageForModel } from './utils/usageInfo';
 
@@ -97,13 +99,22 @@ export const MAX_TAB_MENU_HEADING_LENGTH = 40;
  * The cut goes through the shared title truncation so a heading ends the way every other
  * shortened title does — on a word boundary, never on half a surrogate pair.
  */
-export function buildTabMenuHeading(title: string): string | DocumentFragment {
-  if (title.length <= MAX_TAB_MENU_HEADING_LENGTH) return title;
+export function buildTabMenuHeading(
+  title: string,
+  titleSource?: TitleSource,
+): string | DocumentFragment {
+  const needsShortening = title.length > MAX_TAB_MENU_HEADING_LENGTH;
+  if (!needsShortening && !titleSource) return title;
 
-  const shortened = truncateTitleOnWordBoundary(title, MAX_TAB_MENU_HEADING_LENGTH);
+  const shownTitle = needsShortening
+    ? truncateTitleOnWordBoundary(title, MAX_TAB_MENU_HEADING_LENGTH)
+    : title;
   return createFragment((fragment) => {
-    const span = createSpan({ text: shortened, attr: { 'aria-label': title } });
-    setTooltip(span, title, { placement: 'top' });
+    appendTitleSourceStar(fragment, titleSource);
+    const span = createSpan({ text: shownTitle, attr: { 'aria-label': title } });
+    // Only a shortened heading hides something; tooltipping a name shown in full
+    // would repeat it under the cursor.
+    if (needsShortening) setTooltip(span, title, { placement: 'top' });
     fragment.appendChild(span);
   });
 }
@@ -629,7 +640,10 @@ export class GrimoireView extends ItemView {
     const menu = new Menu();
 
     menu.addItem(item => item
-      .setTitle(buildTabMenuHeading(getTabTitle(tab, this.plugin)))
+      .setTitle(buildTabMenuHeading(
+        getTabTitle(tab, this.plugin),
+        this.tabManager?.getTabTitleSource?.(tabId),
+      ))
       .setIsLabel(true));
     menu.addItem(item => item
       .setTitle(`${t('chat.ui.tabs.closeTab')} (${hotkey})`)
@@ -678,6 +692,7 @@ export class GrimoireView extends ItemView {
       this.app,
       getTabTitle(tab, this.plugin),
       controller && conversationId ? { controller, conversationId } : null,
+      manager.getTabTitleSource?.(tabId),
     );
     if (title === null) return;
     await manager.renameTab(tabId, title);
