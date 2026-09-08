@@ -273,30 +273,54 @@ input.grimoire-history-search-input {
 }
 
 /*
- * The model, under the title. One step down from it and in the faint ink, so
- * the row still reads title first; clipped rather than wrapped, because a
- * label can arrive as a whole billing path and a second line that grows is
- * the wall the single line was removed to avoid.
- */
-.grimoire-history-item-model {
-  overflow: hidden;
-  color: var(--grimoire-ink-faint);
-  font-size: var(--grimoire-text-2xs);
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/*
  * The stamp yields to the title, not the other way round. A model label can
  * arrive as a whole billing path, and an `auto` track took every pixel it
  * asked for - so "Describe the image" became "Describe th…" to make room for
  * "Z.AI Coding Plan/GLM-5.3-Flash", and a row whose title had not generated
  * yet read as a model name and nothing else.
  */
-.grimoire-history-item-time {
+/*
+ * When it happened and what answered it, on one line. Two facts rather than
+ * the four the design pass took out, and no third line: the stamp is bounded
+ * so the model gets the rest, and the model is clipped because a label can
+ * arrive as a whole billing path.
+ */
+.grimoire-history-item-stamp {
   grid-area: 2 / 1;
   justify-self: start;
+  display: flex;
+  align-items: baseline;
+  gap: var(--grimoire-space-4);
+  min-width: 0;
+  max-width: 100%;
+}
+
+/*
+ * The rule between them is a typed one, not a border: it sits on the baseline
+ * with the two facts it separates and carries their ink, so the line reads as
+ * one line rather than as two cells with a divider drawn between them. Drawn
+ * by the model, so a row that never recorded one has no dangling mark.
+ */
+.grimoire-history-item-model::before {
+  content: '|';
+  margin-right: var(--grimoire-space-4);
+  color: var(--grimoire-ink-faint);
+}
+
+.grimoire-history-item-model {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  font-weight: var(--grimoire-weight-normal);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grimoire-history-item-time {
+  flex: none;
   min-width: 0;
   max-width: 160px;
   overflow: hidden;
@@ -309,7 +333,7 @@ input.grimoire-history-search-input {
   white-space: nowrap;
 }
 
-.grimoire-history-item:focus-within .grimoire-history-item-time {
+.grimoire-history-item:focus-within .grimoire-history-item-stamp {
   opacity: 0;
 }
 

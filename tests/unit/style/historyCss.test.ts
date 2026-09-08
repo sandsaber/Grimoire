@@ -72,8 +72,11 @@ describe('history.css', () => {
     expect(getRule(css, '.grimoire-history-item-content')).toContain('grid-area: 1 / 1 / 2 / 3');
     // The stamp has its own end of the second line, so it no longer has to
     // vanish to make room for them.
-    expect(getRule(css, '.grimoire-history-item-time')).toContain('grid-area: 2 / 1');
-    expect(css).not.toContain('.grimoire-history-item:hover .grimoire-history-item-time');
+    // The stamp owns the cell now: the time and the model share it as one line,
+    // which is what keeps the model from costing the row a third.
+    expect(getRule(css, '.grimoire-history-item-stamp')).toContain('grid-area: 2 / 1');
+    expect(getRule(css, '.grimoire-history-item-stamp')).toContain('display: flex');
+    expect(css).not.toContain('.grimoire-history-item:hover .grimoire-history-item-stamp');
   });
 
   it('keeps new-tab controls in the same hover action row as rename', () => {

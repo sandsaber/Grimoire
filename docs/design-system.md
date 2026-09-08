@@ -382,16 +382,28 @@ not a reason to lose sight of this one.
 
 A 34px search row, then rows of 56px at radius 4 with a hover wash. The open conversation carries a
 1.5px accent leading rule. A row is two lines: the title has the first to itself, full width, and
-truncates; the second carries the monospace 11px time or the provider's name at one end and, on
-hover, an open-in-tab and a rename at 24px plus a "Delete" text control that turns `--grimoire-error`
-at the other. The buttons occupy their space at rest, so revealing them shifts nothing — including
-the title, which is what a single line could not deliver: floated over the stamp, controls wider than
+truncates; the second carries the monospace 11px time and the model that answered, `14:02 | GPT-5.4`,
+at one end and, on hover, an open-in-tab and a rename at 24px plus a "Delete" text control that turns
+`--grimoire-error` at the other. The buttons occupy their space at rest, so revealing them shifts
+nothing — including the title, which is what a single line could not deliver: floated over the stamp,
+controls wider than
 that stamp reached back across the title and sat on its last words. Group labels ("Today",
 "Yesterday") are the uppercase monospace micro-label.
 
 This is not the second line Nordic removed. That one carried provider, prompt preview, source count
 and usage in mono under every title and turned a list you scan into a wall you read; this one carries
 what the row already showed, moved off the title's line. It costs about a third of the rows in view.
+
+**Two facts, not one or the other.** The stamp used to be a time for today's rows and the model's
+name for everything older, because one slot cannot hold two things and the model is the one you scan
+for: it is how you tell two conversations apart before you open either, and a tooltip answers none of
+that — it cannot be read down a list, does not open on keyboard focus though the row is focusable,
+and on touch does not exist. Substituting them cost both, and it showed: given a line of its own the
+model appeared twice on every row that was not from today, once in each place. So the line says both,
+divided by a typed `|` in the same faint ink — the time bounded at 160px and never shrinking, the
+model taking the rest and clipping, because a label can arrive as a whole billing path. The rule is
+a glyph rather than a border: it sits on the baseline with the two facts it separates, and it is
+drawn by the model, so a conversation that never recorded one leaves no mark dangling after its time.
 
 **Who named the conversation** is an 11px mark before the title, and only here: `sparkles` for a
 title a model wrote, `pencil` for one the user typed. Both are `--grimoire-ink-muted` and carry the
@@ -417,9 +429,10 @@ for its size and its place in the row and is not one — nothing happens when it
 nothing lights up when it is pointed at.
 
 **What the drawing shows.** [`Grimoire Nordic.html`](design/Grimoire%20Nordic.html) draws the history
-popover at 320px, its rows at 36px on one line, and no mark on them: all of that changed after the
-drawing was checked in, and the drawing is edited in its own canvas rather than by hand. It goes in
-at the next pass over that file.
+popover at 320px, its rows at 36px on one line, and no mark on them; its stamps read `14:02`, `Codex`
+and `Qwen`, which is the substitution above drawn as it stood. All of that changed after the drawing
+was checked in, and the drawing is edited in its own canvas rather than by hand. It goes in at the
+next pass over that file.
 
 ### 11.6 Decisions — one shape for every ask
 

@@ -1240,6 +1240,35 @@ describe('ConversationController', () => {
         expect(meta).not.toContain('0 msgs');
       });
 
+      it('names the model once, not once in its own line and again in the stamp', () => {
+        // The stamp used to fall back to the model for anything older than
+        // today, because the row had nowhere else to say it. With a line of
+        // its own that fallback showed the same conversation its model twice
+        // - and only on the rows that were not from today, which is what made
+        // it read as bad data rather than as a duplicate.
+        const container = createMockEl();
+        const lastWeek = Date.now() - 8 * 24 * 60 * 60 * 1000;
+
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          {
+            id: 'conv-1',
+            providerId: 'claude',
+            title: 'Clarify unspecified inquiry',
+            createdAt: lastWeek,
+            lastResponseAt: lastWeek,
+            messageCount: 2,
+            preview: 'Preview',
+            modelLabel: 'Claude',
+          },
+        ]);
+
+        controller.renderHistoryDropdown(container, { onSelectConversation: jest.fn() });
+
+        const item = getHistoryItem(container, 'conv-1');
+        expect(item.querySelector('.grimoire-history-item-model')?.textContent).toBe('Claude');
+        expect(item.querySelector('.grimoire-history-item-time')?.textContent).not.toBe('Claude');
+      });
+
       it('says which model answered without being hovered, and keeps the rest in the tooltip', () => {
         // A tooltip cannot be scanned down a list, reached by keyboard, or
         // opened by touch. The model is what tells two conversations apart

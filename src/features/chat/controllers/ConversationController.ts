@@ -969,15 +969,19 @@ export class ConversationController {
     const titleEl = titleRow.createDiv({ cls: 'grimoire-history-item-title', text: title });
     const meta = this.formatHistoryMeta(conv);
     titleEl.setAttribute('title', meta ? `${title}\n${meta}` : title);
-    const modelLabel = conv.modelLabel?.trim();
-    if (modelLabel) {
-      content.createDiv({ cls: 'grimoire-history-item-model', text: modelLabel });
-    }
-
-    item.createSpan({
+    // The stamp and the model share the row's second line, so the row keeps the
+    // two lines it was drawn with. They are one fact each about the same thing -
+    // when it happened and what answered it - and reading them as one line is
+    // what stops the model from costing a third.
+    const stamp = item.createDiv({ cls: 'grimoire-history-item-stamp' });
+    stamp.createSpan({
       cls: 'grimoire-history-item-time',
       text: isCurrent ? t('chat.ui.history.current') : this.formatHistoryStamp(conv),
     });
+    const modelLabel = conv.modelLabel?.trim();
+    if (modelLabel) {
+      stamp.createSpan({ cls: 'grimoire-history-item-model', text: modelLabel });
+    }
 
     const canOpenInNewTab = !!options.onOpenConversationInNewTab;
     const openInNewTab = () => this.runHistoryAction(
@@ -1171,22 +1175,12 @@ export class ConversationController {
         minute: '2-digit',
       }).format(new Date(timestamp));
     }
-    return this.shortenModelLabel(conv.modelLabel) || this.formatRelativeTime(timestamp);
-  }
-
-  /**
-   * The part of a model label that identifies the model.
-   *
-   * A label can arrive as a whole billing path - "MiniMax Token Plan
-   * (minimax.io)/MiniMax-M3" - and at the end of a history row that reads as
-   * the row, with the title crushed to "Describe th…" beside it. The segment
-   * after the last slash is the name; the plan in front of it is not.
-   */
-  private shortenModelLabel(label: string | undefined): string {
-    const trimmed = label?.trim();
-    if (!trimmed) return '';
-    const lastSegment = trimmed.split('/').pop()?.trim();
-    return lastSegment || trimmed;
+    // The model used to stand here for anything older than today, because the
+    // row had nowhere else to say it. It has a line of its own now, and a
+    // stamp that is a time on one row and a model name on the next says
+    // neither reliably - which is how the same conversation showed its model
+    // twice, once in each place.
+    return this.formatRelativeTime(timestamp);
   }
 
   private formatHistoryMeta(conv: ConversationMeta): string {
