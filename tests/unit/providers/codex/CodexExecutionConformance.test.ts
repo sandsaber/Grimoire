@@ -58,6 +58,7 @@ function createDriver(
     requestResolver: {
       resolve: () => requestResolution.promise,
       resolveSteer: async () => [],
+      recordRefusal: () => {},
     },
     resultSink: {
       storeResult: async () => ({

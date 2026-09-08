@@ -129,6 +129,8 @@ export class StreamController {
   private pendingToolOutputFrames = new Map<string, ScheduledAnimationFrame>();
   private pendingScrollFrame: ScheduledAnimationFrame | null = null;
   private progressBlocks = new Map<string, ProgressBlockState>();
+  /** Every message this turn pushed a tool call into. See `finalizeRunningToolCalls`. */
+  private turnToolMessages = new Set<ChatMessage>();
   private activeProgressId: string | null = null;
   private currentTextPhase: AssistantTextPhase | undefined;
   private silentTurnTimeout: number | null = null;
@@ -472,6 +474,7 @@ export class StreamController {
       status: 'running',
       isExpanded: false,
     };
+    this.turnToolMessages.add(msg);
     msg.toolCalls = msg.toolCalls || [];
     msg.toolCalls.push(toolCall);
     this.deps.recordRuntimeToolCall?.(toolCall);
@@ -696,6 +699,7 @@ export class StreamController {
       status: 'running',
       isExpanded: false,
     };
+    this.turnToolMessages.add(msg);
     msg.toolCalls = msg.toolCalls || [];
     msg.toolCalls.push(toolCall);
     msg.contentBlocks = msg.contentBlocks || [];
@@ -755,6 +759,7 @@ export class StreamController {
       status: 'running',
       isExpanded: false,
     };
+    this.turnToolMessages.add(msg);
     msg.toolCalls = msg.toolCalls || [];
     msg.toolCalls.push(toolCall);
     this.deps.recordRuntimeToolCall?.(toolCall);
@@ -1069,6 +1074,36 @@ export class StreamController {
     this.activeProgressId = null;
   }
 
+  /**
+   * Settles every tool this turn left running.
+   *
+   * A tool row stops spinning when its result arrives, and a turn can end
+   * without one: cancelling a plan interrupts the session, so `ExitPlanMode`
+   * never reports back and its row kept the spinner beside the word
+   * "Interrupted" — and kept it in the saved transcript too. `unfinished` rather
+   * than `blocked`: nobody refused these, the turn simply ended first.
+   *
+   * **Found through the rows, not through a message.** The message the caller
+   * holds is re-bound after a turn from `completed.assistantMessageId`, and an
+   * interrupted run has no result to carry one — so on the very path this
+   * exists for, the caller was left holding a different object from the one the
+   * turn drew into, and a sweep of its tool calls swept nothing. What this
+   * sweeps instead is what the controller itself drew into, which is the same
+   * question asked of the half that knows the answer.
+   */
+  finalizeRunningToolCalls(): void {
+    const { state } = this.deps;
+    for (const message of this.turnToolMessages) {
+      for (const toolCall of message.toolCalls ?? []) {
+        if (toolCall.status !== 'running') continue;
+        toolCall.status = 'unfinished';
+        this.cancelPendingToolOutputRender(toolCall.id);
+        updateToolCallResult(toolCall.id, toolCall, state.toolCallElements);
+        this.deps.recordRuntimeToolCall?.(toolCall);
+      }
+    }
+  }
+
   async finalizeProgressBlocks(
     msg?: ChatMessage,
     state: Exclude<ProgressState, 'running'> = 'completed',
@@ -1242,7 +1277,18 @@ export class StreamController {
 
     const durationSeconds = finalizeThinkingBlock(thinkingState);
 
-    if (msg && thinkingState.content) {
+    /*
+     * **Stored because it was shown**, not because it has words in it.
+     *
+     * A thinking state exists only where a row was drawn, and the row says how
+     * long the model thought — which is the whole of what it says when the
+     * provider redacts the reasoning itself. Claude does that routinely: one
+     * turn here carried five thinking blocks and every one of them arrived
+     * empty. Keeping only the ones with text meant the reader watched "Thought
+     * for 28s" go by and found it gone when they reopened the conversation,
+     * which is the transcript quietly disagreeing with what it had just shown.
+     */
+    if (msg) {
       msg.contentBlocks = msg.contentBlocks || [];
       msg.contentBlocks.push({
         type: 'thinking',
@@ -1619,6 +1665,7 @@ export class StreamController {
     toolId: string,
     input?: Record<string, unknown>
   ): ToolCallInfo {
+    this.turnToolMessages.add(msg);
     msg.toolCalls = msg.toolCalls || [];
     const existing = msg.toolCalls.find(
       tc => tc.id === toolId && isSubagentToolName(tc.name)
@@ -2039,6 +2086,7 @@ export class StreamController {
     }
     this.progressBlocks.clear();
     this.activeProgressId = null;
+    this.turnToolMessages.clear();
     this.currentTextPhase = undefined;
     state.currentContentEl = null;
     state.currentTextEl = null;

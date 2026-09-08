@@ -12,13 +12,20 @@ type DirectoryEntry = {
   title: string;
 };
 
-/** Compact floating navigation for long conversations. */
+/**
+ * The transcript's own controls: to the first message, to the thread outline,
+ * to the latest.
+ *
+ * They sit in the panel switch row rather than floating over the column, which
+ * is where they used to be — a rail of five translucent circles hovering at 16%
+ * opacity over the text a reader was reading. Prev and next went with the
+ * float: the outline reaches any message in one press and names it, which is
+ * what stepping was for.
+ */
 export class NavigationSidebar {
   private readonly container: HTMLElement;
   private readonly topBtn: HTMLElement;
-  private readonly prevBtn: HTMLElement;
   private readonly directoryBtn: HTMLElement;
-  private readonly nextBtn: HTMLElement;
   private readonly bottomBtn: HTMLElement;
   private directoryPopover: HTMLElement | null = null;
   private pendingVisibilityFrame: ScheduledAnimationFrame | null = null;
@@ -40,29 +47,19 @@ export class NavigationSidebar {
     this.container = this.parentEl.createDiv({ cls: 'grimoire-nav-sidebar' });
     this.topBtn = this.createButton(
       'grimoire-nav-btn-top',
-      'chevrons-up',
+      'arrow-up-to-line',
       t('chat.ui.navigation.scrollTop'),
-    );
-    this.prevBtn = this.createButton(
-      'grimoire-nav-btn-prev',
-      'chevron-up',
-      t('chat.ui.navigation.previousMessage'),
     );
     this.directoryBtn = this.createButton(
       'grimoire-nav-btn-directory',
-      'logs',
+      'list',
       t('chat.ui.navigation.directory'),
     );
     this.directoryBtn.setAttribute('aria-haspopup', 'dialog');
     this.directoryBtn.setAttribute('aria-expanded', 'false');
-    this.nextBtn = this.createButton(
-      'grimoire-nav-btn-next',
-      'chevron-down',
-      t('chat.ui.navigation.nextMessage'),
-    );
     this.bottomBtn = this.createButton(
       'grimoire-nav-btn-bottom',
-      'chevrons-down',
+      'arrow-down-to-line',
       t('chat.ui.navigation.scrollBottom'),
     );
 
@@ -95,8 +92,6 @@ export class NavigationSidebar {
       }
       this.scrollTo(this.scrollEl.scrollHeight);
     });
-    this.prevBtn.addEventListener('click', () => this.scrollToMessage('prev'));
-    this.nextBtn.addEventListener('click', () => this.scrollToMessage('next'));
     this.directoryBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       this.toggleDirectory();
@@ -230,25 +225,6 @@ export class NavigationSidebar {
       .replace(/\s+/g, ' ')
       .trim();
     return title.length > 90 ? `${title.slice(0, 89)}…` : title;
-  }
-
-  private scrollToMessage(direction: 'prev' | 'next'): void {
-    const messages = Array.from(
-      this.messageListEl.querySelectorAll<HTMLElement>('.grimoire-message-user'),
-    );
-    if (messages.length === 0) return;
-
-    const currentTop = this.scrollEl.scrollTop;
-    const threshold = 30;
-    const candidate = direction === 'prev'
-      ? [...messages].reverse().find((message) => message.offsetTop < currentTop - threshold)
-      : messages.find((message) => message.offsetTop > currentTop + threshold);
-
-    if (candidate) {
-      this.scrollToElement(candidate);
-      return;
-    }
-    this.scrollTo(direction === 'prev' ? 0 : this.scrollEl.scrollHeight);
   }
 
   private scrollToElement(element: HTMLElement): void {

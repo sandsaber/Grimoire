@@ -12,18 +12,40 @@ function getRule(css: string, selector: string): string {
 }
 
 describe('history.css', () => {
-  it('opens history as a full chat-pane sheet', () => {
+  it('hangs history off the control that opened it, not over the conversation', () => {
     const css = readHistoryCss();
 
+    // It was a sheet inset 13px on all four sides, so looking for another
+    // conversation meant losing sight of this one.
     const menuRule = getRule(css, '.grimoire-history-menu');
     expect(menuRule).toContain('position: absolute');
-    expect(menuRule).toContain('left: 13px');
-    expect(menuRule).toContain('right: 13px');
-    expect(menuRule).toContain('top: 13px');
-    expect(menuRule).toContain('bottom: 13px');
+    expect(menuRule).toContain('top: calc(var(--grimoire-header-h) + var(--grimoire-space-4))');
+    expect(menuRule).toContain('right: var(--grimoire-space-8)');
+    expect(menuRule).toContain('bottom: auto');
+    expect(menuRule).toContain('left: auto');
+    expect(menuRule).toContain('width: min(320px, calc(100% - var(--grimoire-space-16)))');
+    expect(menuRule).toContain('box-shadow: var(--grimoire-lift-1)');
     expect(getRule(css, '.grimoire-history-menu.visible')).toContain('display: grid');
-    expect(getRule(css, '.grimoire-history-close')).toContain('display: inline-grid');
+    // No header band, so no close button in one: the panel opens on its search
+    // row and closes on an outside click or Escape.
+    expect(css).not.toContain('.grimoire-history-close');
+    expect(getRule(css, '.grimoire-history-footer')).toContain('border-top: 1px solid var(--grimoire-line)');
     expect(css).not.toContain('.grimoire-history-btn[aria-expanded="true"]');
+  });
+
+  it('marks the open conversation with a rule rather than a fill', () => {
+    const css = readHistoryCss();
+
+    const rowRule = getRule(css, '.grimoire-history-item');
+    expect(rowRule).toContain('height: 36px');
+    expect(rowRule).toContain('border-left: 1.5px solid transparent');
+    expect(getRule(css, '.grimoire-history-item.active'))
+      .toContain('border-left-color: var(--grimoire-accent)');
+    // Open in another tab is the same rule at the accent's border weight, not
+    // the hover ground: a row nobody was pointing at looked pointed at.
+    const openElsewhere = getRule(css, '.grimoire-history-item.is-open:not(.active)');
+    expect(openElsewhere).toContain('border-left-color: var(--grimoire-accent-line)');
+    expect(openElsewhere).toContain('background: transparent');
   });
 
   it('styles the redesigned search and grouped history list', () => {
@@ -31,7 +53,7 @@ describe('history.css', () => {
 
     expect(getRule(css, '.grimoire-history-search')).toContain('display: flex');
     expect(getRule(css, '.grimoire-history-group')).toContain('display: grid');
-    expect(getRule(css, '.grimoire-history-provider-dot')).toContain('background: var(--grimoire-history-provider-color');
+    expect(css).not.toContain('.grimoire-history-provider-dot');
   });
 
   it('reveals history actions without changing row width', () => {

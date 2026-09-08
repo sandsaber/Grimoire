@@ -950,6 +950,34 @@ describe('chat execution coordinator', () => {
       ]);
       reopened.dispose();
     });
+
+    it('adopts the session that holds the native provider thread, not the newest one', async () => {
+      const harness = await createHarness();
+      const owner = { kind: 'conversation' as const, ownerId: CONVERSATION_ID };
+      // What a restart leaves behind: the restored session carries the
+      // conversation's provider-native thread.
+      const restored = executionSessionId(opaque('es', 41));
+      await harness.registry.createSession({
+        backendId: FAKE_BACKEND_ID,
+        executionSessionId: restored,
+        owner,
+        nativeSessionRef: 'native-thread-1',
+      });
+      // And a second one for the same conversation, opened without it.
+      await harness.registry.createSession({
+        backendId: FAKE_BACKEND_ID,
+        executionSessionId: executionSessionId(opaque('es', 42)),
+        owner,
+      });
+
+      const reopened = harness.createCoordinator();
+      await reopened.loadConversation(CONVERSATION_ID);
+
+      // Dispatching through the session without the reference would resume a
+      // thread another session already owns, which the provider refuses.
+      expect(reopened.executionSessionFor(CONVERSATION_ID)).toBe(restored);
+      reopened.dispose();
+    });
   });
 
   it('detaches from a durable turn on dispose and refuses what never started', async () => {

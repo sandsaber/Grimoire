@@ -49,7 +49,6 @@ export class RelevantNotesView {
     this.containerEl.classList.add('grimoire-source-card-stack');
 
     const visibleSources = this.getVisibleSources();
-    this.containerEl.classList.toggle('grimoire-relevant-notes-container', visibleSources.length > 0);
     this.updateShownCount(visibleSources.length);
 
     if (visibleSources.length === 0) {
@@ -77,6 +76,12 @@ export class RelevantNotesView {
       if (source.badge) {
         const scoreEl = this.createChild(buttonEl, 'span', 'grimoire-source-card-score');
         scoreEl.textContent = source.badge;
+        // A percentage can be drawn as well as read: the row shows a line filled
+        // to the score. A badge that is a word — "current" — has no line.
+        const percent = /^(\d{1,3})\s*%$/.exec(source.badge);
+        if (percent) {
+          scoreEl.style.setProperty('--grimoire-source-score', percent[1]);
+        }
       }
 
       buttonEl.addEventListener('click', () => this.openVaultPath(source.path));
@@ -97,7 +102,6 @@ export class RelevantNotesView {
       cleanup();
     }
     this.containerEl.replaceChildren();
-    this.containerEl.classList.remove('grimoire-relevant-notes-container');
     this.containerEl.classList.remove('grimoire-source-card-stack');
   }
 

@@ -26,27 +26,33 @@ describe('model-selector.css', () => {
     expect(baseRule).toContain('background: transparent');
     expect(baseRule).toContain('box-shadow: none');
 
+    // A group header is a control that opens and closes, so it answers hover
+    // like every other row in the plugin.
     const hoverRule = getRule(css, '.grimoire-model-dropdown button.grimoire-model-group:hover');
-    expect(hoverRule).toContain('background: transparent');
+    expect(hoverRule).toContain('background: var(--grimoire-hover)');
     expect(hoverRule).toContain('box-shadow: none');
   });
 
   it('keeps the model search container height stable while filtering', () => {
     const css = readModelSelectorCss();
     const searchRule = getRule(css, '.grimoire-model-search');
-    expect(searchRule).toContain('height: 34px');
-    expect(searchRule).toContain('min-height: 34px');
-    expect(searchRule).toContain('max-height: 34px');
-    expect(searchRule).toContain('padding: 0 var(--grimoire-space-4)');
+    expect(searchRule).toContain('height: 36px');
+    expect(searchRule).toContain('min-height: 36px');
+    expect(searchRule).toContain('max-height: 36px');
+    expect(searchRule).toContain('padding: 0 var(--grimoire-space-10)');
   });
 
   it('frames the model search container so it does not bleed past the dropdown edges', () => {
     const css = readModelSelectorCss();
     const searchRule = getRule(css, '.grimoire-model-search');
-    expect(searchRule).toContain('border: 1px solid var(--background-modifier-border)');
-    expect(searchRule).toContain('border-radius: var(--grimoire-radius-2)');
+    // A band with a rule under it: the panel already encloses this, and a
+    // second box says nothing the first did not.
+    expect(searchRule).toContain('border-bottom: 1px solid var(--grimoire-line)');
+    expect(searchRule).toContain('border-radius: 0');
     expect(searchRule).toContain('box-sizing: border-box');
-    expect(searchRule).toMatch(/margin:\s*0/);
+    // It spans the panel's full width by cancelling the panel's own padding,
+    // so the rule under it reaches both edges.
+    expect(searchRule).toContain('margin: calc(-1 * var(--grimoire-space-6)) calc(-1 * var(--grimoire-space-6)) var(--grimoire-space-6)');
   });
 
   it('prevents the native search input from changing the selector height', () => {
@@ -69,22 +75,14 @@ describe('model-selector.css', () => {
     expect(buttonRule).toContain('max-width: min(100%, 260px)');
   });
 
-  it('colors the selected model dot from the resolved provider', () => {
+  it('marks a provider in ink rather than in its vendor colour', () => {
     const css = readModelSelectorCss();
 
-    expect(css).toContain('.grimoire-model-button-provider-icon[data-provider="claude"]');
-    expect(css).toContain('color: var(--grimoire-provider-claude, #d97757)');
-    expect(css).toContain('.grimoire-model-button-provider-icon[data-provider="opencode"]');
-    expect(css).toContain('color: var(--grimoire-provider-opencode, #e0b341)');
-  });
-
-  it('colors provider group dots from provider ids rather than display-name classes', () => {
-    const css = readModelSelectorCss();
-
-    expect(css).toContain('.grimoire-model-group-provider-icon[data-provider="mimocode"]');
-    expect(css).toContain('color: var(--grimoire-provider-mimocode, #ff6a00)');
-    expect(css).toContain('.grimoire-model-group-provider-icon[data-provider="grok"]');
-    expect(css).not.toContain('.grimoire-model-group-section--mimocode .grimoire-model-group-provider-icon');
+    // Nordic spends no hue on identity. The nine brand colours are gone, and
+    // with them every `[data-provider="…"]` rule whose whole body was one.
+    expect(css).not.toMatch(/--grimoire-provider-/);
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(getRule(css, '.grimoire-model-button-provider-icon')).toContain('color: var(--grimoire-ink-muted)');
   });
 
   it('gives model choices room and preserves distinguishing secondary context', () => {
@@ -92,13 +90,13 @@ describe('model-selector.css', () => {
     const dropdownRule = getRule(css, '.grimoire-container--chat-window .grimoire-model-dropdown');
     const detailRule = getLastRule(css, '.grimoire-model-option-detail');
 
-    expect(dropdownRule).toContain('width: min(360px, calc(100vw - 24px))');
+    expect(dropdownRule).toContain('width: min(320px, calc(100vw - 24px))');
     expect(detailRule).not.toContain('display: none');
-    expect(detailRule).toContain('font-size: var(--grimoire-text-2xs)');
-    expect(detailRule).toContain('color: var(--text-muted)');
+    expect(detailRule).toContain('font-size: var(--grimoire-text-s)');
+    expect(detailRule).toContain('color: var(--grimoire-ink-muted)');
 
     const labelRule = getLastRule(css, '.grimoire-model-option-label');
-    expect(labelRule).toContain('color: var(--text-normal)');
+    expect(labelRule).toContain('color: var(--grimoire-ink)');
     expect(labelRule).toContain('font-weight: var(--grimoire-weight-medium)');
   });
 
@@ -108,8 +106,8 @@ describe('model-selector.css', () => {
     const labelRule = getRule(css, '.grimoire-plan-usage-badge-label');
     const meterRule = getRule(css, '.grimoire-plan-usage-badge-meter');
 
-    expect(badgeRule).toContain('gap: var(--grimoire-space-2)');
-    expect(badgeRule).toContain('padding: 0 var(--grimoire-space-3)');
+    expect(badgeRule).toContain('gap: var(--grimoire-space-4)');
+    expect(badgeRule).toContain('padding: 0 var(--grimoire-space-6)');
     expect(labelRule).toContain('display: none');
     expect(meterRule).toContain('width: 18px');
     expect(css).not.toContain('.grimoire-plan-usage-badge-tip');

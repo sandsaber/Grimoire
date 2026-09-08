@@ -318,11 +318,23 @@ export class DeterministicFakeSession implements ExecutionSession {
     };
   }
 
+  /**
+   * What the session can say about its provider-native counterpart.
+   *
+   * A reference appears when the session has one to report: restored from the
+   * config, or minted when this session first runs. A session that has neither
+   * reports none, which every real backend does and this double used not to —
+   * it invented a reference unconditionally, so no test could express the
+   * restarted conversation that holds one session with a native reference and
+   * one without.
+   */
   getSnapshot(): ExecutionSessionSnapshot {
+    const nativeSessionRef = this.config.nativeSessionRef
+      ?? (this.runs.size > 0 ? `fake-session-${this.executionSessionId}` : undefined);
     return {
       executionSessionId: this.executionSessionId,
       sessionInstanceId: this.sessionInstanceId,
-      nativeSessionRef: `fake-session-${this.executionSessionId}`,
+      ...(nativeSessionRef ? { nativeSessionRef } : {}),
     };
   }
 

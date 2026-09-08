@@ -22,14 +22,18 @@ export class InlinePlanApproval {
   private collapseIconEl!: HTMLElement;
   private isInputFocused = false;
   private isCollapsed = false;
+  private onCollapseChange: ((isCollapsed: boolean) => void) | undefined;
   private boundKeyDown: (e: KeyboardEvent) => void;
 
   constructor(
     containerEl: HTMLElement,
     resolve: (decision: PlanApprovalDecision | null) => void,
+    /** See the note on `InlineExitPlanMode`: folded, this card frees the composer. */
+    onCollapseChange?: (isCollapsed: boolean) => void,
   ) {
     this.containerEl = containerEl;
     this.resolveCallback = resolve;
+    this.onCollapseChange = onCollapseChange;
     this.boundKeyDown = (event) => this.handleKeyDown(event);
   }
 
@@ -110,8 +114,9 @@ export class InlinePlanApproval {
       cls: 'grimoire-plan-subtitle',
     });
 
+    // The tool's name in the meta face. The glyph beside the title already says
+    // which tool this is, so drawing it again in the tag said it twice.
     const pill = head.createDiv({ cls: 'grimoire-plan-tool-pill' });
-    setIcon(pill.createSpan(), getToolIcon(TOOL_ENTER_PLAN_MODE));
     pill.createSpan({ text: t('chat.ui.plan.label'), cls: 'grimoire-plan-tool-label' });
 
     this.collapseBtn = head.createEl('button', {
@@ -141,6 +146,8 @@ export class InlinePlanApproval {
       this.feedbackInput.blur();
       this.rootEl.focus();
     }
+
+    this.onCollapseChange?.(isCollapsed);
 
     this.refreshCollapseToggle();
   }

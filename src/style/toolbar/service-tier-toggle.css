@@ -2,7 +2,7 @@
 .grimoire-service-tier-toggle {
   display: flex;
   align-items: center;
-  padding-left: var(--grimoire-space-1);
+  padding-left: var(--grimoire-space-2);
 }
 
 .grimoire-service-tier-button {
@@ -12,7 +12,7 @@
   width: 22px;
   height: 22px;
   border-radius: var(--grimoire-radius-1);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   background: transparent;
   cursor: pointer;
   transition: color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
@@ -31,11 +31,11 @@
 }
 
 .grimoire-service-tier-button:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-service-tier-button.active {
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-container--chat-window .grimoire-service-tier-toggle {
@@ -46,20 +46,20 @@
 .grimoire-container--chat-window .grimoire-service-tier-button {
   box-sizing: border-box;
   width: 28px;
-  height: 28px;
+  height: var(--grimoire-hit-l);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-raise);
+  background: none;
   color: var(--grimoire-workbench-muted);
 }
 
 .grimoire-container--chat-window .grimoire-service-tier-button:hover {
-  background: var(--grimoire-raise-2);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-container--chat-window .grimoire-service-tier-button.active {
   border-color: var(--grimoire-accent-line);
-  background: var(--grimoire-accent-soft);
+  background: var(--grimoire-accent-wash);
   color: var(--grimoire-accent-text);
 }

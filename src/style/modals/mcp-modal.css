@@ -4,20 +4,16 @@
   max-width: 90vw;
 }
 
+/*
+ * The fields a transport needs, as more rows in the same list.
+ *
+ * They sat in a tinted box before, which said "these are different" about
+ * settings that are not: a command is as much part of the server as its name.
+ * The host's own row rule separates them, like every other row in the dialog.
+ */
 .grimoire-mcp-type-fields {
-  margin: var(--grimoire-space-5) 0;
-  padding: var(--grimoire-space-5);
-  background: var(--background-secondary);
-  border-radius: var(--grimoire-radius-2);
-}
-
-.grimoire-mcp-type-fields .setting-item {
-  padding: var(--grimoire-space-4) 0;
-  border-top: none;
-}
-
-.grimoire-mcp-type-fields .setting-item:first-child {
-  padding-top: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .grimoire-mcp-cmd-setting,
@@ -29,33 +25,34 @@
 .grimoire-mcp-cmd-setting .setting-item-control,
 .grimoire-mcp-env-setting .setting-item-control {
   width: 100%;
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-mcp-cmd-textarea,
 .grimoire-mcp-env-textarea {
+  box-sizing: border-box;
   width: 100%;
   min-height: 50px;
-  resize: vertical;
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-s);
-  padding: var(--grimoire-space-4);
+  padding: var(--grimoire-space-6) var(--grimoire-space-10);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
+  background: var(--grimoire-field);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  line-height: var(--grimoire-leading-code);
+  resize: vertical;
 }
 
 .grimoire-mcp-cmd-textarea:focus,
 .grimoire-mcp-env-textarea:focus {
   border-color: var(--grimoire-accent);
+  box-shadow: var(--grimoire-focus-ring);
   outline: none;
 }
 
 .grimoire-mcp-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--grimoire-space-4);
-  margin-top: var(--grimoire-space-6);
+  margin-top: var(--grimoire-space-8);
 }
 
 /* MCP Test Modal */
@@ -65,11 +62,11 @@
 }
 
 .grimoire-mcp-test-modal .modal-content {
-  padding: 0 var(--grimoire-space-7) var(--grimoire-space-7) var(--grimoire-space-7);
+  padding: 0 var(--grimoire-space-20) var(--grimoire-space-20) var(--grimoire-space-20);
 }
 
 .grimoire-mcp-test-modal .modal-title {
-  padding: var(--grimoire-space-7) var(--grimoire-space-7) var(--grimoire-space-5) var(--grimoire-space-7);
+  padding: var(--grimoire-space-20) var(--grimoire-space-20) var(--grimoire-space-12) var(--grimoire-space-20);
   margin: 0 -20px;
 }
 
@@ -77,15 +74,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--grimoire-space-5);
+  gap: var(--grimoire-space-12);
   padding: 32px;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-mcp-test-spinner {
   width: 20px;
   height: 20px;
-  animation: grimoire-spin 1s linear infinite;
+  animation: grimoire-spin 0.9s linear infinite;
 }
 
 .grimoire-mcp-test-spinner svg {
@@ -96,11 +93,11 @@
 .grimoire-mcp-test-status {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-5);
-  background: var(--background-secondary);
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-12);
+  background: var(--grimoire-plane);
   border-radius: var(--grimoire-radius-2);
-  margin-bottom: var(--grimoire-space-5);
+  margin-bottom: var(--grimoire-space-12);
 }
 
 .grimoire-mcp-test-icon {
@@ -114,11 +111,11 @@
 }
 
 .grimoire-mcp-test-icon.success {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-mcp-test-icon.error {
-  color: var(--text-error);
+  color: var(--grimoire-error);
 }
 
 .grimoire-mcp-test-text {
@@ -126,50 +123,50 @@
 }
 
 .grimoire-mcp-test-error {
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  background: rgba(var(--color-red-rgb), 0.1);
-  border: 1px solid var(--text-error);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
+  background: color-mix(in srgb, var(--grimoire-error) 10%, transparent);
+  border: 1px solid var(--grimoire-error);
   border-radius: var(--grimoire-radius-2);
-  color: var(--text-error);
+  color: var(--grimoire-error);
   font-size: var(--grimoire-text-s);
-  margin-bottom: var(--grimoire-space-5);
+  margin-bottom: var(--grimoire-space-12);
 }
 
 .grimoire-mcp-test-tools {
-  margin-bottom: var(--grimoire-space-6);
+  margin-bottom: var(--grimoire-space-16);
 }
 
 .grimoire-mcp-test-tools-header {
   font-weight: var(--grimoire-weight-semibold);
   font-size: var(--grimoire-text-m);
-  margin-bottom: var(--grimoire-space-4);
-  color: var(--text-muted);
+  margin-bottom: var(--grimoire-space-8);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-mcp-test-tools-list {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   max-height: 300px;
   overflow-y: auto;
 }
 
 .grimoire-mcp-test-tool {
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  background: var(--background-secondary);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
+  background: var(--grimoire-plane);
   border-radius: var(--grimoire-radius-2);
 }
 
 .grimoire-mcp-test-tool-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
 }
 
 .grimoire-mcp-test-tool-icon {
   display: flex;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-mcp-test-tool-icon svg {
@@ -197,27 +194,27 @@
 
 .grimoire-mcp-test-tool-disabled .grimoire-mcp-test-tool-name {
   text-decoration: line-through;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-mcp-toggle-all-btn {
-  margin-right: var(--grimoire-space-4);
+  margin-right: var(--grimoire-space-8);
 }
 
 .grimoire-mcp-toggle-all-btn.is-destructive {
-  background: rgba(var(--color-red-rgb), 0.1);
-  border-color: rgba(var(--color-red-rgb), 0.3);
-  color: var(--text-error);
+  background: color-mix(in srgb, var(--grimoire-error) 10%, transparent);
+  border-color: color-mix(in srgb, var(--grimoire-error) 30%, transparent);
+  color: var(--grimoire-error);
 }
 
 .grimoire-mcp-toggle-all-btn.is-destructive:hover {
-  background: rgba(var(--color-red-rgb), 0.2);
+  background: color-mix(in srgb, var(--grimoire-error) 20%, transparent);
 }
 
 .grimoire-mcp-test-tool-desc {
   font-size: var(--grimoire-text-s);
-  color: var(--text-muted);
-  margin-top: var(--grimoire-space-2);
+  color: var(--grimoire-ink-muted);
+  margin-top: var(--grimoire-space-4);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -225,17 +222,17 @@
 }
 
 .grimoire-mcp-test-no-tools {
-  padding: var(--grimoire-space-6);
+  padding: var(--grimoire-space-16);
   text-align: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-m);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
   border-radius: var(--grimoire-radius-2);
-  margin-bottom: var(--grimoire-space-6);
+  margin-bottom: var(--grimoire-space-16);
 }
 
 .grimoire-mcp-test-buttons {
   display: flex;
   justify-content: center;
-  margin-top: var(--grimoire-space-6);
+  margin-top: var(--grimoire-space-16);
 }

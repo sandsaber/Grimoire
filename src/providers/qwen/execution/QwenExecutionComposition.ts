@@ -34,6 +34,7 @@ import type {
   PreparedChatTurn,
 } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
+import { resolveRunAbsoluteTimeoutMs } from '@/core/types/settings';
 import type GrimoirePlugin from '@/main';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
@@ -316,6 +317,7 @@ export class QwenExecution {
       resultCommitTimeoutMs: 2_000,
       recoveryTimeoutMs: 2_000,
       runTimeoutMs: 10 * 60_000,
+      runAbsoluteTimeoutMs: () => resolveRunAbsoluteTimeoutMs(this.plugin.settings),
       maxResultBytes: MAX_RESULT_BYTES,
     };
     this.backend = new QwenExecutionBackend(context);

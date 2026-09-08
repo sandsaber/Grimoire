@@ -11,26 +11,21 @@
   outline: none;
 }
 
+/*
+ * One shape for every ask: a glyph, what is being decided, the material it acts
+ * on, and numbered choices. The card is a hairline on the transcript's own
+ * ground — it was a raised plane with a full drop shadow and an accent inset
+ * ring, which is a modal's weight for something that is part of the thread.
+ */
 .grimoire-ask-form {
-  overflow: hidden;
-  border-radius: var(--grimoire-radius-3);
-  background: var(--grimoire-plane);
-  box-shadow:
-    var(--grimoire-lift-2),
-    inset 0 0 0 1px var(--grimoire-accent-line);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   max-height: 78vh;
-  animation: grimoire-ask-rise 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-@keyframes grimoire-ask-rise {
-  from {
-    transform: translateY(16px);
-  }
-  to {
-    transform: none;
-  }
+  overflow: hidden;
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-2);
+  background: var(--grimoire-ground);
+  box-shadow: var(--grimoire-lift-0);
 }
 
 /* ── Header ── */
@@ -38,45 +33,47 @@
 .grimoire-ask-head {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-5) var(--grimoire-space-5) var(--grimoire-space-5);
-  border-bottom: 1px solid var(--grimoire-line);
+  gap: var(--grimoire-space-10);
+  padding: var(--grimoire-space-14) var(--grimoire-space-14) 0;
+  border-bottom: 0;
 }
 
+/* The glyph is a glyph. It was a 28px tinted tile with its own inset ring. */
 .grimoire-ask-glyph {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
   display: grid;
   place-items: center;
-  border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-accent-soft);
-  color: var(--grimoire-accent-text);
-  box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
+  flex: 0 0 auto;
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-accent);
 }
 
 .grimoire-ask-glyph svg,
 .grimoire-ask-glyph .svg-icon {
-  width: 16px;
-  height: 16px;
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-ask-title-block {
   display: grid;
-  gap: var(--grimoire-space-1);
+  gap: var(--grimoire-space-2);
   min-width: 0;
 }
 
 .grimoire-ask-title {
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-semibold);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   line-height: 1.2;
 }
 
 .grimoire-ask-subtitle {
-  font-size: var(--grimoire-text-xs);
-  color: var(--text-faint);
+  font-size: var(--grimoire-text-s);
+  color: var(--grimoire-ink-muted);
   line-height: 1.25;
 }
 
@@ -85,25 +82,25 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
-  height: 24px;
-  padding: 0 var(--grimoire-space-4);
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-raise-2);
-  color: var(--grimoire-workbench-muted);
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-semibold);
+  gap: var(--grimoire-space-4);
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
 }
 
 .grimoire-ask-tool-pill svg,
 .grimoire-ask-tool-pill .svg-icon {
-  width: 13px;
-  height: 13px;
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
 }
 
-.grimoire-ask-collapse-toggle {
+button.grimoire-ask-collapse-toggle {
   width: 28px;
   height: 28px;
   flex: 0 0 auto;
@@ -112,7 +109,7 @@
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background: transparent;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   cursor: pointer;
   transition:
     background var(--grimoire-duration) var(--grimoire-ease),
@@ -123,7 +120,7 @@
 .grimoire-ask-collapse-toggle:hover,
 .grimoire-ask-collapse-toggle:focus-visible {
   background: var(--grimoire-raise-2);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-ask-collapse-toggle:active {
@@ -136,12 +133,15 @@
   height: 15px;
 }
 
+/*
+ * Collapsed is the same card, shorter. It used to grow a full accent ring and
+ * a drop shadow when folded, so the quietest state on the surface became the
+ * loudest thing on it.
+ */
 .grimoire-ask-anchor.is-collapsed .grimoire-ask-form {
   grid-template-rows: auto;
   max-height: none;
-  box-shadow:
-    var(--grimoire-lift-1),
-    inset 0 0 0 1px var(--grimoire-accent-line);
+  box-shadow: var(--grimoire-lift-0);
 }
 
 .grimoire-ask-anchor.is-collapsed .grimoire-ask-head {
@@ -156,89 +156,97 @@
 /* ── Body (scrollable question stack) ── */
 
 .grimoire-ask-body {
-  padding: var(--grimoire-space-5);
+  padding: var(--grimoire-space-14);
   display: grid;
-  gap: var(--grimoire-space-6);
+  gap: var(--grimoire-space-16);
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb-bg, var(--grimoire-line-2)) transparent;
+  scrollbar-color: var(--grimoire-line-2) transparent;
 }
 
 /* ── Question block ── */
 
 .grimoire-ask-qblock {
   display: grid;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
 }
 
 .grimoire-ask-q-top {
   display: flex;
   align-items: baseline;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
 }
 
+/* Which question this is, in the meta type - it was a bold accent "01". */
 .grimoire-ask-q-num {
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-bold);
-  color: var(--grimoire-accent-text);
   flex: 0 0 auto;
   padding-top: 1px;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-ask-q-title {
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-semibold);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   line-height: 1.4;
   flex: 1 1 auto;
 }
 
 .grimoire-ask-q-kind {
   flex: 0 0 auto;
-  font-family: var(--font-monospace);
+  padding-top: var(--grimoire-space-2);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
-  text-transform: uppercase;
-  color: var(--text-faint);
-  padding-top: var(--grimoire-space-1);
+  font-weight: var(--grimoire-weight-normal);
 }
 
 /* ── Options (radio / checkbox rows) ── */
 
 .grimoire-ask-opts {
   display: grid;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-2);
 }
 
+/*
+ * A choice is a row, not a card: the reader is picking one of a few, and each
+ * of them wearing its own border turns a list into a stack of boxes. Chosen is
+ * the hover wash with a 1.5px accent rule on the leading edge — the same mark
+ * the history row and the thread outline use for "this one".
+ */
 .grimoire-ask-opt {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-raise);
-  box-shadow: inset 0 0 0 1px var(--grimoire-line);
+  height: 32px;
+  gap: var(--grimoire-space-10);
+  padding: 0 var(--grimoire-space-8);
+  border-inline-start: 1.5px solid transparent;
+  border-radius: var(--grimoire-radius-1);
+  background: none;
+  box-shadow: none;
   cursor: pointer;
   transition:
     background var(--grimoire-duration) var(--grimoire-ease),
-    box-shadow var(--grimoire-duration) var(--grimoire-ease),
     color var(--grimoire-duration) var(--grimoire-ease);
   text-align: left;
 }
 
 .grimoire-ask-opt:hover {
-  background: var(--grimoire-raise-2);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-ask-opt.is-selected {
-  background: var(--grimoire-accent-soft);
-  box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
+  border-inline-start-color: var(--grimoire-accent);
+  background: var(--grimoire-hover);
+  box-shadow: none;
 }
 
 .grimoire-ask-opt.is-focused {
-  outline: 1.5px solid var(--grimoire-accent-line);
-  outline-offset: -1.5px;
+  outline: 1px solid var(--grimoire-line-3);
+  outline-offset: -1px;
 }
 
 .grimoire-ask-opt-mark {
@@ -258,7 +266,7 @@
 }
 
 .grimoire-ask-opt.is-selected .grimoire-ask-opt-ring {
-  box-shadow: inset 0 0 0 5px var(--grimoire-brand);
+  box-shadow: inset 0 0 0 5px var(--grimoire-accent);
 }
 
 .grimoire-ask-opt-box {
@@ -274,8 +282,8 @@
 }
 
 .grimoire-ask-opt.is-selected .grimoire-ask-opt-box {
-  background: var(--grimoire-brand);
-  box-shadow: inset 0 0 0 1.6px var(--grimoire-brand);
+  background: var(--grimoire-accent);
+  box-shadow: inset 0 0 0 1.6px var(--grimoire-accent);
 }
 
 .grimoire-ask-opt-box svg {
@@ -292,41 +300,60 @@
 
 .grimoire-ask-opt-text {
   font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
-  color: var(--text-muted);
+  font-weight: var(--grimoire-weight-normal);
+  color: var(--grimoire-ink-muted);
   transition: color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-ask-opt.is-selected .grimoire-ask-opt-text {
-  color: var(--grimoire-accent-text);
+  color: var(--grimoire-ink);
 }
 
 /* ── Freeform textarea ── */
 
+/*
+ * An answer written in prose is a line to write on, not a field to fill: the
+ * card already encloses it, and a bordered box inside a bordered card is the
+ * second box saying what the first one said.
+ */
 .grimoire-ask-freeform {
   width: 100%;
-  min-height: 38px;
+  min-height: 32px;
   max-height: 80px;
   resize: none;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-6) var(--grimoire-space-2);
   border: 0;
+  border-bottom: 1px solid var(--grimoire-line);
   outline: 0;
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-sink);
-  box-shadow: inset 0 0 0 1px var(--grimoire-line-2);
-  color: var(--text-normal);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-normal);
   line-height: 1.5;
-  transition: box-shadow var(--grimoire-duration) var(--grimoire-ease);
+  transition: border-color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-ask-freeform:focus {
-  box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
+  border-bottom-color: var(--grimoire-accent);
+  box-shadow: none;
+}
+
+.grimoire-ask-btn-arrow {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.grimoire-ask-btn-arrow svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-ask-freeform::placeholder {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 /* ── Actions bar ── */
@@ -334,8 +361,8 @@
 .grimoire-ask-actions {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-5) var(--grimoire-space-5);
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-10) var(--grimoire-space-14) var(--grimoire-space-14);
   border-top: 1px solid var(--grimoire-line);
 }
 
@@ -343,47 +370,46 @@
   flex: 1 1 auto;
 }
 
+/*
+ * Every choice that costs something keeps its verb. Only one of them is
+ * filled — the rest are words on the ground, because two filled buttons make
+ * neither of them the answer.
+ */
 .grimoire-ask-btn {
-  height: 32px;
-  padding: 0 var(--grimoire-space-5);
+  display: inline-flex;
+  align-items: center;
+  height: var(--grimoire-hit-l);
+  gap: var(--grimoire-space-6);
+  padding: 0 var(--grimoire-space-14);
   border: 0;
   border-radius: var(--grimoire-radius-1);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-medium);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--grimoire-space-3);
   transition:
     background var(--grimoire-duration) var(--grimoire-ease),
-    color var(--grimoire-duration) var(--grimoire-ease),
-    filter var(--grimoire-duration) var(--grimoire-ease),
-    transform var(--grimoire-duration) var(--grimoire-ease),
-    box-shadow var(--grimoire-duration) var(--grimoire-ease);
+    color var(--grimoire-duration) var(--grimoire-ease);
   cursor: pointer;
 }
 
-.grimoire-ask-btn:active {
-  transform: translateY(1px);
-}
-
 .grimoire-ask-btn svg {
-  width: 14px;
-  height: 14px;
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
 }
 
-.grimoire-ask-btn--skip {
+button.grimoire-ask-btn--skip {
   background: transparent;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-ask-btn--skip:hover {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
-.grimoire-ask-btn--submit {
-  background: var(--grimoire-brand);
-  color: var(--text-on-accent);
-  box-shadow: var(--grimoire-lift-1);
+button.grimoire-ask-btn--submit {
+  background: var(--grimoire-accent);
+  color: var(--grimoire-accent-contrast);
+  box-shadow: none;
 }
 
 .grimoire-ask-btn--submit:hover {
@@ -392,7 +418,7 @@
 
 .grimoire-ask-btn--submit:disabled {
   background: var(--grimoire-raise-2);
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   box-shadow: none;
   cursor: default;
 }
@@ -410,32 +436,35 @@
 
 .grimoire-tool-io-qa {
   display: grid;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
 }
 
 .grimoire-tool-io-qa-q {
   font-size: var(--grimoire-text-xs);
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-tool-io-qa-a {
   font-size: var(--grimoire-text-s);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-weight: var(--grimoire-weight-medium);
   display: flex;
   flex-wrap: wrap;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-tool-io-qa-tag {
-  padding: var(--grimoire-space-1) var(--grimoire-space-4);
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-accent-soft);
-  color: var(--grimoire-accent-text);
-  box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
-  font-weight: var(--grimoire-weight-semibold);
-  font-size: var(--grimoire-text-xs);
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-faint);
+  box-shadow: none;
+  font-family: var(--grimoire-mono);
+  font-weight: var(--grimoire-weight-normal);
+  font-size: var(--grimoire-text-2xs);
+  letter-spacing: var(--grimoire-label-tracking);
   line-height: 1.4;
+  text-transform: uppercase;
 }
 
 /* ── Permission request (unified docked style) ── */
@@ -453,74 +482,71 @@
   outline: none;
 }
 
+/*
+ * A permission is a decision, and it wears the shape every other decision
+ * wears: the glyph, what is being decided, the material it acts on, numbered
+ * choices. It used to be the odd one out - a raised panel tinted 2% accent,
+ * with an accent hairline across its top, a 30px tinted tile around the
+ * shield, a banded header and a code-ground pill for the tool.
+ */
 .grimoire-permission-request {
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) minmax(0, auto);
   max-height: min(70vh, 560px);
   overflow: hidden;
-  border: 1px solid var(--grimoire-line-2);
-  border-radius: var(--grimoire-radius-3);
-  background: color-mix(in srgb, var(--grimoire-panel-2) 98%, var(--grimoire-brand) 2%);
-  box-shadow:
-    var(--grimoire-lift-2);
-  animation: grimoire-ask-rise 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.grimoire-permission-request::before {
-  position: absolute;
-  top: 0;
-  right: 18px;
-  left: 18px;
-  height: 1px;
-  background: var(--grimoire-accent-line-strong);
-  content: "";
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-2);
+  background: var(--grimoire-ground);
+  box-shadow: var(--grimoire-lift-0);
 }
 
 .grimoire-permission-head {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-columns: var(--grimoire-icon-l) minmax(0, 1fr) max-content;
   align-items: center;
-  gap: var(--grimoire-space-4) var(--grimoire-space-4);
-  padding: var(--grimoire-space-5) var(--grimoire-space-5) var(--grimoire-space-5);
-  border-bottom: 1px solid var(--grimoire-line);
-  background: color-mix(in srgb, var(--grimoire-raise) 58%, transparent);
+  gap: var(--grimoire-space-10);
+  padding: var(--grimoire-space-14) var(--grimoire-space-14) 0;
+  border-bottom: 0;
+  background: none;
 }
 
+/* The glyph is a glyph. */
 .grimoire-permission-shield {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-accent-soft);
-  color: var(--grimoire-accent-text);
-  box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-accent);
+  box-shadow: none;
 }
 
 .grimoire-permission-shield svg,
 .grimoire-permission-shield .svg-icon {
-  width: 16px;
-  height: 16px;
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-permission-title-block {
   display: grid;
   min-width: 0;
-  gap: var(--grimoire-space-1);
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-permission-title {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1.2;
 }
 
 .grimoire-permission-subtitle {
-  color: var(--grimoire-workbench-faint);
-  font-size: var(--grimoire-text-xs);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
   line-height: 1.25;
 }
 
@@ -530,25 +556,27 @@
   white-space: normal;
 }
 
+/* Which tool is asking, in the meta type, beside the title it belongs to. */
 .grimoire-permission-tool {
   display: inline-flex;
   flex: 0 0 auto;
-  grid-column: 2;
-  justify-self: start;
+  grid-column: 3;
+  justify-self: end;
   align-items: center;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
   min-height: 22px;
-  max-width: 100%;
-  padding: var(--grimoire-space-2) var(--grimoire-space-4);
-  overflow: hidden;
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-sink);
-  color: var(--grimoire-workbench-muted);
-  box-shadow: inset 0 0 0 1px var(--grimoire-line);
-  font-family: var(--font-monospace);
+  /* A share of the head, not a percentage of it: a percentage max-width on a
+   * grid item makes Chrome compute its max-content contribution as zero, which
+   * collapsed the track and broke "Bash" into one letter per line. */
+  max-width: 180px;
+  padding: 0;
+  overflow: visible;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-faint);
+  box-shadow: none;
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
-  line-height: 1.25;
   white-space: normal;
 }
 
@@ -556,14 +584,15 @@
 .grimoire-permission-tool .svg-icon {
   width: 13px;
   height: 13px;
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-permission-body {
   display: grid;
   min-height: 0;
   max-height: min(42vh, 300px);
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-5) var(--grimoire-space-5) var(--grimoire-space-5);
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-12) var(--grimoire-space-12) var(--grimoire-space-12);
   overflow: hidden auto;
   scrollbar-width: thin;
   scrollbar-color: var(--grimoire-line-3) transparent;
@@ -575,8 +604,8 @@
   align-items: start;
   min-width: 0;
   max-height: min(28vh, 190px);
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   overflow: auto;
   border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
@@ -587,17 +616,17 @@
 }
 
 .grimoire-permission-dollar {
-  margin-top: var(--grimoire-space-1);
-  color: var(--grimoire-accent-text);
-  font-family: var(--font-monospace);
+  margin-top: var(--grimoire-space-2);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-bold);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
 }
 
 .grimoire-permission-command code {
-  color: var(--text-normal);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-medium);
   line-height: 1.5;
@@ -608,14 +637,14 @@
 
 .grimoire-permission-target {
   display: block;
-  padding: var(--grimoire-space-4) var(--grimoire-space-4);
+  padding: var(--grimoire-space-8) var(--grimoire-space-8);
   overflow-wrap: anywhere;
   border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   background: var(--grimoire-sink);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   box-shadow: inset 2px 0 0 var(--grimoire-accent-line);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-medium);
   line-height: 1.5;
@@ -632,7 +661,7 @@
 
 .grimoire-permission-blocked-path {
   color: var(--grimoire-workbench-muted);
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   word-break: break-word;
 }
@@ -642,147 +671,123 @@
   grid-template-columns: minmax(0, 1fr);
   min-height: 0;
   max-height: min(38vh, 250px);
-  gap: 0;
-  padding: var(--grimoire-space-2) var(--grimoire-space-4) var(--grimoire-space-3);
+  gap: var(--grimoire-space-2);
+  margin: 0 var(--grimoire-space-14);
+  padding: var(--grimoire-space-8) 0 var(--grimoire-space-10);
+  border-top: 1px solid var(--grimoire-line);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--grimoire-line-3) transparent;
 }
 
+/*
+ * A choice is a numbered row: the key that picks it, what it does, and what it
+ * costs. Every row used to carry a 14px glyph in the accent and a full-width
+ * rule under it, and "allow" was set in accent text - so the safe answer was
+ * the loud one, and a list of three read as a table.
+ */
 .grimoire-permission-actions > button.grimoire-permission-button {
   appearance: none;
-  display: flex;
+  display: grid;
+  grid-template-columns: 22px auto minmax(0, 1fr);
   align-items: center;
-  justify-content: flex-start;
   box-sizing: border-box;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-10);
   width: 100%;
-  height: 34px;
+  min-height: 34px;
   min-width: 0;
-  padding: 0 var(--grimoire-space-4);
+  padding: 0 var(--grimoire-space-8);
   border: 0;
+  border-inline-start: 1.5px solid transparent;
   border-radius: var(--grimoire-radius-1);
   background-color: transparent;
   box-shadow: none;
-  color: var(--grimoire-workbench-muted);
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-semibold);
-  line-height: 1;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-normal);
+  line-height: 1.3;
+  text-align: left;
   transition:
     background var(--grimoire-duration) var(--grimoire-ease),
-    color var(--grimoire-duration) var(--grimoire-ease),
-    filter var(--grimoire-duration) var(--grimoire-ease),
-    transform var(--grimoire-duration) var(--grimoire-ease),
-    box-shadow var(--grimoire-duration) var(--grimoire-ease);
+    color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-permission-actions > button.grimoire-permission-button:hover,
 .grimoire-permission-actions > button.grimoire-permission-button:focus-visible {
-  background-color: color-mix(in srgb, var(--grimoire-raise) 68%, transparent);
-  color: var(--text-normal);
+  border-inline-start-color: var(--grimoire-accent);
+  background-color: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-permission-actions > button.grimoire-permission-button:focus-visible {
-  outline: 1px solid var(--grimoire-accent-line);
-  outline-offset: -2px;
+  outline: none;
 }
 
-.grimoire-permission-actions > button.grimoire-permission-button:active {
-  transform: translateY(1px);
-}
-
-.grimoire-permission-button svg,
-.grimoire-permission-button .svg-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.grimoire-permission-button-icon {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-}
-
-.grimoire-permission-actions > .grimoire-permission-button--allow {
-  background-color: transparent;
-  color: var(--grimoire-accent-text);
-}
-
-.grimoire-permission-actions > .grimoire-permission-button--allow:hover,
-.grimoire-permission-actions > .grimoire-permission-button--allow:focus-visible {
-  background-color: var(--grimoire-accent-soft);
-  color: var(--grimoire-accent-text);
-}
-
-.grimoire-permission-actions > .grimoire-permission-button--always,
-.grimoire-permission-actions > .grimoire-permission-button--other {
-  color: var(--text-normal);
-}
-
-.grimoire-permission-actions > .grimoire-permission-button:not(.grimoire-permission-button--reject)
-  .grimoire-permission-button-icon {
-  color: var(--grimoire-accent-text);
-}
-
-.grimoire-permission-actions > .grimoire-permission-button:not(.grimoire-permission-button--reject)
-  + .grimoire-permission-button:not(.grimoire-permission-button--reject) {
-  border-top: 1px solid color-mix(in srgb, var(--grimoire-line) 72%, transparent);
-}
-
-.grimoire-permission-actions > .grimoire-permission-button--always:hover,
-.grimoire-permission-actions > .grimoire-permission-button--other:hover,
-.grimoire-permission-actions > .grimoire-permission-button--always:focus-visible,
-.grimoire-permission-actions > .grimoire-permission-button--other:focus-visible {
-  color: var(--text-normal);
+/* The key that answers this row, in the meta type, in a column of its own. */
+.grimoire-permission-button-key {
+  grid-column: 1;
+  justify-self: start;
+  min-width: 0;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  line-height: 1;
 }
 
 .grimoire-permission-actions > .grimoire-permission-button--reject {
-  position: relative;
-  margin-top: var(--grimoire-space-3);
-  color: var(--grimoire-workbench-faint);
-}
-
-.grimoire-permission-actions > .grimoire-permission-button--reject::before {
-  position: absolute;
-  top: -4px;
-  right: 8px;
-  left: 8px;
-  border-top: 1px solid var(--grimoire-line-2);
-  content: "";
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-permission-button-label {
+  grid-column: 2;
   overflow: hidden;
+  color: var(--grimoire-ink);
+  font-weight: var(--grimoire-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * What the choice costs, beside its name - it was hidden entirely. A provider
+ * can hand back a whole shell command as that sentence, so the column that
+ * holds it truncates: `justify-items: start` had every cell sized to its own
+ * content, which let one of them run off the card.
+ */
+.grimoire-permission-option-description {
+  grid-column: 3;
+  justify-self: stretch;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-ink-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .grimoire-permission-actions > .grimoire-permission-button--reject:hover {
-  background-color: rgba(var(--grimoire-error-rgb), 0.08);
+  background-color: color-mix(in srgb, var(--grimoire-error) 8%, transparent);
   color: var(--grimoire-error);
 }
 
 .grimoire-permission-actions > .grimoire-permission-button--reject:focus-visible {
-  background-color: rgba(var(--grimoire-error-rgb), 0.08);
+  background-color: color-mix(in srgb, var(--grimoire-error) 8%, transparent);
   color: var(--grimoire-error);
-  outline-color: rgba(var(--grimoire-error-rgb), 0.75);
+  outline-color: color-mix(in srgb, var(--grimoire-error) 75%, transparent);
 }
 
 .grimoire-permission-button-shortcut {
-  margin-left: auto;
+  display: none;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
 }
 
-.grimoire-permission-compat-label,
-.grimoire-permission-option-description {
+.grimoire-permission-compat-label {
   display: none;
 }
 

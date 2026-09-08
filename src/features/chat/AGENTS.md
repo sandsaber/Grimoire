@@ -24,6 +24,36 @@
 - Long tool outputs and tables must remain readable in the chat column. Prefer contained scrolling/truncation over widening the chat.
 - The session-restart notice marks the end of the thread when a provider could not resume its saved session, so the history above is not mistaken for the agent's memory. Ask the runtime through the neutral `isSessionDropped()`; never read `providerState` from feature code. It is drawn before the user types - after a turn has been spent the warning has already cost what it was meant to save - and comes down as soon as a message joins the thread.
 
+## Context
+
+`ui/context-manager/` is what is attached to the next message, as one list. Before it the open note,
+the mentioned vault paths and the external paths were drawn by three views that could not see each
+other, so "what is attached, and what does it cost" had no answer past four chips.
+
+- `ContextStore` is the single list. It owns order — insertion order inside a group, nothing
+  re-sorted under the reader — and identity, so adding the same path twice flashes the row that is
+  already there. Every surface reads it; none of them keeps its own copy.
+- `ContextAttachments` binds the store to its three sources and mounts the three surfaces.
+  `sync()` rebuilds the list from those sources, so anything a surface removes is detached at
+  source rather than dropped from a copy. A thing with no source has nowhere to live: that is why
+  an attached *folder* is expanded to its files at attach time, and why "current selection" and
+  "clipboard" are not offered here — the selection is already carried by `SelectionController` on
+  every turn, and pasting already works.
+- `ContextComposerView` draws the composer's end. `CHIP_THRESHOLD` is 1: one chip always fits, and
+  past it a summary line that never wraps. It is the same height as a chip row, deliberately —
+  what is attached must not change how much room there is to write about it.
+- `ContextManagerModal` and `ContextAddPicker` are the dialog and the quick picker. The picker is
+  mounted **inside** the dialog when opened from it; a modal is its own stacking context.
+
+The dialog is reachable from every state: the `☰` control pinned in the chip row's corner, `Manage`
+in the summary row, `Review` on the over-budget row, and the `manage-context` command in
+`src/main.ts`, which is the only one of the four a keyboard shortcut can reach. Do not add a state
+that can attach something without also being able to open the dialog — the reason the control and
+the command exist is that with two files attached there was no way in at all.
+
+Costs are estimates by construction (`stat.size / 4`) and every surface labels them "est.". An
+unknown cost is an em dash, never zero.
+
 ## Auto-Scroll
 
 - Auto-scroll is per-tab.

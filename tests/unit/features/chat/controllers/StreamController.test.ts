@@ -1575,7 +1575,15 @@ describe('StreamController - Text Content', () => {
       expect(deps.state.currentThinkingState).toBeNull();
     });
 
-    it('should not add to contentBlocks when no thinking content', async () => {
+    /*
+     * This used to assert the opposite, and the opposite is what lost work the
+     * reader had already seen. A thinking state exists only where a row was
+     * drawn, and when the provider redacts the reasoning the row's duration is
+     * the whole of what it says — Claude does that routinely. Dropping the
+     * block on empty content meant "Thought for 28s" went by on screen and was
+     * gone the next time the conversation was opened.
+     */
+    it('keeps a block whose reasoning the provider redacted', async () => {
       const msg = createTestMessage();
       deps.state.currentThinkingState = {
         content: '',
@@ -1586,7 +1594,9 @@ describe('StreamController - Text Content', () => {
 
       await controller.finalizeCurrentThinkingBlock(msg);
 
-      expect(msg.contentBlocks).toEqual([]);
+      expect(msg.contentBlocks).toContainEqual(
+        expect.objectContaining({ type: 'thinking', content: '' })
+      );
     });
 
     it('should be a no-op when no thinking state', async () => {
@@ -2634,6 +2644,93 @@ describe('StreamController - User-facing progress', () => {
       type: 'progress',
       state: 'blocked',
     }));
+  });
+
+  /*
+   * A tool stops spinning when its result arrives, and a cancelled plan
+   * interrupts the session before `ExitPlanMode` reports one. Its row kept the
+   * spinner beside the word "Interrupted", and kept it in the saved transcript.
+   */
+  /*
+   * Claude redacts reasoning routinely — one turn here carried five thinking
+   * blocks and every one arrived empty. The row still says how long the model
+   * thought, and that was the whole of what it said; keeping only the ones with
+   * text meant "Thought for 28s" went by on screen and was gone on reopen.
+   */
+  it('keeps a thinking block the provider redacted', async () => {
+    const msg = createTestMessage();
+    deps.state.messages.push(msg);
+    await controller.handleStreamChunk({ type: 'thinking', content: '' }, msg);
+
+    await controller.finalizeCurrentThinkingBlock(msg);
+
+    const thinking = (msg.contentBlocks ?? []).filter(block => block.type === 'thinking');
+    expect(thinking).toHaveLength(1);
+    expect(thinking[0]).toEqual(expect.objectContaining({ content: '' }));
+  });
+
+  it('settles a tool the turn left running', async () => {
+    const msg = createTestMessage();
+    deps.state.messages.push(msg);
+    await controller.handleStreamChunk({
+      type: 'tool_use',
+      id: 'exit-plan-1',
+      name: 'ExitPlanMode',
+      input: {},
+    }, msg);
+
+    expect(msg.toolCalls?.[0]?.status).toBe('running');
+
+    controller.finalizeRunningToolCalls();
+
+    expect(msg.toolCalls?.[0]?.status).toBe('unfinished');
+  });
+
+  /*
+   * The caller's message is re-bound after a turn from the completion's
+   * assistant id, and an interrupted run carries none — so on the one path this
+   * exists for, the caller holds a different object from the one the turn drew
+   * into. Cancelling a plan with Escape left the row spinning for exactly that
+   * reason, while the same turn timing out settled correctly.
+   */
+  it('settles a tool the caller has lost the message for', async () => {
+    const drawn = createTestMessage();
+    deps.state.messages.push(drawn);
+    await controller.handleStreamChunk({
+      type: 'tool_use',
+      id: 'exit-plan-2',
+      name: 'ExitPlanMode',
+      input: {},
+    }, drawn);
+
+    // What the caller ends up holding on an interrupted turn: a different
+    // object, with no tool calls on it at all.
+    createTestMessage();
+
+    controller.finalizeRunningToolCalls();
+
+    expect(drawn.toolCalls?.[0]?.status).toBe('unfinished');
+  });
+
+  it('leaves a tool that already reported alone', async () => {
+    const msg = createTestMessage();
+    deps.state.messages.push(msg);
+    await controller.handleStreamChunk({
+      type: 'tool_use',
+      id: 'read-1',
+      name: 'Read',
+      input: {},
+    }, msg);
+    await controller.handleStreamChunk({
+      type: 'tool_result',
+      id: 'read-1',
+      content: 'ok',
+      isError: false,
+    }, msg);
+
+    controller.finalizeRunningToolCalls();
+
+    expect(msg.toolCalls?.[0]?.status).toBe('completed');
   });
 
   it('marks an unfinished ACP plan as waiting when the turn ends', async () => {

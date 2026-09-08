@@ -5,11 +5,11 @@
   bottom: 100%;
   left: 0;
   right: 0;
-  margin-bottom: var(--grimoire-space-2);
-  background: var(--background-secondary);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--background-modifier-border);
+  box-sizing: border-box;
+  margin-bottom: var(--grimoire-space-4);
+  padding: var(--grimoire-space-4);
+  background: var(--grimoire-ground);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   box-shadow: var(--grimoire-lift-1);
   z-index: 1000;
@@ -31,45 +31,55 @@
   z-index: 10001;
 }
 
+/*
+ * A note is a name and where it lives, on one line: the same 30px row the
+ * model groups and the MCP list use. It was a two-line stack with the name set
+ * in the accent, which spent the accent on every row of a list of forty.
+ */
 .grimoire-mention-item {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  box-sizing: border-box;
+  height: 30px;
+  gap: var(--grimoire-space-8);
+  padding: 0 var(--grimoire-space-8);
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-mention-item:hover,
 .grimoire-mention-item.selected {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-mention-icon {
   display: flex;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   flex-shrink: 0;
 }
 
 .grimoire-mention-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-mention-path {
-  font-size: var(--grimoire-text-m);
-  color: var(--text-normal);
+  min-width: 0;
   overflow: hidden;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .grimoire-mention-empty {
-  padding: var(--grimoire-space-5);
-  text-align: center;
-  color: var(--text-muted);
-  font-size: var(--grimoire-text-m);
+  padding: var(--grimoire-space-6) var(--grimoire-space-8);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-xs);
 }
 
 /* Scrollbar for mention dropdown */
@@ -82,7 +92,7 @@
 }
 
 .grimoire-mention-dropdown::-webkit-scrollbar-thumb {
-  background: var(--background-modifier-border);
+  background: var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
 }
 
@@ -92,26 +102,30 @@
 }
 
 .grimoire-mention-item.vault-folder .grimoire-mention-icon {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-mention-text {
   display: flex;
-  flex-direction: column;
-  gap: var(--grimoire-space-1);
+  align-items: baseline;
+  gap: var(--grimoire-space-8);
   min-width: 0;
   flex: 1;
 }
 
 .grimoire-mention-name {
-  font-size: var(--grimoire-text-m);
-  font-weight: var(--grimoire-weight-medium);
-  color: var(--grimoire-accent);
+  flex: 0 0 auto;
+  overflow: hidden;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Context file items in @-mention dropdown */
 .grimoire-mention-item.context-file .grimoire-mention-icon {
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-mention-item.context-file .grimoire-mention-text {
@@ -129,50 +143,50 @@
 
 /* Context folder filter items in @-mention dropdown */
 .grimoire-mention-item.context-folder .grimoire-mention-icon {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-mention-name-folder {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-weight: var(--grimoire-weight-medium);
 }
 
 .grimoire-mention-name-context {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 /* Agent folder items in @-mention dropdown */
 .grimoire-mention-item.agent-folder .grimoire-mention-icon {
-  color: var(--link-color);
+  color: var(--grimoire-accent-text);
 }
 
 .grimoire-mention-name-agent-folder {
-  color: var(--link-color);
-  font-weight: var(--grimoire-weight-semibold);
+  color: var(--grimoire-ink);
+  font-weight: var(--grimoire-weight-medium);
 }
 
 /* Agent items in @-mention dropdown (inside @Agents/) */
 .grimoire-mention-item.agent .grimoire-mention-icon {
-  color: var(--link-color);
+  color: var(--grimoire-accent-text);
 }
 
 .grimoire-mention-item.agent .grimoire-mention-text {
   flex-direction: row;
   align-items: baseline;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   overflow: hidden;
   white-space: nowrap;
 }
 
 .grimoire-mention-item.agent .grimoire-mention-name-agent {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   flex-shrink: 0;
 }
 
 .grimoire-mention-item.agent .grimoire-mention-agent-desc {
   font-size: var(--grimoire-text-xs);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -199,19 +213,31 @@
 .grimoire-context-runtime-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-5);
+  gap: var(--grimoire-space-12);
   min-width: 0;
 }
 
+/*
+ * One section per source of context, separated by a rule.
+ *
+ * Half of this rule used to live in container.css and half here, so the section
+ * had two owners and whichever sheet loaded last decided its type size.
+ */
 .grimoire-context-section {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   min-width: 0;
+  padding: var(--grimoire-space-8) 0;
+  border: 0;
+  border-top: 1px solid var(--grimoire-line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .grimoire-context-section-title {
-  color: var(--text-normal);
+  margin-bottom: var(--grimoire-space-6);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-bold);
 }
@@ -221,23 +247,28 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   min-width: 0;
-  padding: var(--grimoire-space-4) 0;
+  padding: var(--grimoire-space-8) 0;
   background: transparent;
   border: 0;
-  border-top: 1px solid var(--background-modifier-border);
-  color: var(--text-normal);
+  border-top: 1px solid var(--grimoire-line);
+  color: var(--grimoire-ink);
   text-align: left;
   font: inherit;
 }
 
+/* A memory row: separated from the next by a rule, because they differ in kind. */
 .grimoire-note-memory-card {
+  border: 0;
+  border-top: 1px solid var(--grimoire-line);
+  border-radius: 0;
+  background: transparent;
   cursor: pointer;
 }
 
 .grimoire-note-memory-card:hover {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   background: transparent;
 }
 
@@ -254,7 +285,7 @@
 .grimoire-context-file-body {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-1);
+  gap: var(--grimoire-space-2);
   min-width: 0;
 }
 
@@ -268,14 +299,14 @@
 }
 
 .grimoire-context-file-title {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-bold);
   line-height: 1.35;
 }
 
 .grimoire-context-file-path {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-s);
   line-height: 1.35;
 }
@@ -285,9 +316,9 @@
 .grimoire-context-file-method {
   flex-shrink: 0;
   border-radius: var(--grimoire-radius-1);
-  padding: var(--grimoire-space-1) var(--grimoire-space-3);
-  background: var(--background-modifier-hover);
-  color: var(--text-muted);
+  padding: var(--grimoire-space-2) var(--grimoire-space-6);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-2xs);
   font-weight: var(--grimoire-weight-bold);
   letter-spacing: 0;
@@ -299,14 +330,14 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
   max-width: 45%;
 }
 
 .grimoire-context-file-status-loaded {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-context-file-status-failed {
-  color: var(--text-error);
+  color: var(--grimoire-error);
 }

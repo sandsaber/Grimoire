@@ -46,7 +46,10 @@ describe('InlineExitPlanMode', () => {
       container,
       {
         planFilePath,
-        allowedPrompts: [{ tool: 'Bash', prompt: 'Run bash commands' }],
+        allowedPrompts: [
+          { tool: 'Edit', prompt: 'Edit files under Index/' },
+          { tool: 'Read', prompt: 'Read every note under Fieldnotes/' },
+        ],
       },
       resolve,
       undefined,
@@ -59,7 +62,12 @@ describe('InlineExitPlanMode', () => {
     const root = findRoot(container);
     expect(root).toBeTruthy();
     expect(root.getEventListenerCount('keydown')).toBe(1);
-    expect(container.querySelector('.grimoire-plan-permissions-list')).toBeTruthy();
+    // What the plan asks to be allowed reads as one line under its label. It
+    // was a bulleted list, which gave two short phrases the vertical weight of
+    // the plan they belong to.
+    expect(container.querySelector('.grimoire-plan-permissions-list')).toBeNull();
+    expect(container.querySelector('.grimoire-plan-permissions-line')?.textContent)
+      .toBe('Edit files under Index/ \u00B7 Read every note under Fieldnotes/');
     expect(renderContent).toHaveBeenCalled();
 
     fireKeyDown(root, 'Enter');
@@ -81,7 +89,7 @@ describe('InlineExitPlanMode', () => {
       .querySelectorAll('grimoire-ask-item-label')
       .map((label: any) => label.textContent);
 
-    expect(labels).toEqual(['Approve (current session)']);
+    expect(labels).toEqual(['Approve for this session']);
     expect(labels).not.toContain('Approve (new session)');
   });
 

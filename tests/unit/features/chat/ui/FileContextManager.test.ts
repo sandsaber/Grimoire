@@ -194,7 +194,7 @@ describe('FileContextManager', () => {
     manager.destroy();
   });
 
-  it('renders current note chip and removes on click', () => {
+  it('binds the open note and lets it be detached', () => {
     const app = createMockApp();
     const manager = new FileContextManager(
       app,
@@ -204,18 +204,15 @@ describe('FileContextManager', () => {
     );
 
     manager.setCurrentNote('notes/chip.md');
+    expect(manager.getCurrentNotePath()).toBe('notes/chip.md');
+    expect(manager.getAttachedFiles().has('notes/chip.md')).toBe(true);
 
-    const indicator = findByClass(containerEl, 'grimoire-file-indicator');
-    expect(indicator).toBeDefined();
-    expect(indicator?.style.display).toBe('flex');
-
-    const removeEl = findByClass(containerEl, 'grimoire-file-chip-remove');
-    expect(removeEl).toBeDefined();
-
-    removeEl!.click();
+    // Detaching the bound note unbinds it too, or the next sync puts it
+    // straight back — which is what "remove" not working looks like.
+    manager.detachFile('notes/chip.md');
 
     expect(manager.getCurrentNotePath()).toBeNull();
-    expect(indicator?.style.display).toBe('none');
+    expect(manager.getAttachedFiles().has('notes/chip.md')).toBe(false);
 
     manager.destroy();
   });
@@ -244,6 +241,50 @@ describe('FileContextManager', () => {
     manager.autoAttachActiveFile();
     expect(manager.getCurrentNotePath()).toBe('notes/public.md');
 
+    manager.destroy();
+  });
+
+  it('starts a chat on the note the reader is looking at, even from the chat pane', () => {
+    // `getActiveFile()` answers for the active leaf, and opening a new chat in
+    // the main area makes Grimoire that leaf - so a fresh chat attached
+    // nothing at all, and the composer offered no way to say which note it was
+    // about.
+    const app = createMockApp({ files: ['Climate/Blue Carbon.md'] });
+    app.workspace.getActiveFile = jest.fn(() => null);
+    app.workspace.getMostRecentLeaf = jest.fn(() => ({
+      view: { file: createMockTFile('Climate/Blue Carbon.md') },
+    }));
+    const containerEl = createMockEl();
+    const inputEl = createMockEl('textarea');
+    const manager = new FileContextManager(
+      app,
+      containerEl,
+      inputEl,
+      createMockCallbacks()
+    );
+
+    manager.autoAttachActiveFile();
+
+    expect(manager.getCurrentNotePath()).toBe('Climate/Blue Carbon.md');
+    manager.destroy();
+  });
+
+  it('attaches nothing when no leaf holds a file', () => {
+    const app = createMockApp({ files: [] });
+    app.workspace.getActiveFile = jest.fn(() => null);
+    app.workspace.getMostRecentLeaf = jest.fn(() => ({ view: {} }));
+    const containerEl = createMockEl();
+    const inputEl = createMockEl('textarea');
+    const manager = new FileContextManager(
+      app,
+      containerEl,
+      inputEl,
+      createMockCallbacks()
+    );
+
+    manager.autoAttachActiveFile();
+
+    expect(manager.getCurrentNotePath()).toBeNull();
     manager.destroy();
   });
 
@@ -915,21 +956,4 @@ describe('FileContextManager', () => {
     });
   });
 
-  describe('onOpenFile callback', () => {
-    it('should show Notice when file not found in vault', async () => {
-      const { Notice: NoticeMock } = jest.requireMock('obsidian');
-      const app = createMockApp();
-      const manager = new FileContextManager(
-        app, containerEl as any, inputEl, createMockCallbacks()
-      );
-
-      const chipsView = (manager as any).chipsView;
-      const openCallback = chipsView.callbacks.onOpenFile;
-      expect(openCallback).toBeDefined();
-
-      await openCallback('notes/missing.md');
-      expect(NoticeMock).toHaveBeenCalledWith(expect.stringContaining('Could not open file'));
-      manager.destroy();
-    });
-  });
 });

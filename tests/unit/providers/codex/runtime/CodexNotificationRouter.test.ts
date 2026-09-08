@@ -81,6 +81,41 @@ describe('CodexNotificationRouter', () => {
       expect(chunks).toEqual([{ type: 'text', content: 'Done.' }]);
     });
 
+    /*
+     * Taken from a real rollout: a turn that asked four questions completed
+     * thirteen items and not one of them was the ask. `request_user_input`
+     * lives only on the raw stream, so its `function_call_output` is the only
+     * end the call will ever get - and holding it back for an item that never
+     * comes left an answered question spinning until the turn finished, which
+     * on a planning turn means until the plan is approved.
+     */
+    it('ends an answered question when its answer arrives, not at turn end', () => {
+      router.handleNotification('rawResponseItem/completed', {
+        threadId: 't1',
+        turnId: 'turn1',
+        item: {
+          type: 'function_call',
+          id: 'fc_052761821348f3fa016a9ebd6b70bc87d2a73b40de7922faf6',
+          name: 'request_user_input',
+          call_id: 'call_DR0q4hjxBCyKQMCmjVp5q6rx',
+          arguments: '{}',
+        },
+      });
+      router.handleNotification('rawResponseItem/completed', {
+        threadId: 't1',
+        turnId: 'turn1',
+        item: {
+          type: 'function_call_output',
+          id: 'fco_01a07c14-0d0b-7f02-8ce7-ebec4e6b933e',
+          call_id: 'call_DR0q4hjxBCyKQMCmjVp5q6rx',
+          output: '{"answers":{"focus":{"answers":["Content"]}}}',
+        },
+      });
+
+      const result = chunks.find(chunk => chunk.type === 'tool_result');
+      expect(result).toMatchObject({ id: 'call_DR0q4hjxBCyKQMCmjVp5q6rx', isError: false });
+    });
+
     it('accumulates multiple deltas', () => {
       router.handleNotification('item/agentMessage/delta', {
         threadId: 't1', turnId: 'turn1', itemId: 'msg1', delta: 'Hello',

@@ -1,7 +1,7 @@
 /* Input area */
 .grimoire-input-container {
   position: relative;
-  padding: var(--grimoire-space-4) 0 0 0;
+  padding: var(--grimoire-space-8) 0 0 0;
 }
 
 /* Resize handle at the top edge of the input wrapper. */
@@ -24,7 +24,7 @@
   width: 24px;
   height: 3px;
   border-radius: var(--grimoire-radius-1);
-  background: var(--background-modifier-border);
+  background: var(--grimoire-line);
   opacity: 0;
   transition: opacity var(--grimoire-duration) var(--grimoire-ease);
 }
@@ -41,24 +41,32 @@ body.grimoire-dragging-ns {
 
 /* Input wrapper (border container) - flex column so textarea expands when no chips */
 /* Height calculation: context row (36px) + textarea min (60px) + toolbar (38px) + border (2px) = 136px */
+/*
+ * The composer card. One line, one radius, and focus moves that line — it used
+ * to gain an accent border plus an inset highlight plus an outer ring, three
+ * effects saying the same thing about a box the cursor is already inside.
+ */
 .grimoire-input-wrapper {
   position: relative;
   display: flex;
   flex-direction: column;
   height: var(--grimoire-input-wrapper-height, auto);
   min-height: 140px;
-  border: 1px solid var(--grimoire-workbench-border);
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-workbench-bg);
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-3);
+  background: var(--grimoire-ground);
   box-shadow: var(--grimoire-lift-0);
-  transition: border-color var(--grimoire-duration) var(--grimoire-ease), box-shadow var(--grimoire-duration) var(--grimoire-ease);
+  transition: border-color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-input-wrapper:focus-within {
-  border-color: color-mix(in srgb, var(--grimoire-brand) 45%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--grimoire-brand) 12%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--grimoire-brand) 12%, transparent);
+  border-color: var(--grimoire-line-3);
+  box-shadow: none;
+}
+
+/* Over budget: the card says so before the dialog is opened. */
+.grimoire-input-wrapper.is-over-budget {
+  border-color: var(--grimoire-error-line);
 }
 
 /* Context row (file chip start, selection indicator end) - inside input wrapper at top */
@@ -68,8 +76,8 @@ body.grimoire-dragging-ns {
   align-items: flex-start;
   justify-content: flex-start;
   flex-shrink: 0;
-  padding: var(--grimoire-space-4) var(--grimoire-space-4) 0 var(--grimoire-space-4);
-  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-10) var(--grimoire-space-10) 0;
+  gap: var(--grimoire-space-6);
 }
 
 /* Show context row when it has visible content */
@@ -82,16 +90,8 @@ body.grimoire-dragging-ns {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 0 var(--grimoire-space-3) 0;
+  padding: 0 0 var(--grimoire-space-6) 0;
   min-height: 0;
-}
-
-.grimoire-input-nav-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-width: 0;
 }
 
 /* Header mode: hide nav row above input (content moved to header) */
@@ -105,13 +105,13 @@ body.grimoire-dragging-ns {
 .grimoire-selection-indicator,
 .grimoire-browser-selection-indicator,
 .grimoire-canvas-indicator {
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
   font-size: var(--grimoire-text-s);
   line-height: 1;
   opacity: 0.9;
   pointer-events: none;
   white-space: nowrap;
-  padding: var(--grimoire-space-2) var(--grimoire-space-3);
+  padding: var(--grimoire-space-4) var(--grimoire-space-6);
   border: 1px solid transparent;
   border-radius: var(--grimoire-radius-1);
   margin-inline-start: auto;
@@ -128,14 +128,14 @@ body.grimoire-dragging-ns {
   min-height: var(--grimoire-textarea-min-height, 60px);
   max-height: var(--grimoire-textarea-max-height, none);
   resize: none;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-10) var(--grimoire-space-12) var(--grimoire-space-4);
   border: none;
   border-radius: var(--grimoire-radius-2);
   background: transparent;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-family: inherit;
-  font-size: var(--grimoire-text-l);
-  line-height: 1.4;
+  font-size: var(--grimoire-text-m);
+  line-height: var(--grimoire-leading);
   box-shadow: none;
   overflow-y: auto;
   unicode-bidi: plaintext; /* Proper BiDi text handling for mixed RTL/LTR */
@@ -150,36 +150,34 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-input::placeholder {
-  color: var(--grimoire-workbench-muted);
+  color: var(--grimoire-ink-faint);
 }
 
-/* Input toolbar */
+/*
+ * The toolbar. No rule above it: the card already encloses this, and a line
+ * inside a box that has one is a second box.
+ */
 .grimoire-input-toolbar {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   flex-shrink: 0;
-  padding: var(--grimoire-space-2) var(--grimoire-space-3) var(--grimoire-space-3) var(--grimoire-space-3);
+  padding: var(--grimoire-space-4) var(--grimoire-space-6) var(--grimoire-space-6) var(--grimoire-space-8);
   gap: var(--grimoire-space-2);
   min-width: 0;
-  border-top: 1px solid color-mix(in srgb, var(--grimoire-brand) 8%, transparent);
-}
-
-/* File indicator (attached files) */
-.grimoire-file-indicator {
-  display: none;
-  flex-wrap: wrap;
-  gap: var(--grimoire-space-3);
+  border-top: 0;
 }
 
 .grimoire-file-chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--grimoire-space-2);
-  padding: var(--grimoire-space-1) var(--grimoire-space-3) var(--grimoire-space-1) var(--grimoire-space-4);
-  background: color-mix(in srgb, var(--grimoire-brand) 7%, transparent);
-  border: 1px solid color-mix(in srgb, var(--grimoire-brand) 18%, transparent);
-  border-radius: var(--grimoire-radius-3);
+  gap: var(--grimoire-space-6);
+  height: var(--grimoire-chip-h);
+  padding: 0 var(--grimoire-space-4) 0 var(--grimoire-space-8);
+  background: none;
+  border: 1px solid var(--grimoire-accent-line);
+  border-radius: var(--grimoire-radius-1);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-s);
   line-height: 1;
   max-width: 200px;
@@ -189,7 +187,7 @@ body.grimoire-dragging-ns {
 .grimoire-file-chip-icon {
   display: flex;
   align-items: center;
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
   flex-shrink: 0;
 }
 
@@ -202,99 +200,38 @@ body.grimoire-dragging-ns {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text-normal);
+  color: inherit;
 }
 
-.grimoire-file-chip-remove {
+button.grimoire-file-chip-remove {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  box-sizing: border-box;
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
+  padding: 0;
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
-  color: var(--text-muted);
-  font-size: var(--grimoire-text-l);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-s);
   line-height: 1;
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-file-chip-remove svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-file-chip-remove:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-file-chip:hover {
-  background: color-mix(in srgb, var(--grimoire-brand) 12%, transparent);
-}
-
-.grimoire-external-file-indicator {
-  display: none;
-  flex-wrap: wrap;
-  gap: var(--grimoire-space-3);
-  min-width: 0;
-}
-
-.grimoire-external-file-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--grimoire-space-2);
-  padding: var(--grimoire-space-1) var(--grimoire-space-3) var(--grimoire-space-1) var(--grimoire-space-4);
-  background: color-mix(in srgb, var(--grimoire-brand) 5%, transparent);
-  border: 1px solid color-mix(in srgb, var(--grimoire-brand) 28%, transparent);
-  border-radius: var(--grimoire-radius-3);
-  color: var(--text-normal);
-  font-size: var(--grimoire-text-s);
-  line-height: 1;
-  max-width: min(260px, 100%);
-}
-
-.grimoire-external-file-chip-icon {
-  display: flex;
-  align-items: center;
-  color: var(--grimoire-brand);
-  flex-shrink: 0;
-}
-
-.grimoire-external-file-chip-icon svg {
-  width: 12px;
-  height: 12px;
-}
-
-.grimoire-external-file-chip-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: var(--grimoire-weight-semibold);
-}
-
-.grimoire-external-file-chip-remove {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: var(--grimoire-text-l);
-  line-height: 1;
-  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
-}
-
-.grimoire-external-file-chip-remove:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.grimoire-relevant-notes-container {
-  display: flex;
-  align-items: center;
-  width: auto;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
+  background: var(--grimoire-hover);
 }
 
 .grimoire-relevant-notes-slot:empty {
@@ -304,7 +241,7 @@ body.grimoire-dragging-ns {
 .grimoire-relevant-notes {
   display: inline-flex;
   align-items: center;
-  gap: var(--grimoire-space-1);
+  gap: var(--grimoire-space-2);
   width: auto;
   min-width: 0;
   max-width: 100%;
@@ -331,7 +268,7 @@ body.grimoire-dragging-ns {
   min-width: 0;
   max-width: 88px;
   height: 20px;
-  padding: 0 var(--grimoire-space-3);
+  padding: 0 var(--grimoire-space-6);
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background: transparent;
@@ -348,19 +285,19 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-relevant-note:hover {
-  background: color-mix(in srgb, var(--grimoire-brand) 10%, transparent);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-relevant-note:active {
-  background: color-mix(in srgb, var(--grimoire-brand) 14%, transparent);
+  background: var(--grimoire-accent-wash-weak);
 }
 
 .grimoire-relevant-notes-more {
   display: inline-flex;
   align-items: center;
   height: 20px;
-  padding: 0 var(--grimoire-space-2);
+  padding: 0 var(--grimoire-space-4);
   color: var(--grimoire-workbench-faint);
   font-size: var(--grimoire-text-xs);
   line-height: 1;
@@ -374,23 +311,23 @@ body.grimoire-dragging-ns {
   flex-direction: column;
   align-items: stretch;
   font-size: var(--grimoire-text-s);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-style: normal;
-  gap: var(--grimoire-space-2);
-  padding: 0 var(--grimoire-space-1) var(--grimoire-space-4) var(--grimoire-space-1);
+  gap: var(--grimoire-space-4);
+  padding: 0 var(--grimoire-space-2) var(--grimoire-space-8) var(--grimoire-space-2);
 }
 
 .grimoire-queue-indicator-header,
 .grimoire-queue-indicator-item {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   min-width: 0;
 }
 
 .grimoire-queue-indicator-index {
   flex: 0 0 auto;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   font-variant-numeric: tabular-nums;
 }
 
@@ -406,12 +343,12 @@ body.grimoire-dragging-ns {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
 }
 
-.grimoire-queue-indicator-action {
+button.grimoire-queue-indicator-action {
   flex: 0 0 auto;
-  padding: 1px var(--grimoire-space-4);
+  padding: 1px var(--grimoire-space-8);
   border: 0;
   background: transparent;
   color: var(--grimoire-accent);
@@ -424,12 +361,12 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-queue-indicator-action[disabled] {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   cursor: default;
   text-decoration: none;
 }
 
-.grimoire-queue-indicator-icon-action {
+button.grimoire-queue-indicator-icon-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -440,13 +377,13 @@ body.grimoire-dragging-ns {
   border: 0;
   border-radius: var(--grimoire-radius-1);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   cursor: pointer;
 }
 
 .grimoire-queue-indicator-icon-action:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-queue-indicator-icon-action svg {
@@ -454,21 +391,21 @@ body.grimoire-dragging-ns {
   height: 14px;
 }
 
-/* Obsidian blue border when instruction mode is active */
-.grimoire-input-instruction-mode {
-  border-color: var(--color-blue);
-  box-shadow: 0 0 0 1px var(--color-blue);
-}
-
-/* Obsidian pink/purple border when bash mode is active */
+/*
+ * A composer mode moves the card's own line to the accent — the same line that
+ * moves on focus, one step further. It used to be Obsidian's blue for one mode
+ * and its pink for the other, which is two hues the system does not have and
+ * two states told by colour alone. Bash mode also sets its input in monospace
+ * and both modes change the placeholder, so the mode is readable without it.
+ */
+.grimoire-input-instruction-mode,
 .grimoire-input-bang-bash-mode {
-  border-color: var(--color-pink, var(--color-purple));
-  box-shadow: 0 0 0 1px var(--color-pink, var(--color-purple));
+  border-color: var(--grimoire-accent-line);
 }
 
 /* Monospace input while in bash mode */
 .grimoire-input-wrapper.grimoire-input-bang-bash-mode .grimoire-input {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
 }
 
 .grimoire-container--chat-window .grimoire-composer-shell {
@@ -478,8 +415,8 @@ body.grimoire-dragging-ns {
   container-type: inline-size;
   width: 100%;
   margin: 0;
-  gap: var(--grimoire-space-3);
-  padding: var(--grimoire-space-4);
+  gap: var(--grimoire-space-6);
+  padding: var(--grimoire-space-8);
   border: 0;
   border-radius: var(--grimoire-radius-3);
   background: var(--grimoire-sink);
@@ -500,7 +437,7 @@ body.grimoire-dragging-ns {
    Mirrors the composer frame: neutral line at rest, accent border on focus. */
 .grimoire-input-queue-row.grimoire-visible-flex + .grimoire-input-wrapper {
   border-top: 1px solid var(--grimoire-line-2);
-  padding-top: var(--grimoire-space-4);
+  padding-top: var(--grimoire-space-8);
 }
 
 .grimoire-input-queue-row.grimoire-visible-flex + .grimoire-input-wrapper:focus-within {
@@ -508,7 +445,7 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-container--chat-window .grimoire-input-nav-row {
-  padding: 0 0 var(--grimoire-space-3);
+  padding: 0 0 var(--grimoire-space-6);
 }
 
 .grimoire-container--chat-window.grimoire-container--header-mode .grimoire-input-nav-row,
@@ -532,14 +469,14 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-container--chat-window .grimoire-context-row {
-  padding: 0 var(--grimoire-space-1) var(--grimoire-space-2);
-  gap: var(--grimoire-space-2);
+  padding: 0 var(--grimoire-space-2) var(--grimoire-space-4);
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-container--chat-window .grimoire-input {
   min-height: var(--grimoire-textarea-min-height, 46px);
   max-height: var(--grimoire-textarea-max-height, none);
-  padding: var(--grimoire-space-1) var(--grimoire-space-1);
+  padding: var(--grimoire-space-2) var(--grimoire-space-2);
   border-radius: 0;
   font-size: var(--grimoire-text-m);
 }
@@ -548,7 +485,7 @@ body.grimoire-dragging-ns {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
   width: 100%;
   min-height: 28px;
   padding: 0;
@@ -571,23 +508,36 @@ body.grimoire-dragging-ns {
 
 .grimoire-container--chat-window .grimoire-input-toolbar-model-row {
   display: flex;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
   overflow: visible;
 }
 
 .grimoire-container--chat-window .grimoire-input-toolbar-actions-row {
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
   flex-wrap: nowrap;
-  row-gap: var(--grimoire-space-2);
+  row-gap: var(--grimoire-space-4);
 }
 
+/*
+ * What the message carries, gathered at the end of the row next to Send.
+ *
+ * They used to follow the model straight on, so the toolbar read as one long
+ * left-hand run of controls with the whole right half empty and Send alone out
+ * there. The eye now has two groups: who answers, and what goes with it.
+ */
 .grimoire-container--chat-window .grimoire-input-toolbar-config-actions {
   display: flex;
   flex: 0 1 auto;
   flex-wrap: nowrap;
   align-items: center;
   min-width: 0;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
+  margin-inline-start: auto;
+}
+
+/* The free space is spent once, before the group; Send closes the row. */
+.grimoire-container--chat-window .grimoire-send-actions {
+  margin-inline-start: 0;
 }
 
 .grimoire-container--chat-window .grimoire-model-context-stack {
@@ -598,40 +548,49 @@ body.grimoire-dragging-ns {
   overflow: visible;
 }
 
-.grimoire-container--chat-window .grimoire-model-btn {
-  min-width: 96px;
-  max-width: min(100%, 260px);
-  border-radius: var(--grimoire-radius-2);
-}
-
-.grimoire-container--chat-window .grimoire-model-label {
-  overflow: hidden;
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-normal);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .grimoire-container--chat-window .grimoire-input-toolbar .grimoire-context-meter,
 .grimoire-container--chat-window .grimoire-project-workspace-selector {
   display: none;
 }
 
+/*
+ * Send sits at the far end of the toolbar. `auto` is what puts it there; a
+ * fixed 4px left it packed against the control before it with the rest of the
+ * row empty to its right.
+ */
 .grimoire-send-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: var(--grimoire-space-2);
+  gap: 0;
   margin-inline-start: auto;
+  padding-inline-start: var(--grimoire-space-4);
+}
+
+/*
+ * A narrow composer keeps its toolbar on one row, and pays for it by spending
+ * what it can afford to lose - first the meter beside the gauge, then the
+ * model's name. It used to break into two rows instead, which cost a whole
+ * line of the pane to say nothing new: the level is in the control's name and
+ * the model's is one glyph away.
+ */
+@container grimoire-composer (max-width: 300px) {
+  .grimoire-container--chat-window .grimoire-thinking-current .grimoire-thinking-meter {
+    display: none;
+  }
 }
 
 @container grimoire-composer (max-width: 520px) {
   .grimoire-container--chat-window .grimoire-input-toolbar-config-actions {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 }
 
-@container grimoire-composer (max-width: 380px) {
+/*
+ * Past this there is nothing left to drop, so the row does break - model over
+ * controls and Send, rather than an overflowing single line.
+ */
+@container grimoire-composer (max-width: 200px) {
   .grimoire-container--chat-window .grimoire-input-toolbar-actions-row {
     display: grid;
     grid-template-areas:
@@ -661,27 +620,53 @@ body.grimoire-dragging-ns {
   }
 }
 
+/*
+ * The one filled action on this surface, and the same square whether it sends
+ * or stops. It was a washed text button beside a separate stop that appeared
+ * only once a subagent was seen working — two primary actions in the case that
+ * had any, and none in the case that did not.
+ */
 .grimoire-container--chat-window button.grimoire-send-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   flex: 0 0 auto;
   justify-self: end;
-  height: 28px;
-  padding: 0 var(--grimoire-space-4);
+  width: var(--grimoire-hit-l);
+  height: var(--grimoire-hit-l);
+  padding: 0;
   border: 0;
   border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-accent-soft);
-  color: var(--grimoire-accent-text);
-  font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-normal);
+  background: var(--grimoire-accent);
+  color: var(--grimoire-accent-contrast);
   line-height: 1;
   box-shadow: none;
   cursor: pointer;
 }
 
+.grimoire-container--chat-window button.grimoire-send-button svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: var(--grimoire-stroke-check);
+}
+
 .grimoire-container--chat-window button.grimoire-send-button:hover {
   border: 0;
-  background: color-mix(in srgb, var(--grimoire-brand) 22%, transparent);
-  color: var(--grimoire-accent-text);
+  background: var(--grimoire-accent-hover);
+  color: var(--grimoire-accent-contrast);
   filter: none;
+}
+
+/* Nothing to send reads as an inert square, not as a dimmed accent. */
+.grimoire-container--chat-window button.grimoire-send-button:disabled {
+  background: var(--grimoire-line);
+  color: var(--grimoire-ink-faint);
+  cursor: default;
+}
+
+.grimoire-container--chat-window button.grimoire-send-button.grimoire-hidden {
+  display: none;
 }
 
 .grimoire-container--chat-window button.grimoire-stop-button {
@@ -690,13 +675,13 @@ body.grimoire-dragging-ns {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: 28px;
-  height: 28px;
+  width: var(--grimoire-hit-l);
+  height: var(--grimoire-hit-l);
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-raise);
-  color: var(--grimoire-workbench-muted);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: var(--grimoire-accent);
+  color: var(--grimoire-accent-contrast);
   box-shadow: none;
   cursor: pointer;
 }
@@ -706,14 +691,14 @@ body.grimoire-dragging-ns {
 }
 
 .grimoire-container--chat-window button.grimoire-stop-button svg {
-  width: 14px;
-  height: 14px;
-  stroke-width: 2.8;
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke-check);
 }
 
 .grimoire-container--chat-window button.grimoire-stop-button:hover {
-  border-color: rgba(var(--grimoire-error-rgb), 0.22);
-  background: rgba(var(--grimoire-error-rgb), 0.1);
-  color: var(--grimoire-error);
+  border: 0;
+  background: var(--grimoire-accent-hover);
+  color: var(--grimoire-accent-contrast);
   filter: none;
 }

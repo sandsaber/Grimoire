@@ -31,9 +31,11 @@ import type {
 } from '../../core/types';
 import {
   type ChatViewPlacement,
+  MAX_RUN_ABSOLUTE_TIMEOUT_MINUTES,
   MAX_TABS,
   MIN_TABS,
   normalizeMaxTabs,
+  normalizeRunAbsoluteTimeoutMinutes,
 } from '../../core/types/settings';
 import { getAvailableLocales, getLocaleDisplayName, setLocale, t } from '../../i18n/i18n';
 import type { Locale, TranslationKey } from '../../i18n/types';
@@ -389,6 +391,7 @@ const GENERAL_SETTINGS_SEARCH_KEYS: TranslationKey[] = [
   'settings.usageIndicators.name',
   'settings.debugLogging.name',
   'settings.maxTabs.name',
+  'settings.showPanelLabels.name',
 ];
 
 export class GrimoireSettingTab extends PluginSettingTab {
@@ -687,8 +690,11 @@ export class GrimoireSettingTab extends PluginSettingTab {
         cls: 'grimoire-settings-provider-card-name',
         text: this.getProviderDisplayName(providerId),
       });
+      // A CLI Grimoire cannot find is the one fact on this card that changes
+      // what the reader has to do next, so it is the one thing here in colour.
+      const detected = Boolean(this.plugin.getResolvedProviderCliPath?.(providerId));
       copy.createDiv({
-        cls: 'grimoire-settings-provider-card-meta',
+        cls: `grimoire-settings-provider-card-meta${detected ? '' : ' is-missing'}`,
         text: this.getProviderStatusText(providerId),
       });
 
@@ -1960,6 +1966,21 @@ export class GrimoireSettingTab extends PluginSettingTab {
     this.renderMaxTabsSetting(container);
 
     new Setting(container)
+      .setName(t('settings.showPanelLabels.name'))
+      .setDesc(t('settings.showPanelLabels.desc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showPanelLabels)
+          .onChange(async (value) => {
+            this.plugin.settings.showPanelLabels = value;
+            await this.plugin.saveSettings();
+            for (const view of this.plugin.getAllViews()) {
+              view.refreshPanelLabels();
+            }
+          })
+      );
+
+    new Setting(container)
       .setName(t('settings.enableAutoScroll.name'))
       .setDesc(t('settings.enableAutoScroll.desc'))
       .addToggle((toggle) =>
@@ -2057,6 +2078,28 @@ export class GrimoireSettingTab extends PluginSettingTab {
             });
         });
     }
+
+    new Setting(advancedContainer)
+      .setName(t('settings.runAbsoluteTimeout.name'))
+      .setDesc(t('settings.runAbsoluteTimeout.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '0';
+        text.inputEl.max = String(MAX_RUN_ABSOLUTE_TIMEOUT_MINUTES);
+        text.inputEl.setAttribute('aria-label', t('settings.runAbsoluteTimeout.name'));
+        text
+          .setValue(String(normalizeRunAbsoluteTimeoutMinutes(
+            this.plugin.settings.runAbsoluteTimeoutMinutes,
+          )))
+          .onChange(async (rawValue) => {
+            // Normalized on the way in rather than on the way out: the stored
+            // value is what the backends ask for on every turn, and a run
+            // must never arm a ceiling from whatever was typed.
+            const minutes = normalizeRunAbsoluteTimeoutMinutes(Number(rawValue));
+            this.plugin.settings.runAbsoluteTimeoutMinutes = minutes;
+            await this.plugin.saveSettings();
+          });
+      });
 
     // --- Content (advanced) ---
 

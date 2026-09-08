@@ -15,10 +15,10 @@
 .grimoire-messages {
   flex: 1;
   overflow-y: auto;
-  padding: var(--grimoire-space-5) var(--grimoire-space-1);
+  padding: var(--grimoire-space-12) var(--grimoire-space-2);
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
 }
 
 /* Focusable messages panel for vim-style navigation */
@@ -34,25 +34,30 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--grimoire-space-7);
+  padding: var(--grimoire-space-20);
   min-height: 200px;
 }
 
+/*
+ * An empty tab says one line and draws nothing. It was a bordered card on an
+ * accent wash, which is a lot of surface for a sentence nobody asked for.
+ */
 .grimoire-welcome-greeting {
-  max-width: 30rem;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  border: 1px solid var(--grimoire-workbench-border);
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-accent-soft);
-  color: var(--text-muted);
-  font-size: var(--grimoire-text-xl);
-  font-weight: var(--grimoire-weight-medium);
+  max-width: 28ch;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-l);
+  font-weight: var(--grimoire-weight-normal);
   letter-spacing: 0;
-  line-height: 1.35;
+  line-height: var(--grimoire-leading-body);
+  text-wrap: pretty;
 }
 
 .grimoire-message {
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   border-radius: var(--grimoire-radius-2);
   min-width: 0;
   max-width: 95%;
@@ -68,15 +73,15 @@
   flex: 0 0 auto;
   overflow: visible;
   padding: 0;
-  gap: var(--grimoire-space-5);
+  gap: var(--grimoire-space-20);
 }
 
 .grimoire-bound-status {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   min-width: 0;
-  padding: var(--grimoire-space-1) var(--grimoire-space-1) 0;
+  padding: var(--grimoire-space-2) var(--grimoire-space-2) 0;
   color: var(--grimoire-workbench-faint);
   font-size: var(--grimoire-text-xs);
 }
@@ -91,7 +96,7 @@
 }
 
 .grimoire-bound-status-dot.busy {
-  background: var(--grimoire-brand);
+  background: var(--grimoire-accent);
   box-shadow: var(--grimoire-focus-ring);
 }
 
@@ -109,18 +114,18 @@
 }
 
 .grimoire-bound-status-meta {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-bound-status-meta::before {
   content: "·";
-  margin-right: var(--grimoire-space-3);
-  color: var(--text-faint);
+  margin-right: var(--grimoire-space-6);
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-container--chat-window .grimoire-message {
   display: grid;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-10);
   min-width: 0;
   padding: 0;
   border-radius: 0;
@@ -146,19 +151,38 @@
   content: "Grimoire";
 }
 
+/*
+ * What the reader wrote: a plane, not a coloured card.
+ *
+ * It was an accent wash inside an accent border, right-aligned at 86% — a
+ * shape that spent the user's accent on the one thing in the transcript that
+ * needs no emphasis, because they wrote it. Ground says "this is yours"
+ * quietly enough to read the answer beside it.
+ */
 .grimoire-message-user {
   position: relative;
-  background: var(--grimoire-accent-soft);
-  border: 1px solid var(--grimoire-accent-line);
-  align-self: flex-end;
-  max-width: 86%;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  border-radius: var(--grimoire-radius-3) var(--grimoire-radius-3) 4px var(--grimoire-radius-3);
+  background: var(--grimoire-plane);
+  border: 0;
+  align-self: stretch;
+  max-width: 100%;
+  padding: var(--grimoire-space-10) var(--grimoire-space-12);
+  border-radius: var(--grimoire-radius-2);
 }
 
-/* Reserve room for the date/action row positioned below the question bubble. */
+/*
+ * The plane again, at the weight that reaches it.
+ *
+ * `.grimoire-container--chat-window .grimoire-message` flattens every message
+ * to no padding and no radius, and it outranks `.grimoire-message-user` - so
+ * the question came out as a full-bleed grey band with its text against the
+ * pane's edge. The rule above is the shape; this is the one that wins.
+ *
+ * The trailing margin reserves room for the time/action row under it.
+ */
 .grimoire-container--chat-window .grimoire-message-user {
-  margin-bottom: var(--grimoire-space-6);
+  padding: var(--grimoire-space-10) var(--grimoire-space-12);
+  border-radius: var(--grimoire-radius-2);
+  margin-bottom: var(--grimoire-space-24);
 }
 
 /* Text selection in user messages - visible highlight */
@@ -181,7 +205,7 @@
 .grimoire-message-content {
   min-width: 0;
   max-width: 100%;
-  line-height: 1.48;
+  line-height: var(--grimoire-leading-body);
   user-select: text;
   -webkit-user-select: text;
   unicode-bidi: plaintext; /* Proper BiDi text handling for mixed RTL/LTR */
@@ -189,66 +213,44 @@
 
 .grimoire-container--chat-window .grimoire-message-assistant .grimoire-message-content {
   display: grid;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-8);
 }
 
+/*
+ * Who answered, on what, at what effort. A caption, not a heading: it was set
+ * uppercase, tracked and semibold, which is the weight of a section title on
+ * three words of provenance.
+ */
 .grimoire-assistant-response-meta {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  margin-bottom: var(--grimoire-space-2);
-  color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
-  letter-spacing: 0.12em;
+  gap: var(--grimoire-space-8);
+  margin-bottom: var(--grimoire-space-4);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: 0;
   line-height: 1;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
-.grimoire-assistant-response-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-provider-generic, var(--grimoire-workbench-faint));
+/* The vendor's own mark, in ink. */
+.grimoire-assistant-response-mark {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
   flex: 0 0 auto;
+  color: var(--grimoire-ink-muted);
 }
 
-.grimoire-assistant-response-meta[data-provider="claude"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-claude);
-}
 
-.grimoire-assistant-response-meta[data-provider="codex"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-codex);
-}
 
-.grimoire-assistant-response-meta[data-provider="qwen"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-qwen);
-}
 
-.grimoire-assistant-response-meta[data-provider="antigravity"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-antigravity);
-}
 
-.grimoire-assistant-response-meta[data-provider="gemini"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-gemini);
-}
 
-.grimoire-assistant-response-meta[data-provider="opencode"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-opencode);
-}
 
-.grimoire-assistant-response-meta[data-provider="mimocode"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-mimocode);
-}
 
-.grimoire-assistant-response-meta[data-provider="kimicode"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-kimicode);
-}
 
-.grimoire-assistant-response-meta[data-provider="grok"] .grimoire-assistant-response-dot {
-  background: var(--grimoire-provider-grok);
-}
 
 .grimoire-assistant-response-separator {
   color: var(--grimoire-workbench-muted);
@@ -259,7 +261,7 @@
 }
 
 .grimoire-interrupted-hint {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 /*
@@ -273,14 +275,14 @@
 .grimoire-history-notice {
   display: flex;
   justify-content: center;
-  padding: var(--size-4-2) var(--size-4-3);
-  margin-bottom: var(--size-4-2);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
+  margin-bottom: var(--grimoire-space-8);
 }
 
 .grimoire-history-notice-text {
   max-width: 60ch;
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
   text-align: center;
   text-wrap: pretty;
 }
@@ -300,7 +302,7 @@
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
-  padding-inline-end: var(--grimoire-text-block-inline-end-buffer, var(--grimoire-space-8));
+  padding-inline-end: var(--grimoire-text-block-inline-end-buffer, var(--grimoire-space-24));
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -323,10 +325,10 @@
   width: 24px;
   height: 24px;
   box-sizing: border-box;
-  padding: var(--grimoire-space-2);
+  padding: var(--grimoire-space-4);
   border: none;
   border-radius: var(--grimoire-radius-1);
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   cursor: pointer;
   opacity: 1;
   transition: color var(--grimoire-duration) var(--grimoire-ease);
@@ -334,7 +336,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-text-copy-btn svg {
@@ -343,7 +345,7 @@
 }
 
 .grimoire-text-copy-btn:hover {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-text-copy-btn.copied {
@@ -351,8 +353,8 @@
 }
 
 .grimoire-message-completion-time {
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
   font-variant-numeric: tabular-nums;
   font-weight: var(--grimoire-weight-normal);
@@ -360,42 +362,21 @@
   white-space: nowrap;
 }
 
-.grimoire-text-block > .grimoire-message-completion-time {
-  position: absolute;
-  bottom: 7px;
-  inset-inline-start: 32px;
-  display: none;
-  pointer-events: auto;
-}
-
-.grimoire-text-block--with-completion-time {
-  padding-bottom: var(--grimoire-space-8);
-}
-
-.grimoire-text-block--with-completion-time > .grimoire-message-completion-time {
-  display: inline-block;
-}
-
-.grimoire-text-block--with-completion-time > .grimoire-text-copy-btn {
-  inset-inline-start: 0;
-  inset-inline-end: auto;
-}
-
 .grimoire-text-block+.grimoire-tool-call {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-tool-call+.grimoire-text-block {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-message-content p {
-  margin: 0 0 var(--grimoire-space-4) 0;
+  margin: 0 0 var(--grimoire-space-8) 0;
   overflow-wrap: anywhere;
 }
 
 .grimoire-container--chat-window .grimoire-message-content p {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-message-content p:last-child {
@@ -404,8 +385,8 @@
 
 .grimoire-message-content ul,
 .grimoire-message-content ol {
-  margin: var(--grimoire-space-4) 0;
-  padding-inline-start: var(--grimoire-space-7);
+  margin: var(--grimoire-space-8) 0;
+  padding-inline-start: var(--grimoire-space-20);
   min-width: 0;
 }
 
@@ -430,9 +411,9 @@
 }
 
 .grimoire-message-content blockquote {
-  margin: var(--grimoire-space-4) 0;
-  padding-inline-start: var(--grimoire-space-5);
-  border-inline-start: 2px solid var(--background-modifier-border);
+  margin: var(--grimoire-space-8) 0;
+  padding-inline-start: var(--grimoire-space-12);
+  border-inline-start: 2px solid var(--grimoire-line);
 }
 
 /* Full-width tables */
@@ -441,7 +422,7 @@
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  margin: var(--grimoire-space-4) 0;
+  margin: var(--grimoire-space-8) 0;
 }
 
 .grimoire-message-content .grimoire-table-scroll > table {
@@ -455,8 +436,8 @@
 
 .grimoire-message-content th,
 .grimoire-message-content td {
-  border: 1px solid var(--background-modifier-border);
-  padding: var(--grimoire-space-3) var(--grimoire-space-4);
+  border: 1px solid var(--grimoire-line);
+  padding: var(--grimoire-space-6) var(--grimoire-space-8);
   text-align: start;
   overflow-wrap: normal;
   word-break: normal;
@@ -489,25 +470,90 @@
   background: var(--grimoire-workbench-border-strong);
 }
 
-/* Response duration footer - styled as another line of content */
+/*
+ * How long the turn took: a clock and a mono duration, in the faintest ink.
+ *
+ * It replaced an italic sentence built from a random word — "* Roasted for 19s"
+ * — which read as prose, so the one fact in the footer was the part of it the
+ * eye reached last.
+ */
 .grimoire-response-footer {
-  margin-top: var(--grimoire-space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--grimoire-space-2);
+  margin-top: var(--grimoire-space-6);
+}
+
+/* The reading and the actions, with the design's six pixels between them. */
+.grimoire-response-footer .grimoire-baked-duration {
+  margin-inline-end: var(--grimoire-space-6);
+}
+
+/* The same 24px square the question's own actions use, on the same row. */
+.grimoire-response-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: var(--grimoire-hit-s);
+  height: var(--grimoire-hit-s);
+  border-radius: var(--grimoire-radius-1);
+  color: var(--grimoire-ink-faint);
+  cursor: pointer;
+  transition: color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-response-copy-btn svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-response-copy-btn:hover {
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
+}
+
+.grimoire-response-copy-btn.copied {
+  color: var(--grimoire-accent-text);
 }
 
 .grimoire-baked-duration {
-  color: var(--text-muted);
-  font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
-  font-style: italic;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--grimoire-space-4);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Action buttons toolbar below user messages */
+.grimoire-baked-duration-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.grimoire-baked-duration-icon svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
+}
+
+/*
+ * What can be done to a turn, under it and to the right: copy, rewind, fork.
+ *
+ * The controls hold their space at rest and change only colour and ground on
+ * hover, so revealing them never moves the text above.
+ */
 .grimoire-user-msg-actions {
   position: absolute;
-  bottom: -24px;
+  bottom: calc(-1 * var(--grimoire-hit-s));
   right: 0;
   display: flex;
-  gap: var(--grimoire-space-5);
+  align-items: center;
+  gap: var(--grimoire-space-2);
   opacity: 1;
   z-index: 1;
 }
@@ -517,34 +563,48 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-faint);
-  transition: color var(--grimoire-duration) var(--grimoire-ease);
+  width: var(--grimoire-hit-s);
+  height: var(--grimoire-hit-s);
+  border-radius: var(--grimoire-radius-1);
+  color: var(--grimoire-ink-faint);
+  transition: color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-user-msg-actions span svg {
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-user-msg-actions span:hover {
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-user-msg-actions span.copied {
   color: var(--grimoire-accent-text);
 }
 
-.grimoire-user-msg-actions .grimoire-message-completion-time {
+/*
+ * The time is a word in the row, not a 24px hit target: the blanket `span`
+ * rule above squeezed it into one and centred it there. Six pixels separate
+ * the reading from the actions, which is what the design puts between them.
+ */
+.grimoire-user-msg-actions .grimoire-message-completion-time,
+.grimoire-response-footer .grimoire-message-completion-time {
+  width: auto;
+  height: auto;
+  margin-inline-end: var(--grimoire-space-6);
   cursor: default;
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 /* Compact boundary indicator */
 .grimoire-compact-boundary {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  margin: var(--grimoire-space-5) 0;
+  gap: var(--grimoire-space-8);
+  margin: var(--grimoire-space-12) 0;
 }
 
 .grimoire-compact-boundary::before,
@@ -552,53 +612,48 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--background-modifier-border);
+  background: var(--grimoire-line);
 }
 
 .grimoire-compact-boundary-label {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-xs);
   white-space: nowrap;
 }
 
 /* Session restart notice: the seam where a saved session could not be resumed */
 .grimoire-session-restart-notice {
-  margin: var(--grimoire-space-2) 0 var(--grimoire-space-1);
+  margin: var(--grimoire-space-4) 0 var(--grimoire-space-2);
 }
 
 .grimoire-session-restart-notice-hint {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-s);
   line-height: 1.5;
-  padding: 0 var(--grimoire-space-2);
+  padding: 0 var(--grimoire-space-4);
   text-align: center;
 }
 
-.grimoire-container--chat-window .grimoire-messages {
-  gap: var(--grimoire-space-5);
-  padding: 0;
-}
-
+/*
+ * The greeting is a line above the transcript, not a stage the transcript
+ * begins after.
+ *
+ * It was a 160px block that centred itself in whatever space was left, so a
+ * conversation with messages in it still opened on an empty band and the first
+ * message started halfway down the pane.
+ */
 .grimoire-container--chat-window .grimoire-welcome {
-  min-height: 160px;
-  padding: var(--grimoire-space-6) var(--grimoire-space-4);
+  display: block;
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0;
+  text-align: start;
 }
 
 .grimoire-container--chat-window .grimoire-welcome-greeting {
   max-width: 100%;
-  font-size: var(--grimoire-text-l);
-}
-
-.grimoire-container--chat-window .grimoire-message {
-  padding: 0;
-  border-radius: 0;
-}
-
-.grimoire-container--chat-window .grimoire-message-user {
-  max-width: 86%;
-  align-self: flex-end;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  border-radius: var(--grimoire-radius-3) var(--grimoire-radius-3) 4px var(--grimoire-radius-3);
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-container--chat-window .grimoire-message-assistant {

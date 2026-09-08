@@ -20,6 +20,23 @@ const OBSIDIAN_PARTIAL_CSS_FEATURES = Object.freeze([
     message:
       'Unexpected browser feature "css-display-contents" is only partially supported by Obsidian 1.11.4',
   },
+  {
+    // The Level 3 longhands and the multi-value shorthand, not the plain
+    // `text-decoration: underline | line-through | none` the sheet uses in
+    // eight places and Obsidian does not flag.
+    //
+    // The shorthand's values stop at a brace as well as at a semicolon. The
+    // built sheet is one minified line, so without that a plain
+    // `text-decoration:underline}` ran on into the next rule and found its
+    // "second value" in a neighbouring declaration — which is why
+    // `build:release` passed on a clean checkout and failed on the second run,
+    // once the previous build had left `styles.css` behind to be scanned.
+    id: 'text-decoration',
+    pattern:
+      /(?:text-decoration-(?:color|line|style|thickness)|text-underline-(?:offset|position))\s*:|text-decoration\s*:\s*[^;{}\s]+\s+[^;{}\s]+/i,
+    message:
+      'Unexpected browser feature "text-decoration" is only partially supported by Obsidian 1.11.4',
+  },
 ]);
 
 function findImportantDeclarations(inputs) {

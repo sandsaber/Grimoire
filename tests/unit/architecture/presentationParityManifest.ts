@@ -144,14 +144,28 @@ export const PARITY_SURFACES: ParitySurface[] = [
   {
     id: 'chat-file-context',
     area: 'chat',
-    description: 'Pinned file context, chips, and runtime context activity.',
+    description: 'Pinned file context, mentions, and runtime context activity.',
     state: 'wired',
     modules: [
       'src/features/chat/ui/FileContext.ts',
       'src/features/chat/ui/file-context/state/FileContextState.ts',
-      'src/features/chat/ui/file-context/view/FileChipsView.ts',
       'src/features/chat/ui/context/RuntimeContextActivity.ts',
       'src/features/chat/controllers/contextRowVisibility.ts',
+    ],
+  },
+  {
+    id: 'chat-context-manager',
+    area: 'chat',
+    description: 'What is attached to the next message: chips, the manage dialog, the add picker.',
+    state: 'wired',
+    modules: [
+      'src/features/chat/ui/context-manager/ContextAttachments.ts',
+      'src/features/chat/ui/context-manager/ContextStore.ts',
+      'src/features/chat/ui/context-manager/ContextComposerView.ts',
+      'src/features/chat/ui/context-manager/ContextManagerModal.ts',
+      'src/features/chat/ui/context-manager/ContextAddPicker.ts',
+      'src/features/chat/ui/context-manager/contextItems.ts',
+      'src/features/chat/ui/context-manager/tokenEstimate.ts',
     ],
   },
   {

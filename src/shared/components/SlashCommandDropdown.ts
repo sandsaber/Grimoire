@@ -1,6 +1,9 @@
 import { getBuiltInCommandsForDropdown } from '../../core/commands/builtInCommands';
 import type { ProviderCommandDropdownConfig } from '../../core/providers/commands/ProviderCommandCatalog';
-import type { ProviderCommandEntry } from '../../core/providers/commands/ProviderCommandEntry';
+import type {
+  ProviderCommandEntry,
+  ProviderCommandScope,
+} from '../../core/providers/commands/ProviderCommandEntry';
 import type { SlashCommand } from '../../core/types';
 import { t } from '../../i18n/i18n';
 import { normalizeArgumentHint } from '../../utils/slashCommand';
@@ -27,6 +30,12 @@ export interface SlashCommandDropdownOptions {
   hiddenCommands?: Set<string>;
   providerConfig?: ProviderCommandDropdownConfig;
   getProviderEntries?: () => Promise<readonly ProviderCommandEntry[]>;
+}
+
+/** Where a listed command comes from, in the words the badge uses. */
+function scopeOf(item: DropdownItem): ProviderCommandScope {
+  if (item.isBuiltIn) return 'builtin';
+  return item.providerEntry?.scope ?? 'vault';
 }
 
 export class SlashCommandDropdown {
@@ -335,6 +344,15 @@ export class SlashCommandDropdown {
           const hintEl = itemEl.createSpan({ cls: 'grimoire-slash-hint' });
           hintEl.setText(normalizeArgumentHint(item.argumentHint));
         }
+
+        // Where a command comes from decides whether the reader can change it,
+        // and two commands can share a name across those places. The list said
+        // nothing about it, so `/review` from the vault and `/review` from the
+        // CLI were the same row twice.
+        itemEl.createSpan({
+          cls: 'grimoire-slash-scope',
+          text: t(`shared.slashCommands.scope.${scopeOf(item)}`),
+        });
 
         if (item.description) {
           const descEl = itemEl.createDiv({ cls: 'grimoire-slash-desc' });

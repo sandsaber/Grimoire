@@ -44,11 +44,9 @@ import { ResumeSessionDropdown } from '../../../shared/components/ResumeSessionD
 import { InstructionModal } from '../../../shared/modals/InstructionConfirmModal';
 import type { BrowserSelectionContext } from '../../../utils/browser';
 import type { CanvasSelectionContext } from '../../../utils/canvas';
-import { formatDurationMmSs } from '../../../utils/date';
 import type { EditorSelectionContext } from '../../../utils/editor';
 import { splitContextPaths } from '../../../utils/externalContext';
 import { appendMarkdownSnippet } from '../../../utils/markdown';
-import { COMPLETION_FLAVOR_WORDS } from '../constants';
 import { buildImageGenerationPrompt } from '../imageGeneration';
 import type { QueuePauseReason } from '../queue/MessageQueue';
 import { InlineAskUserQuestion } from '../rendering/InlineAskUserQuestion';
@@ -760,6 +758,19 @@ export class InputController {
           this.pauseQueue(turnFailed ? 'failed' : 'cancelled');
         }
         if (didCancelThisTurn) {
+          /*
+           * **The turn may have been stopped before it had a bubble to say so
+           * in**, which is the same hole the failure path above already fills.
+           * A turn interrupted before the provider says anything leaves a
+           * message with no content, no blocks and no tools, and `appendText`
+           * returns early on a null cursor — so the notice went nowhere and the
+           * transcript kept an empty bubble between two questions, which reads
+           * as an answer that was there and got lost.
+           */
+          if (!state.currentContentEl) {
+            const messageEl = renderer.addMessage(finalAssistantMsg);
+            state.currentContentEl = messageEl.querySelector<HTMLElement>('.grimoire-message-content');
+          }
           await streamController.appendText(
             `\n\n<span class="grimoire-interrupted">${t('chat.ui.messages.interrupted')}</span> `
             + `<span class="grimoire-interrupted-hint">${t('chat.ui.messages.interruptedHint')}</span>`,
@@ -776,18 +787,7 @@ export class InputController {
             ? Math.floor((performance.now() - state.responseStartTime) / 1000)
             : 0;
           if (durationSeconds > 0) {
-            const flavorWord =
-              COMPLETION_FLAVOR_WORDS[Math.floor(Math.random() * COMPLETION_FLAVOR_WORDS.length)];
             finalAssistantMsg.durationSeconds = durationSeconds;
-            finalAssistantMsg.durationFlavorWord = flavorWord;
-            // Add footer to live message in DOM
-            if (state.currentContentEl) {
-              const footerEl = state.currentContentEl.createDiv({ cls: 'grimoire-response-footer' });
-              footerEl.createSpan({
-                text: `* ${flavorWord} for ${formatDurationMmSs(durationSeconds)}`,
-                cls: 'grimoire-baked-duration',
-              });
-            }
           }
         }
 
@@ -795,9 +795,16 @@ export class InputController {
           finalAssistantMsg,
           didCancelThisTurn ? 'blocked' : 'completed',
         );
+        streamController.finalizeRunningToolCalls();
         await streamController.finalizeCurrentThinkingBlock(finalAssistantMsg);
         await streamController.finalizeCurrentTextBlock(finalAssistantMsg);
         finalAssistantMsg.completedAt = Date.now();
+        // After the blocks are closed, because the row carries what can be
+        // copied and until then the answer's own text has not landed on the
+        // message yet — which is why the live row had a duration and no copy.
+        if (state.currentContentEl) {
+          renderer.renderResponseFooter(state.currentContentEl, finalAssistantMsg);
+        }
         renderer.updateMessageCompletionTime(finalAssistantMsg);
         state.currentContentEl = null;
         this.deps.getSubagentManager().resetStreamingState();
@@ -1478,6 +1485,10 @@ export class InputController {
       return;
     }
 
+    // The tab may already be bound to a conversation the kernel created; the
+    // state field is only one of the two places that binding lives.
+    conversationController.adoptBoundConversationId?.();
+
     if (!state.currentConversationId) {
       const sessionId = this.getAgentService()?.getSessionId() ?? undefined;
       const conversation = await plugin.createConversation({
@@ -1830,7 +1841,16 @@ export class InputController {
 
     streamController.hideThinkingIndicator();
     streamController.pauseTurnSilenceIndicator(true);
-    this.hideInputContainer(inputContainerEl);
+    /*
+     * The card stands where the composer does, so the composer goes away while
+     * it is open — and comes back the moment the card folds, because a folded
+     * card is a one-line reminder and a pane with neither is a pane with no
+     * text field in it. Balanced through one flag rather than through the hide
+     * counter directly, so a card that resolves while folded does not decrement
+     * a hide it had already given back.
+     */
+    const composer = this.composerLock(inputContainerEl);
+    composer.hide();
 
     const enrichedInput = state.planFilePath
       ? { ...input, planFilePath: state.planFilePath }
@@ -1847,20 +1867,21 @@ export class InputController {
         enrichedInput,
         (decision: ExitPlanModeDecision | null) => {
           this.pendingExitPlanModeInline = null;
-          this.restoreInputContainer(inputContainerEl);
+          composer.show();
           streamController.pauseTurnSilenceIndicator(false);
           resolve(decision);
         },
         signal,
         renderContent,
         planPathPrefix,
+        isCollapsed => { if (isCollapsed) composer.show(); else composer.hide(); },
       );
       this.pendingExitPlanModeInline = inline;
       try {
         inline.render();
       } catch (err) {
         this.pendingExitPlanModeInline = null;
-        this.restoreInputContainer(inputContainerEl);
+        composer.show();
         streamController.pauseTurnSilenceIndicator(false);
         reject(toError(err));
       }
@@ -1896,7 +1917,8 @@ export class InputController {
       return Promise.resolve({ decision: null, invalidated: false });
     }
 
-    this.hideInputContainer(inputContainerEl);
+    const composer = this.composerLock(inputContainerEl);
+    composer.hide();
     this.deps.streamController.pauseTurnSilenceIndicator(true);
     this.pendingPlanApprovalInvalidated = false;
 
@@ -1907,10 +1929,11 @@ export class InputController {
           const invalidated = this.pendingPlanApprovalInvalidated;
           this.pendingPlanApprovalInvalidated = false;
           this.pendingPlanApproval = null;
-          this.restoreInputContainer(inputContainerEl);
+          composer.show();
           this.deps.streamController.pauseTurnSilenceIndicator(false);
           resolve({ decision, invalidated });
         },
+        isCollapsed => { if (isCollapsed) composer.show(); else composer.hide(); },
       );
       this.pendingPlanApproval = inline;
       try {
@@ -1918,7 +1941,7 @@ export class InputController {
       } catch (err) {
         this.pendingPlanApproval = null;
         this.pendingPlanApprovalInvalidated = false;
-        this.restoreInputContainer(inputContainerEl);
+        composer.show();
         this.deps.streamController.pauseTurnSilenceIndicator(false);
         reject(toError(err));
       }
@@ -1993,6 +2016,29 @@ export class InputController {
       } else {
         sendButtonEl.setAttribute('disabled', previousSendDisabled);
       }
+    };
+  }
+
+  /**
+   * One card's hold on the composer, which it can take and give back at will.
+   *
+   * The hide underneath is counted, so two surfaces can hold it at once — but a
+   * single surface must not decrement twice for one hold, which is what folding
+   * a card and then resolving it would otherwise do.
+   */
+  private composerLock(inputContainerEl: HTMLElement): { hide(): void; show(): void } {
+    let held = false;
+    return {
+      hide: () => {
+        if (held) return;
+        held = true;
+        this.hideInputContainer(inputContainerEl);
+      },
+      show: () => {
+        if (!held) return;
+        held = false;
+        this.restoreInputContainer(inputContainerEl);
+      },
     };
   }
 

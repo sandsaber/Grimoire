@@ -20,6 +20,7 @@ import {
   type HiddenProviderCommands,
   normalizeMaxTabs,
   normalizePermissionMode,
+  normalizeRunAbsoluteTimeoutMinutes,
   type ProviderConfigMap,
   type TabBarPosition,
 } from '../../core/types/settings';
@@ -132,6 +133,12 @@ function normalizeUsageIndicatorsEnabled(value: unknown): boolean {
   return typeof value === 'boolean'
     ? value
     : DEFAULT_GRIMOIRE_SETTINGS.usageIndicatorsEnabled;
+}
+
+function normalizeShowPanelLabels(value: unknown): boolean {
+  return typeof value === 'boolean'
+    ? value
+    : DEFAULT_GRIMOIRE_SETTINGS.showPanelLabels;
 }
 
 function shouldPersistChatViewPlacementMigration(
@@ -374,8 +381,12 @@ export class GrimoireSettingsStorage {
     );
     const maxTabs = normalizeMaxTabs(stored.maxTabs);
     const tabBarPosition = normalizeTabBarPosition(stored.tabBarPosition);
+    const showPanelLabels = normalizeShowPanelLabels(stored.showPanelLabels);
     const usageIndicatorsEnabled = normalizeUsageIndicatorsEnabled(stored.usageIndicatorsEnabled);
     const debugLoggingEnabled = normalizeDebugLoggingEnabled(stored.debugLoggingEnabled);
+    const runAbsoluteTimeoutMinutes = normalizeRunAbsoluteTimeoutMinutes(
+      stored.runAbsoluteTimeoutMinutes,
+    );
     const legacyProviderSettings = {
       ...stored,
       hiddenProviderCommands,
@@ -398,8 +409,10 @@ export class GrimoireSettingsStorage {
       chatViewPlacement,
       maxTabs,
       tabBarPosition,
+      showPanelLabels,
       usageIndicatorsEnabled,
       debugLoggingEnabled,
+      runAbsoluteTimeoutMinutes,
     };
 
     const merged = {

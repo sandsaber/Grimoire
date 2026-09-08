@@ -26,6 +26,7 @@ import {
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatTurnRequest, PreparedChatTurn } from '@/core/runtime/types';
 import type { PermissionMode } from '@/core/types/settings';
+import { resolveRunAbsoluteTimeoutMs } from '@/core/types/settings';
 import type GrimoirePlugin from '@/main';
 import { createClaudeModuleContext } from '@/providers/claude/app/ClaudeModuleContext';
 import { claudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
@@ -250,6 +251,7 @@ export class ClaudeExecution {
           scope: 'claude',
         });
       },
+      runAbsoluteTimeoutMs: () => resolveRunAbsoluteTimeoutMs(this.plugin.settings),
       rewindBackup: {
         create: filesChanged => createClaudeRewindBackup(
           filesChanged ? [...filesChanged] : undefined,

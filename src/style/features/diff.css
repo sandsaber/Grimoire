@@ -1,23 +1,23 @@
 /* Write/Edit Diff Block - Subagent style */
 .grimoire-write-edit-block {
-  margin: var(--grimoire-space-2) 0;
+  margin: var(--grimoire-space-4) 0;
   background: transparent;
   overflow: hidden;
 }
 
 .grimoire-text-block+.grimoire-write-edit-block {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-write-edit-block+.grimoire-text-block {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-write-edit-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-2) 0;
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-4) 0;
   cursor: pointer;
   user-select: none;
   background: transparent;
@@ -38,18 +38,18 @@
 
 /* Two-part header: name (fixed) + summary (flexible) */
 .grimoire-write-edit-name {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-normal);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .grimoire-write-edit-summary {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-m);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -58,18 +58,18 @@
 }
 
 .grimoire-write-edit-stats {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   flex-shrink: 0;
 }
 
 .grimoire-write-edit-stats .added {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-write-edit-stats .removed {
-  color: var(--color-red);
-  margin-left: var(--grimoire-space-2);
+  color: var(--grimoire-error);
+  margin-left: var(--grimoire-space-4);
 }
 
 .grimoire-write-edit-status {
@@ -89,12 +89,12 @@
 }
 
 .grimoire-write-edit-status.status-completed {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-write-edit-status.status-error,
 .grimoire-write-edit-status.status-blocked {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 .grimoire-write-edit-content {
@@ -107,77 +107,101 @@
   display: flex;
 }
 
+/*
+ * The diff block. It sits inline under the step that made the edit, on the
+ * code ground, and a long line truncates rather than wrapping: a wrapped diff
+ * line stops being a line, which is the only thing a diff is made of.
+ */
 .grimoire-write-edit-diff {
   flex: 1;
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-s);
-  line-height: 1.5;
-  background: transparent;
+  padding: var(--grimoire-space-8) var(--grimoire-space-10);
+  border-radius: var(--grimoire-radius-1);
+  background: var(--grimoire-code);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  line-height: var(--grimoire-leading-code);
   max-height: 300px;
   overflow-y: auto;
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .grimoire-write-edit-loading,
 .grimoire-write-edit-binary,
 .grimoire-write-edit-error,
 .grimoire-write-edit-done-text {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-write-edit-error {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 /* Diff line styling */
 .grimoire-diff-hunk {
-  margin-bottom: var(--grimoire-space-2);
+  margin-bottom: var(--grimoire-space-4);
 }
 
 .grimoire-diff-line {
   display: flex;
-  white-space: pre-wrap;
-  word-break: break-all;
+  gap: var(--grimoire-space-10);
 }
 
+/*
+ * The sign is the only coloured thing in the block. A full-width tinted band
+ * behind every added line reads as a highlight the reader did not ask for, and
+ * on a light theme it is a second background competing with the code ground.
+ */
 .grimoire-diff-prefix {
   flex-shrink: 0;
-  width: 16px;
-  text-align: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-faint);
   user-select: none;
 }
 
 .grimoire-diff-text {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grimoire-diff-insert {
-  background: color-mix(in srgb, var(--color-green) 25%, transparent);
-  color: var(--text-normal);
+  background: none;
+  color: var(--grimoire-ink);
 }
 
 .grimoire-diff-insert .grimoire-diff-prefix {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
+}
+
+/* What is going away is struck through and receding, not painted red. */
+.grimoire-diff-delete {
+  background: none;
+  color: var(--grimoire-ink-faint);
+  text-decoration: line-through;
+}
+
+.grimoire-diff-delete .grimoire-diff-prefix {
+  color: var(--grimoire-error);
+  text-decoration: none;
 }
 
 /* Hunk separator */
 .grimoire-diff-separator {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   text-align: center;
-  padding: var(--grimoire-space-2) 0;
+  padding: var(--grimoire-space-4) 0;
   font-style: italic;
-  border-top: 1px dashed var(--background-modifier-border);
-  border-bottom: 1px dashed var(--background-modifier-border);
-  margin: var(--grimoire-space-4) 0;
+  border-top: 1px dashed var(--grimoire-line);
+  border-bottom: 1px dashed var(--grimoire-line);
+  margin: var(--grimoire-space-8) 0;
   font-size: var(--grimoire-text-xs);
 }
 
 .grimoire-diff-no-changes {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-style: italic;
-  padding: var(--grimoire-space-4);
+  padding: var(--grimoire-space-8);
 }

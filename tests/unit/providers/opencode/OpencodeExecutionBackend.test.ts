@@ -494,6 +494,32 @@ describe('OpencodeExecutionBackend', () => {
       .toEqual(trace.cases.approval);
   });
 
+  it('lets a working turn outlive the inactivity window, and still bounds it absolutely', async () => {
+    // The run timeout was armed once at dispatch and only ever cleared, so a
+    // turn longer than the window died even while it was streaming — ten
+    // minutes of work ended exactly like ten minutes of silence. Shared by
+    // every provider on the managed ACP backend, not just this one.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend);
+    void collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    const armed = fixture.scheduler.pending(60_000);
+    expect(armed).toHaveLength(1);
+    const absolute = fixture.scheduler.pending(30 * 60_000);
+    expect(absolute).toHaveLength(1);
+
+    // The agent says something: the turn is alive.
+    fixture.client.emit(agentText('native-session', 'still working'));
+    await flushPromises();
+
+    const rearmed = fixture.scheduler.pending(60_000);
+    expect(rearmed).toHaveLength(1);
+    expect(rearmed[0]).not.toBe(armed[0]);
+    // The ceiling is not a liveness timer and does not move.
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual(absolute);
+  });
+
   it('cancels a permission prepared after its bounded request already failed closed', async () => {
     const preparation = deferred<ManagedAcpPreparedInteraction>();
     const cancel = jest.fn(async () => ({ outcome: { outcome: 'cancelled' as const } }));
@@ -590,6 +616,22 @@ describe('OpencodeExecutionBackend', () => {
         result: { resultId: 'provider-result', storage: 'provider-native' },
       },
     }));
+  });
+
+  it('leaves no live timer behind a finished run', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+    fixture.client.emit(agentText('native-session', 'OpenCode result'));
+    fixture.client.completePrompt({ stopReason: 'end_turn', userMessageId: 'message-1' });
+
+    expectTerminal(await events, 'succeeded', 'completed');
+    await flushPromises();
+    // The terminal event is emitted after both timers are cleared, and the
+    // emit re-arms the window: without a guard the run ends holding one.
+    expect(fixture.scheduler.pending(60_000)).toEqual([]);
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual([]);
   });
 
   it('rejects dynamic configuration before prompt dispatch', async () => {
@@ -1329,36 +1371,50 @@ class FakeManagedAcpClient implements ManagedAcpClient {
 }
 
 class FakeScheduler implements ManagedAcpExecutionScheduler {
-  // The delay is kept, not just the callback: a budget is only correct
+  // The delay is kept alongside the callback: a budget is only correct
   // relative to the other budgets, so a test that cannot see how long a timer
-  // was armed for cannot tell the startup window from the control one.
-  private readonly tasks = new Map<object, { readonly run: () => void; readonly delayMs: number }>();
-  setTimeout(callback: () => void, delayMs = 0): object {
+  // was armed for can tell neither a re-armed timer from a surviving one nor
+  // the startup window from the control one.
+  private readonly tasks = new Map<object, () => void>();
+  private readonly delays = new Map<object, number>();
+  setTimeout(callback: () => void, ms?: number): object {
     const handle = {};
-    this.tasks.set(handle, { run: callback, delayMs });
+    this.tasks.set(handle, callback);
+    this.delays.set(handle, ms ?? 0);
     return handle;
   }
+
+  /** Live timers, so a test can tell a re-armed timer from a surviving one. */
+  pending(ms: number): object[] {
+    return [...this.tasks.keys()].filter(handle => this.delays.get(handle) === ms);
+  }
   clearTimeout(handle: unknown): void {
-    if (typeof handle === 'object' && handle !== null) this.tasks.delete(handle);
+    if (typeof handle === 'object' && handle !== null) {
+      this.tasks.delete(handle);
+      this.delays.delete(handle);
+    }
   }
   fireNext(): void {
     const task = this.tasks.entries().next().value;
     if (!task) throw new Error('No timer.');
     this.tasks.delete(task[0]);
-    task[1].run();
+    this.delays.delete(task[0]);
+    task[1]();
   }
   fireLast(): void {
     const task = [...this.tasks.entries()].at(-1);
     if (!task) throw new Error('No timer.');
     this.tasks.delete(task[0]);
-    task[1].run();
+    this.delays.delete(task[0]);
+    task[1]();
   }
   /** Fires every timer a budget of `delayMs` or shorter could have armed. */
   fireAllUpTo(delayMs: number): void {
-    for (const [handle, task] of [...this.tasks.entries()]) {
-      if (task.delayMs > delayMs) continue;
+    for (const [handle, run] of [...this.tasks.entries()]) {
+      if ((this.delays.get(handle) ?? 0) > delayMs) continue;
       this.tasks.delete(handle);
-      task.run();
+      this.delays.delete(handle);
+      run();
     }
   }
 }

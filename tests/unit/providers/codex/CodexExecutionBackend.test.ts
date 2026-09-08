@@ -34,6 +34,7 @@ import type {
   CodexExecutionNotificationListener,
   CodexExecutionServerRequestHandler,
 } from '@/providers/codex/runtime/CodexExecutionConnection';
+import { CodexRpcResponseError } from '@/providers/codex/runtime/CodexRpcTransport';
 
 const RUN_1 = runId(`run-${'1'.repeat(32)}`);
 const RUN_2 = runId(`run-${'2'.repeat(32)}`);
@@ -51,6 +52,18 @@ const TURN_PARAMS: Omit<TurnStartParams, 'threadId'> = {
   model: 'gpt-5.6-codex',
   summary: 'detailed',
 };
+const RESTORED_THREAD = 'thread-restored';
+const RESUME_PARAMS = {
+  experimentalRawEvents: true,
+  persistExtendedHistory: true,
+};
+/**
+ * What the app-server answers a second `thread/resume` with.
+ *
+ * A structured JSON-RPC error rather than a bare `Error`: the run has to tell
+ * a definite refusal from a lost answer, and only the shape carries that.
+ */
+const ACTIVE_WRITER_CODE = -32603;
 
 describe('CodexExecutionBackend', () => {
   it('multiplexes sessions through one initialized connection and preserves early notifications', async () => {
@@ -975,6 +988,75 @@ describe('CodexExecutionBackend', () => {
       .toHaveLength(1);
   });
 
+  it('lets a working turn outlive the inactivity window, and still bounds it absolutely', async () => {
+    // The run timeout was armed once at dispatch and only ever cleared, so ten
+    // minutes of *work* ended exactly like ten minutes of silence. A turn that
+    // streams the whole time is the healthy case, not the stuck one.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    void collectEvents(session.createRun(request(RUN_1, 'default')));
+    await fixture.connection.waitForCall('turn/start');
+
+    const armed = fixture.scheduler.pending(30_000);
+    expect(armed).toHaveLength(1);
+    const absolute = fixture.scheduler.pending(30 * 60_000);
+    expect(absolute).toHaveLength(1);
+
+    // The provider says something: the turn is alive.
+    fixture.connection.notifyExecution('item/agentMessage/delta', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'message-1',
+      delta: 'still working',
+    });
+    await flushPromises();
+
+    const rearmed = fixture.scheduler.pending(30_000);
+    expect(rearmed).toHaveLength(1);
+    expect(rearmed[0]).not.toBe(armed[0]);
+    // The ceiling is not a liveness timer and does not move.
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual(absolute);
+  });
+
+  it('leaves no live timer behind a finished run', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    const events = collectEvents(session.createRun(request(RUN_1, 'default')));
+    await fixture.connection.waitForCall('turn/start');
+    fixture.connection.complete('thread-1', 'turn-1', 'answer');
+
+    expectTerminal(await events, 'succeeded', 'completed');
+    await flushPromises();
+    // The terminal event is emitted after both timers are cleared, and the
+    // emit re-arms the window: without a guard the run ends holding one.
+    expect(fixture.scheduler.pending(30_000)).toEqual([]);
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual([]);
+  });
+
+  it('asks for the run ceiling each turn, and arms none when it is zero', async () => {
+    let ceilingMs = 0;
+    const fixture = createFixture({ runAbsoluteTimeoutMs: () => ceilingMs });
+    const session = await createSession(fixture.backend, 1);
+    const first = collectEvents(session.createRun(request(RUN_1, 'default')));
+    await fixture.connection.waitForCall('turn/start');
+
+    // Zero is the setting that removes the ceiling, not a missing value.
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual([]);
+    fixture.connection.complete('thread-1', 'turn-1', 'first answer');
+    expectTerminal(await first, 'succeeded', 'completed');
+
+    // Raised in settings between the two turns. Asked for again rather than
+    // captured when the backend was built, so it reaches the next turn without
+    // reloading the plugin.
+    ceilingMs = 90 * 60_000;
+    const second = collectEvents(session.createRun(request(RUN_2, 'default')));
+    await fixture.connection.waitForCalls('turn/start', 2);
+
+    expect(fixture.scheduler.pending(90 * 60_000)).toHaveLength(1);
+    fixture.connection.complete('thread-1', 'turn-2', 'second answer');
+    expectTerminal(await second, 'succeeded', 'completed');
+  });
+
   it('arbitrates output-limit, cancellation, and timeout through one interrupt', async () => {
     const interrupt = deferred<Record<string, never>>();
     const fixture = createFixture({
@@ -1035,12 +1117,203 @@ describe('CodexExecutionBackend', () => {
     expect(fixture.connection.calls.filter(call => call.method === 'turn/interrupt'))
       .toHaveLength(1);
   });
+
+  it('reuses a restored native thread when a replacement session takes it over', async () => {
+    // One conversation, two execution sessions after a restart: the restored
+    // one carries the native thread, the replacement one the kernel opened
+    // carries no reference at all. The replacement must not resume a thread
+    // this app-server generation has already loaded.
+    const fixture = createFixture({
+      invocations: {
+        first: resumeInvocation(),
+        second: resumeInvocation(),
+      },
+    });
+    const restored = await fixture.backend.createSession({
+      executionSessionId: executionSessionId(`es-${'1'.repeat(32)}`),
+      owner: OWNER,
+      backendGeneration: 1,
+      nativeSessionRef: RESTORED_THREAD,
+    });
+    const firstEvents = collectEvents(restored.createRun(request(RUN_1, 'first')));
+    await fixture.connection.waitForCalls('turn/start', 1);
+    fixture.connection.complete(RESTORED_THREAD, 'turn-1', 'first answer');
+    expectTerminal(await firstEvents, 'succeeded', 'completed');
+
+    const replacement = await createSession(fixture.backend, 2);
+    const secondEvents = collectEvents(replacement.createRun(request(RUN_2, 'second')));
+    await fixture.connection.waitForCalls('turn/start', 2);
+    fixture.connection.complete(RESTORED_THREAD, 'turn-2', 'second answer');
+
+    expectTerminal(await secondEvents, 'succeeded', 'completed');
+    expect(fixture.connection.calls.filter(call => call.method === 'thread/resume'))
+      .toHaveLength(1);
+    expect(replacement.getSnapshot()).toMatchObject({ nativeSessionRef: RESTORED_THREAD });
+  });
+
+  it('refuses to take a native thread away from a session with a live run', async () => {
+    const fixture = createFixture({
+      invocations: {
+        first: resumeInvocation(),
+        second: resumeInvocation(),
+      },
+    });
+    const restored = await fixture.backend.createSession({
+      executionSessionId: executionSessionId(`es-${'1'.repeat(32)}`),
+      owner: OWNER,
+      backendGeneration: 1,
+      nativeSessionRef: RESTORED_THREAD,
+    });
+    const firstEvents = collectEvents(restored.createRun(request(RUN_1, 'first')));
+    await fixture.connection.waitForCalls('turn/start', 1);
+
+    const replacement = await createSession(fixture.backend, 2);
+    const secondEvents = collectEvents(replacement.createRun(request(RUN_2, 'second')));
+
+    // The live turn keeps its thread; the intruder is rejected before dispatch
+    // rather than silently displacing the run that is still producing an answer.
+    expectTerminal(await secondEvents, 'invalidated', 'side-effect-free-rejection');
+    expect(fixture.connection.calls.filter(call => call.method === 'turn/start'))
+      .toHaveLength(1);
+    // The tab renders this instead of the kernel's neutral sentence, which
+    // cannot name what is holding the thread.
+    expect(fixture.refusals.get('second'))
+      .toBe('Codex native thread is in use by another execution session.');
+
+    fixture.connection.complete(RESTORED_THREAD, 'turn-1', 'first answer');
+    expectTerminal(await firstEvents, 'succeeded', 'completed');
+  });
+
+  it('classifies a definite native preparation rejection as side-effect-free', async () => {
+    const fixture = createFixture({ invocations: { first: resumeInvocation() } });
+    fixture.connection.beforeRequest = method => (method === 'thread/resume'
+      ? Promise.reject(new CodexRpcResponseError({
+        code: ACTIVE_WRITER_CODE,
+        message: 'thread already has an active writer',
+      }))
+      : undefined);
+    const session = await createSession(fixture.backend, 1);
+
+    const events = collectEvents(session.createRun(request(RUN_1, 'first')));
+
+    // The provider answered. Nothing was dispatched, so nothing can have run.
+    expectTerminal(await events, 'invalidated', 'side-effect-free-rejection');
+    expect(fixture.connection.calls.some(call => call.method === 'turn/start')).toBe(false);
+    // The daemon's own words, kept for the terminal that follows them. Only the
+    // message: the structured `data` of a provider error is never rendered.
+    expect(fixture.refusals.get('first')).toBe('thread already has an active writer');
+  });
+
+  it('fences the previous turn after a replacement session takes the thread over', async () => {
+    const fixture = createFixture({
+      invocations: {
+        first: resumeInvocation(),
+        compact: {
+          thread: { kind: 'resume', threadId: RESTORED_THREAD, params: RESUME_PARAMS },
+          turn: { kind: 'compact' },
+        },
+      },
+    });
+    const restored = await fixture.backend.createSession({
+      executionSessionId: executionSessionId(`es-${'1'.repeat(32)}`),
+      owner: OWNER,
+      backendGeneration: 1,
+      nativeSessionRef: RESTORED_THREAD,
+    });
+    const firstEvents = collectEvents(restored.createRun(request(RUN_1, 'first')));
+    await fixture.connection.waitForCalls('turn/start', 1);
+    fixture.connection.complete(RESTORED_THREAD, 'turn-1', 'first answer');
+    await firstEvents;
+
+    const replacement = await createSession(fixture.backend, 2);
+    const compactEvents = collectEvents(replacement.createRun(request(RUN_2, 'compact')));
+    await fixture.connection.waitForCall('thread/compact/start');
+    // The turn the session it replaced ended on. A compaction learns its turn
+    // id from this notification alone, so the replacement has to know which one
+    // is already over — which it can only do if the id travelled with the
+    // thread it took over.
+    fixture.connection.notifyExecution('turn/started', {
+      threadId: RESTORED_THREAD,
+      turn: turn('turn-1', 'inProgress'),
+    });
+    fixture.connection.notifyExecution('turn/started', {
+      threadId: RESTORED_THREAD,
+      turn: turn('turn-compact', 'inProgress'),
+    });
+    fixture.connection.complete(RESTORED_THREAD, 'turn-compact', 'compacted');
+
+    const settled = await compactEvents;
+    expectTerminal(settled, 'succeeded', 'completed');
+    expect(settled.filter(event => event.event.kind === 'run-started')).toEqual([
+      expect.objectContaining({ scope: expect.objectContaining({ nativeRunRef: 'turn-compact' }) }),
+    ]);
+  });
+
+  it('remembers a forked thread the daemon loaded when the rollback fails', async () => {
+    const fixture = createFixture({
+      invocations: {
+        first: {
+          thread: {
+            kind: 'fork',
+            sourceThreadId: 'thread-source',
+            resumeAtTurnId: 'source-turn-1',
+            resumeParams: RESUME_PARAMS,
+          },
+          turn: { kind: 'start', params: TURN_PARAMS },
+        },
+        second: resumeInvocation('thread-fork'),
+      },
+    });
+    fixture.connection.beforeRequest = method => {
+      if (method === 'thread/fork') {
+        return startResult(thread('thread-fork', [
+          turn('source-turn-1', 'completed'),
+          turn('source-turn-2', 'completed'),
+        ]));
+      }
+      return method === 'thread/rollback'
+        ? Promise.reject(new Error('Transport disposed'))
+        : undefined;
+    };
+    const forking = await createSession(fixture.backend, 1);
+    const forkEvents = collectEvents(forking.createRun(request(RUN_1, 'first')));
+    expectTerminal(await forkEvents, 'indeterminate', 'effects-unknown');
+
+    // The fork is resumed before it is bound to anything, and the binding is
+    // what used to record the load. A failure in between left a thread this
+    // daemon holds open with nothing remembering it, and the next run resumed
+    // it again — into the writer conflict.
+    const resuming = await createSession(fixture.backend, 2);
+    const secondEvents = collectEvents(resuming.createRun(request(RUN_2, 'second')));
+    await fixture.connection.waitForCall('turn/start');
+    fixture.connection.complete('thread-fork', 'turn-1', 'second answer');
+
+    expectTerminal(await secondEvents, 'succeeded', 'completed');
+    expect(fixture.connection.calls.filter(call => call.method === 'thread/resume'
+      && (call.params as { readonly threadId?: string }).threadId === 'thread-fork'))
+      .toHaveLength(1);
+  });
+
+  it('keeps an ambiguous native preparation failure indeterminate', async () => {
+    const fixture = createFixture({ invocations: { first: resumeInvocation() } });
+    fixture.connection.beforeRequest = method => (method === 'thread/resume'
+      ? Promise.reject(new Error('Transport disposed'))
+      : undefined);
+    const session = await createSession(fixture.backend, 1);
+
+    const events = collectEvents(session.createRun(request(RUN_1, 'first')));
+
+    // No answer came back. The request may have been acted on.
+    expectTerminal(await events, 'indeterminate', 'effects-unknown');
+    expect(fixture.connection.calls.some(call => call.method === 'turn/start')).toBe(false);
+  });
 });
 
 interface FixtureOptions {
   readonly invocations?: Readonly<Record<string, CodexExecutionInvocation>>;
   readonly reconciliation?: CodexTurnReconciliationEvidence;
   readonly runTimeoutMs?: number;
+  readonly runAbsoluteTimeoutMs?: () => number;
   readonly maxResultBytes?: number;
   readonly connections?: readonly FakeCodexConnection[];
   readonly resultCommitOutcome?: ResultCommitOutcome;
@@ -1055,6 +1328,8 @@ function createFixture(options: FixtureOptions = {}) {
     readonly output: string;
     readonly source: 'assistant' | 'native-agent';
   }> = [];
+  /** What a definite rejection told the store the tab reads its wording from. */
+  const refusals = new Map<string, string>();
   let connectionFactoryCalls = 0;
   let sessionInstances = 0;
   let interactionIdsCreated = 0;
@@ -1078,6 +1353,7 @@ function createFixture(options: FixtureOptions = {}) {
     requestResolver: {
       resolve: async requestRef => options.invocations?.[requestRef] ?? defaultInvocation,
       resolveSteer: async () => [{ type: 'text', text: 'Continue with the correction' }],
+      recordRefusal: (requestRef, message) => { refusals.set(requestRef, message); },
     },
     resultSink: {
       storeResult: async input => {
@@ -1124,6 +1400,9 @@ function createFixture(options: FixtureOptions = {}) {
     recoveryDelayMs: 250,
     cancellationTurnIdTimeoutMs: 500,
     runTimeoutMs: options.runTimeoutMs ?? 30_000,
+    ...(options.runAbsoluteTimeoutMs
+      ? { runAbsoluteTimeoutMs: options.runAbsoluteTimeoutMs }
+      : {}),
     maxResultBytes: options.maxResultBytes ?? 1024,
   };
   const backend = new CodexExecutionBackend(context);
@@ -1134,6 +1413,7 @@ function createFixture(options: FixtureOptions = {}) {
     scheduler,
     interactionIds,
     resultSinkInputs,
+    refusals,
     get connectionFactoryCalls() {
       return connectionFactoryCalls;
     },
@@ -1148,6 +1428,7 @@ class FakeCodexConnection implements CodexExecutionConnection {
   private readonly notifications = new Set<CodexExecutionNotificationListener>();
   private readonly serverRequests = new Set<CodexExecutionServerRequestHandler>();
   private readonly connectionLosses = new Set<(error?: Error) => void>();
+  private readonly loadedThreads = new Set<string>();
   private threadSequence = 0;
   private turnSequence = 0;
 
@@ -1169,10 +1450,22 @@ class FakeCodexConnection implements CodexExecutionConnection {
     }
     const record = params as Record<string, unknown>;
     if (method === 'thread/start') {
-      return startResult(thread(`thread-${++this.threadSequence}`)) as T;
+      const started = thread(`thread-${++this.threadSequence}`);
+      this.loadedThreads.add(started.id);
+      return startResult(started) as T;
     }
     if (method === 'thread/resume') {
-      return startResult(thread(String(record.threadId))) as T;
+      const threadId = String(record.threadId);
+      // The app-server refuses to load a thread it already holds open, which
+      // is the conflict this suite exists to keep out.
+      if (this.loadedThreads.has(threadId)) {
+        throw new CodexRpcResponseError({
+          code: ACTIVE_WRITER_CODE,
+          message: 'thread already has an active writer',
+        });
+      }
+      this.loadedThreads.add(threadId);
+      return startResult(thread(threadId)) as T;
     }
     if (method === 'thread/fork') {
       return startResult(thread(`thread-${++this.threadSequence}`)) as T;
@@ -1245,6 +1538,10 @@ class FakeCodexConnection implements CodexExecutionConnection {
   waitForCall(method: string): Promise<void> {
     return waitFor(() => this.calls.some(call => call.method === method));
   }
+
+  waitForCalls(method: string, count: number): Promise<void> {
+    return waitFor(() => this.calls.filter(call => call.method === method).length >= count);
+  }
 }
 
 class ManualScheduler implements CodexExecutionScheduler {
@@ -1260,6 +1557,11 @@ class ManualScheduler implements CodexExecutionScheduler {
     if (typeof handle === 'object' && handle !== null) {
       this.tasks.delete(handle);
     }
+  }
+
+  /** Live timers, so a test can tell a re-armed timer from a surviving one. */
+  pending(delayMs: number): object[] {
+    return [...this.tasks].filter(([, task]) => task.delay === delayMs).map(([handle]) => handle);
   }
 
   fireDelay(delayMs: number): void {
@@ -1278,6 +1580,13 @@ function request(id: typeof RUN_1, requestRef: string): ExecutionRequest {
     owner: OWNER,
     resultExpectation: 'required',
     requestRef,
+  };
+}
+
+function resumeInvocation(threadId = RESTORED_THREAD): CodexExecutionInvocation {
+  return {
+    thread: { kind: 'resume', threadId, params: RESUME_PARAMS },
+    turn: { kind: 'start', params: TURN_PARAMS },
   };
 }
 

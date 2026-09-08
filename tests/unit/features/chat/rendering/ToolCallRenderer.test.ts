@@ -36,6 +36,48 @@ describe('ToolCallRenderer', () => {
     jest.clearAllMocks();
   });
 
+  /*
+   * `blocked` is a decision — somebody said no. `unfinished` is the absence of
+   * one: the turn ended before the tool reported. They were the same status,
+   * so a tool nobody had ever been asked about was drawn in the error colour
+   * behind a crossed shield — the permission vocabulary — telling the reader
+   * they had refused something they never saw.
+   */
+  describe('a refusal and a turn that ended are not the same thing', () => {
+    it('draws a refusal in the permission vocabulary', () => {
+      const parentEl = createMockEl();
+      const toolEl = renderToolCall(parentEl, createToolCall({
+        id: 'bash-blocked',
+        name: 'Bash',
+        input: { command: 'rm -rf /' },
+        status: 'blocked',
+      }), new Map<string, HTMLElement>());
+
+      expect(toolEl.hasClass('is-blocked')).toBe(true);
+      expect(toolEl.hasClass('is-unfinished')).toBe(false);
+      expect(toolEl.querySelector('.grimoire-tool-status')?.hasClass('status-blocked')).toBe(true);
+      expect(setIcon).toHaveBeenCalledWith(expect.anything(), 'shield-off');
+      expect(toolEl.querySelector('.grimoire-tool-result')?.textContent).toBe('skipped');
+    });
+
+    it('draws a turn that ended as absence, not as a refusal', () => {
+      const parentEl = createMockEl();
+      const toolEl = renderToolCall(parentEl, createToolCall({
+        id: 'bash-unfinished',
+        name: 'Bash',
+        input: { command: 'ls' },
+        status: 'unfinished',
+      }), new Map<string, HTMLElement>());
+
+      expect(toolEl.hasClass('is-unfinished')).toBe(true);
+      expect(toolEl.hasClass('is-blocked')).toBe(false);
+      expect(toolEl.hasClass('is-error')).toBe(false);
+      expect(toolEl.querySelector('.grimoire-tool-status')?.hasClass('status-unfinished')).toBe(true);
+      expect(setIcon).not.toHaveBeenCalledWith(expect.anything(), 'shield-off');
+      expect(toolEl.querySelector('.grimoire-tool-result')?.textContent).toBe('stopped');
+    });
+  });
+
   describe('renderToolCall', () => {
     it('renders Bash as a compact activity-trace step with expandable command input', () => {
       const parentEl = createMockEl();

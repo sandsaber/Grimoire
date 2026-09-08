@@ -1,59 +1,122 @@
-/* Header - logo, title/tabs slot, and actions */
+/*
+ * The header: the tab strip, the context meter, and two actions.
+ *
+ * 40px tall with a single rule under it, and the active tab's accent underline
+ * sits *on* that rule rather than above it — `margin-bottom: -1px` — so the two
+ * lines read as one line that bends.
+ */
 .grimoire-header {
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 46px;
-  padding: var(--grimoire-space-5) var(--grimoire-window-padding-x) var(--grimoire-space-4);
-  border-bottom: 0;
-  background: var(--grimoire-panel);
+  justify-content: space-between;
+  height: var(--grimoire-header-h);
+  min-height: var(--grimoire-header-h);
+  padding: 0 var(--grimoire-space-8) 0 var(--grimoire-space-12);
+  border-bottom: 1px solid var(--grimoire-line);
+  background: var(--grimoire-ground);
 }
 
-/* Header actions (end side - always stays at end via margin-inline-start: auto) */
+.grimoire-input-nav-content {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  gap: var(--grimoire-space-8);
+}
+
+/* Header actions (end side) */
 .grimoire-header-actions {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-2);
   flex-shrink: 0;
   margin-inline-start: auto;
 }
 
 .grimoire-header-actions-slot {
-  align-self: stretch;
-  padding-left: var(--grimoire-space-4);
+  align-self: center;
+  padding-left: 0;
   border-left: 0;
 }
 
 .grimoire-header .grimoire-tab-bar-container {
   display: flex;
-  gap: var(--grimoire-space-2);
+  align-items: stretch;
+  min-width: 0;
+  gap: 0;
 }
 
-.grimoire-header-btn {
+/*
+ * The repeating chrome button. It is icon-only because it repeats and the user
+ * learns it once; the name is deferred to the tooltip, never dropped.
+ */
+.grimoire-header-btn,
+button.grimoire-header-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid transparent;
+  flex: 0 0 auto;
+  width: var(--grimoire-hit-l);
+  height: var(--grimoire-hit-l);
+  padding: 0;
+  border: 0;
   border-radius: var(--grimoire-radius-1);
+  background: none;
+  box-shadow: none;
   cursor: pointer;
-  color: var(--text-faint);
-  transition: background var(--grimoire-duration) var(--grimoire-ease), border-color var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
+  color: var(--grimoire-ink-muted);
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-header-btn:hover {
-  border-color: transparent;
-  background: var(--grimoire-raise-2);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
+}
+
+/*
+ * A button that has been clicked keeps focus, and the host paints a focused
+ * button. That left a permanent box around `+` after every new tab — a control
+ * lit up for no reason the reader can see. Only keyboard focus shows a ring.
+ */
+.grimoire-header-btn:focus {
+  background: none;
+  box-shadow: none;
+  outline: none;
+}
+
+.grimoire-header-btn:focus-visible {
+  background: var(--grimoire-hover);
+  box-shadow: var(--grimoire-focus-ring);
+  color: var(--grimoire-ink);
+  outline: none;
+}
+
+.grimoire-header-btn:focus:hover {
+  background: var(--grimoire-hover);
 }
 
 .grimoire-header-btn svg {
-  width: 16px;
-  height: 16px;
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
+  stroke-width: var(--grimoire-stroke);
+}
+
+/*
+ * The add control sits at the end of the strip rather than in the actions, and
+ * is inset from the header's rule so it reads as part of the tabs without
+ * being one.
+ */
+button.grimoire-new-tab-btn {
+  align-self: stretch;
+  height: auto;
+  margin: var(--grimoire-space-6) 0;
+  color: var(--grimoire-ink-faint);
 }
 
 .grimoire-new-tab-btn svg {
-  width: 16.8px;
-  height: 16.8px;
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
 }
