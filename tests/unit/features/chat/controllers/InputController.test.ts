@@ -1877,6 +1877,62 @@ describe('InputController - Message Queue', () => {
       );
     });
 
+    it('still says why the title failed when the user renamed the chat first', async () => {
+      // The one case that left nothing behind: a rename clears the status, so
+      // the record keeps no `failed` either, and the reason used to go with it.
+      const mockTitleService = {
+        generateTitle: jest.fn().mockResolvedValue(undefined),
+        cancel: jest.fn(),
+      };
+
+      deps = createSendableDeps({
+        getTitleGenerationService: () => mockTitleService,
+      });
+      const recordDebugLog = jest.fn();
+      (deps.plugin as any).recordDebugLog = recordDebugLog;
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockReturnValue(
+        createMockStream([
+          { type: 'text', content: 'Response' },
+          { type: 'done' },
+        ])
+      );
+
+      (deps.streamController.handleStreamChunk as jest.Mock).mockImplementation(async (chunk, msg) => {
+        if (chunk.type === 'text') {
+          msg.content = chunk.content;
+        }
+      });
+
+      inputEl = deps.getInputEl();
+      inputEl.value = 'Test';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+
+      // A title of the user's own, so the callback takes the renamed arm.
+      (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
+        id: 'conv-1',
+        providerId: 'opencode',
+        title: 'A name the user chose',
+      });
+
+      const callback = mockTitleService.generateTitle.mock.calls[0][2];
+      await callback('conv-1', { success: false, error: 'Managed ACP auxiliary query timed out.' });
+
+      // The user's choice still wins the status.
+      expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', { titleGenerationStatus: undefined });
+      expect(recordDebugLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ state: 'user-renamed' }),
+          error: 'Managed ACP auxiliary query timed out.',
+          event: 'generation.failed',
+          level: 'warn',
+          scope: 'title',
+        })
+      );
+    });
+
     it('should not set pending status when titleService is null', async () => {
       deps = createSendableDeps({
         getTitleGenerationService: () => null,

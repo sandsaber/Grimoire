@@ -1543,6 +1543,25 @@ export class InputController {
         // Only apply AI title if user hasn't manually renamed (title still matches fallback)
         const userManuallyRenamed = currentConv.title !== expectedTitle;
 
+        // Said before the status is decided, because the failure is the same
+        // failure either way. A rename during generation clears the status, and
+        // clearing it used to take the reason with it — so the one case where
+        // nothing is left in the record was also the one that wrote no line.
+        // `state` is what became of the status, so a `failed` line beside a
+        // conversation with no failed status still reconciles.
+        if (!result.success) {
+          plugin.recordDebugLog?.({
+            data: {
+              providerId: this.getActiveProviderId(),
+              source: 'auto',
+              state: userManuallyRenamed ? 'user-renamed' : 'failed',
+            },
+            error: result.error,
+            event: 'generation.failed',
+            level: 'warn',
+            scope: 'title',
+          });
+        }
         // The rename is asked first because it answers for both outcomes: a
         // title the user has already chosen outranks whatever the model made of
         // it. Asking it inside each arm instead cost a repeated condition and,
@@ -1555,19 +1574,7 @@ export class InputController {
           await plugin.renameConversation(conversationId, result.title, 'model');
           await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
         } else {
-          // Keep fallback title, mark as failed. The status is a state; the
-          // reason the service gave for it exists only here, and the log is the
-          // one place it survives the tick.
-          plugin.recordDebugLog?.({
-            data: {
-              providerId: this.getActiveProviderId(),
-              source: 'auto',
-            },
-            error: result.error,
-            event: 'generation.failed',
-            level: 'warn',
-            scope: 'title',
-          });
+          // Keep the fallback title, and mark the status the reason above names.
           await plugin.updateConversation(conversationId, { titleGenerationStatus: 'failed' });
         }
         conversationController.updateHistoryDropdown();
