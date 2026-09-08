@@ -1314,7 +1314,32 @@ export class ConversationController {
    */
   canSuggestTitle(conversationId: string | null): boolean {
     if (!conversationId) return false;
-    return this.resolveTitleSource(this.deps.plugin.getConversationSync(conversationId)).ok;
+    return this.resolveTitleSource(this.deps.plugin.getConversationSync(conversationId), conversationId).ok;
+  }
+
+  /**
+   * The first user message, from the record or from the tab that is on it.
+   *
+   * A conversation is created when its first message is sent and saved when the
+   * turn that answers it ends, so for the whole of that first turn the record
+   * holds no messages while the tab plainly shows one. Gating on the record
+   * alone disabled auto-rename there and explained it with «needs a message» to
+   * a user looking at their own — and it came back by itself when the answer
+   * landed, which is what made it read as a broken control rather than a wait.
+   *
+   * Only this tab's own conversation is answered from the live state: another
+   * tab's messages are not this controller's to read.
+   */
+  private firstUserMessage(
+    conversation: Conversation | null | undefined,
+    conversationId?: string,
+  ): ChatMessage | undefined {
+    const stored = conversation?.messages.find(m => m.role === 'user');
+    if (stored) return stored;
+    const { state } = this.deps;
+    const id = conversationId ?? conversation?.id;
+    if (!id || state.currentConversationId !== id) return undefined;
+    return state.messages.find(m => m.role === 'user');
   }
 
   /**
@@ -1331,7 +1356,7 @@ export class ConversationController {
    */
   async suggestTitle(conversationId: string): Promise<TitleSuggestion> {
     const conversation = await this.deps.plugin.getConversationById(conversationId);
-    const source = this.resolveTitleSource(conversation);
+    const source = this.resolveTitleSource(conversation, conversationId);
     if (!source.ok) return source;
 
     return new Promise<TitleSuggestion>((resolve) => {
@@ -1358,10 +1383,13 @@ export class ConversationController {
   }
 
   /** Shared gates for both the synchronous check and the actual generation. */
-  private resolveTitleSource(conversation: Conversation | null): TitleSuggestionSource {
+  private resolveTitleSource(
+    conversation: Conversation | null,
+    conversationId?: string,
+  ): TitleSuggestionSource {
     if (!this.isAutoTitleEnabled()) return { ok: false, reason: 'disabled' };
 
-    const firstUserMsg = conversation?.messages.find(m => m.role === 'user');
+    const firstUserMsg = this.firstUserMessage(conversation, conversationId);
     if (!conversation || !firstUserMsg) return { ok: false, reason: 'no-messages' };
 
     const service = this.deps.getTitleGenerationService();
@@ -1381,7 +1409,7 @@ export class ConversationController {
     if (!conversation) return;
     // Gate on the conversation we just loaded rather than the sync accessor: same object in
     // production, and it keeps this path independent of which accessor a caller warmed up.
-    if (!this.resolveTitleSource(conversation).ok) return;
+    if (!this.resolveTitleSource(conversation, conversationId).ok) return;
 
     // Remember the title so a manual rename during generation wins over the model.
     const expectedTitle = conversation.title;

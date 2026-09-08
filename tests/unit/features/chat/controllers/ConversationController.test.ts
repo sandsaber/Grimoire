@@ -2807,6 +2807,39 @@ describe('ConversationController title suggestion', () => {
     ).toBe(false);
   });
 
+  it('can suggest while the first turn is still running, before the record is saved', () => {
+    // The record for a conversation whose first turn has not ended yet: created
+    // on send, saved when the answer lands.
+    const { controller, deps } = createTitleHarness({
+      conversation: conversationWithUserMessage({ messages: [] }),
+    });
+    deps.state.currentConversationId = 'conv-1';
+    deps.state.messages = [{ id: 'm1', role: 'user', content: 'how do I dry PETG?', timestamp: 1 } as any];
+
+    expect(controller.canSuggestTitle('conv-1')).toBe(true);
+  });
+
+  it('does not read the live messages of another tab', () => {
+    const { controller, deps } = createTitleHarness({
+      conversation: conversationWithUserMessage({ messages: [] }),
+    });
+    deps.state.currentConversationId = 'conv-2';
+    deps.state.messages = [{ id: 'm1', role: 'user', content: 'not this conversation', timestamp: 1 } as any];
+
+    expect(controller.canSuggestTitle('conv-1')).toBe(false);
+  });
+
+  it('generates from the live message when the record has not caught up', async () => {
+    const { controller, deps, service } = createTitleHarness({
+      conversation: conversationWithUserMessage({ messages: [] }),
+    });
+    deps.state.currentConversationId = 'conv-1';
+    deps.state.messages = [{ id: 'm1', role: 'user', content: 'how do I dry PETG?', timestamp: 1 } as any];
+
+    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: true, title: 'Drying PETG' });
+    expect(service.generateTitle).toHaveBeenCalledWith('conv-1', 'how do I dry PETG?', expect.any(Function));
+  });
+
   it('returns the generated title without touching the conversation', async () => {
     const { controller, deps, service } = createTitleHarness();
 
