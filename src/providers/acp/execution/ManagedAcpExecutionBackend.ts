@@ -928,13 +928,6 @@ class ManagedAcpExecutionSession implements ExecutionSession {
     } catch (error) {
       if (error instanceof JsonRpcErrorResponse) {
         run.presentTurnRefusal(error.message);
-      } else if (error instanceof AcpStartupError) {
-        // Carried rather than dropped. Only a `JsonRpcErrorResponse` used to
-        // reach the tab, so a startup that never produced one left the run with
-        // no words at all — and the composition then explained the silence with
-        // the sentence it had, about a saved session that may be gone. The
-        // conversation had no saved session; the CLI had not finished starting.
-        run.presentTurnRefusal(error.message, 'startup');
       }
       throw error;
     }
