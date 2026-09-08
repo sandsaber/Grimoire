@@ -1332,13 +1332,12 @@ export class ConversationController {
    */
   private firstUserMessage(
     conversation: Conversation | null | undefined,
-    conversationId?: string,
+    conversationId: string,
   ): ChatMessage | undefined {
     const stored = conversation?.messages.find(m => m.role === 'user');
     if (stored) return stored;
     const { state } = this.deps;
-    const id = conversationId ?? conversation?.id;
-    if (!id || state.currentConversationId !== id) return undefined;
+    if (state.currentConversationId !== conversationId) return undefined;
     return state.messages.find(m => m.role === 'user');
   }
 
@@ -1385,7 +1384,7 @@ export class ConversationController {
   /** Shared gates for both the synchronous check and the actual generation. */
   private resolveTitleSource(
     conversation: Conversation | null,
-    conversationId?: string,
+    conversationId: string,
   ): TitleSuggestionSource {
     if (!this.isAutoTitleEnabled()) return { ok: false, reason: 'disabled' };
 
