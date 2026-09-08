@@ -1506,6 +1506,29 @@ describe('ConversationController', () => {
       expect(deps.plugin.renameConversation).not.toHaveBeenCalled();
     });
 
+    it('says so when the rename cannot be saved', async () => {
+      // The field this dialog replaced ran through `runConversationAction` and
+      // showed a notice when the save failed. Awaiting the dialog with `void`
+      // instead left the failure silent and the rejection unhandled.
+      (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+        { id: 'conv-1', providerId: 'claude', title: 'Test Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview' },
+      ]);
+      (deps.plugin.renameConversation as jest.Mock).mockRejectedValue(new Error('disk is gone'));
+
+      controller.updateHistoryDropdown();
+
+      const item = getHistoryItem(dropdown, 'conv-1');
+      const renameBtn = item.querySelector('.grimoire-history-rename-btn');
+      renameModalMock.mockResolvedValue('A name the reader typed');
+      mockNotice.mockClear();
+
+      await renameBtn!._eventListeners!.get('click')![0]({ preventDefault: jest.fn(), stopPropagation: jest.fn() });
+      await flushPromises();
+
+      expect(deps.plugin.renameConversation).toHaveBeenCalled();
+      expect(mockNotice).toHaveBeenCalled();
+    });
+
     it('should delete conversation and reload active when deleting current conversation', async () => {
       deps.state.currentConversationId = 'conv-1';
 

@@ -1059,7 +1059,10 @@ export class ConversationController {
     renameBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      void this.requestRename(conv.id, conv.title, options);
+      runConversationAction(
+        () => this.requestRename(conv.id, conv.title, options),
+        t('chat.ui.errors.renameConversationFailed'),
+      );
     });
 
     // Deleting a conversation is the one thing on this row that cannot be
@@ -1274,7 +1277,10 @@ export class ConversationController {
     menu.addItem((menuItem) => menuItem
       .setTitle(t('chat.ui.history.rename'))
       .onClick(() => {
-        void this.requestRename(conversationId, conv.title, options);
+        runConversationAction(
+          () => this.requestRename(conversationId, conv.title, options),
+          t('chat.ui.errors.renameConversationFailed'),
+        );
       }));
     menu.addItem((menuItem) => menuItem
       .setTitle(t('common.delete'))
@@ -1334,6 +1340,10 @@ export class ConversationController {
     // leave the title alone, and neither may mark it as manually chosen.
     if (nextTitle === null || nextTitle === currentTitle) return;
 
+    // Thrown on, not swallowed: both call sites run this through
+    // `runConversationAction`, which is what says so to the reader. Awaiting it
+    // with `void` instead left a failed save silent and the rejection
+    // unhandled - the inline field it replaced did show that notice.
     try {
       await plugin.renameConversation(convId, nextTitle, 'manual');
     } finally {
