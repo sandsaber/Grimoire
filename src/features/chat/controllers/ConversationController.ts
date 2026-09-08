@@ -910,10 +910,15 @@ export class ConversationController {
     item.setAttribute('tabindex', isCurrent ? '-1' : '0');
 
     /*
-     * One line: the title, and one piece of meta at its end. The row carried a
-     * second line of provider, prompt preview, source count and usage - four
-     * facts in 11px mono under every title, which turned a list you scan into
-     * a wall you read. What is left of that line is the tooltip.
+     * The title, and under it the one fact that says which agent answered.
+     *
+     * The row used to carry four - provider, prompt preview, source count and
+     * usage - which turned a list you scan into a wall you read, so they moved
+     * into the tooltip. Three of them belong there: they answer a question you
+     * ask about a conversation you have already found. The model does not - it
+     * is how you find it in the first place, and a tooltip cannot be scanned
+     * down a list, reached by keyboard, or opened by touch at all. So the
+     * model alone comes back to the row, and the tooltip keeps the full line.
      */
     const content = item.createDiv({ cls: 'grimoire-history-item-content' });
     // A conversation whose title never generated still has to be findable, so
@@ -922,6 +927,10 @@ export class ConversationController {
     const titleEl = content.createDiv({ cls: 'grimoire-history-item-title', text: title });
     const meta = this.formatHistoryMeta(conv);
     titleEl.setAttribute('title', meta ? `${title}\n${meta}` : title);
+    const modelLabel = conv.modelLabel?.trim();
+    if (modelLabel) {
+      content.createDiv({ cls: 'grimoire-history-item-model', text: modelLabel });
+    }
 
     item.createSpan({
       cls: 'grimoire-history-item-time',

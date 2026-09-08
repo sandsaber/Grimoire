@@ -1133,6 +1133,63 @@ describe('ConversationController', () => {
         expect(meta).not.toContain('0 msgs');
       });
 
+      it('says which model answered without being hovered, and keeps the rest in the tooltip', () => {
+        // A tooltip cannot be scanned down a list, reached by keyboard, or
+        // opened by touch. The model is what tells two conversations apart
+        // before you open either, so it is text in the row; preview, sources
+        // and usage stay in the tooltip, where they were moved for good reason.
+
+        const container = createMockEl();
+
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          {
+            id: 'conv-1',
+            providerId: 'codex',
+            title: 'Chapter 03.md',
+            createdAt: 1000,
+            lastResponseAt: 1000,
+            messageCount: 0,
+            preview: 'Rewrite plan - three pressure beats',
+            modelLabel: 'GPT-5.4',
+            sourceCount: 2,
+            usagePercentage: 55,
+          },
+        ]);
+
+        controller.renderHistoryDropdown(container, { onSelectConversation: jest.fn() });
+
+        const item = getHistoryItem(container, 'conv-1');
+        const model = item.querySelector('.grimoire-history-item-model');
+
+        expect(model?.textContent).toBe('GPT-5.4');
+        // The second line is the model and nothing else: the wall does not come back.
+        expect(item.querySelector('.grimoire-history-item-model')?.textContent)
+          .not.toContain('Rewrite plan');
+        expect(getHistoryMeta(item)).toContain('Rewrite plan - three pressure beats');
+      });
+
+      it('draws no model line for a conversation that never recorded one', () => {
+        const container = createMockEl();
+
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          {
+            id: 'conv-1',
+            providerId: 'codex',
+            title: 'Chapter 03.md',
+            createdAt: 1000,
+            lastResponseAt: 1000,
+            messageCount: 0,
+          },
+        ]);
+
+        controller.renderHistoryDropdown(container, { onSelectConversation: jest.fn() });
+
+        const item = getHistoryItem(container, 'conv-1');
+        // An empty line under every untitled row would be the wall again, in
+        // whitespace instead of text.
+        expect(item.querySelector('.grimoire-history-item-model')).toBeNull();
+      });
+
       it('should open a conversation in a new tab on modifier click when supported', async () => {
         const container = createMockEl();
         const onSelectConversation = jest.fn();
