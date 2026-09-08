@@ -365,8 +365,15 @@ export class TabManager implements TabManagerInterface {
       activateTab(tab);
       refreshRuntimeContextUI(tab, this.plugin);
 
-      // Load conversation if not already loaded
-      if (tab.conversationId && tab.state.messages.length === 0) {
+      // Bind by identity, not by whether projection hydration happened to draw
+      // messages first. A restored tab opens its projection asynchronously; if
+      // that reset wins this race, messages are already present while
+      // ChatState still has no conversation id. Treating message presence as
+      // proof of a binding leaves post-turn save to create a duplicate chat.
+      if (
+        tab.conversationId
+        && tab.state.currentConversationId !== tab.conversationId
+      ) {
         await tab.controllers.conversationController?.switchTo(tab.conversationId);
       } else if (
         tab.conversationId

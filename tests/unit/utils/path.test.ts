@@ -560,10 +560,12 @@ describe('findClaudeCLIPath', () => {
       const s = String(p);
       return s === claudePath || s === binDir;
     });
+    // The mock implements one overload of many; `readFileSync` is generic over
+    // ArrayBufferView, so a string-returning stub no longer overlaps.
     jest.spyOn(fs, 'readFileSync').mockImplementation(((p: string) => {
       if (String(p) === path.join(nvmDir, 'alias', 'default')) return '22';
       throw new Error('not found');
-    }) as typeof fs.readFileSync);
+    }) as unknown as typeof fs.readFileSync);
     jest.spyOn(fs, 'readdirSync').mockImplementation(((p: string) => {
       if (String(p) === path.join(nvmDir, 'versions', 'node')) return ['v22.18.0'];
       return [];
@@ -598,10 +600,12 @@ describe('findClaudeCLIPath', () => {
       const s = String(p);
       return s === claudePath || s === binDir;
     });
+    // The mock implements one overload of many; `readFileSync` is generic over
+    // ArrayBufferView, so a string-returning stub no longer overlaps.
     jest.spyOn(fs, 'readFileSync').mockImplementation(((p: string) => {
       if (String(p) === path.join(nvmDir, 'alias', 'default')) return 'node';
       throw new Error('not found');
-    }) as typeof fs.readFileSync);
+    }) as unknown as typeof fs.readFileSync);
     jest.spyOn(fs, 'readdirSync').mockImplementation(((p: string) => {
       if (String(p) === path.join(nvmDir, 'versions', 'node')) return ['v20.10.0', 'v22.18.0'];
       return [];
