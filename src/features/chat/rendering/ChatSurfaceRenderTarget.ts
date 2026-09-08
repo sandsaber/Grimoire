@@ -280,6 +280,19 @@ export class ChatSurfaceRenderTarget implements ChatRenderTarget {
     this.deps.stream.startTurnSilenceIndicator(this.deps.getProviderId());
   }
 
+  adoptTurn(turn: ChatTurnView): void {
+    // Whatever `reset` just put in the transcript is the answer this run
+    // wrote, so the run is bound to it rather than to a message of its own.
+    // A turn that said nothing names a message that was never created; then
+    // there is nothing to bind and nothing addresses it, as before.
+    const message = this.deps.state.messages.find(
+      candidate => candidate.id === turn.assistantMessageId,
+    );
+    if (message) {
+      this.turnMessages.set(turn.runId, message);
+    }
+  }
+
   openTurnBlock(runId: RunId, index: number, item: ChatLiveItem): void {
     const message = this.turnMessages.get(runId);
     if (!message) {

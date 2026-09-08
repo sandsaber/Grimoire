@@ -548,6 +548,52 @@ describe('chat surface render target', () => {
       .toBe('This turn was later established to have succeeded.');
   });
 
+  it('adopts a redrawn turn onto the answer it already has, and draws nothing doing it', async () => {
+    // A saved turn is not re-opened after a redraw — `beginTurn` would put a
+    // second bubble beside the one the transcript already holds. Adopting binds
+    // the run to that message instead, so evidence arriving afterwards has
+    // somewhere to land. Without it `reconcileTurn` finds no message and the
+    // sentence it exists to replace stays on screen.
+    const chat = harness();
+    const answer = {
+      id: `assistant-${RUN_ID}`,
+      role: 'assistant' as const,
+      content: 'Hello.',
+      timestamp: 1,
+    };
+    chat.target.reset({
+      conversationId: 'conv-1',
+      title: 'Tomatoes',
+      messages: [{ id: 'msg-1', role: 'user', content: 'Hi', timestamp: 1 }, answer],
+    });
+    chat.clear();
+
+    chat.target.adoptTurn({
+      runId: RUN_ID,
+      commandId: 'cmd-1',
+      assistantMessageId: `assistant-${RUN_ID}`,
+      startedAt: 1,
+    });
+
+    await drained(chat.target);
+    // No bubble, no cursor, no indicators: adopting is bookkeeping.
+    expect(chat.methods()).toEqual([]);
+
+    chat.target.reconcileTurn(RUN_ID, {
+      reconciliationId: `rec-${'6'.repeat(32)}`,
+      observedOutcome: 'succeeded',
+      evidence: { kind: 'native-history', evidenceRef: 'thread-1' },
+      recordedAt: 20,
+    });
+
+    await drained(chat.target);
+    const chunk = chat.calls.find(call => call.method === 'handleStreamChunk');
+    expect((chunk?.args[0] as { content: string }).content)
+      .toBe('This turn was later established to have succeeded.');
+    // Into the transcript's own message, not a copy of it.
+    expect(chunk?.args[1]).toBe(chat.state.messages[1]);
+  });
+
   it('draws a conversation from nothing and forgets the turns it was holding', async () => {
     const chat = harness();
     beginTurn(chat.target);

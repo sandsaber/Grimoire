@@ -478,6 +478,34 @@ describe('TabManager - Tab Lifecycle', () => {
       // Service initialization is now lazy (on first query), not on switch
       expect(mockInitializeTabService).not.toHaveBeenCalled();
     });
+
+    it('restores the conversation binding when projection hydration wins the tab-load race', async () => {
+      const tab = createMockTabData({
+        id: 'restored-tab',
+        conversationId: 'conv-restored',
+        state: {
+          currentConversationId: null,
+          messages: [{ id: 'message-1', role: 'user', content: 'Already projected' }],
+        },
+      });
+      const manager = createManager({
+        callbacks,
+        plugin: createMockPlugin({
+          getConversationById: jest.fn().mockResolvedValue({
+            id: 'conv-restored',
+            providerId: 'claude',
+            messages: [],
+          }),
+        }),
+        tabFactory: () => tab,
+      });
+
+      await manager.createTab('conv-restored');
+
+      expect(tab.controllers.conversationController.switchTo).toHaveBeenCalledWith(
+        'conv-restored',
+      );
+    });
   });
 
   describe('closeTab', () => {
@@ -2970,6 +2998,7 @@ describe('TabManager - switchToTab Session Sync', () => {
       });
       // For tab-2, simulate already having messages loaded
       if (tabCounter === 2) {
+        tab.state.currentConversationId = 'conv-loaded';
         tab.state.messages = [{ id: 'msg-1', role: 'user', content: 'test' }] as any;
       }
       return tab;
@@ -3020,6 +3049,7 @@ describe('TabManager - switchToTab Session Sync', () => {
         service: mockService,
         serviceInitialized: true,
         state: {
+          currentConversationId: 'conv-streaming',
           isStreaming: true,
           messages: [{ id: 'msg-1', role: 'user', content: 'test' }],
         },
@@ -3074,6 +3104,7 @@ describe('TabManager - switchToTab Session Sync', () => {
         service: mockService,
         serviceInitialized: true,
         state: {
+          currentConversationId: 'conv-pending-save',
           hasPendingConversationSave: true,
           messages: [{ id: 'msg-1', role: 'user', content: 'test' }],
         },
