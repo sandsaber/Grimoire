@@ -41,7 +41,7 @@ import { normalizeMaxTabs } from './tabs/types';
 import { closeTopmostImageViewer } from './ui/imageViewerStack';
 import { ContextUsageMeter, getNextPermissionMode } from './ui/InputToolbar';
 import { requestTabRename } from './ui/RenameTabModal';
-import { appendTitleSourceStar } from './ui/titleSourceMarker';
+import { appendTitleSourceMark } from './ui/titleSourceMarker';
 import { buildAssistantResponseMetadata } from './utils/assistantResponseMetadata';
 import { recalculateUsageForModel } from './utils/usageInfo';
 
@@ -110,7 +110,7 @@ export function buildTabMenuHeading(
     ? truncateTitleOnWordBoundary(title, MAX_TAB_MENU_HEADING_LENGTH)
     : title;
   return createFragment((fragment) => {
-    appendTitleSourceStar(fragment, titleSource);
+    appendTitleSourceMark(fragment, titleSource);
     const span = createSpan({ text: shownTitle, attr: { 'aria-label': title } });
     // Only a shortened heading hides something; tooltipping a name shown in full
     // would repeat it under the cursor.
@@ -642,7 +642,7 @@ export class GrimoireView extends ItemView {
     menu.addItem(item => item
       .setTitle(buildTabMenuHeading(
         getTabTitle(tab, this.plugin),
-        this.tabManager?.getTabTitleSource?.(tabId),
+        this.tabManager?.getTabTitleSource(tabId),
       ))
       .setIsLabel(true));
     menu.addItem(item => item
@@ -692,7 +692,7 @@ export class GrimoireView extends ItemView {
       this.app,
       getTabTitle(tab, this.plugin),
       controller && conversationId ? { controller, conversationId } : null,
-      manager.getTabTitleSource?.(tabId),
+      manager.getTabTitleSource(tabId),
     );
     if (title === null) return;
     await manager.renameTab(tabId, title);

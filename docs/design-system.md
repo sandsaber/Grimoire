@@ -230,6 +230,7 @@ Lucide, through Obsidian's `setIcon()`.
 
 | Token | Value | Where |
 |---|---|---|
+| `--grimoire-icon-2xs` | 11px | a mark beside a name rather than an icon of its own: the title source |
 | `--grimoire-icon-s` | 12px | inside a line of 12px text: a chevron, a chip glyph, a check |
 | `--grimoire-icon-m` | 14px | the chrome default: panel segments, tool steps, list rows |
 | `--grimoire-icon-l` | 16px | header actions, a decision card's glyph |
@@ -384,6 +385,22 @@ A 34px search row, then rows of 36px at radius 4 with a hover wash. The open con
 provider's name. On hover a row reveals pin and rename at 24px and a "Delete" text control that turns
 `--grimoire-error` — the buttons occupy their space at rest, so revealing them shifts nothing. Group
 labels ("Today", "Yesterday") are the uppercase monospace micro-label.
+
+**Who named the conversation** is an 11px mark before the title: `circle-dashed` for the placeholder
+cut from the first message, `sparkles` for a title a model wrote, `pencil` for one the user typed.
+All three are `--grimoire-ink-muted`, and each carries its word as an `aria-label` and a tooltip.
+
+The shape is the meaning and the colour is none, for the reason §3.9 gives and for a second one this
+mark found: the first draft told the three apart by hue — muted, `--grimoire-ok`, `--grimoire-accent-text` —
+and in a vault whose accent is green two of the three are the same colour. The same mark heads the
+tab context menu and sits beside the field in the rename dialog. Three places it deliberately does
+not appear: the tab badge, which shows a number rather than a name; the rename input, where a prefix
+inside the edited value would be saved as part of the title; and the tab's `aria-label`, a string
+with no DOM to colour and a reader who cannot see one, which names the placeholder in words instead.
+
+**What the drawing shows.** [`Grimoire Nordic.html`](design/Grimoire%20Nordic.html) draws the history
+rows without this mark: it was added after the drawing was checked in, and the drawing is edited in
+its own canvas rather than by hand. It goes in at the next pass over that file.
 
 ### 11.6 Decisions — one shape for every ask
 

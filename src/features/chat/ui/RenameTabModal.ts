@@ -4,7 +4,7 @@ import type { TitleSource } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
 import type { ConversationController } from '../controllers/ConversationController';
 import { MAX_TAB_TITLE_LENGTH } from '../tabs/types';
-import { appendTitleSourceStar } from './titleSourceMarker';
+import { appendTitleSourceMark } from './titleSourceMarker';
 
 export interface TabRenameAutoSource {
   controller: ConversationController;
@@ -51,7 +51,7 @@ export class RenameTabModal extends Modal {
     const field = form.createDiv({ cls: 'grimoire-rename-tab-field grimoire-dialog-field' });
     // Beside the input, never inside it: the input holds the title itself, and a
     // marker prefixed to that value would be saved as part of the name.
-    appendTitleSourceStar(field, this.titleSource);
+    appendTitleSourceMark(field, this.titleSource);
     const input = field.createEl('input', {
       cls: 'grimoire-rename-tab-input grimoire-dialog-input',
       attr: {

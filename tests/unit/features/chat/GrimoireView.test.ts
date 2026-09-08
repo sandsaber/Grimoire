@@ -850,6 +850,9 @@ describe('GrimoireView tab context menu auto-rename', () => {
       getTab: jest.fn().mockReturnValue(tab),
       getTabIds: jest.fn().mockReturnValue(['tab-1', 'tab-2']),
       canCreateTab: jest.fn().mockReturnValue(true),
+      // The heading asks the manager who named the tab. A double that answers
+      // nothing is a tab with no recorded source, which is what these cases are.
+      getTabTitleSource: jest.fn().mockReturnValue(undefined),
     };
 
     MockMenu.instances.length = 0;

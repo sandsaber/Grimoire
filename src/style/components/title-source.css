@@ -1,10 +1,12 @@
 /*
- * The star that says who wrote a conversation's title.
+ * The mark that says who wrote a conversation's title.
  *
- * One rule set for every place the mark appears — the tab context-menu heading,
- * the history row, the rename dialog — because the colour is the meaning and
- * three copies of it would drift apart. The tab badge is deliberately not one of
- * those places: it shows a number, not a name.
+ * One rule set for every place it appears — the tab context-menu heading, the
+ * history row, the rename dialog. The shape is the meaning and the colour is
+ * none: all three sources are ink, the way a provider's identity is, because a
+ * state told apart by hue alone cannot be read by a reader who cannot separate
+ * the hues and cannot be named by one who has not learnt the palette. The tab
+ * badge is deliberately not one of those places: it shows a number, not a name.
  */
 
 .grimoire-title-source {
@@ -12,25 +14,13 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  color: var(--grimoire-title-source-color, var(--grimoire-ink-muted));
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-title-source .svg-icon {
-  width: 11px;
-  height: 11px;
-}
-
-/* A placeholder is the absence of a title, so it stays quiet. */
-.grimoire-title-source-fallback {
-  --grimoire-title-source-color: var(--grimoire-ink-muted);
-}
-
-.grimoire-title-source-model {
-  --grimoire-title-source-color: var(--grimoire-ok);
-}
-
-.grimoire-title-source-manual {
-  --grimoire-title-source-color: var(--grimoire-accent-text);
+  width: var(--grimoire-icon-2xs);
+  height: var(--grimoire-icon-2xs);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-history-item-title-row {

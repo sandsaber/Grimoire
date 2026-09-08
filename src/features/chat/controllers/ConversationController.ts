@@ -18,7 +18,7 @@ import type { FileContextManager } from '../ui/FileContext';
 import type { ImageContextManager } from '../ui/ImageContext';
 import type { ExternalContextSelector, McpServerSelector } from '../ui/InputToolbar';
 import type { StatusPanel } from '../ui/StatusPanel';
-import { appendTitleSourceStar } from '../ui/titleSourceMarker';
+import { appendTitleSourceMark } from '../ui/titleSourceMarker';
 import { getRandomGreeting } from '../utils/greetings';
 
 function runConversationAction(action: () => Promise<void>, failureMessage: string): void {
@@ -921,7 +921,7 @@ export class ConversationController {
     // it says when it happened rather than nothing at all.
     const title = conv.title?.trim() || this.formatDate(this.getHistoryTimestamp(conv));
     const titleRow = content.createDiv({ cls: 'grimoire-history-item-title-row' });
-    appendTitleSourceStar(titleRow, conv.titleSource);
+    appendTitleSourceMark(titleRow, conv.titleSource);
     const titleEl = titleRow.createDiv({ cls: 'grimoire-history-item-title', text: title });
     const meta = this.formatHistoryMeta(conv);
     titleEl.setAttribute('title', meta ? `${title}\n${meta}` : title);

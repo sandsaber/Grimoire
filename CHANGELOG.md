@@ -29,6 +29,7 @@ The provider runtime is rebuilt on an execution kernel, and the chat surfaces ar
 - A run left `dispatching` or `running` by a quit is classified honestly at the next load instead of being shown as still running.
 - Agent work started from a conversation is durable: a restart shows what became of it rather than forgetting it.
 - A setting for how long one turn may run. A turn is stopped after ten minutes of silence, which is the check meant for a provider that has stopped answering; separately, no turn may run longer than the ceiling this setting names - thirty minutes by default. Raise it for long agentic work, or set it to 0 to remove it. Advanced, under Conversations (#145).
+- A conversation records who wrote its title - the placeholder cut from your first message, the model, or you - and shows it as a small mark before the name in the history list, the tab menu and the rename dialog. The mark is a shape rather than a colour, and names itself on hover. "Regenerate title" is now offered for any conversation instead of only after a failed generation: a title you are not happy with is not a failed one. Conversations from before this say nothing rather than guess (#161).
 
 ### Fixed
 
