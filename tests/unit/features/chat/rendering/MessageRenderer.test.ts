@@ -288,7 +288,7 @@ describe('MessageRenderer', () => {
       '\u00B7',
       'Opus 4.8',
       '\u00B7',
-      'Effort Extra high',
+      'Extra high',
     ]);
   });
 
@@ -314,7 +314,7 @@ describe('MessageRenderer', () => {
 
     const header = messagesEl.querySelector('.grimoire-assistant-response-meta');
     expect(Array.from(header?.children ?? []).map(child => (child as HTMLElement).textContent))
-      .toContain('推理强度 极高');
+      .toContain('极高');
     setLocale('en');
   });
 
@@ -787,7 +787,6 @@ describe('MessageRenderer', () => {
         { type: 'text', content: 'Response text' } as any,
       ],
       durationSeconds: 65,
-      durationFlavorWord: 'Baked',
     };
 
     renderer.renderStoredMessage(msg);
@@ -797,9 +796,9 @@ describe('MessageRenderer', () => {
     const contentEl = msgEl.children[0]; // grimoire-message-content
     const footerEl = contentEl.children.find((c: any) => c.hasClass('grimoire-response-footer'));
     expect(footerEl).toBeDefined();
-    const durationSpan = footerEl!.children[0];
-    expect(durationSpan.textContent).toContain('Baked');
-    expect(durationSpan.textContent).toContain('1m 5s');
+    const durationSpan = footerEl!.querySelector('.grimoire-baked-duration');
+    expect(durationSpan.children[0].hasClass('grimoire-baked-duration-icon')).toBe(true);
+    expect(durationSpan.children[1].textContent).toBe('1m 5s');
   });
 
   it('does not render footer when durationSeconds is 0', () => {
@@ -823,10 +822,13 @@ describe('MessageRenderer', () => {
     const msgEl = messagesEl.children[0];
     const contentEl = msgEl.children[0];
     const footerEl = contentEl.children.find((c: any) => c.hasClass('grimoire-response-footer'));
-    expect(footerEl).toBeUndefined();
+    // The row is still there because it carries the copy, but it says nothing
+    // about how long a turn that took no measurable time took.
+    expect(footerEl?.querySelector('.grimoire-baked-duration')).toBeNull();
+    expect(footerEl?.querySelector('.grimoire-response-copy-btn')).not.toBeNull();
   });
 
-  it('uses default flavor word "Baked" when durationFlavorWord is not set', () => {
+  it('renders the duration as a clock and a number, with no flavour word', () => {
     const messagesEl = createMockEl();
     const { renderer } = createRenderer(messagesEl);
     jest.spyOn(renderer, 'renderContent').mockResolvedValue(undefined);
@@ -848,7 +850,9 @@ describe('MessageRenderer', () => {
     const contentEl = msgEl.children[0];
     const footerEl = contentEl.children.find((c: any) => c.hasClass('grimoire-response-footer'));
     expect(footerEl).toBeDefined();
-    expect(footerEl!.children[0].textContent).toContain('Baked');
+    const durationSpan = footerEl!.querySelector('.grimoire-baked-duration');
+    expect(durationSpan.children[0].hasClass('grimoire-baked-duration-icon')).toBe(true);
+    expect(durationSpan.children[1].textContent).toBe('30s');
   });
 
   it('renders fallback content for old conversations without contentBlocks', () => {
@@ -871,8 +875,12 @@ describe('MessageRenderer', () => {
 
     // Should render content text
     expect(renderContentSpy).toHaveBeenCalledWith(expect.anything(), 'Legacy response text');
-    // Should add copy button for fallback text
-    expect(addCopySpy).toHaveBeenCalledWith(expect.anything(), 'Legacy response text');
+    // The copy is on the answer's footer row now, not pinned inside the text
+    // block, so a legacy message without contentBlocks copies its own content.
+    expect(addCopySpy).not.toHaveBeenCalled();
+    const footerEl = messagesEl.children[0].children[0].children
+      .find((child: any) => child.hasClass('grimoire-response-footer'));
+    expect(footerEl?.querySelector('.grimoire-response-copy-btn')).not.toBeNull();
     // Should render tool call
     expect(renderStoredToolCall).toHaveBeenCalled();
   });
@@ -1287,7 +1295,7 @@ describe('MessageRenderer', () => {
       '\u00B7',
       'Opus 4.8',
       '\u00B7',
-      'Effort Extra high',
+      'Extra high',
     ]);
   });
 
@@ -1392,44 +1400,42 @@ describe('MessageRenderer', () => {
     expect(textEl.children[1].hasClass('grimoire-message-completion-time')).toBe(true);
   });
 
-  it('shows a compact localized completion date beside the last assistant copy button', () => {
-    setLocale('zh-CN');
-    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(new Date(2026, 7, 2, 12, 0).getTime());
-    try {
-      const messagesEl = createMockEl();
-      const { renderer } = createRenderer(messagesEl);
-      jest.spyOn(renderer, 'renderContent').mockResolvedValue(undefined);
-      const completedAt = new Date(2026, 6, 31, 9, 5).getTime();
+  it('puts the clock, the duration and the copy on one row under the answer', () => {
+    // The clock used to be pinned inside the last text block, which cost that
+    // block 24px of reserved padding, and the duration sat on a row of its own
+    // below it. All three read left to right in one row now.
+    const messagesEl = createMockEl();
+    const { renderer } = createRenderer(messagesEl);
+    jest.spyOn(renderer, 'renderContent').mockResolvedValue(undefined);
+    const completedAt = new Date(2026, 6, 31, 9, 5).getTime();
 
-      renderer.renderStoredMessage({
-        id: 'assistant-completed-at',
-        role: 'assistant',
-        content: 'First\nSecond',
-        timestamp: completedAt - 5000,
-        completedAt,
-        contentBlocks: [
-          { type: 'text', content: 'First' },
-          { type: 'text', content: 'Second' },
-        ],
-      });
+    renderer.renderStoredMessage({
+      id: 'assistant-completed-at',
+      role: 'assistant',
+      content: 'First\nSecond',
+      timestamp: completedAt - 5000,
+      completedAt,
+      durationSeconds: 5,
+      contentBlocks: [
+        { type: 'text', content: 'First' },
+        { type: 'text', content: 'Second' },
+      ],
+    });
 
-      const textBlocks = messagesEl.querySelectorAll('.grimoire-text-block');
-      expect(textBlocks[0]?.hasClass('grimoire-text-block--with-completion-time')).toBe(false);
-      expect(textBlocks[1]?.hasClass('grimoire-text-block--with-completion-time')).toBe(true);
-      const completionEl = textBlocks[1]?.querySelector('.grimoire-message-completion-time');
-      const completionTime = completionEl?.textContent ?? '';
-      expect(completionTime).toContain('7月31日');
-      expect(completionTime).toContain('09:05');
-      expect(completionTime).not.toContain('2026');
-      expect(setTooltip).toHaveBeenCalledWith(
-        completionEl,
-        expect.stringContaining('2026'),
-        { placement: 'top' }
-      );
-    } finally {
-      nowSpy.mockRestore();
-      setLocale('en');
-    }
+    const assistant = messagesEl.querySelectorAll('.grimoire-message-assistant')[0];
+    expect(assistant?.querySelector('.grimoire-text-block')?.querySelector(
+      '.grimoire-message-completion-time',
+    )).toBeNull();
+    const footer = assistant?.querySelector('.grimoire-response-footer');
+    expect(footer?.children.map((child: any) => [
+      'grimoire-message-completion-time',
+      'grimoire-baked-duration',
+      'grimoire-response-copy-btn',
+    ].find(name => child.hasClass(name)))).toEqual([
+      'grimoire-message-completion-time',
+      'grimoire-baked-duration',
+      'grimoire-response-copy-btn',
+    ]);
   });
 
   it('places the user completion time before the user copy button', () => {
@@ -1526,12 +1532,11 @@ describe('MessageRenderer', () => {
       expect(userMessage?.querySelector('.grimoire-message-completion-time')?.textContent)
         .toContain('17:11');
 
+      // The clock sits in the answer's footer row, not inside its prose.
       const assistantMessage = messagesEl.querySelectorAll('.grimoire-message-assistant')[0];
-      expect(assistantMessage?.querySelector('.grimoire-message-completion-time')?.textContent)
+      expect(assistantMessage?.querySelector('.grimoire-response-footer')
+        ?.querySelector('.grimoire-message-completion-time')?.textContent)
         .toContain('17:12');
-      expect(assistantMessage?.querySelector('.grimoire-text-block')?.hasClass(
-        'grimoire-text-block--with-completion-time'
-      )).toBe(true);
     } finally {
       nowSpy.mockRestore();
     }

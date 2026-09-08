@@ -1,5 +1,7 @@
 import { setIcon } from 'obsidian';
 
+import { markDecorative } from '@/shared/components/activatable';
+
 import type { AskUserQuestionItem, AskUserQuestionOption } from '../../../core/types/tools';
 import { t } from '../../../i18n/i18n';
 
@@ -236,8 +238,12 @@ export class InlineAskUserQuestion {
     this.submitBtn = actions.createEl('button', {
       cls: 'grimoire-ask-btn grimoire-ask-btn--submit',
     });
-    setIcon(this.submitBtn.createSpan(), 'arrow-right');
+    // The arrow follows the words: it says where this sends you, and a glyph
+    // in front of a verb reads as an icon button that happens to have a label.
     this.submitBtn.createSpan({ text: t('chat.ui.ask.sendAnswers') });
+    const submitArrow = this.submitBtn.createSpan({ cls: 'grimoire-ask-btn-arrow' });
+    setIcon(submitArrow, 'arrow-right');
+    markDecorative(submitArrow);
     this.submitBtn.addEventListener('click', () => this.handleSubmit());
 
     this.refreshValidity();

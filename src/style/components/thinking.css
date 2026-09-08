@@ -1,9 +1,15 @@
+/*
+ * Reasoning is an aside, and it is set like one: faint, upright, at the size of
+ * the chrome around it. It was the accent in italics — the loudest colour in
+ * the system on the part of a turn the reader most often skips.
+ */
 .grimoire-thinking {
-  color: var(--grimoire-brand);
-  font-style: italic;
-  padding: var(--grimoire-space-2) 0;
+  color: var(--grimoire-ink-faint);
+  font-style: normal;
+  font-size: var(--grimoire-text-s);
+  padding: var(--grimoire-space-4) 0;
   text-align: start;
-  animation: thinking-pulse 1.5s ease-in-out infinite;
+  animation: grimoire-pulse 1.4s ease-in-out infinite;
 }
 
 .grimoire-thinking.grimoire-thinking--compact {
@@ -11,19 +17,19 @@
 }
 
 .grimoire-thinking-hint {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-style: normal;
   font-variant-numeric: tabular-nums;
 }
 
 .grimoire-silent-turn-status {
   align-items: center;
-  animation: grimoire-silent-turn-fade 250ms ease-out;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   display: flex;
   font-size: var(--grimoire-text-m);
-  gap: var(--grimoire-space-3);
-  padding: var(--grimoire-space-2) 0;
+  gap: var(--grimoire-space-6);
+  padding: var(--grimoire-space-4) 0;
 }
 
 .grimoire-silent-turn-status-icon {
@@ -34,11 +40,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-@keyframes grimoire-silent-turn-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .grimoire-silent-turn-status {
     animation: none;
@@ -46,60 +47,95 @@
 }
 
 .grimoire-thinking-block {
-  margin: var(--grimoire-space-4) 0;
+  margin: var(--grimoire-space-8) 0;
 }
 
 .grimoire-container--chat-window .grimoire-message-content > .grimoire-thinking-block {
-  margin: var(--grimoire-space-1) 0;
+  margin: var(--grimoire-space-2) 0;
 }
 
 .grimoire-text-block+.grimoire-thinking-block {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-thinking-block+.grimoire-text-block {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-thinking-block+.grimoire-tool-call {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-tool-call+.grimoire-thinking-block {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-thinking-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-2) 0;
+  gap: var(--grimoire-space-6);
+  padding: var(--grimoire-space-4) 0;
   cursor: pointer;
   overflow: hidden;
 }
 
+/*
+ * A row with nothing behind it is a caption, not a control: where the provider
+ * redacted the reasoning, the duration is the whole of what the row says, and a
+ * pointer promising a body it does not have is worse than no promise.
+ */
+.grimoire-thinking-block.is-caption .grimoire-thinking-header {
+  cursor: default;
+  padding-inline-start: var(--grimoire-space-2);
+}
+
+/* The chevron: closed points right, open points down, like every disclosure. */
+.grimoire-thinking-caret {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+  transition: transform var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-thinking-header[aria-expanded="true"] .grimoire-thinking-caret {
+  transform: rotate(90deg);
+}
+
 .grimoire-thinking-label {
   flex: 1;
-  font-size: var(--grimoire-text-m);
-  font-weight: var(--grimoire-weight-medium);
-  color: var(--grimoire-brand);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-normal);
+  color: var(--grimoire-ink-faint);
+  transition: color var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-thinking-header:hover .grimoire-thinking-label {
+  color: var(--grimoire-ink-muted);
+}
+
+.grimoire-thinking-header svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
 }
 
 /* Thinking block content - tree-branch style */
+/* The same hairline a run of tool steps hangs on, at the same offset. */
 .grimoire-thinking-content {
-  padding: var(--grimoire-space-2) 0;
-  padding-inline-start: var(--grimoire-space-8);
-  font-size: var(--grimoire-text-m);
-  line-height: 1.5;
-  color: var(--text-muted);
+  padding: var(--grimoire-space-4) 0;
+  padding-inline-start: var(--grimoire-space-14);
+  font-size: var(--grimoire-text-s);
+  line-height: var(--grimoire-leading-body);
+  color: var(--grimoire-ink-muted);
   max-height: 400px;
   overflow-y: auto;
-  border-inline-start: 2px solid var(--background-modifier-border);
-  margin-inline-start: var(--grimoire-space-3);
+  border-inline-start: 1px solid var(--grimoire-line);
+  margin-inline-start: var(--grimoire-space-6);
 }
 
 .grimoire-thinking-content p {
-  margin: 0 0 var(--grimoire-space-4) 0;
+  margin: 0 0 var(--grimoire-space-8) 0;
 }
 
 .grimoire-thinking-content p:last-child {
@@ -107,15 +143,15 @@
 }
 
 .grimoire-thinking-content .grimoire-code-wrapper {
-  margin: var(--grimoire-space-4) 0;
+  margin: var(--grimoire-space-8) 0;
 }
 
 .grimoire-thinking-content .grimoire-code-wrapper pre {
-  padding: var(--grimoire-space-4) var(--grimoire-space-4);
+  padding: var(--grimoire-space-8) var(--grimoire-space-8);
   border-radius: var(--grimoire-radius-1);
 }
 
 .grimoire-thinking-content code {
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-s);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-inline-code);
 }

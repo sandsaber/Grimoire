@@ -92,6 +92,7 @@ function getStatusText(status: string): string {
   if (status === 'running') return t('chat.ui.status.running');
   if (status === 'completed') return t('chat.ui.status.completed');
   if (status === 'blocked') return t('chat.ui.status.blocked');
+  if (status === 'unfinished') return t('chat.ui.status.unfinished');
   if (status === 'error') return t('chat.ui.status.error');
   if (status === 'orphaned') return t('chat.ui.status.orphaned');
   return status;

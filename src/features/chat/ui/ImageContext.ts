@@ -1,7 +1,7 @@
-import { Notice } from 'obsidian';
+import { Notice, setIcon } from 'obsidian';
 import * as path from 'path';
 
-import { asActivatable } from '@/shared/components/activatable';
+import { asActivatable, markDecorative } from '@/shared/components/activatable';
 
 import type { AttachmentStore } from '../../../core/attachments/AttachmentStore';
 import { prepareImageForStore } from '../../../core/attachments/prepareImage';
@@ -64,11 +64,11 @@ export class ImageContextManager {
     this.inputEl = inputEl;
     this.callbacks = callbacks;
 
-    // Create image preview in previewContainerEl, before file indicator if present
-    const fileIndicator = this.previewContainerEl.querySelector('.grimoire-file-indicator');
+    // Images sit above what is attached as text, so the two never interleave.
+    const attachmentsEl = this.previewContainerEl.querySelector('.grimoire-context-attachments');
     this.imagePreviewEl = this.previewContainerEl.createDiv({ cls: 'grimoire-image-preview' });
-    if (fileIndicator && fileIndicator.parentElement === this.previewContainerEl) {
-      this.previewContainerEl.insertBefore(this.imagePreviewEl, fileIndicator);
+    if (attachmentsEl && attachmentsEl.parentElement === this.previewContainerEl) {
+      this.previewContainerEl.insertBefore(this.imagePreviewEl, attachmentsEl);
     }
 
     this.setupDragAndDrop();
@@ -119,23 +119,11 @@ export class ImageContextManager {
 
     this.dropOverlay = inputWrapper.createDiv({ cls: 'grimoire-drop-overlay' });
     const dropContent = this.dropOverlay.createDiv({ cls: 'grimoire-drop-content' });
-    const svg = dropContent.createSvg('svg', {
-      attr: {
-        viewBox: '0 0 24 24',
-        width: '32',
-        height: '32',
-        fill: 'none',
-        stroke: 'currentColor',
-        'stroke-width': '2',
-      },
-    });
-    svg.createSvg('path', {
-      attr: { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' },
-    });
-    svg.createSvg('polyline', { attr: { points: '17 8 12 3 7 8' } });
-    svg.createSvg('line', {
-      attr: { x1: '12', y1: '3', x2: '12', y2: '15' },
-    });
+    // What is being dropped, not the act of dropping: a hand-built 32px upload
+    // arrow said "upload" where the target only takes images.
+    const iconEl = dropContent.createSpan({ cls: 'grimoire-drop-icon' });
+    setIcon(iconEl, 'image');
+    markDecorative(iconEl);
     dropContent.createSpan({ text: t('chat.ui.images.dropHere') });
 
     const dropZone = inputWrapper;
@@ -380,7 +368,10 @@ export class ImageContextManager {
         'aria-label': t('chat.ui.images.remove'),
       },
     });
-    removeEl.setText('\u00D7');
+    // The × was a multiplication sign hidden behind two rotated pseudo-element
+    // bars; it is the same lucide glyph every other remove in the plugin uses.
+    setIcon(removeEl, 'x');
+    markDecorative(removeEl);
 
     removeEl.addEventListener('click', (e) => {
       e.stopPropagation();

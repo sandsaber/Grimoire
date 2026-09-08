@@ -1,32 +1,32 @@
 .grimoire-subagent-list {
-  margin: var(--grimoire-space-4) 0;
+  margin: var(--grimoire-space-8) 0;
 }
 
 .grimoire-container--chat-window .grimoire-message-content > .grimoire-subagent-list {
-  margin: var(--grimoire-space-1) 0;
+  margin: var(--grimoire-space-2) 0;
 }
 
 .grimoire-text-block+.grimoire-subagent-list {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-subagent-list+.grimoire-text-block {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-tool-call+.grimoire-subagent-list {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-subagent-list+.grimoire-tool-call {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-subagent-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-2) 0;
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-4) 0;
   cursor: pointer;
   overflow: hidden;
 }
@@ -45,10 +45,10 @@
 
 .grimoire-subagent-label {
   flex: 1;
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-normal);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-subagent-status {
@@ -67,38 +67,38 @@
 }
 
 .grimoire-subagent-status.status-completed {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-subagent-status.status-error {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 .grimoire-subagent-content {
-  padding: var(--grimoire-space-2) 0;
-  padding-inline-start: var(--grimoire-space-6);
-  margin-inline-start: var(--grimoire-space-3);
-  border-inline-start: 2px solid var(--background-modifier-border);
+  padding: var(--grimoire-space-4) 0;
+  padding-inline-start: var(--grimoire-space-16);
+  margin-inline-start: var(--grimoire-space-6);
+  border-inline-start: 2px solid var(--grimoire-line);
 }
 
 .grimoire-subagent-section {
-  margin: var(--grimoire-space-1) 0 var(--grimoire-space-3);
+  margin: var(--grimoire-space-2) 0 var(--grimoire-space-6);
 }
 
 .grimoire-subagent-section-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   cursor: pointer;
   user-select: none;
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
-  color: var(--text-muted);
-  padding: var(--grimoire-space-1) 0;
+  color: var(--grimoire-ink-muted);
+  padding: var(--grimoire-space-2) 0;
 }
 
 .grimoire-subagent-section-header:hover {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-subagent-section-title {
@@ -107,15 +107,15 @@
 }
 
 .grimoire-subagent-section-body {
-  padding-inline-start: var(--grimoire-space-3);
+  padding-inline-start: var(--grimoire-space-6);
 }
 
 .grimoire-subagent-prompt-text,
 .grimoire-subagent-result-output {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
   line-height: 1.4;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -128,7 +128,7 @@
 .grimoire-subagent-tools {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-subagent-tool-item {
@@ -138,10 +138,10 @@
 .grimoire-subagent-tool-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   cursor: pointer;
   overflow: hidden;
-  padding: var(--grimoire-space-1) 0;
+  padding: var(--grimoire-space-2) 0;
 }
 
 .grimoire-subagent-tool-header:hover {
@@ -161,17 +161,17 @@
 }
 
 .grimoire-subagent-tool-name {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .grimoire-subagent-tool-summary {
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -195,32 +195,32 @@
 }
 
 .grimoire-subagent-tool-status.status-completed {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-subagent-tool-status.status-error,
 .grimoire-subagent-tool-status.status-blocked {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 .grimoire-subagent-tool-content {
-  padding: var(--grimoire-space-1) 0 var(--grimoire-space-1) var(--grimoire-space-6);
+  padding: var(--grimoire-space-2) 0 var(--grimoire-space-2) var(--grimoire-space-16);
 }
 
 .grimoire-subagent-tool-empty {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
   font-style: italic;
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-s);
-  padding: var(--grimoire-space-1) 0;
+  padding: var(--grimoire-space-2) 0;
 }
 
 .grimoire-subagent-status-text {
   font-size: var(--grimoire-text-xs);
-  font-family: var(--font-monospace);
-  color: var(--text-muted);
+  font-family: var(--grimoire-mono);
+  color: var(--grimoire-ink-muted);
   margin-inline-start: auto;
-  padding-inline-start: var(--grimoire-space-4);
+  padding-inline-start: var(--grimoire-space-8);
 }
 
 .grimoire-subagent-list.async .grimoire-subagent-icon {
@@ -228,7 +228,7 @@
 }
 
 .grimoire-subagent-list.async.pending .grimoire-subagent-status-text {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-subagent-list.async.running .grimoire-subagent-status-text {
@@ -236,17 +236,17 @@
 }
 
 .grimoire-subagent-list.async.awaiting .grimoire-subagent-status-text {
-  color: var(--color-yellow);
+  color: var(--grimoire-warn);
 }
 
 .grimoire-subagent-list.async.completed .grimoire-subagent-status-text {
-  color: var(--color-green);
+  color: var(--grimoire-ok);
 }
 
 .grimoire-subagent-list.async.error .grimoire-subagent-status-text {
-  color: var(--color-red);
+  color: var(--grimoire-error);
 }
 
 .grimoire-subagent-list.async.orphaned .grimoire-subagent-status-text {
-  color: var(--color-orange);
+  color: var(--grimoire-warn);
 }

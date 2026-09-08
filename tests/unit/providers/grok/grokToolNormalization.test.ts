@@ -237,3 +237,48 @@ describe('createGrokToolStreamAdapter', () => {
     }]);
   });
 });
+
+/*
+ * The names taken from Grok's own session histories, not guessed from the
+ * shapes its siblings use. These four are its commonest tools and none was
+ * mapped, so a transcript drew six identical `read_file` rows under a wrench
+ * where Claude names the note it read — while `write` and `grep`, which happen
+ * to match, drew properly beside them.
+ */
+describe('the names Grok actually sends', () => {
+  it('names its file, directory, edit and command tools', () => {
+    expect(normalizeGrokToolName('read_file')).toBe('Read');
+    expect(normalizeGrokToolName('list_dir')).toBe('LS');
+    expect(normalizeGrokToolName('search_replace')).toBe('Edit');
+    expect(normalizeGrokToolName('run_terminal_command')).toBe('Bash');
+  });
+
+  it('carries the path each of them names it by', () => {
+    expect(normalizeGrokToolInput('read_file', {
+      target_file: '/vault/Geography/Indian Ocean.md',
+    })).toEqual({ file_path: '/vault/Geography/Indian Ocean.md' });
+
+    expect(normalizeGrokToolInput('list_dir', {
+      target_directory: '/vault',
+    })).toEqual({ path: '/vault' });
+
+    expect(normalizeGrokToolInput('search_replace', {
+      file_path: '/vault/Welcome.md',
+      old_string: '- [[Indian Ocean]]',
+      new_string: '- [[Indian Ocean]] - warmest basin',
+    })).toEqual({
+      file_path: '/vault/Welcome.md',
+      old_string: '- [[Indian Ocean]]',
+      new_string: '- [[Indian Ocean]] - warmest basin',
+    });
+
+    // Grok's command shape is already the one a Bash row reads.
+    expect(normalizeGrokToolInput('run_terminal_command', {
+      command: 'python3 .grimoire/generate_data.py',
+      description: 'Regenerate vault-data.js',
+    })).toEqual({
+      command: 'python3 .grimoire/generate_data.py',
+      description: 'Regenerate vault-data.js',
+    });
+  });
+});

@@ -137,3 +137,18 @@ The MCP SDK range is `^1.30.0`, whose dependency contract accepts `@hono/node-se
 | `yaml` | Direct dependency (frontmatter) | Verify from release bundle | current lockfile | npm audit gate | Replaces `js-yaml` for skills/agents/command YAML |
 
 The `npm run review:deps` check (run automatically by `npm run build:release`) enforces the resolved versions for tracked review advisories. The release workflow also runs the unmodified `npm audit --omit=dev` command and requires a clean result.
+
+## Provider marks
+
+Each provider is identified by its vendor's own mark, redrawn as a single path in
+`src/shared/icons.ts` and filled with `currentColor` — Grimoire never paints a vendor's
+colour. The marks are used to name whose CLI a session runs, which is nominative use of a
+trademark; Grimoire is not affiliated with, endorsed by, or a product of any of them.
+
+| Mark | Taken from |
+|---|---|
+| Grok Build | `Grok-icon.svg` on Wikimedia Commons, glyph only, without its black square |
+| Kimi Code | Moonshot AI's [branding guide](https://moonshotai.github.io/Branding-Guide/), the icon-only "K" |
+| MiMoCode | Xiaomi's 2021 wordmark on Wikimedia Commons, glyph only, without its squircle |
+
+A vendor who would rather their mark were not carried here can ask, and it will be removed.

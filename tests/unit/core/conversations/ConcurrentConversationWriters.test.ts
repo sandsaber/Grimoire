@@ -197,4 +197,31 @@ describe('two writers on one conversation', () => {
     expect(stored.revision).toBe(3);
     expect(stored.schemaVersion).toBe(1);
   });
+
+  /*
+   * A transcript the store could not copy is still a transcript.
+   *
+   * On the partial-write path an absent field is a deletion, and the copy
+   * returned `undefined` both for a conversation with no messages and for one
+   * whose clone threw - so a message the store merely failed to serialize took
+   * the whole stored transcript with it, silently, at the next save.
+   */
+  it('leaves the stored transcript alone when the copy cannot be made', async () => {
+    const { storage, read } = createStorage();
+    await storage.createMetadata(storage.toSessionMetadata(conversation({
+      messages: [message('user', 'First'), message('assistant', 'Second')],
+    })));
+
+    const circular = message('user', 'Third') as ChatMessage & { self?: unknown };
+    circular.self = circular;
+
+    await storage.updateMetadata(
+      conversation({ messages: [circular] }),
+      ['messages'],
+    );
+
+    expect(read().messages).toHaveLength(2);
+    expect(read().messages[1].content).toBe('Second');
+  });
+
 });

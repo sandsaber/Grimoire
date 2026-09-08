@@ -196,6 +196,14 @@ export interface GrimoireSettings {
   // UI preferences
   maxTabs: number;
   tabBarPosition: TabBarPosition;
+  /**
+   * Whether every panel segment says its word, or only the active one.
+   *
+   * Off by default: the switch is dense repeating chrome that a reader learns
+   * once, so it ships as a rail of glyphs with the active segment named. On is
+   * for a reader who would rather not learn it.
+   */
+  showPanelLabels: boolean;
   enableAutoScroll: boolean;
   deferMathRenderingDuringStreaming: boolean;
   chatViewPlacement: ChatViewPlacement;

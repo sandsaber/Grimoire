@@ -8,6 +8,7 @@ import { resetOpenImageViewers } from '@/features/chat/ui/imageViewerStack';
 
 jest.mock('obsidian', () => ({
   Notice: jest.fn(),
+  setIcon: jest.fn(),
 }));
 
 // Mock document.createElementNS for SVG elements created in setupDragAndDrop
@@ -189,11 +190,11 @@ describe('ImageContextManager', () => {
       expect(previewEl).not.toBeNull();
     });
 
-    it('should insert image preview before file indicator if present', () => {
+    it('keeps images above what is attached as text', () => {
       const previewContainer = createMockEl();
-      const fileIndicator = previewContainer.createDiv({ cls: 'grimoire-file-indicator' });
+      const attachments = previewContainer.createDiv({ cls: 'grimoire-context-attachments' });
       // Patch parentElement to match check in constructor
-      Object.defineProperty(fileIndicator, 'parentElement', { get: () => previewContainer });
+      Object.defineProperty(attachments, 'parentElement', { get: () => previewContainer });
 
       const { container: c } = createContainerWithInputWrapper();
       const input = createMockTextArea();
@@ -201,9 +202,9 @@ describe('ImageContextManager', () => {
 
       new ImageContextManager(c, input, cb, previewContainer);
       const children = previewContainer.children;
-      const fileIndicatorIdx = children.indexOf(fileIndicator);
+      const attachmentsIdx = children.indexOf(attachments);
       const previewIdx = children.findIndex((el: any) => el.hasClass?.('grimoire-image-preview'));
-      expect(previewIdx).toBeLessThan(fileIndicatorIdx);
+      expect(previewIdx).toBeLessThan(attachmentsIdx);
     });
   });
 });

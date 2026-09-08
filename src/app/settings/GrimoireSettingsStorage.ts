@@ -134,6 +134,12 @@ function normalizeUsageIndicatorsEnabled(value: unknown): boolean {
     : DEFAULT_GRIMOIRE_SETTINGS.usageIndicatorsEnabled;
 }
 
+function normalizeShowPanelLabels(value: unknown): boolean {
+  return typeof value === 'boolean'
+    ? value
+    : DEFAULT_GRIMOIRE_SETTINGS.showPanelLabels;
+}
+
 function shouldPersistChatViewPlacementMigration(
   stored: Record<string, unknown>,
   normalized: ChatViewPlacement,
@@ -374,6 +380,7 @@ export class GrimoireSettingsStorage {
     );
     const maxTabs = normalizeMaxTabs(stored.maxTabs);
     const tabBarPosition = normalizeTabBarPosition(stored.tabBarPosition);
+    const showPanelLabels = normalizeShowPanelLabels(stored.showPanelLabels);
     const usageIndicatorsEnabled = normalizeUsageIndicatorsEnabled(stored.usageIndicatorsEnabled);
     const debugLoggingEnabled = normalizeDebugLoggingEnabled(stored.debugLoggingEnabled);
     const legacyProviderSettings = {
@@ -398,6 +405,7 @@ export class GrimoireSettingsStorage {
       chatViewPlacement,
       maxTabs,
       tabBarPosition,
+      showPanelLabels,
       usageIndicatorsEnabled,
       debugLoggingEnabled,
     };

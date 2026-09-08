@@ -1,0 +1,180 @@
+/*
+ * The shape every Grimoire dialog shares.
+ *
+ * Obsidian owns the modal chrome — the backdrop, the frame, the close button —
+ * and Grimoire styles only what sits inside it. What sits inside was five
+ * different dialogs before this: three button heights, four field heights, and
+ * a title that was sometimes the host's and sometimes ours. One shape now:
+ * 16px between the parts, a 30px field, a bordered Cancel and one accent fill.
+ */
+.grimoire-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--grimoire-space-16);
+}
+
+/* A row of fields and the controls that act on them. */
+.grimoire-dialog-field {
+  display: flex;
+  align-items: center;
+  gap: var(--grimoire-space-6);
+  min-width: 0;
+}
+
+input.grimoire-dialog-input {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  height: var(--grimoire-field-h);
+  min-width: 0;
+  padding: 0 var(--grimoire-space-10);
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-1);
+  background: var(--grimoire-field);
+  box-shadow: none;
+  color: var(--grimoire-ink);
+  font: inherit;
+  font-size: var(--grimoire-text-m);
+  outline: none;
+}
+
+.grimoire-dialog-input:focus,
+.grimoire-dialog-input:focus-visible {
+  border-color: var(--grimoire-accent);
+  box-shadow: var(--grimoire-focus-ring);
+  outline: none;
+}
+
+/* A control beside a field: same height as the field, so the row has one line. */
+button.grimoire-dialog-field-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: var(--grimoire-field-h);
+  height: var(--grimoire-field-h);
+  padding: 0;
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: transparent;
+  box-shadow: none;
+  color: var(--grimoire-ink-muted);
+  cursor: pointer;
+  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
+}
+
+button.grimoire-dialog-field-btn:hover:not(:disabled),
+button.grimoire-dialog-field-btn:focus-visible:not(:disabled) {
+  background: var(--grimoire-hover);
+  box-shadow: none;
+  color: var(--grimoire-ink);
+  outline: none;
+}
+
+button.grimoire-dialog-field-btn:focus-visible {
+  box-shadow: var(--grimoire-focus-ring);
+}
+
+/* The one control in a dialog that offers to think for you wears the accent. */
+button.grimoire-dialog-field-btn--accent {
+  color: var(--grimoire-accent-text);
+}
+
+button.grimoire-dialog-field-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+button.grimoire-dialog-field-btn svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
+}
+
+/* What the dialog costs, and what it does: the count on the left, actions right. */
+.grimoire-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--grimoire-space-12);
+}
+
+.grimoire-dialog-note {
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.grimoire-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--grimoire-space-6);
+  margin-left: auto;
+}
+
+.grimoire-dialog-actions button {
+  box-sizing: border-box;
+  height: var(--grimoire-field-h);
+  min-height: 0;
+  padding: 0 var(--grimoire-space-12);
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-1);
+  background: transparent;
+  box-shadow: none;
+  color: var(--grimoire-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--grimoire-text-m);
+  transition: border-color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-dialog-actions button:hover:not(:disabled) {
+  border-color: var(--grimoire-line-3);
+  background: transparent;
+  box-shadow: none;
+}
+
+/* A dialog that only reports leaves the way out unbordered: there is no choice. */
+.grimoire-dialog-actions button.grimoire-dialog-quiet {
+  border-color: transparent;
+  padding: 0 var(--grimoire-space-10);
+  color: var(--grimoire-ink-muted);
+}
+
+.grimoire-dialog-actions button.grimoire-dialog-quiet:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--grimoire-ink);
+}
+
+/* The one fill the surface is allowed. */
+.grimoire-dialog-actions button.mod-cta {
+  padding: 0 var(--grimoire-space-14);
+  border-color: transparent;
+  background: var(--grimoire-accent);
+  color: var(--grimoire-accent-contrast);
+  font-weight: var(--grimoire-weight-medium);
+}
+
+.grimoire-dialog-actions button.mod-cta:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--grimoire-accent-hover);
+}
+
+.grimoire-dialog-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.grimoire-dialog-actions button:focus-visible {
+  box-shadow: var(--grimoire-focus-ring);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.grimoire-dialog-field-btn,
+  .grimoire-dialog-actions button {
+    transition: none;
+  }
+}

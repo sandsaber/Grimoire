@@ -13,6 +13,7 @@
     "success": "성공",
     "warning": "경고",
     "confirm": "확인",
+    "done": "완료",
     "settings": "설정",
     "advanced": "고급",
     "enabled": "활성화",
@@ -254,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "최신 메시지로 이동",
-        "placeholder": "Grimoire에게 편집, 검색, 비교, 생성 또는 명령 실행을 요청하세요...",
+        "placeholder": "Grimoire에 질문…",
         "send": "보내기",
         "sendMessage": "메시지 보내기",
         "stopResponse": "응답 중지",
@@ -303,6 +304,9 @@
         "permissionSafe": "안전",
         "permissionAuto": "자동",
         "permissionPlan": "계획",
+        "permissionSafeDetail": "모든 편집과 명령을 확인합니다",
+        "permissionAutoDetail": "편집과 명령을 묻지 않고 실행합니다",
+        "permissionPlanDetail": "계획을 승인할 때까지 읽기 전용입니다",
         "effortLevels": {
           "low": "낮음",
           "medium": "보통",
@@ -327,6 +331,8 @@
         "absolutePathRequired": "경로는 절대 경로여야 합니다. 사용법: /add-dir /absolute/path",
         "duplicate": "이 폴더는 이미 외부 컨텍스트로 추가되어 있습니다.",
         "selectTitle": "외부 컨텍스트 선택",
+        "selectFileTitle": "외부 파일 선택",
+        "selectFolderTitle": "외부 폴더 선택",
         "pickerFailed": "폴더 선택기를 열 수 없습니다.",
         "conflictInside": "“{path}”을(를) 추가할 수 없습니다 — 기존 경로 “{existing}” 내부에 있습니다",
         "conflictContains": "“{path}”을(를) 추가할 수 없습니다 — 기존 경로 “{existing}”을(를) 포함합니다",
@@ -378,9 +384,53 @@
         "safeMode": "안전 모드",
         "loadedThisSession": "이 세션에서 로드됨"
       },
+      "contextManager": {
+        "title": "컨텍스트",
+        "headerCount": "{count}개 · 약 {tokens} 토큰",
+        "searchPlaceholder": "첨부된 항목을 거르거나, 입력해 보관함에서 추가",
+        "add": "추가",
+        "addContext": "컨텍스트 추가",
+        "addNamed": "{name} 추가",
+        "manage": "관리",
+        "review": "검토",
+        "selected": "{count}개 선택됨",
+        "estimatedTokens": "약 {tokens}(추정)",
+        "clearSelection": "선택 해제",
+        "selectNamed": "{name} 선택",
+        "removeNamed": "{name} 제거",
+        "removeAll": "모두 제거",
+        "removeAllConfirm": "{count}개를 제거할까요?",
+        "empty": "첨부된 것이 없습니다. 노트, 폴더, 링크를 추가하세요.",
+        "noMatches": "일치하는 항목이 없습니다.",
+        "groupVault": "보관함",
+        "groupExternal": "외부",
+        "groupFromVault": "보관함에서",
+        "fileCount": "{count}개",
+        "summaryCost": "약 {tokens} · 창의 {percent}%",
+        "overBudget": "{count}개 · 약 {tokens}이 이 모델의 창을 넘습니다",
+        "overBudgetBy": "약 {tokens} 초과",
+        "windowShare": "이 메시지 이후 창의 {percent}%",
+        "windowUnknown": "이 모델은 컨텍스트 창을 알려주지 않았습니다",
+        "exceedsBy": "이 모델의 창을 약 {tokens} 초과",
+        "notCounted": "{count}개는 계산되지 않음",
+        "unreadable": "읽을 수 없음",
+        "missing": "없음 — 이동되었거나 삭제됨",
+        "inFlight": "전송 중",
+        "attached": "첨부됨",
+        "pickerPlaceholder": "보관함 검색",
+        "pickerHint": "⏎ 추가 · ⇥ 열어 두기",
+        "quickOpenFile": "열린 파일",
+        "quickBrowseFile": "외부 파일…",
+        "quickBrowseFolder": "외부 폴더…",
+        "detailExternal": "보관함 밖",
+        "detailOpenNote": "열린 노트",
+        "folderDetail": "노트 {count}개"
+      },
       "tabs": {
         "createFailed": "탭을 만들지 못했습니다",
         "newTab": "새 탭",
+        "tabLabel": "탭 {index} · {title}",
+        "tabActions": "탭 작업",
         "history": "채팅 기록",
         "switchFailed": "탭을 전환하지 못했습니다",
         "closeFailed": "탭을 닫지 못했습니다",
@@ -414,8 +464,6 @@
         "conversationCompacted": "대화 압축됨",
         "sessionRestarted": "새 세션",
         "sessionRestartedHint": "에이전트가 이전 세션을 복원하지 못해 이 대화는 새 세션에서 계속됩니다. 위의 메시지는 해당 컨텍스트에 없습니다. 여전히 필요한 내용은 다시 알려주거나 새 탭에서 시작하세요.",
-        "completed": "완료됨",
-        "duration": "* {flavor} · {duration}",
         "copied": "복사됨!",
         "renderFailed": "메시지 콘텐츠를 렌더링하지 못했습니다.",
         "copyMessage": "메시지 복사",
@@ -528,17 +576,17 @@
         "shellCommand": "셸 명령"
       },
       "plan": {
-        "requestedPermissions": "요청된 권한:",
-        "approveCurrentSession": "승인 (현재 세션)",
-        "continueFeedbackPlaceholder": "계획을 계속할 피드백을 입력하세요...",
-        "keyboardHints": "화살표 키로 이동 · Enter로 선택 · Esc로 취소",
+        "requestedPermissions": "요청된 권한",
+        "approveCurrentSession": "이 세션에서 승인",
+        "continueFeedbackPlaceholder": "계획을 수정할 피드백…",
+        "keyboardHints": "↑↓ 이동 · ⏎ 선택 · esc 취소",
         "complete": "계획 완료",
         "reviewBeforeProceeding": "진행하기 전에 계획을 검토하세요",
         "label": "계획",
         "expand": "계획 펼치기",
         "collapse": "계획 접기",
         "implement": "구현",
-        "reviseFeedbackPlaceholder": "계획을 수정할 피드백을 입력하세요..."
+        "reviseFeedbackPlaceholder": "계획을 수정할 피드백…"
       },
       "images": {
         "dropHere": "여기에 이미지를 놓으세요",
@@ -586,6 +634,7 @@
         "runningEllipsis": "실행 중...",
         "completed": "완료됨",
         "blocked": "차단됨",
+        "unfinished": "미완료",
         "error": "오류",
         "orphaned": "연결 끊김",
         "inProgress": "진행 중",
@@ -659,10 +708,12 @@
         "queryCountOne": "쿼리 {count}개",
         "queryCountMany": "쿼리 {count}개",
         "stepCountOne": "단계 {count}개",
-        "stepCountMany": "단계 {count}개"
+        "stepCountMany": "단계 {count}개",
+        "resultSkipped": "건너뜀",
+        "resultStopped": "중단됨"
       },
       "responseMetadata": {
-        "effort": "추론 수준 {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -900,6 +951,10 @@
       "name": "최대 채팅 탭 수",
       "desc": "동시에 열 수 있는 최대 채팅 탭 수(1-10). 각 탭은 별도의 Claude 세션을 사용합니다.",
       "warning": "5개 탭을 초과하면 성능 및 메모리 사용량에 영향을 줄 수 있습니다."
+    },
+    "showPanelLabels": {
+      "name": "패널 이름 표시",
+      "desc": "대화 위 전환기에서 각 패널의 이름을 표시합니다. 현재 패널은 항상 이름이 나오고, 나머지는 켜기 전까지 아이콘으로만 표시됩니다."
     },
     "tabBarPosition": {
       "name": "탭 바 위치",
@@ -1518,6 +1573,7 @@
     "newTab": "새 탭",
     "newSession": "새 세션(현재 탭)",
     "closeCurrentTab": "현재 탭 닫기",
+    "manageContext": "컨텍스트 관리",
     "switchToTab": "탭 {index}(으)로 전환",
     "environmentRestartFailed": "환경 변경이 적용되었지만 영향을 받은 탭 {count}개를 다시 시작하지 못했습니다.",
     "environmentAppliedRebuild": "환경 변수가 적용되었습니다. 다음 메시지에서 세션을 다시 만듭니다.",
@@ -1525,6 +1581,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "기본 제공",
+        "vault": "보관함",
+        "user": "사용자",
+        "system": "시스템",
+        "runtime": "런타임"
+      },
       "noMatches": "일치하는 명령이 없습니다"
     },
     "resumeConversation": {

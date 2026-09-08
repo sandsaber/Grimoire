@@ -68,6 +68,7 @@ export const DEFAULT_GRIMOIRE_SETTINGS: GrimoireSettings = {
 
   maxTabs: 5,
   tabBarPosition: 'header',
+  showPanelLabels: false,
   enableAutoScroll: true,
   deferMathRenderingDuringStreaming: true,
   chatViewPlacement: 'right-sidebar',

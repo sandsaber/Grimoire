@@ -49,10 +49,16 @@ describe('InlinePermissionRequest', () => {
     expect(parentEl.querySelectorAll('.grimoire-permission-button')).toHaveLength(6);
     expect(parentEl.querySelector('.grimoire-permission-button--project')).toBeNull();
     expect(parentEl.querySelector('.grimoire-permission-button--user')).toBeNull();
-    expect(parentEl.querySelectorAll('.grimoire-permission-button-shortcut').map(
+    /*
+     * Numbered choices with `esc` on one of them, the way screen 2d draws it.
+     * Every rejecting row used to be drawn `esc`, so a card offering two ways
+     * to say no showed the same key twice and `Escape` could only ever reach
+     * the first — the second was unreachable from the keyboard entirely.
+     */
+    expect(parentEl.querySelectorAll('.grimoire-permission-button-key').map(
       (el: { textContent: string }) => el.textContent,
     ))
-      .toEqual(['Enter', 'Esc']);
+      .toEqual(['1', '2', '3', '4', 'esc', '5']);
     expect(parentEl.querySelectorAll('.grimoire-permission-button-label').map(
       (el: { textContent: string }) => el.textContent,
     )).toEqual([
@@ -63,10 +69,9 @@ describe('InlinePermissionRequest', () => {
       'Reject',
       'Reject again',
     ]);
-    expect(setIcon).toHaveBeenCalledWith(expect.anything(), 'check');
-    expect(setIcon).toHaveBeenCalledWith(expect.anything(), 'folder-check');
-    expect(setIcon).toHaveBeenCalledWith(expect.anything(), 'user-check');
-    expect(setIcon).toHaveBeenCalledWith(expect.anything(), 'x');
+    // No per-row glyph: an accent check on "allow" made the safe answer the
+    // loudest thing on a card about caution.
+    expect(parentEl.querySelector('.grimoire-permission-button-icon')).toBeNull();
     expect(parentEl.querySelector('.grimoire-permission-description')).toBeNull();
     expect(parentEl.querySelector('.grimoire-permission-body')).toBeNull();
   });
@@ -394,5 +399,55 @@ describe('InlinePermissionRequest', () => {
     expect(setIcon).toHaveBeenCalledWith(expect.anything(), 'shield-check');
     expect(setIcon).not.toHaveBeenCalledWith(expect.anything(), 'folder-check');
     expect(setIcon).not.toHaveBeenCalledWith(expect.anything(), 'user-check');
+  });
+
+  /*
+   * The card drew `1` and `2` and listened for `Enter` and `a`, so the keys it
+   * advertised did nothing at all: pressing 1 or 2 on a permission request was
+   * a no-op, and only `esc` — the one key both halves happened to agree on —
+   * did anything.
+   */
+  it('answers with the number it draws', () => {
+    const parentEl = createMockEl();
+    const resolve = jest.fn();
+    renderPermissionRequest(parentEl, {
+      toolName: 'Bash',
+      input: {},
+      description: 'Bash requests permission.',
+      decisionOptions: [
+        { decision: 'allow', label: 'Yes, proceed', value: 'once' },
+        { decision: 'allow-always', label: 'Yes, and stop asking', value: 'always' },
+        { decision: 'deny', label: 'No', value: 'no' },
+      ],
+      resolve,
+    });
+
+    parentEl.querySelector('.grimoire-permission-anchor')?.ownerDocument.dispatchEvent({
+      key: '2', type: 'keydown', preventDefault: jest.fn(), stopPropagation: jest.fn(),
+    });
+
+    expect(resolve).toHaveBeenCalledWith('always');
+  });
+
+  it('gives Escape the row it drew esc on', () => {
+    const parentEl = createMockEl();
+    const resolve = jest.fn();
+    renderPermissionRequest(parentEl, {
+      toolName: 'Bash',
+      input: {},
+      description: 'Bash requests permission.',
+      decisionOptions: [
+        { decision: 'allow', label: 'Yes, proceed', value: 'once' },
+        { decision: 'deny', label: 'No', value: 'no' },
+        { decision: 'deny', label: 'No, and stop asking', value: 'no-always' },
+      ],
+      resolve,
+    });
+
+    parentEl.querySelector('.grimoire-permission-anchor')?.ownerDocument.dispatchEvent({
+      key: 'Escape', type: 'keydown', preventDefault: jest.fn(), stopPropagation: jest.fn(),
+    });
+
+    expect(resolve).toHaveBeenCalledWith('no');
   });
 });

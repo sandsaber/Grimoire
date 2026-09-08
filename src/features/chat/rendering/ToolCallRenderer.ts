@@ -911,7 +911,10 @@ function resetStatusElement(statusEl: HTMLElement, statusClass: string, ariaLabe
 const STATUS_ICONS: Record<string, string> = {
   completed: 'check',
   error: 'x',
+  // A crossed shield is the permission vocabulary: it says somebody refused.
   blocked: 'shield-off',
+  // A ring that was never closed, for the tool the turn ended underneath.
+  unfinished: 'circle-dashed',
 };
 
 function setTodoWriteStatus(statusEl: HTMLElement, input: Record<string, unknown>): void {
@@ -931,7 +934,9 @@ function setToolStatus(statusEl: HTMLElement, status: ToolCallInfo['status']): v
       ? t('chat.ui.status.completed')
       : status === 'blocked'
         ? t('chat.ui.status.blocked')
-        : t('chat.ui.status.error');
+        : status === 'unfinished'
+          ? t('chat.ui.status.unfinished')
+          : t('chat.ui.status.error');
   resetStatusElement(statusEl, `status-${status}`, t('chat.ui.status.aria', { status: statusText }));
   if (status === 'running') {
     statusEl.createSpan({ cls: 'grimoire-tool-spinner' });
@@ -1006,7 +1011,8 @@ interface ToolElementStructure {
 
 function getResultLabel(toolCall: ToolCallInfo): string {
   if (toolCall.status === 'running') return '';
-  if (toolCall.status === 'blocked') return 'skipped';
+  if (toolCall.status === 'blocked') return t('chat.ui.tools.resultSkipped');
+  if (toolCall.status === 'unfinished') return t('chat.ui.tools.resultStopped');
 
   const result = toolCall.result?.trim() ?? '';
   if (!result) return '';
@@ -1039,6 +1045,7 @@ function syncToolStateClasses(toolEl: HTMLElement, status: ToolCallInfo['status'
   toolEl.toggleClass('is-completed', status === 'completed');
   toolEl.toggleClass('is-error', status === 'error');
   toolEl.toggleClass('is-blocked', status === 'blocked');
+  toolEl.toggleClass('is-unfinished', status === 'unfinished');
 }
 
 function syncToolHeaderText(
@@ -1263,6 +1270,7 @@ function getGroupStatus(toolCalls: ToolCallInfo[]): ToolCallInfo['status'] {
   if (toolCalls.some(toolCall => toolCall.status === 'running')) return 'running';
   if (toolCalls.some(toolCall => toolCall.status === 'error')) return 'error';
   if (toolCalls.some(toolCall => toolCall.status === 'blocked')) return 'blocked';
+  if (toolCalls.some(toolCall => toolCall.status === 'unfinished')) return 'unfinished';
   return 'completed';
 }
 
@@ -1314,6 +1322,7 @@ function syncToolGroupStateClasses(groupEl: HTMLElement, status: ToolCallInfo['s
   groupEl.toggleClass('is-completed', status === 'completed');
   groupEl.toggleClass('is-error', status === 'error');
   groupEl.toggleClass('is-blocked', status === 'blocked');
+  groupEl.toggleClass('is-unfinished', status === 'unfinished');
 }
 
 function renderToolGroup(

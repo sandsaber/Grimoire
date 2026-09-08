@@ -2,19 +2,19 @@ export function updateContextRowHasContent(contextRowEl: HTMLElement): void {
   const editorIndicator = contextRowEl.querySelector('.grimoire-selection-indicator');
   const browserIndicator = contextRowEl.querySelector('.grimoire-browser-selection-indicator');
   const canvasIndicator = contextRowEl.querySelector('.grimoire-canvas-indicator');
-  const fileIndicator = contextRowEl.querySelector('.grimoire-file-indicator');
-  const externalFileIndicator = contextRowEl.querySelector('.grimoire-external-file-indicator');
+  const attachments = contextRowEl.querySelector('.grimoire-context-attachments');
   const imagePreview = contextRowEl.querySelector('.grimoire-image-preview');
 
   const hasEditorSelection = !!editorIndicator && !editorIndicator.hasClass('grimoire-hidden');
   const hasBrowserSelection = !!browserIndicator && !browserIndicator.hasClass('grimoire-hidden');
   const hasCanvasSelection = !!canvasIndicator && !canvasIndicator.hasClass('grimoire-hidden');
-  const hasFileChips = !!fileIndicator && fileIndicator.hasClass('grimoire-visible-flex');
-  const hasExternalFileChips = !!externalFileIndicator && externalFileIndicator.hasClass('grimoire-visible-flex');
+  // One list now, across vault files, the open note and external paths: two
+  // chip rows that each counted only their own half is what this replaced.
+  const hasAttachments = !!attachments && !attachments.hasClass('grimoire-hidden');
   const hasImageChips = !!imagePreview && imagePreview.hasClass('grimoire-visible-flex');
 
   contextRowEl.classList.toggle(
     'has-content',
-    hasEditorSelection || hasBrowserSelection || hasCanvasSelection || hasFileChips || hasExternalFileChips || hasImageChips
+    hasEditorSelection || hasBrowserSelection || hasCanvasSelection || hasAttachments || hasImageChips
   );
 }

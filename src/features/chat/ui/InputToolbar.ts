@@ -2,7 +2,7 @@ import { Notice, setIcon, setTooltip } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
 
-import { asActivatable } from '@/shared/components/activatable';
+import { asActivatable, markDecorative } from '@/shared/components/activatable';
 
 import type { ProjectWorkspace } from '../../../core/context/types';
 import type {
@@ -24,6 +24,7 @@ import type {
   UsageInfo,
 } from '../../../core/types';
 import { t } from '../../../i18n/i18n';
+import type { TranslationKey } from '../../../i18n/types';
 import { appendCheckIcon, appendMcpIcon, createProviderIconSvg } from '../../../shared/icons';
 import { filterValidPaths, findConflictingPath, isDuplicatePath, isValidContextPath, validateContextPath } from '../../../utils/externalContext';
 import { expandHomePath, normalizePathForFilesystem } from '../../../utils/path';
@@ -40,6 +41,21 @@ interface ElectronRemoteApi {
     showOpenDialog(options: { properties: string[]; title: string }): Promise<ElectronOpenDialogResult>;
   };
 }
+
+/** What the native dialog is asked to return. */
+export type ExternalContextTarget = 'any' | 'file' | 'folder';
+
+const EXTERNAL_CONTEXT_DIALOG_PROPERTIES: Record<ExternalContextTarget, string[]> = {
+  any: ['openFile', 'openDirectory'],
+  file: ['openFile'],
+  folder: ['openDirectory'],
+};
+
+const EXTERNAL_CONTEXT_DIALOG_TITLES: Record<ExternalContextTarget, TranslationKey> = {
+  any: 'chat.ui.externalContext.selectTitle',
+  file: 'chat.ui.externalContext.selectFileTitle',
+  folder: 'chat.ui.externalContext.selectFolderTitle',
+};
 
 function runToolbarAction(action: () => Promise<void>, failureMessage: string): void {
   void action().catch(() => {
@@ -440,7 +456,7 @@ export class ModelSelector {
     const buttonLabel = modelInfo?.buttonLabel?.trim() || modelInfo?.label;
     labelEl.setText(buttonLabel ? formatModelButtonLabel(buttonLabel) : fullLabel);
     const chevronEl = this.buttonEl.createSpan({ cls: 'grimoire-model-chevron' });
-    setIcon(chevronEl, 'chevron-up');
+    setIcon(chevronEl, 'chevron-down');
     this.buttonEl.removeAttribute('title');
     this.buttonEl.setAttribute('aria-label', `${t('chat.ui.model.selectTooltip')}: ${fullLabel}`);
     setTooltip(this.buttonEl, fullLabel, { placement: 'top' });
@@ -538,7 +554,9 @@ export class ModelSelector {
       }
       headerEl.createSpan({ cls: 'grimoire-model-group-label', text: group.name });
       headerEl.createSpan({ cls: 'grimoire-model-group-count', text: String(group.models.length) });
-      headerEl.createSpan({ cls: 'grimoire-model-group-chevron' });
+      const groupChevronEl = headerEl.createSpan({ cls: 'grimoire-model-group-chevron' });
+      setIcon(groupChevronEl, isOpen ? 'chevron-down' : 'chevron-right');
+      markDecorative(groupChevronEl);
 
       const groupBodyEl = groupEl.createDiv({ cls: 'grimoire-model-group-options' });
       if (providerId) {
@@ -550,6 +568,8 @@ export class ModelSelector {
         groupEl.toggleClass('is-open', open);
         this.modelGroupOpenState.set(groupKey, open);
         headerEl.setAttribute('aria-expanded', String(open));
+        setIcon(groupChevronEl, open ? 'chevron-down' : 'chevron-right');
+        markDecorative(groupChevronEl);
       });
 
       for (const model of group.models) {
@@ -1035,33 +1055,94 @@ export class ThinkingBudgetSelector {
     if (!this.effortGearsEl) return;
     this.effortGearsEl.empty();
 
-    const currentEffort = this.callbacks.getSettings().effortLevel;
     const reasoning = this.callbacks.getChatUI().reasoning;
     const settings = this.callbacks.getSettings();
     const model = settings.model;
     const options = reasoning?.options(model, settings) ?? [];
+    /*
+     * The level this model can actually be set to.
+     *
+     * A stored effort the current model does not offer - a blank tab's draft
+     * pinned before the model changed, a value from a model with different
+     * tiers - left `findIndex` at -1, so the meter drew no filled dot at all
+     * while the label quietly fell back to the first option. The control then
+     * said two different things: a name, and a level of none. The provider
+     * declares what it falls back to, which is what `defaultValue` is for.
+     */
+    const stored = settings.effortLevel;
+    const currentEffort = options.some(option => option.value === stored)
+      ? stored
+      : reasoning?.defaultValue(model, settings) ?? stored;
     const currentInfo = options.find(e => e.value === currentEffort);
 
     const currentEl = this.effortGearsEl.createDiv({ cls: 'grimoire-thinking-current' });
     const currentLabel = currentInfo?.label || options[0]?.label || t('chat.ui.toolbar.high');
-    currentEl.setText(localizeReasoningLevel(currentEffort, currentLabel));
+    /*
+     * How much thinking, as a gauge and four dots rather than as a word. The
+     * level is one of a small ordered set, and a filled-to-here meter says
+     * "third of four" at a glance where "high" needs the other three names to
+     * mean anything. The word is the control's accessible name and its
+     * tooltip, and it is what the dropdown lists.
+     */
+    const gaugeEl = currentEl.createSpan({ cls: 'grimoire-thinking-gauge' });
+    setIcon(gaugeEl, 'gauge');
+    markDecorative(gaugeEl);
+    const meterEl = currentEl.createSpan({ cls: 'grimoire-thinking-meter' });
+    markDecorative(meterEl);
+    const filled = options.length > 0
+      ? options.findIndex(option => option.value === currentEffort) + 1
+      : 0;
+    for (let step = 1; step <= Math.max(options.length, 1); step += 1) {
+      const dot = meterEl.createSpan({ cls: 'grimoire-thinking-meter-dot' });
+      if (step <= filled) dot.addClass('is-filled');
+    }
+    /*
+     * The control's name has to carry the level, because the meter is the only
+     * thing on screen that says it and a meter announces as nothing.
+     */
     this.bindThinkingCurrent(
       this.effortGearsEl,
       currentEl,
-      t('chat.ui.toolbar.effort').replace(/[：:]\s*$/, ''),
+      `${t('chat.ui.toolbar.effort').replace(/[：:]\s*$/, '')} · ${localizeReasoningLevel(currentEffort, currentLabel)}`,
     );
 
     const optionsEl = this.effortGearsEl.createDiv({ cls: 'grimoire-thinking-options' });
     optionsEl.setAttribute('role', 'listbox');
+    optionsEl.createDiv({
+      cls: 'grimoire-group-label',
+      text: t('chat.ui.toolbar.effort').replace(/[\uff1a:]\s*$/, ''),
+    });
 
-    for (const effort of [...options].reverse()) {
+    /*
+     * The open menu carries the meter on every row, not only on the button:
+     * the level is one of an ordered set, and four dots filled to here say
+     * "third of four" where the word "high" needs the other three names to
+     * mean anything. Listed low to high, the way the header reads down.
+     */
+    options.forEach((effort, index) => {
       const gearEl = optionsEl.createDiv({ cls: 'grimoire-thinking-gear' });
-      gearEl.setText(localizeReasoningLevel(effort.value, effort.label));
+      const nameEl = gearEl.createSpan({ cls: 'grimoire-thinking-gear-name' });
+      const isSelected = effort.value === currentEffort;
+      if (isSelected) {
+        const checkEl = nameEl.createSpan({ cls: 'grimoire-menu-check' });
+        setIcon(checkEl, 'check');
+        markDecorative(checkEl);
+      }
+      nameEl.createSpan({
+        cls: 'grimoire-thinking-gear-label',
+        text: localizeReasoningLevel(effort.value, effort.label),
+      });
+      const rowMeterEl = gearEl.createSpan({ cls: 'grimoire-thinking-meter' });
+      markDecorative(rowMeterEl);
+      for (let step = 1; step <= options.length; step += 1) {
+        const dot = rowMeterEl.createSpan({ cls: 'grimoire-thinking-meter-dot' });
+        if (step <= index + 1) dot.addClass('is-filled');
+      }
       gearEl.setAttribute('role', 'option');
       gearEl.setAttribute('tabindex', '0');
-      gearEl.setAttribute('aria-selected', String(effort.value === currentEffort));
+      gearEl.setAttribute('aria-selected', String(isSelected));
 
-      if (effort.value === currentEffort) {
+      if (isSelected) {
         gearEl.addClass('selected');
       }
 
@@ -1084,7 +1165,7 @@ export class ThinkingBudgetSelector {
         event.stopPropagation();
         selectEffort();
       });
-    }
+    });
   }
 
   private renderBudgetGears() {
@@ -1109,10 +1190,23 @@ export class ThinkingBudgetSelector {
 
     const optionsEl = this.budgetGearsEl.createDiv({ cls: 'grimoire-thinking-options' });
     optionsEl.setAttribute('role', 'listbox');
+    optionsEl.createDiv({
+      cls: 'grimoire-group-label',
+      text: t('chat.ui.toolbar.thinking').replace(/[\uff1a:]\s*$/, ''),
+    });
 
-    for (const budget of [...options].reverse()) {
+    for (const budget of options) {
       const gearEl = optionsEl.createDiv({ cls: 'grimoire-thinking-gear' });
-      gearEl.setText(localizeReasoningLevel(budget.value, budget.label));
+      const nameEl = gearEl.createSpan({ cls: 'grimoire-thinking-gear-name' });
+      if (budget.value === currentBudget) {
+        const checkEl = nameEl.createSpan({ cls: 'grimoire-menu-check' });
+        setIcon(checkEl, 'check');
+        markDecorative(checkEl);
+      }
+      nameEl.createSpan({
+        cls: 'grimoire-thinking-gear-label',
+        text: localizeReasoningLevel(budget.value, budget.label),
+      });
       gearEl.setAttribute('role', 'option');
       gearEl.setAttribute('tabindex', '0');
       gearEl.setAttribute('aria-selected', String(budget.value === currentBudget));
@@ -1331,31 +1425,81 @@ export class PermissionToggle {
     const planValue = toggleConfig.planValue;
     const canShowPlan = Boolean(planValue) && capabilities.supportsPlanMode;
     const options = [
-      { label: t('chat.ui.toolbar.permissionSafe'), value: toggleConfig.inactiveValue },
-      { label: t('chat.ui.toolbar.permissionAuto'), value: toggleConfig.activeValue },
+      {
+        detail: t('chat.ui.toolbar.permissionSafeDetail'),
+        label: t('chat.ui.toolbar.permissionSafe'),
+        value: toggleConfig.inactiveValue,
+      },
+      {
+        detail: t('chat.ui.toolbar.permissionAutoDetail'),
+        label: t('chat.ui.toolbar.permissionAuto'),
+        value: toggleConfig.activeValue,
+      },
       ...(canShowPlan && planValue
-        ? [{ label: t('chat.ui.toolbar.permissionPlan'), value: planValue }]
+        ? [{
+          detail: t('chat.ui.toolbar.permissionPlanDetail'),
+          label: t('chat.ui.toolbar.permissionPlan'),
+          value: planValue,
+        }]
         : []),
     ];
     const currentOption = options.find(option => option.value === mode) ?? options[0];
 
-    this.labelEl.setText(currentOption.label);
-    this.labelEl.toggleClass('active', mode === toggleConfig.activeValue);
-    this.labelEl.toggleClass('plan-active', Boolean(planValue) && mode === planValue);
+    /*
+     * Permissions as a glyph, in the composer's repeating chrome. The mode was
+     * a word - "Safe", "Auto", "Plan" - set in the toolbar at the same weight
+     * as the model's name, which gave three words equal billing with the one
+     * choice the reader actually makes often.
+     *
+     * Each mode gets its own glyph rather than a hue: there are no fixed
+     * colours in this system, and the accent is one colour, so painting Auto
+     * and Plan with it left them identical - a raised shield on a wash, twice.
+     * The guard is up, the guard is down, or the work is a route staked out
+     * before anything is touched, which is the glyph the design draws for it.
+     */
+    const isPlan = Boolean(planValue) && mode === planValue;
+    const isAuto = mode === toggleConfig.activeValue;
+    this.labelEl.empty();
+    setIcon(this.labelEl, isPlan ? 'route' : isAuto ? 'shield-off' : 'shield');
+    this.labelEl.toggleClass('active', isAuto);
+    this.labelEl.toggleClass('plan-active', isPlan);
     this.labelEl.setAttribute('aria-expanded', String(this.gearsEl.hasClass('open')));
+    this.labelEl.setAttribute(
+      'aria-label',
+      `${t('chat.ui.toolbar.modeTooltip')} · ${currentOption.label}`,
+    );
     this.labelEl.removeAttribute('title');
-    setTooltip(this.labelEl, t('chat.ui.toolbar.modeTooltip'), { placement: 'top' });
+    setTooltip(
+      this.labelEl,
+      `${t('chat.ui.toolbar.modeTooltip')} · ${currentOption.label}`,
+      { placement: 'top' },
+    );
 
     this.optionsEl.empty();
-    for (const option of [...options].reverse()) {
-      const optionEl = this.optionsEl.createDiv({
-        cls: 'grimoire-permission-option',
-        text: option.label,
-      });
+    this.optionsEl.createDiv({
+      cls: 'grimoire-group-label',
+      text: t('chat.ui.toolbar.modeTooltip'),
+    });
+    /*
+     * Three modes listed as three bare words left the reader to find out which
+     * one stops asking. Each says what it costs, in the order they relax: ask,
+     * then run, then read-only until a plan is approved.
+     */
+    for (const option of options) {
+      const isSelected = option.value === mode;
+      const optionEl = this.optionsEl.createDiv({ cls: 'grimoire-permission-option' });
+      const checkEl = optionEl.createSpan({ cls: 'grimoire-menu-check' });
+      markDecorative(checkEl);
+      if (isSelected) {
+        setIcon(checkEl, 'check');
+      }
+      optionEl.createSpan({ cls: 'grimoire-permission-option-title', text: option.label });
+      optionEl.createSpan({ cls: 'grimoire-permission-option-detail', text: option.detail });
       optionEl.setAttribute('role', 'option');
       optionEl.setAttribute('tabindex', '0');
-      optionEl.setAttribute('aria-selected', String(option.value === mode));
-      optionEl.toggleClass('selected', option.value === mode);
+      optionEl.setAttribute('aria-selected', String(isSelected));
+      optionEl.setAttribute('aria-label', `${option.label} · ${option.detail}`);
+      optionEl.toggleClass('selected', isSelected);
       const selectOption = (): void => {
         runToolbarAction(async () => {
           this.closeMenu();
@@ -1746,7 +1890,17 @@ export class ExternalContextSelector {
     });
   }
 
-  private async openFolderPicker() {
+  /**
+   * The native dialog, which is how a path from outside the vault gets in.
+   *
+   * `target` is not a nicety: Windows and Linux cannot show one dialog that
+   * picks either, and Electron resolves `['openFile', 'openDirectory']` there
+   * by showing the directory picker - so asking for both is asking Windows
+   * readers to give up on external files. Public because the context picker
+   * offers the same two sources; before it, the only way to fill the EXTERNAL
+   * group the manage dialog draws was a toolbar control you had to know about.
+   */
+  async openFolderPicker(target: ExternalContextTarget = 'any'): Promise<void> {
     try {
       // Access Electron's dialog through remote
       // eslint-disable-next-line @typescript-eslint/no-require-imports -- Electron remote is exposed only at runtime in Obsidian's renderer.
@@ -1755,8 +1909,8 @@ export class ExternalContextSelector {
         throw new Error('Electron remote API is unavailable');
       }
       const result = await remote.dialog.showOpenDialog({
-        properties: ['openFile', 'openDirectory'],
-        title: t('chat.ui.externalContext.selectTitle'),
+        properties: EXTERNAL_CONTEXT_DIALOG_PROPERTIES[target],
+        title: t(EXTERNAL_CONTEXT_DIALOG_TITLES[target]),
       });
 
       if (!result.canceled && result.filePaths.length > 0) {
@@ -2180,6 +2334,7 @@ export class ContextUsageMeter {
       return;
     }
     this.container.removeClass('grimoire-hidden');
+    this.container.removeClass('is-empty');
     this.container.setCssProps({
       '--grimoire-context-meter-pct': `${Math.min(100, Math.max(0, usage.percentage))}`,
     });
@@ -2195,6 +2350,10 @@ export class ContextUsageMeter {
       this.container.removeClass('warning');
     }
 
+    this.container.setAttribute(
+      'aria-label',
+      t('chat.ui.contextUsage.ariaUsed', { percent: usage.percentage }),
+    );
     setTooltip(this.container, t('chat.ui.contextUsage.tokens', {
       used: this.formatTokens(usage.contextTokens),
       total: this.formatTokens(usage.contextWindow),
@@ -2204,6 +2363,8 @@ export class ContextUsageMeter {
   private renderEmptyState(contextWindow?: number): void {
     this.container.removeClass('grimoire-hidden');
     this.container.removeClass('warning');
+    // Nothing spent yet reads as an outline rather than as a full track.
+    this.container.addClass('is-empty');
     this.container.setCssProps({ '--grimoire-context-meter-pct': '0' });
     this.percentEl?.setText('0%');
     const windowLabel = contextWindow ? this.formatTokens(contextWindow) : t('chat.ui.contextUsage.context');
@@ -2337,10 +2498,15 @@ export function createInputToolbar(
   });
   const modelContextStackEl = actionsRowEl.createDiv({ cls: 'grimoire-model-context-stack' });
   const modelSelector = new ModelSelector(modelContextStackEl, callbacks);
+  /*
+   * Effort sits with the model, not with the actions: it says how hard the thing
+   * on its left will think, and the right of the row is for what the message
+   * carries — files, servers, permission, workers — ending at Send.
+   */
+  const thinkingBudgetSelector = new ThinkingBudgetSelector(modelContextStackEl, callbacks);
   const planUsageBadge = new PlanUsageBadge(modelContextStackEl, callbacks);
   const relevantNotesContainerEl = modelContextStackEl.createDiv({ cls: 'grimoire-relevant-notes-slot' });
   const configActionsEl = actionsRowEl.createDiv({ cls: 'grimoire-input-toolbar-config-actions' });
-  const thinkingBudgetSelector = new ThinkingBudgetSelector(configActionsEl, callbacks);
   const serviceTierToggle = new ServiceTierToggle(configActionsEl, callbacks);
   const contextUsageMeter = new ContextUsageMeter(configActionsEl);
   const externalContextSelector = new ExternalContextSelector(configActionsEl, callbacks);

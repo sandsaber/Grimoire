@@ -19,23 +19,24 @@ describe('container.css source controls', () => {
   it('keeps the composer bottom gutter visually compact', () => {
     const composerRule = getRuleIncludingSelector(readContainerCss(), '.grimoire-composer-surface');
 
-    expect(composerRule).toContain('padding: var(--grimoire-space-3) var(--grimoire-window-padding-x) var(--grimoire-space-1)');
+    expect(composerRule).toContain('padding: var(--grimoire-space-8) var(--grimoire-window-padding-x) var(--grimoire-space-12)');
   });
 
-  it('keeps source filter buttons visually flat except the active state', () => {
+  it('underlines the chosen source filter rather than filling it', () => {
     const css = readContainerCss();
 
+    // Three words, not three buttons the width of the panel: the accent marks
+    // the chosen one the way it marks a tab.
     const baseRule = getRuleIncludingSelector(css, '.grimoire-source-filters button.grimoire-source-filter');
     expect(baseRule).toContain('appearance: none');
-    expect(baseRule).toContain('border: 0');
+    expect(baseRule).toContain('border-bottom: 1.5px solid transparent');
+    expect(baseRule).toContain('background: none');
     expect(baseRule).toContain('box-shadow: none');
 
-    const hoverRule = getRuleIncludingSelector(css, '.grimoire-source-filters button.grimoire-source-filter:hover');
-    expect(hoverRule).toContain('box-shadow: none');
-
     const activeRule = getRuleIncludingSelector(css, '.grimoire-source-filters button.grimoire-source-filter.is-active');
-    expect(activeRule).toContain('background: var(--grimoire-accent-soft)');
-    expect(activeRule).toContain('box-shadow: inset 0 0 0 1px var(--grimoire-accent-line)');
+    expect(activeRule).toContain('border-bottom-color: var(--grimoire-accent)');
+    expect(activeRule).toContain('background: none');
+    expect(activeRule).toContain('box-shadow: none');
   });
 
   it('keeps source rows from inheriting native button chrome', () => {

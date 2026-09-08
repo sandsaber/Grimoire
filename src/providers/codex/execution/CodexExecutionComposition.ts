@@ -362,7 +362,10 @@ export class CodexExecution {
         if (reason === 'provider-failure') {
           return content.lastFailure();
         }
-        return reason === 'pre-dispatch-rejected'
+        // Both rejections read the same store: one refused by the resolver
+        // before anything was sent, one refused by the daemon before the turn
+        // was. Neither ran, and neither is explained by the kernel's wording.
+        return reason === 'pre-dispatch-rejected' || reason === 'side-effect-free-rejection'
           ? this.requests.refusalFor(lastRequestRef)
           : undefined;
       },

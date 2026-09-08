@@ -99,6 +99,7 @@ describe('ThinkingBlockRenderer', () => {
       const parentEl = createMockEl();
 
       const state = createThinkingBlock(parentEl, mockRenderContent);
+      state.content = 'Reasoning the reader can open.';
       const header = (state.wrapperEl as any)._children[0];
 
       // Expand first
@@ -109,6 +110,25 @@ describe('ThinkingBlockRenderer', () => {
       // Finalize
       finalizeThinkingBlock(state);
       expect(header.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    /*
+     * Claude redacts reasoning routinely, and the row's duration is then the
+     * whole of what it says. A chevron promising a body it does not have is
+     * worse than no promise, so the row becomes a caption — and stops claiming
+     * to be a button, which is the half a keyboard would otherwise land on.
+     */
+    it('turns a redacted block into a caption rather than a control', () => {
+      const parentEl = createMockEl();
+
+      const state = createThinkingBlock(parentEl, mockRenderContent);
+      const header = (state.wrapperEl as any)._children[0];
+
+      finalizeThinkingBlock(state);
+
+      expect((state.wrapperEl as any).hasClass('is-caption')).toBe(true);
+      expect(header.getAttribute('role')).toBeNull();
+      expect(header.getAttribute('tabindex')).toBeNull();
     });
   });
 

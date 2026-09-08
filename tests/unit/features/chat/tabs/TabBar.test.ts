@@ -46,13 +46,14 @@ describe('TabBar', () => {
       const callbacks = createMockCallbacks();
       const tabBar = new TabBar(containerEl, callbacks);
 
-      // First update
+      // The strip ends with the control that extends it, so a strip of N tabs
+      // is N + 1 children.
       tabBar.update([createTabBarItem()]);
-      expect(containerEl._children.length).toBe(1);
+      expect(containerEl._children.length).toBe(2);
 
       // Second update should clear first
       tabBar.update([createTabBarItem(), createTabBarItem({ id: 'tab-2', index: 2 })]);
-      expect(containerEl._children.length).toBe(2);
+      expect(containerEl._children.length).toBe(3);
     });
 
     it('should render badge for each tab item', () => {
@@ -66,17 +67,18 @@ describe('TabBar', () => {
         createTabBarItem({ id: 'tab-3', index: 3 }),
       ]);
 
-      expect(containerEl._children.length).toBe(3);
+      expect(containerEl._children.length).toBe(4);
     });
 
-    it('should render empty when no items', () => {
+    it('should render only the add control when no items', () => {
       const containerEl = createMockEl();
       const callbacks = createMockCallbacks();
       const tabBar = new TabBar(containerEl, callbacks);
 
       tabBar.update([]);
 
-      expect(containerEl._children.length).toBe(0);
+      expect(containerEl._children.length).toBe(1);
+      expect(containerEl._children[0]._classList.has('grimoire-new-tab-btn')).toBe(true);
     });
   });
 
@@ -91,26 +93,45 @@ describe('TabBar', () => {
       expect(containerEl._children[0].querySelector('.grimoire-tab-number')?.textContent).toBe('5');
     });
 
-    it('should set aria-label tooltip from item title', () => {
+    it('names a tab by the number it shows and the title it does not', () => {
       const containerEl = createMockEl();
       const callbacks = createMockCallbacks();
       const tabBar = new TabBar(containerEl, callbacks);
 
-      tabBar.update([createTabBarItem({ title: 'My Conversation' })]);
+      tabBar.update([createTabBarItem({ index: 2, title: 'My Conversation' })]);
 
-      expect(containerEl._children[0].getAttribute('aria-label')).toBe('My Conversation');
+      // The tab shows its number, so the number is half of what names it.
+      expect(containerEl._children[0].getAttribute('aria-label')).toBe('Tab 2 · My Conversation');
       // title attribute is intentionally omitted to prevent double tooltip
       expect(containerEl._children[0].getAttribute('title')).toBeNull();
     });
 
-    it('should set a provider attribute for per-tab streaming colors', () => {
+    it('says nothing about which provider a tab runs', () => {
       const containerEl = createMockEl();
       const callbacks = createMockCallbacks();
       const tabBar = new TabBar(containerEl, callbacks);
 
       tabBar.update([createTabBarItem({ providerId: 'opencode' })]);
 
-      expect(containerEl._children[0].getAttribute('data-provider')).toBe('opencode');
+      // The dot said a tab was working; a vendor colour said who was doing the
+      // work, in nine hues that no longer exist.
+      expect(containerEl._children[0].getAttribute('data-provider')).toBeNull();
+    });
+
+    it('offers the add control at the end of the strip', () => {
+      const containerEl = createMockEl();
+      const callbacks = createMockCallbacks();
+      const tabBar = new TabBar(containerEl, callbacks);
+
+      tabBar.update([createTabBarItem(), createTabBarItem({ id: 'tab-2', index: 2 })]);
+
+      const addControl = containerEl._children[2];
+      expect(addControl._classList.has('grimoire-new-tab-btn')).toBe(true);
+      expect(addControl.getAttribute('aria-label')).toBe('New tab');
+      expect(tabBar.getNewTabButton()).toBe(addControl);
+
+      addControl.click();
+      expect(callbacks.onNewTab).toHaveBeenCalledTimes(1);
     });
 
     // The orchestrator and worker badges were asserted here. Both are gone: a
@@ -264,11 +285,12 @@ describe('TabBar', () => {
       const tabBar = new TabBar(containerEl, callbacks);
 
       tabBar.update([createTabBarItem(), createTabBarItem({ id: 'tab-2', index: 2 })]);
-      expect(containerEl._children.length).toBe(2);
+      expect(containerEl._children.length).toBe(3);
 
       tabBar.destroy();
 
       expect(containerEl._children.length).toBe(0);
+      expect(tabBar.getNewTabButton()).toBeNull();
     });
 
     it('should remove tab badges class from container', () => {

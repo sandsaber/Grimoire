@@ -2,15 +2,15 @@
 
 .grimoire-slash-item-hint {
   font-size: var(--grimoire-text-s);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-style: italic;
 }
 
 .grimoire-slash-item-badge {
   font-size: var(--grimoire-text-2xs);
-  padding: var(--grimoire-space-1) var(--grimoire-space-3);
-  background: var(--background-modifier-border);
+  padding: var(--grimoire-space-2) var(--grimoire-space-6);
+  background: var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   text-transform: uppercase;
 }

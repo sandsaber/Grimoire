@@ -13,6 +13,7 @@
     "success": "Éxito",
     "warning": "Advertencia",
     "confirm": "Confirmar",
+    "done": "Listo",
     "settings": "Configuración",
     "advanced": "Avanzado",
     "enabled": "Habilitado",
@@ -254,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "Ir al mensaje más reciente",
-        "placeholder": "Pídele a Grimoire que edite, busque, compare, genere o ejecute un comando...",
+        "placeholder": "Pregunta a Grimoire…",
         "send": "Enviar",
         "sendMessage": "Enviar mensaje",
         "stopResponse": "Detener respuesta",
@@ -303,6 +304,9 @@
         "permissionSafe": "Seguro",
         "permissionAuto": "Automático",
         "permissionPlan": "Plan",
+        "permissionSafeDetail": "Confirmar cada edición y cada comando",
+        "permissionAutoDetail": "Las ediciones y los comandos se ejecutan sin preguntar",
+        "permissionPlanDetail": "Solo lectura hasta que apruebes un plan",
         "effortLevels": {
           "low": "Bajo",
           "medium": "Medio",
@@ -327,6 +331,8 @@
         "absolutePathRequired": "La ruta debe ser absoluta. Uso: /add-dir /absolute/path",
         "duplicate": "Esta carpeta ya se añadió como contexto externo.",
         "selectTitle": "Seleccionar contexto externo",
+        "selectFileTitle": "Seleccionar un archivo externo",
+        "selectFolderTitle": "Seleccionar una carpeta externa",
         "pickerFailed": "No se pudo abrir el selector de carpetas.",
         "conflictInside": "No se puede añadir “{path}” — está dentro de la ruta existente “{existing}”",
         "conflictContains": "No se puede añadir “{path}” — contiene la ruta existente “{existing}”",
@@ -378,9 +384,53 @@
         "safeMode": "Modo seguro",
         "loadedThisSession": "Cargado en esta sesión"
       },
+      "contextManager": {
+        "title": "Contexto",
+        "headerCount": "{count} archivos · ~{tokens} tokens",
+        "searchPlaceholder": "Filtra lo adjunto, o escribe para añadir desde la bóveda",
+        "add": "Añadir",
+        "addContext": "Añadir contexto",
+        "addNamed": "Añadir {name}",
+        "manage": "Gestionar",
+        "review": "Revisar",
+        "selected": "{count} seleccionados",
+        "estimatedTokens": "~{tokens} aprox.",
+        "clearSelection": "Quitar selección",
+        "selectNamed": "Seleccionar {name}",
+        "removeNamed": "Quitar {name}",
+        "removeAll": "Quitar todo",
+        "removeAllConfirm": "¿Quitar {count} archivos?",
+        "empty": "No hay nada adjunto. Añade una nota, una carpeta o un enlace.",
+        "noMatches": "Sin coincidencias.",
+        "groupVault": "Bóveda",
+        "groupExternal": "Externo",
+        "groupFromVault": "De la bóveda",
+        "fileCount": "{count} archivos",
+        "summaryCost": "~{tokens} · {percent}% de la ventana",
+        "overBudget": "{count} archivos · ~{tokens} excede la ventana de este modelo",
+        "overBudgetBy": "~{tokens} de más",
+        "windowShare": "{percent}% de la ventana tras este mensaje",
+        "windowUnknown": "Este modelo no ha informado de su ventana de contexto",
+        "exceedsBy": "excede la ventana de este modelo en ~{tokens}",
+        "notCounted": "{count} archivos sin contar",
+        "unreadable": "ilegible",
+        "missing": "no está — movido o borrado",
+        "inFlight": "en curso",
+        "attached": "adjunto",
+        "pickerPlaceholder": "Buscar en la bóveda",
+        "pickerHint": "⏎ añadir · ⇥ mantener abierto",
+        "quickOpenFile": "Archivo abierto",
+        "quickBrowseFile": "Archivo externo…",
+        "quickBrowseFolder": "Carpeta externa…",
+        "detailExternal": "fuera de la bóveda",
+        "detailOpenNote": "nota abierta",
+        "folderDetail": "{count} notas"
+      },
       "tabs": {
         "createFailed": "No se pudo crear la pestaña",
         "newTab": "Nueva pestaña",
+        "tabLabel": "Pestaña {index} · {title}",
+        "tabActions": "Acciones de pestaña",
         "history": "Historial de chat",
         "switchFailed": "No se pudo cambiar de pestaña",
         "closeFailed": "No se pudo cerrar la pestaña",
@@ -414,8 +464,6 @@
         "conversationCompacted": "Conversación compactada",
         "sessionRestarted": "Nueva sesión",
         "sessionRestartedHint": "El agente no pudo restaurar la sesión anterior, así que esta conversación continúa en una nueva. Los mensajes de arriba no están en su contexto: repite lo que siga haciendo falta o empieza de nuevo en otra pestaña.",
-        "completed": "Listo",
-        "duration": "* {flavor} durante {duration}",
         "copied": "¡Copiado!",
         "renderFailed": "No se pudo renderizar el contenido del mensaje.",
         "copyMessage": "Copiar mensaje",
@@ -528,17 +576,17 @@
         "shellCommand": "comando de shell"
       },
       "plan": {
-        "requestedPermissions": "Permisos solicitados:",
-        "approveCurrentSession": "Aprobar (sesión actual)",
-        "continueFeedbackPlaceholder": "Escribe comentarios para continuar la planificación...",
-        "keyboardHints": "Teclas de flecha para navegar · Intro para seleccionar · Esc para cancelar",
+        "requestedPermissions": "Permisos solicitados",
+        "approveCurrentSession": "Aprobar para esta sesión",
+        "continueFeedbackPlaceholder": "Comentarios para revisar el plan…",
+        "keyboardHints": "↑↓ navegar · ⏎ seleccionar · esc cancelar",
         "complete": "Plan completo",
         "reviewBeforeProceeding": "Revisa el plan antes de continuar",
         "label": "plan",
         "expand": "Expandir plan",
         "collapse": "Contraer plan",
         "implement": "Implementar",
-        "reviseFeedbackPlaceholder": "Escribe comentarios para revisar el plan..."
+        "reviseFeedbackPlaceholder": "Comentarios para revisar el plan…"
       },
       "images": {
         "dropHere": "Suelta la imagen aquí",
@@ -586,6 +634,7 @@
         "runningEllipsis": "En ejecución...",
         "completed": "completado",
         "blocked": "bloqueado",
+        "unfinished": "sin terminar",
         "error": "Error",
         "orphaned": "Huérfano",
         "inProgress": "en curso",
@@ -659,10 +708,12 @@
         "queryCountOne": "{count} consulta",
         "queryCountMany": "{count} consultas",
         "stepCountOne": "{count} paso",
-        "stepCountMany": "{count} pasos"
+        "stepCountMany": "{count} pasos",
+        "resultSkipped": "omitido",
+        "resultStopped": "detenido"
       },
       "responseMetadata": {
-        "effort": "Esfuerzo {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -900,6 +951,10 @@
       "name": "Máximo de pestañas de chat",
       "desc": "Número máximo de pestañas de chat simultáneas (1-10). Cada pestaña usa una sesión de Claude separada.",
       "warning": "Más de 5 pestañas puede afectar el rendimiento y el uso de memoria."
+    },
+    "showPanelLabels": {
+      "name": "Mostrar nombres de panel",
+      "desc": "Nombra cada panel en el selector sobre la conversación. El panel activo siempre se nombra; los demás son iconos hasta que actives esto."
     },
     "tabBarPosition": {
       "name": "Posición de la barra de pestañas",
@@ -1518,6 +1573,7 @@
     "newTab": "Nueva pestaña",
     "newSession": "Nueva sesión (en la pestaña actual)",
     "closeCurrentTab": "Cerrar pestaña actual",
+    "manageContext": "Gestionar contexto",
     "switchToTab": "Cambiar a la pestaña {index}",
     "environmentRestartFailed": "Se aplicaron los cambios de entorno, pero no se pudieron reiniciar {count} pestañas afectadas.",
     "environmentAppliedRebuild": "Variables de entorno aplicadas. Las sesiones se reconstruirán con el próximo mensaje.",
@@ -1525,6 +1581,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "Integrado",
+        "vault": "Bóveda",
+        "user": "Usuario",
+        "system": "Sistema",
+        "runtime": "Ejecución"
+      },
       "noMatches": "No hay comandos coincidentes"
     },
     "resumeConversation": {

@@ -33,7 +33,14 @@ export interface ToolCallInfo {
   id: string;
   name: string;
   input: Record<string, unknown>;
-  status: 'running' | 'completed' | 'error' | 'blocked';
+  /**
+   * `blocked` is a decision — somebody said no. `unfinished` is the absence of
+   * one: the turn ended before the tool reported, so nothing was decided and
+   * nothing failed. They looked identical, in the error colour and behind a
+   * crossed shield, which told the reader they had refused something they never
+   * saw.
+   */
+  status: 'running' | 'completed' | 'error' | 'blocked' | 'unfinished';
   result?: string;
   isExpanded?: boolean;
   diffData?: ToolDiffData;

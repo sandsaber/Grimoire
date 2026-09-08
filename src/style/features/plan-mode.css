@@ -1,42 +1,31 @@
 /* Plan Mode - inline ExitPlanMode / approval cards */
 
+/*
+ * The same shape the ask card has, because it is the same kind of moment: a
+ * glyph, what is being decided, the material, numbered choices. A plan is
+ * prose about the vault, so it is set in the interface face rather than in
+ * monospace — the code inside it is what monospace is for.
+ */
 .grimoire-plan-approval-inline {
-  overflow: hidden;
-  border-radius: var(--grimoire-radius-3);
-  outline: none;
-  background: var(--grimoire-plane);
-  box-shadow:
-    var(--grimoire-lift-2),
-    inset 0 0 0 1px var(--grimoire-accent-line);
-  color: var(--text-normal);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--grimoire-space-12);
   max-height: 80vh;
-  font-family: var(--font-monospace);
+  overflow: hidden;
+  padding: var(--grimoire-space-14);
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-2);
+  outline: none;
+  background: var(--grimoire-ground);
+  box-shadow: var(--grimoire-lift-0);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-face);
   font-size: var(--grimoire-text-s);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .grimoire-plan-approval-inline {
-    animation: grimoire-plan-rise 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
-  }
-}
-
-@keyframes grimoire-plan-rise {
-  from {
-    transform: translateY(16px);
-  }
-  to {
-    transform: none;
-  }
-}
-
 .grimoire-plan-approval-inline.is-collapsed {
-  grid-template-rows: auto;
   max-height: none;
-  box-shadow:
-    var(--grimoire-lift-1),
-    inset 0 0 0 1px var(--grimoire-accent-line);
+  box-shadow: var(--grimoire-lift-0);
 }
 
 .grimoire-plan-approval-inline.is-collapsed .grimoire-plan-inline-title {
@@ -55,38 +44,39 @@
 .grimoire-plan-inline-title {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-10);
   min-width: 0;
-  padding: var(--grimoire-space-5) var(--grimoire-space-5) var(--grimoire-space-5);
-  border-bottom: 1px solid var(--grimoire-line);
+  padding: 0;
+  border-bottom: 0;
 }
 
 .grimoire-plan-glyph {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
   display: grid;
   place-items: center;
-  border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-accent-soft);
-  color: var(--grimoire-accent-text);
-  box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
+  flex: 0 0 auto;
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-accent);
 }
 
 .grimoire-plan-glyph svg,
 .grimoire-plan-glyph .svg-icon {
-  width: 16px;
-  height: 16px;
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-plan-title-block {
   display: grid;
-  gap: var(--grimoire-space-1);
+  gap: var(--grimoire-space-2);
   min-width: 0;
 }
 
 .grimoire-plan-title {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1.2;
@@ -105,16 +95,16 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: var(--grimoire-space-3);
-  height: 24px;
+  gap: var(--grimoire-space-4);
+  height: auto;
   margin-left: auto;
-  padding: 0 var(--grimoire-space-4);
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-raise-2);
-  color: var(--grimoire-workbench-muted);
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-xs);
-  font-weight: var(--grimoire-weight-semibold);
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
 }
 
@@ -124,55 +114,58 @@
   height: 13px;
 }
 
-.grimoire-plan-collapse-toggle {
-  width: 28px;
-  height: 28px;
+button.grimoire-plan-collapse-toggle {
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
   flex: 0 0 auto;
   display: grid;
   place-items: center;
+  padding: 0;
   border: 0;
   border-radius: var(--grimoire-radius-1);
-  background: transparent;
-  color: var(--text-faint);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-faint);
   cursor: pointer;
-  transition:
-    background var(--grimoire-duration) var(--grimoire-ease),
-    color var(--grimoire-duration) var(--grimoire-ease),
-    transform var(--grimoire-duration) var(--grimoire-ease);
+  transition: color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-plan-collapse-toggle:hover,
 .grimoire-plan-collapse-toggle:focus-visible {
-  background: var(--grimoire-raise-2);
-  color: var(--text-muted);
-}
-
-.grimoire-plan-collapse-toggle:active {
-  transform: translateY(1px);
+  background: none;
+  color: var(--grimoire-ink);
 }
 
 .grimoire-plan-collapse-toggle svg,
 .grimoire-plan-collapse-toggle .svg-icon {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
+  stroke-width: var(--grimoire-stroke);
 }
 
 /* Plan content preview */
 
+/*
+ * The plan itself, set flush in the card. It used to sit in a second card -
+ * its own ring, its own raised ground, its own radius - inside the first,
+ * which is the one thing a decision surface never does: it has one frame, and
+ * what is being decided is written inside that frame.
+ */
 .grimoire-plan-content-preview {
-  max-height: 300px;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 320px;
   overflow-y: auto;
-  margin: var(--grimoire-space-5) var(--grimoire-space-5) var(--grimoire-space-4);
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  border-radius: var(--grimoire-radius-2);
-  background: var(--grimoire-raise);
-  box-shadow: inset 0 0 0 1px var(--grimoire-line);
-  color: var(--text-muted);
-  font-family: var(--font-interface);
+  margin: 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-face);
   font-size: var(--grimoire-text-s);
   line-height: 1.55;
   scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb-bg, var(--grimoire-line-2)) transparent;
+  scrollbar-color: var(--grimoire-line-2) transparent;
 }
 
 .grimoire-plan-content-preview::-webkit-scrollbar {
@@ -185,7 +178,7 @@
 }
 
 .grimoire-plan-content-preview p {
-  margin: 0 0 var(--grimoire-space-4);
+  margin: 0 0 var(--grimoire-space-8);
 }
 
 .grimoire-plan-content-preview p:last-child {
@@ -196,8 +189,8 @@
 .grimoire-plan-content-preview h2,
 .grimoire-plan-content-preview h3,
 .grimoire-plan-content-preview h4 {
-  margin: var(--grimoire-space-4) 0 var(--grimoire-space-3);
-  color: var(--text-normal);
+  margin: var(--grimoire-space-8) 0 var(--grimoire-space-6);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-s);
   font-weight: var(--grimoire-weight-semibold);
   line-height: 1.35;
@@ -213,19 +206,31 @@
 .grimoire-plan-content-preview ul,
 .grimoire-plan-content-preview ol {
   display: grid;
-  gap: var(--grimoire-space-3);
-  margin: var(--grimoire-space-1) 0 var(--grimoire-space-4);
-  padding-left: var(--grimoire-space-6);
+  gap: var(--grimoire-space-6);
+  margin: var(--grimoire-space-2) 0 var(--grimoire-space-8);
+  padding-left: var(--grimoire-space-16);
 }
 
 .grimoire-plan-content-preview li {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--grimoire-ink);
+}
+
+/*
+ * The card sets the space between its parts, so the plan's own first and last
+ * block must not add to it - a trailing list margin read as a gap and a half.
+ */
+.grimoire-plan-content-preview > :first-child {
+  margin-top: 0;
+}
+
+.grimoire-plan-content-preview > :last-child {
+  margin-bottom: 0;
 }
 
 .grimoire-plan-content-preview code {
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   font-weight: var(--grimoire-weight-medium);
 }
@@ -238,148 +243,170 @@
 .grimoire-plan-content-text {
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: var(--font-monospace);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-xs);
   line-height: 1.55;
 }
 
 .grimoire-plan-read-error {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
 /* Permissions list */
 
+/*
+ * What the plan is asking to be allowed to do: the system's group label, then
+ * the prompts on one line. A bulleted list gave four words the vertical weight
+ * of the plan above them, which is not what they are.
+ */
 .grimoire-plan-permissions {
   display: grid;
-  gap: var(--grimoire-space-3);
-  padding: 0 var(--grimoire-space-5) var(--grimoire-space-4);
+  gap: var(--grimoire-space-4);
+  padding: 0;
 }
 
 .grimoire-plan-permissions-label {
-  color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: var(--grimoire-label-tracking);
+  line-height: 1;
+  text-transform: uppercase;
 }
 
-.grimoire-plan-permissions-list {
-  display: grid;
-  gap: var(--grimoire-space-2);
-  margin: 0;
-  padding-left: var(--grimoire-space-6);
-  color: var(--text-muted);
+.grimoire-plan-permissions-line {
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
   line-height: 1.5;
-}
-
-.grimoire-plan-permissions-list li {
-  margin: 0;
 }
 
 /* Keyboard approval rows */
 
 .grimoire-plan-approval-inline .grimoire-ask-list {
   display: grid;
-  gap: var(--grimoire-space-1);
-  padding: var(--grimoire-space-4) var(--grimoire-space-4);
+  gap: var(--grimoire-space-2);
+  padding-top: var(--grimoire-space-10);
   border-top: 1px solid var(--grimoire-line);
 }
 
+/* The same 32px numbered row every decision surface offers a choice as. */
 .grimoire-plan-approval-inline .grimoire-ask-item {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-5);
-  width: 100%;
-  min-height: 38px;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  border-radius: var(--grimoire-radius-2);
+  width: auto;
+  height: 32px;
+  gap: var(--grimoire-space-10);
+  margin: 0 calc(var(--grimoire-space-8) * -1);
+  padding: 0 var(--grimoire-space-8);
+  border-inline-start: 1.5px solid transparent;
+  border-radius: var(--grimoire-radius-1);
   background: transparent;
-  box-shadow: inset 0 0 0 1px transparent;
-  color: var(--text-normal);
+  box-shadow: none;
+  color: var(--grimoire-ink);
   cursor: pointer;
   text-align: left;
   transition:
     background var(--grimoire-duration) var(--grimoire-ease),
-    box-shadow var(--grimoire-duration) var(--grimoire-ease),
     color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-plan-approval-inline .grimoire-ask-item:hover {
-  background: var(--grimoire-raise);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-plan-approval-inline .grimoire-ask-item.is-focused {
-  background: var(--grimoire-accent-soft);
-  box-shadow: inset 0 0 0 1px var(--grimoire-accent-line);
+  border-inline-start-color: var(--grimoire-accent);
+  background: var(--grimoire-hover);
+  box-shadow: none;
 }
 
+/* The row's own rule says which one is focused; a caret would say it twice. */
 .grimoire-plan-approval-inline .grimoire-ask-cursor {
-  width: 8px;
-  flex: 0 0 auto;
-  color: var(--grimoire-accent-text);
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-l);
-  line-height: 1;
+  display: none;
 }
 
+/* The key that picks it, set as a key: monospace, quiet, one column wide. */
 .grimoire-plan-approval-inline .grimoire-ask-item-num {
-  width: 19px;
-  height: 19px;
-  flex: 0 0 auto;
   display: grid;
   place-items: center;
-  border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-raise-2);
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  flex: 0 0 auto;
+  width: var(--grimoire-icon-s);
+  height: auto;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
-  transition:
-    background var(--grimoire-duration) var(--grimoire-ease),
-    color var(--grimoire-duration) var(--grimoire-ease);
+  transition: color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-plan-approval-inline .grimoire-ask-item.is-focused .grimoire-ask-item-num {
-  background: var(--grimoire-brand);
-  color: var(--text-on-accent);
+  background: none;
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-plan-approval-inline .grimoire-ask-item-label {
   flex: 1 1 auto;
-  color: var(--text-normal);
-  font-family: var(--font-interface);
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-face);
   font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1.25;
 }
 
+/*
+ * A line to write on. Without one this choice read as a disabled row: the two
+ * beside it are words you pick, and nothing said this one takes typing.
+ */
 .grimoire-plan-approval-inline .grimoire-ask-custom-text {
   flex: 1 1 auto;
   min-width: 0;
   height: 26px;
+  /*
+   * Flush with the label of the row above it. The host gives every text field
+   * 8px of its own, so the two choices' boxes lined up and their words did not:
+   * "Approve for this session" started eight pixels left of the placeholder
+   * under it, on a card whose whole shape is a column of numbered choices.
+   */
+  padding: 0;
   border: 0;
+  border-bottom: 1px solid var(--grimoire-line);
   outline: 0;
+  border-radius: 0;
   background: transparent;
-  color: var(--text-normal);
-  font-family: var(--font-interface);
+  box-shadow: none;
+  color: var(--grimoire-ink);
+  font-family: var(--grimoire-face);
   font-size: var(--grimoire-text-s);
   line-height: 1;
+  transition: border-color var(--grimoire-duration) var(--grimoire-ease);
+}
+
+.grimoire-plan-approval-inline .grimoire-ask-custom-text:focus {
+  border-bottom-color: var(--grimoire-accent);
 }
 
 .grimoire-plan-approval-inline .grimoire-ask-custom-text::placeholder {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-faint);
 }
 
+/*
+ * The last line of the card, not a footer band. It wore a rule of its own, so
+ * a card whose choices already sat under one ended in two horizontal lines a
+ * few pixels apart.
+ */
 .grimoire-plan-approval-inline .grimoire-ask-hints {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--grimoire-space-2);
-  padding: var(--grimoire-space-4) var(--grimoire-space-5) var(--grimoire-space-5);
-  border-top: 1px solid var(--grimoire-line);
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  gap: var(--grimoire-space-4);
+  padding: 0;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-medium);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1.4;
 }

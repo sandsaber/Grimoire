@@ -1,21 +1,67 @@
-/* Fork Target Modal */
+/*
+ * Fork into — where the copy of this thread should go.
+ *
+ * Two choices, each with the digit that picks it, in the shape every decision
+ * surface uses: the number, the words, and one left rule marking where the
+ * keyboard is. It was two unnumbered rows before, answerable only by mouse.
+ */
 .grimoire-fork-target-modal {
-  max-width: 340px;
+  width: min(300px, calc(100vw - 32px));
 }
 
 .grimoire-fork-target-list {
   display: flex;
   flex-direction: column;
+  gap: var(--grimoire-space-2);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-fork-target-option {
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  border-radius: var(--grimoire-radius-2);
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--grimoire-list-row-h);
+  gap: var(--grimoire-space-10);
+  padding: 0 var(--grimoire-space-10);
+  border-left: 1.5px solid transparent;
+  border-radius: var(--grimoire-radius-1);
+  color: var(--grimoire-ink);
   cursor: pointer;
-  color: var(--text-normal);
-  font-size: var(--grimoire-text-l);
+  transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
-.grimoire-fork-target-option:hover {
-  background: var(--background-modifier-hover);
+.grimoire-fork-target-option:hover,
+.grimoire-fork-target-option:focus-visible {
+  background: var(--grimoire-hover);
+  outline: none;
+}
+
+/* Where the keyboard is, as the one accent line this surface spends. */
+.grimoire-fork-target-option.is-selected,
+.grimoire-fork-target-option:focus-visible {
+  border-left-color: var(--grimoire-accent);
+  background: var(--grimoire-hover);
+}
+
+/* Pointing at another one moves the mark. */
+.grimoire-fork-target-list:hover .grimoire-fork-target-option.is-selected:not(:hover) {
+  border-left-color: transparent;
+}
+
+/* Obsidian gives a bare `kbd` a code ground and its own padding; a key here is
+ * a digit beside a word, not a chip. */
+.grimoire-fork-target-key {
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grimoire-fork-target-option {
+    transition: none;
+  }
 }

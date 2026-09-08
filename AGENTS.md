@@ -9,7 +9,7 @@ Repository documentation and user-facing product copy should be in English unles
 - `AGENTS.md` is the canonical shared instruction file for coding agents.
 - `CLAUDE.md` files exist so Claude Code can load the same instructions. They should import the nearest `AGENTS.md` and contain only Claude-specific additions.
 - Keep root instructions durable. Put path-specific details in nested `AGENTS.md` files next to the code they govern.
-- If a design handoff directory is named by the user, treat it as the source of truth for that task. Keep temporary handoff/debug artifacts untracked unless the user explicitly asks to commit them.
+- If a design handoff directory is named by the user, treat it as the source of truth for that task. Keep temporary handoff/debug artifacts untracked unless the user explicitly asks to commit them. `docs/design/` is the exception and is checked in: [`Grimoire Nordic.html`](docs/design/Grimoire%20Nordic.html) is the drawing the design system describes, every surface doc links to it, and it is meant to be edited as the design moves — not a scratch artifact to be cleaned up.
 
 ## Provider Directories
 
@@ -106,6 +106,18 @@ Grimoire's visual system is **Nordic**, and [`docs/design-system.md`](docs/desig
 canonical description. Read it before changing any surface's appearance, adding a stylesheet, or
 introducing a control.
 
+The drawing that description is of is [`docs/design/Grimoire Nordic.html`](docs/design/Grimoire%20Nordic.html) —
+thirteen screens of the plugin, `1a` through `3c`, in English and in Obsidian's own variables. Open
+it in a browser and compare against a render of the plugin rather than against a reading of its CSS;
+§16 of the design doc says how to build that render, and why it has to include Obsidian's `app.css`.
+
+It is checked in and it is meant to be edited. When a surface changes, the drawing and
+[`docs/design-system.md`](docs/design-system.md) move with it. When the implementation deliberately
+departs from the drawing — the composer collapses at one chip rather than four, the manage dialog
+draws no close of its own — say so in the doc and say why, next to what the drawing shows. A
+divergence nobody wrote down is indistinguishable from drift, and the next person to open the file
+has no way to tell which one they are looking at.
+
 The rule the whole system rests on: **feature code reads a Grimoire token; only
 `src/style/base/variables.css` reads an Obsidian one.** That is what makes a theme swap a no-op and a
 system change a one-line edit. A colour, size, weight, radius, spacing value, shadow or duration
@@ -121,16 +133,35 @@ Two habits the system exists to enforce, both learned from shipped defects:
   `tests/fixtures/obsidian/theme-tokens.json`, taken from the `app.css` inside the installed `.asar`.
 - **A fallback hides a missing dependency**, so a value that looks considered can be frozen. Prefer no
   fallback on a Grimoire token, and let the gate catch a missing one.
+- **A class alone loses to the host.** Obsidian names elements and attributes — `button:not(…)`,
+  `input[type='text']`, `.modal` — so a correct-looking rule can be present and overruled, and a
+  modifier named by class alone loses to its own element-named base. The table of what to write is
+  in `src/style/AGENTS.md`; the gates cannot see a rule the plugin never wrote, so a render against
+  the real `app.css` is what finds these.
 
-The system is enforced, not documented: `tests/unit/style/designSystem.test.ts` and
-`tests/unit/style/themeAdaptation.test.ts`. Extend them when you extend the system, and prove a new
-rule by breaking it.
+There are no fixed colours. The nine provider brand colours were the last exception, and identity is
+the vendor's own mark drawn in `--grimoire-ink-muted` instead — status is an accent dot beside a
+word, never a hue on its own.
+
+The accent is spent on a budget, and it is short: a line, a dot, a glyph, a 40% border, a 12% wash,
+an 8% wash for one band, and exactly one filled action per surface. Anything else is ink, ground or
+line.
+
+The system is enforced, not documented: `tests/unit/style/designSystem.test.ts`,
+`tests/unit/style/themeAdaptation.test.ts` and `tests/unit/style/decisionCardCss.test.ts`. Extend
+them when you extend the system, and prove a new rule by breaking it. Regenerate the theme fixture
+with `node scripts/generate-theme-tokens.mjs` after adding a dependency on a host variable.
 
 Icons carry recognition, words carry meaning. Icon plus label where a choice has a cost; icon only in
 dense repeating chrome, and never without an accessible name; never icon-only for something that
 cannot be taken back. A non-button element that responds to a click goes through
 `asActivatable` in `src/shared/components/activatable.ts`, which gives it the role, the name, the tab
-stop and the Enter/Space handling a button has.
+stop and the Enter/Space handling a button has. A menu with one way in must not need a mouse: the tab
+menu was right-click only, which put six of its items out of the keyboard's reach entirely.
+
+Every decision Grimoire asks for wears one shape — a glyph, what is being decided, the material it
+acts on, numbered choices — whether it is a plan to approve, a question to answer or a permission to
+grant.
 
 Settings surfaces are built with the declarative settings API and must look native: style what
 Grimoire puts *inside* a row, never `.setting-item` and its parts.

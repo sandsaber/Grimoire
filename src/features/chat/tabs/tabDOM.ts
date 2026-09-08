@@ -1,6 +1,26 @@
+import { setIcon } from 'obsidian';
+
 import { t } from '../../../i18n/i18n';
+import { markDecorative } from '../../../shared/components/activatable';
 import { createInputResizeHandle } from '../ui/inputResizeHandle';
 import type { TabDOMElements, TabPanelView } from './types';
+
+/** The glyph each panel is recognised by, before its word is read. */
+const PANEL_ICONS: Record<TabPanelView, string> = {
+  chat: 'message-square',
+  sources: 'book-open',
+  context: 'layers',
+};
+
+/**
+ * Whether the inactive segments say their words.
+ *
+ * The active one always does — a rail of glyphs with nothing named would leave
+ * the reader's own position unwritten.
+ */
+export function applyPanelLabels(dom: TabDOMElements, showLabels: boolean): void {
+  dom.panelSwitchEl.toggleClass('grimoire-panel-switch--labelled', showLabels);
+}
 
 export function buildTabDOM(contentEl: HTMLElement): TabDOMElements {
   contentEl.addClass('grimoire-tab-chat-window');
@@ -8,24 +28,60 @@ export function buildTabDOM(contentEl: HTMLElement): TabDOMElements {
 
   const workbenchGridEl = contentEl.createDiv({ cls: 'grimoire-chat-window-grid' });
 
-  const panelTabsEl = workbenchGridEl.createEl('nav', {
+  /*
+   * The panel switch. A segment is its glyph; the active one also says its
+   * word, so the row stays a rail of icons and still names where the reader is.
+   * `showPanelLabels` turns the other words on for someone who would rather
+   * read them than learn them.
+   */
+  const panelSwitchEl = workbenchGridEl.createDiv({ cls: 'grimoire-panel-switch' });
+  const panelTabsEl = panelSwitchEl.createEl('nav', {
     cls: 'grimoire-panel-tabs',
   });
-  const chatPanelButtonEl = panelTabsEl.createEl('button', {
-    cls: 'grimoire-panel-tab is-active',
-    text: t('chat.ui.view.chat'),
-    attr: { type: 'button', 'data-panel-view': 'chat', 'aria-pressed': 'true' },
+  const createPanelButton = (view: TabPanelView, label: string): HTMLButtonElement => {
+    const button = panelTabsEl.createEl('button', {
+      cls: view === 'chat' ? 'grimoire-panel-tab is-active' : 'grimoire-panel-tab',
+      attr: {
+        type: 'button',
+        'data-panel-view': view,
+        'aria-pressed': String(view === 'chat'),
+        'aria-label': label,
+        title: label,
+      },
+    });
+    const icon = button.createSpan({ cls: 'grimoire-panel-tab-icon' });
+    setIcon(icon, PANEL_ICONS[view]);
+    markDecorative(icon);
+    button.createSpan({ cls: 'grimoire-panel-tab-label', text: label });
+    return button;
+  };
+  const chatPanelButtonEl = createPanelButton('chat', t('chat.ui.view.chat'));
+  const sourcesPanelButtonEl = createPanelButton('sources', t('chat.ui.view.sources'));
+  const contextPanelButtonEl = createPanelButton('context', t('chat.ui.view.context'));
+  /*
+   * The other end of the row belongs to whichever view is open: the transcript's
+   * jump controls in Chat, the source filters in Sources. They were stacked into
+   * the panel below instead, which spent a whole row on three words and left the
+   * switch row half empty.
+   */
+  const panelAsideEl = panelSwitchEl.createDiv({ cls: 'grimoire-panel-aside' });
+  const sourceFiltersEl = panelAsideEl.createDiv({ cls: 'grimoire-source-filters' });
+  sourceFiltersEl.createEl('button', {
+    cls: 'grimoire-source-filter is-active',
+    text: t('chat.ui.view.all'),
+    attr: { type: 'button', 'data-source-filter': 'all', 'aria-pressed': 'true' },
   });
-  const sourcesPanelButtonEl = panelTabsEl.createEl('button', {
-    cls: 'grimoire-panel-tab',
-    text: t('chat.ui.view.sources'),
-    attr: { type: 'button', 'data-panel-view': 'sources', 'aria-pressed': 'false' },
+  sourceFiltersEl.createEl('button', {
+    cls: 'grimoire-source-filter',
+    text: t('chat.ui.view.linked'),
+    attr: { type: 'button', 'data-source-filter': 'linked', 'aria-pressed': 'false' },
   });
-  const contextPanelButtonEl = panelTabsEl.createEl('button', {
-    cls: 'grimoire-panel-tab',
-    text: t('chat.ui.view.context'),
-    attr: { type: 'button', 'data-panel-view': 'context', 'aria-pressed': 'false' },
+  sourceFiltersEl.createEl('button', {
+    cls: 'grimoire-source-filter',
+    text: t('chat.ui.view.current'),
+    attr: { type: 'button', 'data-source-filter': 'current', 'aria-pressed': 'false' },
   });
+  const panelJumpEl = panelAsideEl.createDiv({ cls: 'grimoire-panel-jump' });
   const chatScrollEl = workbenchGridEl.createDiv({
     cls: 'grimoire-chat-scroll',
     attr: { 'aria-live': 'polite' },
@@ -54,22 +110,6 @@ export function buildTabDOM(contentEl: HTMLElement): TabDOMElements {
   const sourceShownCountEl = sourceHeaderEl.createSpan({
     cls: 'grimoire-panel-section-count',
     text: t('chat.ui.view.shownCount', { count: 0 }),
-  });
-  const sourceFiltersEl = sourceRailEl.createDiv({ cls: 'grimoire-source-filters' });
-  sourceFiltersEl.createEl('button', {
-    cls: 'grimoire-source-filter is-active',
-    text: t('chat.ui.view.all'),
-    attr: { type: 'button', 'data-source-filter': 'all', 'aria-pressed': 'true' },
-  });
-  sourceFiltersEl.createEl('button', {
-    cls: 'grimoire-source-filter',
-    text: t('chat.ui.view.linked'),
-    attr: { type: 'button', 'data-source-filter': 'linked', 'aria-pressed': 'false' },
-  });
-  sourceFiltersEl.createEl('button', {
-    cls: 'grimoire-source-filter',
-    text: t('chat.ui.view.current'),
-    attr: { type: 'button', 'data-source-filter': 'current', 'aria-pressed': 'false' },
   });
   const sourceCardsEl = sourceRailEl.createDiv({ cls: 'grimoire-source-card-stack' });
   const statusPanelContainerEl = sourceRailEl.createDiv({
@@ -129,6 +169,8 @@ export function buildTabDOM(contentEl: HTMLElement): TabDOMElements {
   return {
     contentEl,
     workbenchGridEl,
+    panelSwitchEl,
+    panelJumpEl,
     contextRailEl,
     contextMemoryEl,
     contextRuntimeEl,

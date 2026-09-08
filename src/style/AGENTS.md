@@ -29,8 +29,10 @@
 
 ## The Nordic token layer
 
-[`docs/design-system.md`](../../docs/design-system.md) is the canonical description; this is the
-working reference for editing files in this directory.
+[`docs/design-system.md`](../../docs/design-system.md) is the canonical description and
+[`docs/design/Grimoire Nordic.html`](../../docs/design/Grimoire%20Nordic.html) is the drawing it is
+of; this is the working reference for editing files in this directory. A change to a surface is
+checked by rendering it beside the mock, not by reading the rule you just wrote.
 
 **`base/variables.css` is the only file that reads an Obsidian variable.** Everything else reads a
 Grimoire token. The layer is defined on `body`, not on `.grimoire-container`, because settings tabs
@@ -39,47 +41,86 @@ grown apart before that moved.
 
 | Group | Read this | Never this |
 |---|---|---|
-| Accent | `--grimoire-accent`, `--grimoire-accent-text`, `--grimoire-accent-line`, `--grimoire-accent-soft`, `--grimoire-focus-ring` | `--interactive-accent`, `--text-accent`, a hex, an `rgba()` triple |
+| Accent | `--grimoire-accent`, `--grimoire-accent-text`, `--grimoire-accent-line` (40%), `--grimoire-accent-wash` (12%), `--grimoire-accent-wash-weak` (8%), `--grimoire-focus-ring` | `--interactive-accent`, `--text-accent`, a hex, an `rgba()` triple |
 | Ground | `--grimoire-ground`, `--grimoire-plane`, `--grimoire-hover`, `--grimoire-field` | `rgba(255, 255, 255, …)`, `color-mix(… #000)` |
 | Line | `--grimoire-line`, `--grimoire-line-2`, `--grimoire-line-3` | a literal border colour |
-| Ink | `--grimoire-ink`, `--grimoire-ink-muted`, `--grimoire-ink-faint`, `--grimoire-ink-ghost` | a literal text colour |
-| Space | `--grimoire-space-1` … `-8` (2, 4, 6, 8, 12, 16, 20, 24px) | any padding/margin/gap px below 32 |
+| Ink | `--grimoire-ink`, `--grimoire-ink-muted`, `--grimoire-ink-faint`, `--grimoire-ink-ghost` | a literal text colour, `--text-normal`, `--text-muted` |
+| Face | `--grimoire-face`, `--grimoire-mono` | `--font-interface`, `--font-monospace` |
+| Space | `--grimoire-space-<n>`, named by the value: 2, 4, 6, 8, 10, 12, 14, 16, 20, 22, 24, 40 | any padding/margin/gap px below 32 |
+| Size | `--grimoire-header-h` 40, `--grimoire-hit-s/m/l` 24/26/28, `--grimoire-chip-h` 24, `--grimoire-tool-row-h` 26, `--grimoire-segment-h` 26, `--grimoire-list-row-h` 34 | a one-off control height |
 | Radius | `--grimoire-radius-1/2/3`, `--grimoire-radius-pill`, `--grimoire-radius-circle` | a px radius |
-| Type | `--grimoire-text-2xs` … `-2xl` (10, 11, 12, 13, 14, 16, 20px at host defaults) | a px `font-size` |
+| Type | `--grimoire-text-2xs/xs/s/m/l/xl` (10, 11, 12, 13, 15, 20px at host defaults) | a px `font-size` |
+| Icon | `--grimoire-icon-s/m/l` 12/14/16, `--grimoire-stroke` 1.75, `--grimoire-stroke-check` 2.25 | a px `width` on an svg |
 | Weight | `--grimoire-weight-normal/medium/semibold/bold` | a numeric `font-weight` |
 | Lift | `--grimoire-lift-0/1/2` (`none`, `--shadow-s`, `--shadow-l`) | a hand-rolled `box-shadow` stack |
 | Motion | `--grimoire-duration`, `--grimoire-duration-slow`, `--grimoire-ease` | any transition time at or under 0.32s |
+| Status | `--grimoire-ok`, `--grimoire-warn`, `--grimoire-error`, `--grimoire-error-line` (40%), `--grimoire-error-wash` (12%) | a colour standing in for a word |
 
 Rules the gates hold, in `tests/unit/style/designSystem.test.ts` and `themeAdaptation.test.ts`:
 
-1. every Grimoire token a stylesheet reads without a fallback is defined, or is one of the thirteen a
+1. every Grimoire token a stylesheet reads without a fallback is defined, or is one of the twelve a
    controller sets per element;
 2. sizes, weights and radii are steps in the scale;
-3. colour comes from the theme — no `rgba(<digits>` and no hex outside a provider-mark fallback;
+3. colour comes from the theme — no `rgba(<digits>` and no hex anywhere, including the token layer;
 4. spacing below 32px is a token;
 5. motion is one duration on one curve;
 6. `.setting-item` is never selected without a `.grimoire-` scope;
 7. the accent is read in one place;
 8. the layer depends on no Obsidian variable the app does not define, resolves on both themes, and
-   each type step lands where the literal it replaced stood.
+   each type step lands where the literal it replaced stood;
+9. provider identity is a glyph in ink — no `--grimoire-provider-*`, and no rule selected by
+   `[data-provider=…]`, because a rule selected by provider id exists to paint that provider;
+10. no module sheet reads an Obsidian variable at all. The rule was true of the accent only, and
+    476 declarations across 40 sheets read `--text-muted`, `--background-primary` and their family
+    directly — so "swap the token layer" was a claim the stylesheets could not honour. The one
+    exception is `--setting-items-*`, because matching the host's settings-row geometry means
+    reading the host's numbers for it.
 
 **Prove a new rule by breaking it.** Copy the file to the scratchpad in the same command that injects
 the defect, watch the gate fail, then restore from the copy — never `git checkout`, which discards the
 uncommitted work the rule is about.
 
-**Fixed colours.** Provider marks (`--grimoire-provider-*`) are identity rather than decoration and
-are the one place a hex belongs. They live in `base/variables.css` with that reason written down.
+**No fixed colours.** There is no exception left. The nine provider brand colours were the one place
+a hex belonged, and Nordic draws a provider as its own mark in `--grimoire-ink-muted` instead, so
+nothing in the plugin names a hue the user did not pick. Status is an accent dot beside a word, never
+a hue on its own.
 
 **Accent alpha.** There is no accent RGB triple in Obsidian — `--interactive-accent-rgb` and
 `--color-accent-rgb` do not exist, which is how thirty-two surfaces shipped painting a fallback
 violet. Express a translucent accent as
-`color-mix(in srgb, var(--grimoire-brand) N%, transparent)`.
+`color-mix(in srgb, var(--grimoire-accent) N%, transparent)`.
 
-**Regenerating the theme fixture.** `tests/fixtures/obsidian/theme-tokens.json` is the transitive
-closure of the Obsidian variables this layer depends on, read from the `app.css` inside the installed
-`obsidian-<version>.asar`. Take it from the root tables only — `body`, `.theme-light`, `.theme-dark`.
-Collecting every declaration in the file picks up component-scoped ones and makes
-`--background-modifier-border` resolve to `transparent` on both themes.
+**Regenerating the theme fixture.** `node scripts/generate-theme-tokens.mjs` rewrites
+`tests/fixtures/obsidian/theme-tokens.json` — the transitive closure of the Obsidian variables this
+layer depends on, read from the `app.css` inside the installed `obsidian-<version>.asar`. Run it
+after adding a dependency on a host variable, and after an app upgrade. It takes the root tables only
+— `body`, `.theme-light`, `.theme-dark` — because collecting every declaration in the file picks up
+component-scoped ones and makes `--background-modifier-border` resolve to `transparent` on both
+themes.
+
+## Outranking the host
+
+Obsidian names elements and attributes; Grimoire names classes; a class alone loses. Every rule below
+replaced a shipped defect, and every one of them was found by rendering the surface with the real
+`app.css` — see §16 of [`docs/design-system.md`](../../docs/design-system.md) for how to build that
+render and read measurements out of it.
+
+| The host's rule | Weight | Write |
+|---|---|---|
+| `button:not(.clickable-icon)` | element + class | `button.grimoire-…` |
+| `input[type='text']` | element + attribute | `input.grimoire-…` |
+| `input[type='text']:focus`, `:focus-visible` | element + attribute + pseudo | `input.grimoire-…:focus`, `:focus-visible` |
+| `.modal` (width, padding) | class, on the modal itself | size `.grimoire-…-modal`, not its `.modal-content` |
+
+And one that is Grimoire against itself: **a modifier of an element-named base must name the element
+too.** `button.grimoire-icon-btn` outweighs `.grimoire-icon-btn--small`, so that modifier never
+reached its own width and height and every small icon button drew at the large size. The gate for it
+is `lets a modifier outrank the base it modifies` in `tests/unit/style/designSystem.test.ts`.
+
+Two things the gates cannot do for you. They only see properties the plugin actually wrote, so a
+missing `:focus` rule is not a violation of anything — nothing will tell you the host is drawing a
+ring you did not ask for. And they compare text, not pixels: a rule can be present, correct and
+overruled. Render the surface.
 
 ## Obsidian community CSS review
 
@@ -90,11 +131,12 @@ Local gate (runs in `npm run review:css` and `prebuild:release`):
 - `scripts/reviewCss.js` — `OBSIDIAN_PARTIAL_CSS_FEATURES` denylist (regex + message matching Obsidian's wording).
 - `scripts/check-review-css.mjs` — fails on `!important` **and** any denylisted feature in `src/style/**` and root `styles.css`.
 
-**Known denylisted feature today**
+**Known denylisted features today**
 
 | Feature | Do not use | Prefer |
 |---------|------------|--------|
 | `css-display-contents` | `display: contents` | Normal flow (`display: block` / `flex` / `grid` on a real box). For marker wrappers (e.g. `.grimoire-workspace-provider-section`), keep a real box and style children with `> .wrapper > …` selectors when needed. |
+| `text-decoration` | The Level 3 longhands — `text-decoration-color/line/style/thickness`, `text-underline-offset/position` — and the multi-value shorthand (`text-decoration: underline dotted`) | Plain `text-decoration: underline \| line-through \| none`, which the sheet uses in eight places and review does not flag. For an underline in a colour of its own, `border-bottom: 1px solid …` on the inline element. |
 
 When Obsidian's CSS lint reports a new partial/unsupported feature:
 

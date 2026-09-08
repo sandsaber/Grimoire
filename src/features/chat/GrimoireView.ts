@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import type { EventRef, WorkspaceLeaf } from 'obsidian';
-import { ItemView, Menu, Notice, Platform, Scope, setTooltip } from 'obsidian';
+import { ItemView, Menu, Notice, Platform, Scope, setIcon, setTooltip } from 'obsidian';
 
 import { GRIMOIRE_CHANGELOG_URL } from '../../app/changelog/source';
 import {
@@ -12,12 +12,12 @@ import {
 import { truncateTitleOnWordBoundary } from '../../core/prompt/titleLength';
 import { getHiddenProviderCommandSet } from '../../core/providers/commands/hiddenCommands';
 import { providerCatalog } from '../../core/providers/ProviderCatalog';
-import { ProviderSettingsCoordinator } from '../../core/providers/ProviderSettingsCoordinator';
-import { DEFAULT_CHAT_PROVIDER_ID, type ProviderId } from '../../core/providers/types';
+import type { ProviderId } from '../../core/providers/types';
 import { VIEW_TYPE_GRIMOIRE } from '../../core/types';
 import { t } from '../../i18n/i18n';
 import type GrimoirePlugin from '../../main';
 import { GRIMOIRE_APP_ICON_ID } from '../../shared/appIcon';
+import { asActivatable } from '../../shared/components/activatable';
 import { renderWhatsNewCard } from '../../shared/whats-new/renderWhatsNewCard';
 import {
   cancelScheduledAnimationFrame,
@@ -32,7 +32,9 @@ import {
 import type { OrchestratorPlan } from './rendering/orchestratorPlanParser';
 import { getTabProviderId, getTabSettingsSnapshot, getTabTitle, onProviderAvailabilityChanged, updatePlanModeUI } from './tabs/Tab';
 import { TabBar } from './tabs/TabBar';
+import { applyPanelLabels } from './tabs/tabDOM';
 import { TabManager } from './tabs/TabManager';
+import { getTabPermissionMode } from './tabs/tabSettings';
 import type { ClosedTabSnapshot, TabData, TabId } from './tabs/types';
 import { normalizeMaxTabs } from './tabs/types';
 import { closeTopmostImageViewer } from './ui/imageViewerStack';
@@ -148,7 +150,7 @@ export class GrimoireView extends ItemView {
   private navContentEl: HTMLElement | null = null;
   private headerActionsContent: HTMLElement | null = null;
   private headerContextUsageMeter: ContextUsageMeter | null = null;
-  private newTabButtonEl: HTMLElement | null = null;
+  private tabMenuButtonEl: HTMLElement | null = null;
   private historyButtonEl: HTMLElement | null = null;
 
   // Header elements
@@ -326,7 +328,6 @@ export class GrimoireView extends ItemView {
             this.updateTabBar();
             this.updateNavRowLocation();
             this.persistTabState();
-            this.syncProviderBrandColor();
             this.syncHeaderContextUsage();
           },
           onTabSwitched: () => {
@@ -334,7 +335,6 @@ export class GrimoireView extends ItemView {
             this.updateHistoryDropdown();
             this.updateNavRowLocation();
             this.persistTabState();
-            this.syncProviderBrandColor();
             this.syncHeaderContextUsage();
           },
           onTabClosed: () => {
@@ -359,24 +359,20 @@ export class GrimoireView extends ItemView {
           onTabConversationChanged: () => {
             this.updateTabBar();
             this.persistTabState();
-            this.syncProviderBrandColor();
             this.syncHeaderContextUsage();
           },
           onTabProviderChanged: () => {
             this.updateTabBar();
-            this.syncProviderBrandColor();
             this.syncHeaderContextUsage();
           },
           onTabDraftSettingsChanged: () => {
             this.updateTabBar();
             this.persistTabState();
-            this.syncProviderBrandColor();
             this.syncHeaderContextUsage();
           },
           onTabOrchestratorModeChanged: () => {
             this.updateTabBar();
             this.persistTabState();
-            this.syncProviderBrandColor();
             this.syncHeaderContextUsage();
           },
           onTabUsageChanged: (tabId) => {
@@ -393,7 +389,6 @@ export class GrimoireView extends ItemView {
       await this.recordOpenEvent('restore.finished', {
         tabCount: this.tabManager.getTabCount(),
       }, 'info');
-      this.syncProviderBrandColor();
       this.updateLayoutForPosition();
       this.tabManager?.primeProviderRuntime();
       await this.recordOpenEvent('onOpen.finished', undefined, 'info');
@@ -475,19 +470,12 @@ export class GrimoireView extends ItemView {
         void this.createNewTab().catch(() => new Notice(t('chat.ui.tabs.createFailed')));
       },
     });
-    // Context, new-tab, and history actions (right side)
+    // Context usage and the two header actions (right side). The add control
+    // is not here: it extends the tab strip, so the strip owns it.
     this.headerActionsContent = wrapper.createDiv({ cls: 'grimoire-header-actions' });
 
     this.headerContextUsageMeter = new ContextUsageMeter(this.headerActionsContent, {
       showWhenEmpty: true,
-    });
-
-    // New tab button (plus icon)
-    this.newTabButtonEl = this.headerActionsContent.createDiv({ cls: 'grimoire-header-btn grimoire-new-tab-btn' });
-    this.newTabButtonEl.setText('+');
-    this.newTabButtonEl.setAttribute('aria-label', t('chat.ui.tabs.newTab'));
-    this.newTabButtonEl.addEventListener('click', () => {
-      void this.createNewTab().catch(() => new Notice(t('chat.ui.tabs.createFailed')));
     });
 
     this.historyButtonEl = this.headerActionsContent.createDiv({ cls: 'grimoire-header-btn grimoire-history-btn' });
@@ -508,7 +496,33 @@ export class GrimoireView extends ItemView {
       this.toggleHistoryDropdown();
     });
 
+    // The tab menu had one way in, and it was a right-click — which the
+    // keyboard cannot perform. It is a control now, next to the history it sits
+    // beside in the design.
+    this.tabMenuButtonEl = this.headerActionsContent.createDiv({
+      cls: 'grimoire-header-btn grimoire-tab-menu-btn',
+    });
+    setIcon(this.tabMenuButtonEl, 'more-vertical');
+    asActivatable(this.tabMenuButtonEl, {
+      label: t('chat.ui.tabs.tabActions'),
+      onActivate: () => this.showActiveTabMenu(),
+    });
+    this.tabMenuButtonEl.setAttribute('aria-haspopup', 'menu');
+
     return wrapper;
+  }
+
+  /** Opens the active tab's menu from the header, without a right-click. */
+  private showActiveTabMenu(): void {
+    const activeTab = this.tabManager?.getActiveTab();
+    const anchor = this.tabMenuButtonEl;
+    if (!activeTab || !anchor) return;
+    this.showTabMenu(activeTab.id, menu => menu.showAtMouseEvent({
+      // A Menu wants a point; the button's own corner is the honest one, and
+      // an activation from the keyboard carries no pointer to borrow.
+      clientX: anchor.getBoundingClientRect?.().left ?? 0,
+      clientY: anchor.getBoundingClientRect?.().bottom ?? 0,
+    } as MouseEvent));
   }
 
   private buildHistorySheet(parentEl: HTMLElement): HTMLElement {
@@ -549,6 +563,14 @@ export class GrimoireView extends ItemView {
   /** Refreshes tab controls after settings that affect tab availability change. */
   refreshTabControls(): void {
     this.updateTabBarVisibility();
+  }
+
+  /** Re-reads `showPanelLabels` into every open tab's panel switch. */
+  refreshPanelLabels(): void {
+    const showLabels = this.plugin.settings.showPanelLabels === true;
+    for (const tab of this.tabManager?.getAllTabs() ?? []) {
+      applyPanelLabels(tab.dom, showLabels);
+    }
   }
 
   // ============================================
@@ -592,6 +614,10 @@ export class GrimoireView extends ItemView {
   }
 
   private showTabContextMenu(tabId: TabId, event: MouseEvent): void {
+    this.showTabMenu(tabId, menu => menu.showAtMouseEvent(event));
+  }
+
+  private showTabMenu(tabId: TabId, present: (menu: Menu) => void): void {
     const manager = this.tabManager;
     const tab = manager?.getTab(tabId);
     if (!manager || !tab) return;
@@ -639,7 +665,7 @@ export class GrimoireView extends ItemView {
       .setTitle(t('chat.ui.tabs.duplicate'))
       .setDisabled(!manager.canCreateTab())
       .onClick(() => { void this.duplicateTab(tabId); }));
-    menu.showAtMouseEvent(event);
+    present(menu);
   }
 
   private async renameTab(tabId: TabId): Promise<void> {
@@ -756,26 +782,19 @@ export class GrimoireView extends ItemView {
   }
 
   private updateNewTabButtonVisibility(): void {
-    if (!this.newTabButtonEl || !this.tabManager) return;
+    const newTabButtonEl = this.tabBar?.getNewTabButton();
+    if (!newTabButtonEl || !this.tabManager) return;
 
     const canCreateTab = this.tabManager.canCreateTab();
-    this.newTabButtonEl.toggleClass('grimoire-hidden', !canCreateTab);
+    newTabButtonEl.toggleClass('grimoire-hidden', !canCreateTab);
     if (canCreateTab) {
-      this.newTabButtonEl.removeAttribute('aria-disabled');
-      this.newTabButtonEl.removeAttribute('aria-hidden');
+      newTabButtonEl.removeAttribute('aria-disabled');
+      newTabButtonEl.removeAttribute('aria-hidden');
       return;
     }
 
-    this.newTabButtonEl.setAttribute('aria-disabled', 'true');
-    this.newTabButtonEl.setAttribute('aria-hidden', 'true');
-  }
-
-  /** Sets `data-provider` on the root container for provider-scoped status accents. */
-  private syncProviderBrandColor(): void {
-    if (!this.viewContainerEl) return;
-    const activeTab = this.tabManager?.getActiveTab();
-    const providerId = activeTab ? getTabProviderId(activeTab, this.plugin) : DEFAULT_CHAT_PROVIDER_ID;
-    this.viewContainerEl.dataset.provider = providerId;
+    newTabButtonEl.setAttribute('aria-disabled', 'true');
+    newTabButtonEl.setAttribute('aria-hidden', 'true');
   }
 
   private syncHeaderContextUsage(): void {
@@ -1040,10 +1059,9 @@ export class GrimoireView extends ItemView {
         const toggleConfig = providerCatalog().declarations(providerId)
           .chatUI.permissionMode?.toggle() ?? null;
         if (!toggleConfig) return;
-        const current = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
-          this.plugin.settings,
-          providerId,
-        ).permissionMode as string;
+        // The tab's mode, not the shared one: a blank tab answers from its own
+        // draft, which is what its toolbar shows and what the cycle must start from.
+        const current = getTabPermissionMode(activeTab, this.plugin);
         const next = getNextPermissionMode(current, toggleConfig, capabilities.supportsPlanMode);
         if (current === toggleConfig.planValue) {
           activeTab.state.prePlanPermissionMode = null;

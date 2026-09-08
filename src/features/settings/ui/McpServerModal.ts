@@ -144,7 +144,9 @@ export class McpServerModal extends Modal {
         });
     }
 
-    const buttonContainer = contentEl.createDiv({ cls: 'grimoire-mcp-buttons' });
+    const buttonContainer = contentEl.createDiv({
+      cls: 'grimoire-mcp-buttons grimoire-dialog-actions',
+    });
 
     const cancelBtn = buttonContainer.createEl('button', {
       text: t('common.cancel'),

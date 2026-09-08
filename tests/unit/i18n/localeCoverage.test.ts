@@ -65,6 +65,9 @@ const VERIFIED_IDENTICAL: Readonly<Record<typeof LOCALES[number], readonly strin
     'chat.ui.permission.agent',
     'chat.ui.status.aria',
     'chat.ui.subagent.prompt',
+    // "Tab" is the German word too, and the rest of the string is punctuation
+    // and two placeholders.
+    'chat.ui.tabs.tabLabel',
     'chat.ui.toolbar.permissionAuto',
     'chat.ui.toolbar.permissionPlan',
     'chat.ui.toolbar.plan',
@@ -74,6 +77,8 @@ const VERIFIED_IDENTICAL: Readonly<Record<typeof LOCALES[number], readonly strin
     'settings.envSnippets.modal.name',
     'settings.hub.name',
     'settings.providerTabs.codex.reasoning.auto',
+    // "System" is the German word too.
+    'shared.slashCommands.scope.system',
     'settings.slashCommandEditor.agent',
     'settings.slashCommandEditor.skill',
     'settings.slashCommandEditor.skillBadge',
@@ -103,6 +108,8 @@ const VERIFIED_IDENTICAL: Readonly<Record<typeof LOCALES[number], readonly strin
     'chat.ui.ask.option',
     'chat.ui.ask.optional',
     'chat.ui.ask.question',
+    // "{count} notes" is the same phrase in French, noun and plural alike.
+    'chat.ui.contextManager.folderDetail',
     'chat.ui.plan.label',
     'chat.ui.toolbar.effortLevels.max',
     'chat.ui.toolbar.permissionAuto',

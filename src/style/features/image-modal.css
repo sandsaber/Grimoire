@@ -5,7 +5,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--background-modifier-cover);
+  background: var(--grimoire-cover);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -28,7 +28,8 @@
   box-shadow: var(--grimoire-lift-2);
 }
 
-.grimoire-image-modal-close {
+.grimoire-image-modal-close,
+button.grimoire-image-modal-close {
   position: absolute;
   top: -12px;
   right: -12px;
@@ -37,16 +38,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
   border-radius: 50%;
   cursor: pointer;
-  font-size: var(--grimoire-text-2xl);
-  color: var(--text-muted);
+  font-size: var(--grimoire-text-xl);
+  color: var(--grimoire-ink-muted);
   box-shadow: var(--grimoire-lift-1);
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-image-modal-close:hover {
-  background: var(--background-modifier-error);
-  color: var(--text-on-accent);
+  background: var(--grimoire-error-ground);
+  color: var(--grimoire-accent-contrast);
 }
