@@ -5,51 +5,51 @@
 }
 
 .grimoire-whats-new-modal .modal-content {
-  padding-bottom: var(--grimoire-space-6);
+  padding-bottom: var(--grimoire-space-16);
 }
 
 .grimoire-whats-new-summary {
-  margin: 0 0 var(--grimoire-space-5);
-  color: var(--text-muted);
+  margin: 0 0 var(--grimoire-space-12);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-m);
 }
 
 .grimoire-whats-new-list {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-5);
-  margin-bottom: var(--grimoire-space-6);
+  gap: var(--grimoire-space-12);
+  margin-bottom: var(--grimoire-space-16);
 }
 
 .grimoire-whats-new-section {
-  padding: var(--grimoire-space-5);
-  border: 1px solid var(--background-modifier-border);
+  padding: var(--grimoire-space-12);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
 }
 
 .grimoire-whats-new-section h3 {
-  margin: 0 0 var(--grimoire-space-4);
-  color: var(--text-normal);
+  margin: 0 0 var(--grimoire-space-8);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-l);
   font-weight: var(--grimoire-weight-semibold);
 }
 
 .grimoire-whats-new-section ul {
   margin: 0;
-  padding-left: var(--grimoire-space-7);
+  padding-left: var(--grimoire-space-20);
 }
 
 .grimoire-whats-new-section li {
-  margin: var(--grimoire-space-2) 0;
-  color: var(--text-normal);
+  margin: var(--grimoire-space-4) 0;
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   line-height: 1.45;
 }
 
 .grimoire-whats-new-link {
   display: inline-flex;
-  margin-bottom: var(--grimoire-space-5);
+  margin-bottom: var(--grimoire-space-12);
   color: var(--grimoire-accent-text);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-semibold);

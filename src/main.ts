@@ -43,6 +43,7 @@ import {
 } from './core/bootstrap/SessionStorage';
 import type { SharedAppStorage } from './core/bootstrap/storage';
 import { ConversationAlreadyExistsError } from './core/conversations/ConversationRepository';
+import { isSessionClaimed } from './core/conversations/sessionClaims';
 import { type DebugLogEvent, DebugLogService } from './core/debug/DebugLogService';
 import type { LocalShellInvocation } from './core/execution/local/LocalShellBackend';
 import {
@@ -68,6 +69,7 @@ import type {
   Conversation,
   ConversationMeta,
   GrimoireSettings,
+  TitleSource,
 } from './core/types';
 import {
   VIEW_TYPE_GRIMOIRE,
@@ -307,6 +309,20 @@ export default class GrimoirePlugin extends Plugin {
         },
       });
 
+      this.registerShellCommand({
+        id: 'manage-context',
+        name: t('plugin.manageContext'),
+        checkCallback: (checking: boolean) => {
+          const attachments = this.getView()?.getActiveTab()?.ui.contextAttachments;
+          if (!attachments) return false;
+
+          if (!checking) {
+            attachments.manage();
+          }
+          return true;
+        },
+      });
+
       for (let index = 1; index <= 9; index++) {
         this.registerShellCommand({
           id: `switch-to-tab-${index}`,
@@ -374,6 +390,7 @@ export default class GrimoirePlugin extends Plugin {
     updateCommandName('new-tab', t('plugin.newTab'));
     updateCommandName('new-session', t('plugin.newSession'));
     updateCommandName('close-current-tab', t('plugin.closeCurrentTab'));
+    updateCommandName('manage-context', t('plugin.manageContext'));
     for (let index = 1; index <= 9; index++) {
       updateCommandName(`switch-to-tab-${index}`, t('plugin.switchToTab', { index }));
     }
@@ -1169,14 +1186,35 @@ export default class GrimoirePlugin extends Plugin {
       messages: [],
     });
 
-    // A conversation created from a live session is keyed by that session id,
-    // which is how its transcript is found again. When the vault already holds
-    // one under that id, the new chat takes an id of its own and keeps the
-    // session in its `sessionId` field, so resume still works and the existing
-    // conversation is left alone. Written as a refusal and a retry rather than
-    // a lookup first: the store serializes per id, and a check-then-write can
-    // lose the race with another window.
-    let conversation = build(sessionId ?? this.generateConversationId());
+    /*
+     * A conversation created from a live session is keyed by that session id,
+     * which is how its transcript is found again. When the vault already holds
+     * one under that id, the new chat takes an id of its own and keeps the
+     * session in its `sessionId` field, so resume still works and the existing
+     * conversation is left alone. Written as a refusal and a retry rather than
+     * a lookup first: the store serializes per id, and a check-then-write can
+     * lose the race with another window.
+     *
+     * A conversation can also hold that session without being *named* by it -
+     * an id of its own in `id`, the session in `sessionId` - and the refusal
+     * above cannot see that, because no record under that id exists. That is
+     * how one Codex chat came to be stored twice, ten messages and all, one
+     * millisecond after its own turn ended. The claim is checked here, against
+     * the list in memory: the id it produces is new, so nothing is read back
+     * and there is no race to lose.
+     */
+    const claimedByAnother = isSessionClaimed(this.conversations, sessionId);
+    if (claimedByAnother) {
+      this.recordDebugLog({
+        data: { providerId, sessionId },
+        event: 'conversation.create.sessionClaimed',
+        level: 'warn',
+        scope: 'plugin',
+      });
+    }
+    let conversation = build(
+      sessionId && !claimedByAnother ? sessionId : this.generateConversationId(),
+    );
     try {
       await this.storage.sessions.createMetadata(
         this.storage.sessions.toSessionMetadata(conversation)
@@ -1293,17 +1331,26 @@ export default class GrimoirePlugin extends Plugin {
     }
   }
 
-  async renameConversation(id: string, title: string): Promise<void> {
+  /**
+   * @param titleSource Who wrote this title. Omitted leaves the recorded source
+   * alone, which is what a rename with nothing to say about provenance means —
+   * a fork, a duplicate, a restore.
+   */
+  async renameConversation(id: string, title: string, titleSource?: TitleSource): Promise<void> {
     const conversation = this.conversations.find(c => c.id === id);
     if (!conversation) return;
 
     conversation.title = title.trim() || this.generateDefaultTitle();
     conversation.updatedAt = Date.now();
+    if (titleSource) conversation.titleSource = titleSource;
 
     // The title and nothing else. A rename that landed mid-stream used to write
     // the whole conversation this window was holding, which put back the
     // messages it had before the stream started.
-    await this.storage.sessions.updateMetadata(conversation, ['title']);
+    await this.storage.sessions.updateMetadata(
+      conversation,
+      titleSource ? ['title', 'titleSource'] : ['title'],
+    );
 
     for (const view of this.getAllViews()) {
       view.getTabManager()?.notifyConversationRenamed?.(id, conversation.title);
@@ -1401,6 +1448,7 @@ export default class GrimoirePlugin extends Plugin {
       sourceCount: this.getConversationSourceCount(c),
       usagePercentage: c.usage?.percentage,
       titleGenerationStatus: c.titleGenerationStatus,
+      titleSource: c.titleSource,
     }));
   }
 

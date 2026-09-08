@@ -159,6 +159,38 @@ describe('two writers on one conversation', () => {
     expect(stored.titleGenerationStatus).toBe('success');
   });
 
+  it('drops a pending title generation left behind by a closed session', async () => {
+    // A generation runs in the session that started it. Read back from disk, a
+    // `pending` is an attempt nobody is making any more — and the history row
+    // it belongs to kept a spinner on it for the life of the vault.
+    const { storage } = createStorage();
+    const stored = storage.toSessionMetadata(conversation({ titleGenerationStatus: 'pending' }));
+
+    expect(storage.toConversation(stored, 'codex').titleGenerationStatus).toBeUndefined();
+    // An attempt that finished says what it did, and keeps saying it.
+    const done = storage.toSessionMetadata(conversation({ titleGenerationStatus: 'failed' }));
+    expect(storage.toConversation(done, 'codex').titleGenerationStatus).toBe('failed');
+  });
+
+  it('carries the title source with the title, and only when a writer names it', async () => {
+    const { storage, read } = createStorage();
+    await storage.createMetadata(storage.toSessionMetadata(conversation()));
+
+    await storage.updateMetadata(
+      conversation({ title: 'About tomatoes', titleSource: 'model' }),
+      ['title', 'titleSource'],
+    );
+    expect(read().titleSource).toBe('model');
+
+    // A writer with nothing to say about provenance — a fork, a restore — must
+    // not blank what the last one recorded.
+    await storage.updateMetadata(conversation({ title: 'About peppers' }), ['title']);
+
+    const stored = read();
+    expect(stored.title).toBe('About peppers');
+    expect(stored.titleSource).toBe('model');
+  });
+
   it('moves the derived fields with the messages they are derived from', async () => {
     const { storage, read } = createStorage();
     await storage.createMetadata(storage.toSessionMetadata(conversation()));
@@ -197,4 +229,31 @@ describe('two writers on one conversation', () => {
     expect(stored.revision).toBe(3);
     expect(stored.schemaVersion).toBe(1);
   });
+
+  /*
+   * A transcript the store could not copy is still a transcript.
+   *
+   * On the partial-write path an absent field is a deletion, and the copy
+   * returned `undefined` both for a conversation with no messages and for one
+   * whose clone threw - so a message the store merely failed to serialize took
+   * the whole stored transcript with it, silently, at the next save.
+   */
+  it('leaves the stored transcript alone when the copy cannot be made', async () => {
+    const { storage, read } = createStorage();
+    await storage.createMetadata(storage.toSessionMetadata(conversation({
+      messages: [message('user', 'First'), message('assistant', 'Second')],
+    })));
+
+    const circular = message('user', 'Third') as ChatMessage & { self?: unknown };
+    circular.self = circular;
+
+    await storage.updateMetadata(
+      conversation({ messages: [circular] }),
+      ['messages'],
+    );
+
+    expect(read().messages).toHaveLength(2);
+    expect(read().messages[1].content).toBe('Second');
+  });
+
 });

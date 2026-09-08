@@ -1,0 +1,28 @@
+/*
+ * The mark that says who wrote a conversation's title.
+ *
+ * One rule set for every place it appears — the tab context-menu heading, the
+ * history row, the rename dialog. The shape is the meaning and the colour is
+ * none: all three sources are ink, the way a provider's identity is, because a
+ * state told apart by hue alone cannot be read by a reader who cannot separate
+ * the hues and cannot be named by one who has not learnt the palette. The tab
+ * badge is deliberately not one of those places: it shows a number, not a name.
+ */
+
+.grimoire-title-source {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--grimoire-ink-muted);
+}
+
+.grimoire-title-source .svg-icon {
+  width: var(--grimoire-icon-2xs);
+  height: var(--grimoire-icon-2xs);
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-rename-tab-field .grimoire-title-source {
+  margin-inline-end: var(--grimoire-space-2);
+}

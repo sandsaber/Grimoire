@@ -141,9 +141,14 @@ export class InlinePermissionRequest {
   private renderActions(cardEl: HTMLElement): void {
     const actionsEl = cardEl.createDiv({ cls: 'grimoire-permission-actions grimoire-ask-list' });
 
-    let allowShortcutRendered = false;
-    let rejectShortcutRendered = false;
-    for (const option of this.getOrderedOptions()) {
+    /*
+     * Numbered choices, the way every other decision surface numbers them: the
+     * key that answers this row sits in a column of its own, and rejecting is
+     * `esc` rather than the fourth number. Each row used to open with a 14px
+     * accent glyph instead, which made the safe answer the loudest thing on a
+     * card about caution.
+     */
+    for (const { key, option } of this.getKeyedOptions()) {
       const action = this.getAction(option);
       const buttonEl = actionsEl.createEl('button', {
         cls: [
@@ -154,10 +159,7 @@ export class InlinePermissionRequest {
         attr: { type: 'button' },
       });
 
-      setIcon(
-        buttonEl.createSpan({ cls: 'grimoire-permission-button-icon' }),
-        this.getActionIcon(option),
-      );
+      buttonEl.createSpan({ cls: 'grimoire-permission-button-key', text: key });
 
       buttonEl.createSpan({
         cls: 'grimoire-permission-button-label',
@@ -173,22 +175,32 @@ export class InlinePermissionRequest {
           text: option.description,
         });
       }
-      const shortcut = action === 'allow' && !allowShortcutRendered
-        ? 'Enter'
-        : action === 'reject' && !rejectShortcutRendered
-          ? 'Esc'
-          : null;
-      if (shortcut) {
-        buttonEl.createEl('kbd', {
-          cls: 'grimoire-permission-button-shortcut',
-          text: shortcut,
-          attr: { 'aria-hidden': 'true' },
-        });
-      }
-      allowShortcutRendered ||= action === 'allow';
-      rejectShortcutRendered ||= action === 'reject';
       buttonEl.addEventListener('click', () => this.handleResolve(option.value));
     }
+  }
+
+  /**
+   * Each choice with the key that answers it — one list, read by the drawing
+   * and by the keyboard.
+   *
+   * They were two lists that disagreed. The card drew `1` and `2` and listened
+   * for `Enter` and `a`, so the keys it advertised did nothing at all; and
+   * every rejecting choice was drawn as `esc`, so a card offering two ways to
+   * say no showed `esc` twice and `Escape` could only ever reach the first of
+   * them. `esc` belongs to one row, the way the design draws it, and everything
+   * else is numbered in the order it is listed.
+   */
+  private getKeyedOptions(): { key: string; option: ApprovalDecisionOption }[] {
+    let escapeTaken = false;
+    let choiceNumber = 0;
+    return this.getOrderedOptions().map(option => {
+      if (!escapeTaken && this.getAction(option) === 'reject') {
+        escapeTaken = true;
+        return { key: 'esc', option };
+      }
+      choiceNumber += 1;
+      return { key: String(choiceNumber), option };
+    });
   }
 
   private getOrderedOptions(): ApprovalDecisionOption[] {
@@ -228,11 +240,20 @@ export class InlinePermissionRequest {
       return;
     }
 
-    if (event.key === 'Escape') {
-      const option = this.findOption('reject');
+    // The keys the card actually draws. Without this the numbers were decoration.
+    const numbered = this.getKeyedOptions().find(entry => entry.key === event.key);
+    if (numbered) {
       event.preventDefault();
       event.stopPropagation();
-      this.handleResolve(option?.value ?? null);
+      this.handleResolve(numbered.option.value);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      const escaped = this.getKeyedOptions().find(entry => entry.key === 'esc');
+      event.preventDefault();
+      event.stopPropagation();
+      this.handleResolve(escaped?.option.value ?? null);
     }
   }
 
@@ -262,19 +283,6 @@ export class InlinePermissionRequest {
       return t('chat.ui.permission.reject');
     }
     return option.label;
-  }
-
-  private getActionIcon(option: ApprovalDecisionOption): string {
-    const action = this.getAction(option);
-    if (action === 'allow') return 'check';
-    if (action === 'reject') return 'x';
-    if (action === 'always') {
-      const scope = `${option.label} ${option.value}`;
-      if (/\bproject\b/i.test(scope)) return 'folder-check';
-      if (/\buser\b/i.test(scope)) return 'user-check';
-      return 'shield-check';
-    }
-    return 'circle-dot';
   }
 
   private getToolLabel(): string {

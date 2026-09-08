@@ -18,6 +18,7 @@ export {
   type ProgressState,
   type SessionMetadata,
   type StreamChunk,
+  type TitleSource,
   type UsageInfo,
   VIEW_TYPE_GRIMOIRE,
 } from './chat';

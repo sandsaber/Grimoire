@@ -744,9 +744,19 @@ export class ChatExecutionCoordinator {
     const unfinished = this.lifecycle.getRunsForOwner(owner).filter(run => !run.terminal);
     const sessions = this.lifecycle.getSessionsForOwner(owner);
     const latest = unfinished.at(-1);
+    const idle = sessions.filter(candidate => candidate.status !== 'disposed');
     const session = latest
       ? sessions.find(candidate => candidate.executionSessionId === latest.executionSessionId)
-      : sessions.filter(candidate => candidate.status !== 'disposed').at(-1);
+      // The newest session is not automatically the authoritative one. A
+      // restart can leave a conversation with two: the restored session, which
+      // carries the provider-native reference the conversation continues from,
+      // and a replacement opened afterwards without one. Adopting by recency
+      // alone picked the replacement, and the next turn then asked the provider
+      // to resume a thread the restored session still owned — which Codex
+      // refuses as an active-writer conflict, leaving the conversation
+      // unusable until it was recreated. The reference is what makes a session
+      // this conversation's, so it wins; recency only breaks the tie.
+      : idle.filter(candidate => candidate.nativeSessionRef).at(-1) ?? idle.at(-1);
     if (!session) {
       return;
     }

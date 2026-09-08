@@ -156,6 +156,65 @@ describe('Obsidian review gate', () => {
     ]);
   });
 
+  it('reports the Level 3 text-decoration longhands, and leaves the plain shorthand alone', () => {
+    // Obsidian flagged `text-decoration-color` on the picker's match underline
+    // while eight plain `text-decoration: underline | line-through | none`
+    // declarations in the same sheet went unmentioned, so the denylist has to
+    // separate the two rather than ban the property.
+    const findings = findPartialCssSupportFeatures([
+      {
+        file: 'src/style/example.css',
+        contents: [
+          '.match {',
+          '  text-decoration: underline;',
+          '  text-decoration-color: var(--grimoire-accent);',
+          '  text-underline-offset: 2px;',
+          '  text-decoration: underline dotted;',
+          '}',
+          '.plain { text-decoration: none; }',
+          '.struck { text-decoration: line-through; }',
+        ].join('\n'),
+      },
+    ]);
+
+    expect(findings.map(finding => ({ line: finding.line, declaration: finding.declaration }))).toEqual([
+      { line: 3, declaration: 'text-decoration-color: var(--grimoire-accent);' },
+      { line: 4, declaration: 'text-underline-offset: 2px;' },
+      { line: 5, declaration: 'text-decoration: underline dotted;' },
+    ]);
+    expect(findings.every(finding => finding.featureId === 'text-decoration')).toBe(true);
+    expect(findings[0].message).toBe(
+      'Unexpected browser feature "text-decoration" is only partially supported by Obsidian 1.11.4',
+    );
+  });
+
+  it('does not read a minified sheet\'s next rule as a second shorthand value', () => {
+    // The built `styles.css` is one line, and it is scanned: a run of
+    // `build:release` leaves it in the root for the next run's gate to read.
+    // The value has to stop at the brace, or every plain `text-decoration`
+    // in the sheet borrows the next rule's spacing and is reported.
+    const findings = findPartialCssSupportFeatures([
+      {
+        file: 'styles.css',
+        contents: '.a{text-decoration:underline}.b{flex:0 0 auto}'
+          + '.c{text-decoration:none}.d{margin:0 auto}',
+      },
+    ]);
+
+    expect(findings).toEqual([]);
+  });
+
+  it('still reports a multi-value shorthand inside a minified sheet', () => {
+    const findings = findPartialCssSupportFeatures([
+      {
+        file: 'styles.css',
+        contents: '.a{color:red}.b{text-decoration:underline dotted}.c{flex:0 0 auto}',
+      },
+    ]);
+
+    expect(findings.map(finding => finding.featureId)).toEqual(['text-decoration']);
+  });
+
   it('reports CSS features that Obsidian review only partially supports', () => {
     const findings = findPartialCssSupportFeatures([
       {

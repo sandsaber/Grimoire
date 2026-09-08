@@ -8,7 +8,7 @@ import type { VaultTextIndex } from '../../../core/context/VaultTextIndex';
 import { MAX_TITLE_LENGTH } from '../../../core/prompt/titleLength';
 import type { InstructionRefineService, ProviderId, TitleGenerationService } from '../../../core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
-import type { UsageInfo } from '../../../core/types';
+import type { TitleSource, UsageInfo } from '../../../core/types';
 import type { SlashCommandDropdown } from '../../../shared/components/SlashCommandDropdown';
 import type { BrowserSelectionController } from '../controllers/BrowserSelectionController';
 import type { CanvasSelectionController } from '../controllers/CanvasSelectionController';
@@ -22,6 +22,7 @@ import type { SubagentManager } from '../services/SubagentManager';
 import type { ChatState } from '../state/ChatState';
 import type { BangBashModeManager } from '../ui/BangBashModeManager';
 import type { RuntimeContextActivityView } from '../ui/context/RuntimeContextActivity';
+import type { ContextAttachments } from '../ui/context-manager/ContextAttachments';
 import type { FileContextManager } from '../ui/FileContext';
 import type { ImageContextManager } from '../ui/ImageContext';
 import type {
@@ -124,6 +125,8 @@ export interface TabServices {
  */
 export interface TabUIComponents {
   fileContextManager: FileContextManager | null;
+  /** The one list behind the composer chips, the manage dialog and the picker. */
+  contextAttachments: ContextAttachments | null;
   imageContextManager: ImageContextManager | null;
   modelSelector: ModelSelector | null;
   planUsageBadge: PlanUsageBadge | null;
@@ -164,6 +167,10 @@ export interface TabDOMElements {
   sourceFiltersEl: HTMLElement;
   sourceShownCountEl: HTMLElement;
   composerSurfaceEl: HTMLElement;
+
+  /** The panel switch row: the view segments, and the transcript's jump controls. */
+  panelSwitchEl: HTMLElement;
+  panelJumpEl: HTMLElement;
 
   /** Current-tab view tabs. */
   panelTabsEl: HTMLElement;
@@ -287,6 +294,17 @@ export interface TabData {
 
   /** Monotonic guard for overlapping bound-session model selections. */
   modelSelectionGeneration?: number;
+
+  /**
+   * Tells the view that a blank tab's draft settings moved, so the tab bar and
+   * `data.json` catch up. The toolbar gets this as a wiring parameter, but a
+   * keyboard shortcut reaches a tab without going through the toolbar, and the
+   * draft it writes has to persist the same way a click's does.
+   */
+  notifyDraftSettingsChanged?: (
+    providerId: ProviderId,
+    settings: Record<string, unknown>,
+  ) => void | Promise<void>;
 }
 
 export type TabProviderContext = Pick<TabData, 'conversationId' | 'service' | 'providerId' | 'lifecycleState' | 'draftModel' | 'draftSettings'>;
@@ -378,6 +396,8 @@ export interface TabBarItem {
   /** 1-based index for display. */
   index: number;
   title: string;
+  /** Where `title` came from, when the conversation records it. */
+  titleSource?: TitleSource;
   providerId: ProviderId;
   isActive: boolean;
   isStreaming: boolean;

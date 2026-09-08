@@ -401,7 +401,14 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
     return refusal;
   }
 
-  private refuse(requestRef: string, message: string): Error {
+  /**
+   * Keeps a refusal this store did not itself issue.
+   *
+   * The backend records what the daemon answered a native preparation with, so
+   * a `thread/resume` refused before any turn was dispatched is described in
+   * the words that explain it rather than by the kernel's neutral sentence.
+   */
+  recordRefusal(requestRef: string, message: string): void {
     while (this.refusals.size >= REFUSAL_LIMIT) {
       const oldest = this.refusals.keys().next();
       if (oldest.done) {
@@ -410,6 +417,10 @@ export class CodexExecutionRequests implements CodexExecutionRequestResolver {
       this.refusals.delete(oldest.value);
     }
     this.refusals.set(requestRef, message);
+  }
+
+  private refuse(requestRef: string, message: string): Error {
+    this.recordRefusal(requestRef, message);
     return new Error(message);
   }
 

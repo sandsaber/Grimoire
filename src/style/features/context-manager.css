@@ -1,0 +1,737 @@
+/*
+ * Context management: the composer's summary of what is attached, the dialog
+ * that lists all of it, and the picker that adds more.
+ *
+ * See docs/design-system.md. Everything here is ink, ground, line and a
+ * hairline of accent; the only filled things on these three surfaces are Add
+ * and Done, which are one primary action each.
+ */
+
+/* ---- 3a · the composer ---- */
+
+.grimoire-context-attachments {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--grimoire-space-4);
+  width: 100%;
+}
+
+.grimoire-context-chips {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: var(--grimoire-space-6);
+}
+
+/*
+ * The way into the dialog while the chips still fit. The drawing puts Manage
+ * in the summary row, which only exists past four attachments - so with two
+ * files attached there was no way to open the dialog at all.
+ */
+/*
+ * Pinned to the row's corner, and out of its flow.
+ *
+ * In flow it was the last thing on a wrapping row, so in a sidebar narrow
+ * enough that it did not fit beside the chips it dropped to a line of its
+ * own - a whole row spent on one 24px control. The row reserves the width
+ * instead, which keeps a chip from running under it.
+ */
+.grimoire-context-chips--managed {
+  position: relative;
+  padding-inline-end: calc(var(--grimoire-chip-h) + var(--grimoire-space-8));
+}
+
+/* Its size comes from `--small`, which is a hit target and a chip's height. */
+.grimoire-context-chips-manage {
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+}
+
+/* Add is always one control away, whatever else the row is showing. */
+.grimoire-file-chip--add {
+  padding: 0 var(--grimoire-space-8);
+  border-style: dashed;
+  border-color: var(--grimoire-line);
+  color: var(--grimoire-ink-faint);
+  cursor: pointer;
+}
+
+.grimoire-file-chip--add:hover {
+  border-color: var(--grimoire-line-3);
+  background: none;
+  color: var(--grimoire-ink);
+}
+
+/*
+ * The same line a chip row is, exactly.
+ *
+ * It carried its own vertical padding and a rule under it, so switching from
+ * one chip to two made the whole row taller and took that height out of the
+ * message being written. What is attached should not change how much room
+ * there is to write about it.
+ */
+.grimoire-context-summary-bar {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: var(--grimoire-chip-h);
+  gap: var(--grimoire-space-8);
+}
+
+.grimoire-context-summary-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--grimoire-accent);
+}
+
+.grimoire-context-summary-icon svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-summary-icon.is-over-budget {
+  color: var(--grimoire-error);
+}
+
+.grimoire-context-summary-icon.is-over-budget svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+}
+
+.grimoire-context-summary-count {
+  flex: 0 0 auto;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
+}
+
+.grimoire-context-summary-cost {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grimoire-context-summary-spacer {
+  flex: 1 1 auto;
+}
+
+button.grimoire-context-summary-manage {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: var(--grimoire-hit-m);
+  gap: var(--grimoire-space-6);
+  padding: 0 var(--grimoire-space-8);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-muted);
+  cursor: pointer;
+  font-size: var(--grimoire-text-m);
+  line-height: 1;
+}
+
+.grimoire-context-summary-manage:hover {
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
+}
+
+.grimoire-context-summary-manage svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
+}
+
+/* ---- 3b · the manage dialog ---- */
+
+/*
+ * The dialog is sized on the modal, not on what it holds.
+ *
+ * Obsidian's `.modal` is 560px wide with 16px of padding, so a 640px content
+ * box overflowed it by 112px and the host's own `overflow: auto` clipped the
+ * whole right column away: the token count on every row, every row's remove
+ * cross, the Add button and Done. What that cost was a dialog whose entire
+ * job - deciding what to keep - could not be done in it.
+ */
+.grimoire-context-modal {
+  width: min(640px, 92vw);
+  max-width: min(640px, 92vw);
+  height: min(560px, 80vh);
+  padding: 0;
+  overflow: hidden;
+}
+
+.grimoire-context-modal .modal-content {
+  padding: 0;
+}
+
+.grimoire-context-manager {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.grimoire-context-header {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 44px;
+  gap: var(--grimoire-space-8);
+  /* Room at the end for the host's close, which sits over this corner. */
+  padding: 0 var(--grimoire-hit-l) 0 var(--grimoire-space-16);
+  border-bottom: 1px solid var(--grimoire-line);
+}
+
+.grimoire-context-title {
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-l);
+  font-weight: var(--grimoire-weight-semibold);
+  line-height: 1;
+}
+
+.grimoire-context-header-count {
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  line-height: 1;
+}
+
+.grimoire-context-header-spacer,
+.grimoire-context-item-spacer,
+.grimoire-context-bulk-spacer,
+.grimoire-context-footer-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* One field, two jobs: filter what is attached, or type to add from the vault. */
+.grimoire-context-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 40px;
+  gap: var(--grimoire-space-8);
+  padding: 0 var(--grimoire-space-10) 0 var(--grimoire-space-16);
+  border-bottom: 1px solid var(--grimoire-line);
+}
+
+.grimoire-context-search-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+}
+
+.grimoire-context-search-icon svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
+}
+
+input.grimoire-context-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  outline: 0;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-search-input::placeholder {
+  color: var(--grimoire-ink-faint);
+}
+
+/*
+ * No ring around either search field.
+ *
+ * The host draws one at `input[type='text']:focus-visible` - element,
+ * attribute and pseudo-class - which a rule named `input.<class>` cannot
+ * reach, so `box-shadow: none` on the base was overruled the moment the field
+ * took focus. The picker focuses its field as it opens, so that was permanent
+ * chrome around a band both 3b and 3c draw flat. Focus reads on the glyph
+ * instead: a glyph in the accent is inside the budget, a 2px box is not.
+ */
+input.grimoire-context-search-input:focus,
+input.grimoire-context-search-input:focus-visible,
+input.grimoire-context-picker-input:focus,
+input.grimoire-context-picker-input:focus-visible {
+  box-shadow: none;
+}
+
+.grimoire-context-search:focus-within .grimoire-context-search-icon,
+.grimoire-context-picker-search:focus-within .grimoire-context-picker-icon {
+  color: var(--grimoire-accent);
+}
+
+.grimoire-context-search .grimoire-primary-action {
+  height: var(--grimoire-hit-m);
+}
+
+/* A band, not a fill: the eye must not read the selection as a surface. */
+.grimoire-context-bulk {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 34px;
+  gap: var(--grimoire-space-8);
+  padding: 0 var(--grimoire-space-10) 0 var(--grimoire-space-16);
+  border-bottom: 1px solid var(--grimoire-line);
+  background: var(--grimoire-accent-wash-weak);
+}
+
+.grimoire-context-bulk-count {
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-bulk-tokens {
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+}
+
+button.grimoire-context-bulk-clear {
+  padding: 0 var(--grimoire-space-6);
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-muted);
+  cursor: pointer;
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-bulk-clear:hover {
+  background: none;
+  color: var(--grimoire-ink);
+}
+
+button.grimoire-context-bulk-remove {
+  display: inline-flex;
+  align-items: center;
+  height: var(--grimoire-hit-s);
+  gap: var(--grimoire-space-4);
+  padding: 0 var(--grimoire-space-6);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-error);
+  cursor: pointer;
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-bulk-remove:hover {
+  background: var(--grimoire-error-wash);
+  color: var(--grimoire-error);
+}
+
+.grimoire-context-bulk-remove-icon svg {
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--grimoire-space-6) var(--grimoire-space-8) var(--grimoire-space-10);
+  scrollbar-width: thin;
+  scrollbar-color: var(--grimoire-line-2) transparent;
+}
+
+.grimoire-context-item {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: var(--grimoire-list-row-h);
+  gap: var(--grimoire-space-10);
+  padding: 0 var(--grimoire-space-8);
+  border-radius: var(--grimoire-radius-1);
+  cursor: pointer;
+}
+
+.grimoire-context-item:hover,
+.grimoire-context-item.is-focused {
+  background: var(--grimoire-hover);
+}
+
+/* Selection keeps the wash rather than gaining a colour of its own. */
+.grimoire-context-item.is-selected {
+  background: var(--grimoire-hover);
+}
+
+/*
+ * Adding something already attached flashes the row it is already on, so the
+ * count staying the same reads as an answer rather than as nothing happening.
+ */
+.grimoire-context-item.is-duplicate {
+  background: var(--grimoire-accent-wash);
+}
+
+.grimoire-context-item.is-failed {
+  opacity: 0.6;
+}
+
+.grimoire-context-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  border: 1.5px solid var(--grimoire-line-3);
+  border-radius: var(--grimoire-radius-1);
+  color: var(--grimoire-accent-contrast);
+  cursor: pointer;
+}
+
+.grimoire-context-item.is-selected .grimoire-context-checkbox {
+  border-color: var(--grimoire-accent);
+  background: var(--grimoire-accent);
+}
+
+.grimoire-context-checkbox svg {
+  width: 10px;
+  height: 10px;
+  stroke-width: 3;
+}
+
+.grimoire-context-item-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--grimoire-accent);
+}
+
+.grimoire-context-item-icon svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-item-icon.is-failed {
+  color: var(--grimoire-error);
+}
+
+.grimoire-context-item--candidate .grimoire-context-item-icon {
+  color: var(--grimoire-ink-muted);
+}
+
+.grimoire-context-item-name {
+  flex: none;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-item-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grimoire-context-item-tokens {
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  white-space: nowrap;
+}
+
+/*
+ * A failure names its cause where the path would have been, next to the name
+ * it is about, and carries no token count - it contributes nothing to count.
+ */
+.grimoire-context-item-error {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-error);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grimoire-context-empty {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  padding: var(--grimoire-space-20);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-m);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.grimoire-context-footer {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 48px;
+  gap: var(--grimoire-space-10);
+  padding: 0 var(--grimoire-space-12) 0 var(--grimoire-space-16);
+  border-top: 1px solid var(--grimoire-line);
+}
+
+/* The budget, as a line rather than as a number the reader has to compare. */
+.grimoire-context-budget {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 4px;
+  border-radius: var(--grimoire-radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--grimoire-accent) var(--grimoire-context-budget-pct, 0%),
+    var(--grimoire-line) var(--grimoire-context-budget-pct, 0%)
+  );
+}
+
+.grimoire-context-budget.is-over {
+  background: var(--grimoire-error);
+}
+
+.grimoire-context-budget-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.grimoire-context-remove-all {
+  height: var(--grimoire-hit-l);
+  padding: 0 var(--grimoire-space-8);
+  border: 0;
+  border-radius: var(--grimoire-radius-1);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-error);
+  cursor: pointer;
+  font-size: var(--grimoire-text-s);
+  white-space: nowrap;
+}
+
+.grimoire-context-remove-all:hover {
+  background: var(--grimoire-error-wash);
+  color: var(--grimoire-error);
+}
+
+/* ---- 3c · the add picker ---- */
+
+.grimoire-context-picker {
+  position: absolute;
+  bottom: calc(100% + var(--grimoire-space-4));
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - var(--grimoire-space-24)));
+  max-height: 340px;
+  overflow: hidden;
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-2);
+  background: var(--grimoire-ground);
+  box-shadow: var(--grimoire-lift-1);
+}
+
+/*
+ * Opened from the manage dialog, the panel drops out of the search band that
+ * holds the control. In the composer it rises instead - and it cannot simply
+ * be drawn in the composer both times, because a modal is its own stacking
+ * context and a panel outside it lands behind it however high its z-index.
+ */
+.grimoire-context-picker--below {
+  top: calc(100% + var(--grimoire-space-4));
+  bottom: auto;
+  left: var(--grimoire-space-12);
+  width: auto;
+  right: var(--grimoire-space-12);
+}
+
+.grimoire-context-picker-search {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 38px;
+  gap: var(--grimoire-space-8);
+  padding: 0 var(--grimoire-space-10) 0 var(--grimoire-space-12);
+  border-bottom: 1px solid var(--grimoire-line);
+}
+
+.grimoire-context-picker-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+}
+
+.grimoire-context-picker-icon svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
+}
+
+input.grimoire-context-picker-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  outline: 0;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-picker-input::placeholder {
+  color: var(--grimoire-ink-faint);
+}
+
+/* The keyboard map, where the keyboard can see it. */
+.grimoire-context-picker-hint {
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  white-space: nowrap;
+}
+
+.grimoire-context-picker-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--grimoire-space-6);
+}
+
+.grimoire-context-picker-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 32px;
+  gap: var(--grimoire-space-10);
+  padding: 0 var(--grimoire-space-8);
+  border-radius: var(--grimoire-radius-1);
+  cursor: pointer;
+}
+
+.grimoire-context-picker-row:hover,
+.grimoire-context-picker-row.is-highlighted {
+  background: var(--grimoire-hover);
+}
+
+/* Already in context: highlighted, inert, and saying so. */
+.grimoire-context-picker-row.is-attached {
+  background: var(--grimoire-hover);
+  cursor: default;
+}
+
+.grimoire-context-picker-row.is-attached .grimoire-context-picker-row-icon {
+  color: var(--grimoire-accent);
+}
+
+.grimoire-context-picker-row-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-muted);
+}
+
+.grimoire-context-picker-row-icon svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-context-picker-row-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * What matched, underlined in the accent — a line, which is what it may be.
+ *
+ * Drawn as a border rather than as a decoration: `text-decoration-color` and
+ * `text-underline-offset` are CSS Text Decoration Level 3, which Obsidian's
+ * review baseline lists as partial. The plain `text-decoration: underline`
+ * shorthand is fine and is what the sheet uses elsewhere; it just cannot carry
+ * a colour of its own.
+ */
+.grimoire-context-picker-match {
+  border-bottom: 1px solid var(--grimoire-accent);
+}
+
+.grimoire-context-picker-row-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.grimoire-context-picker-row-meta {
+  flex: 0 0 auto;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-xs);
+  white-space: nowrap;
+}
+
+.grimoire-context-picker-empty {
+  padding: var(--grimoire-space-12) var(--grimoire-space-8);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
+}
+
+.grimoire-context-picker-footer {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 34px;
+  gap: var(--grimoire-space-6);
+  padding: 0 var(--grimoire-space-12);
+  border-top: 1px solid var(--grimoire-line);
+}
+
+button.grimoire-context-picker-quick,
+.grimoire-context-picker-sep {
+  height: var(--grimoire-hit-s);
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+}
+
+.grimoire-context-picker-quick {
+  cursor: pointer;
+}
+
+.grimoire-context-picker-quick:hover {
+  background: none;
+  color: var(--grimoire-ink);
+}

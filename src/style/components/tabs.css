@@ -1,73 +1,91 @@
+/*
+ * The tab strip.
+ *
+ * A tab is its number and its state, and the state is a dot: filled and pulsing
+ * while the provider streams, a ring while the turn waits on the user, nothing
+ * at rest. The active tab is the only one carrying a line, and that line is the
+ * accent — which is the whole of what the accent does here.
+ */
 .grimoire-tab-bar-container {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   min-width: 0;
-  gap: var(--grimoire-space-2);
+  gap: 0;
 }
 
 .grimoire-tab-badges {
   display: flex;
-  align-items: center;
-  gap: var(--grimoire-space-2);
+  align-items: stretch;
   max-width: 100%;
   min-width: 0;
+  height: 100%;
+  gap: var(--grimoire-space-2);
   overflow: auto hidden;
   scrollbar-width: none;
+}
+
+.grimoire-tab-badges::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .grimoire-tab-badge {
   position: relative;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   box-sizing: border-box;
-  min-width: 28px;
-  width: 28px;
-  height: 28px;
   flex: 0 0 auto;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--grimoire-radius-1);
-  font-family: var(--font-monospace);
+  gap: var(--grimoire-space-6);
+  padding: 0 var(--grimoire-space-8);
+  border: 0;
+  border-radius: var(--grimoire-radius-1) var(--grimoire-radius-1) 0 0;
+  background: none;
+  box-shadow: none;
+  cursor: pointer;
+  color: var(--grimoire-ink-faint);
   font-size: var(--grimoire-text-s);
   font-variant-numeric: tabular-nums;
-  font-weight: var(--grimoire-weight-bold);
   line-height: 1;
-  cursor: pointer;
-  color: var(--grimoire-workbench-muted);
-  background: var(--grimoire-raise);
-  box-shadow: none;
   transition: color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-tab-badge:hover {
-  background: var(--grimoire-raise-2);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
+}
+
+/*
+ * A tab with something to say is not faint, whether or not it is the one being
+ * read: the dot needs a label beside it that the eye can also find.
+ */
+.grimoire-tab-badge-streaming,
+.grimoire-tab-badge-attention {
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-tab-badge-active {
-  border-color: var(--grimoire-accent-line);
-  background: var(--grimoire-accent-soft);
-  color: var(--grimoire-accent-text);
+  border-radius: 0;
+  /* 2px, not the 1.5px a leading edge gets: this line lands on the header's
+   * own rule and half of it is spent hiding that rule, so at 1.5 it read as a
+   * slightly brighter piece of the rule rather than as a mark. */
+  border-bottom: 2px solid var(--grimoire-accent);
+  margin-bottom: -1px;
+  background: none;
+  color: var(--grimoire-ink);
+  font-weight: var(--grimoire-weight-medium);
 }
 
-.grimoire-tab-badge-streaming::before {
-  display: none;
+.grimoire-tab-badge-active:hover {
+  background: none;
 }
 
 .grimoire-tab-activity-dot {
   display: none;
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
+  box-sizing: border-box;
   flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--grimoire-ok);
-}
-
-.grimoire-tab-badge-streaming,
-.grimoire-tab-badge-attention {
-  width: 38px;
-  gap: var(--grimoire-space-2);
+  border-radius: var(--grimoire-radius-circle);
 }
 
 .grimoire-tab-badge-streaming .grimoire-tab-activity-dot,
@@ -75,58 +93,21 @@
   display: block;
 }
 
+.grimoire-tab-badge-streaming .grimoire-tab-activity-dot {
+  background: var(--grimoire-accent);
+  animation: grimoire-pulse 1.4s ease-in-out infinite;
+}
+
+/* Waiting on the user: the same dot, opened out, so it reads as unfinished. */
 .grimoire-tab-badge-attention .grimoire-tab-activity-dot {
-  background: var(--text-warning);
+  border: 1px solid var(--grimoire-accent);
+  background: none;
 }
 
 .grimoire-tab-number {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.grimoire-tab-badge-streaming[data-provider="claude"] {
-  --grimoire-ok: var(--grimoire-provider-claude, #d97757);
-}
-
-.grimoire-tab-badge-streaming[data-provider="codex"] {
-  --grimoire-ok: var(--grimoire-provider-codex, #19c37d);
-}
-
-.grimoire-tab-badge-streaming[data-provider="qwen"] {
-  --grimoire-ok: var(--grimoire-provider-qwen, #615ced);
-}
-
-.grimoire-tab-badge-streaming[data-provider="antigravity"] {
-  --grimoire-ok: var(--grimoire-provider-antigravity, #5b8def);
-}
-
-.grimoire-tab-badge-streaming[data-provider="gemini"] {
-  --grimoire-ok: var(--grimoire-provider-gemini, #669df6);
-}
-
-.grimoire-tab-badge-streaming[data-provider="opencode"] {
-  --grimoire-ok: var(--grimoire-provider-opencode, #e0b341);
-}
-
-.grimoire-tab-badge-streaming[data-provider="mimocode"] {
-  --grimoire-ok: var(--grimoire-provider-mimocode, #ff6a00);
-}
-
-.grimoire-tab-badge-streaming[data-provider="kimicode"] {
-  --grimoire-ok: var(--grimoire-provider-kimicode, #7c3aed);
-}
-
-.grimoire-tab-badge-streaming[data-provider="grok"] {
-  --grimoire-ok: var(--grimoire-provider-grok, var(--text-faint));
-}
-
-.grimoire-tab-badge-attention {
-  color: var(--grimoire-workbench-muted);
-}
-
-.grimoire-tab-badge-idle {
-  color: var(--grimoire-workbench-muted);
 }
 
 .grimoire-tab-close-toast-stack {
@@ -138,7 +119,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--grimoire-space-3);
+  gap: var(--grimoire-space-6);
   pointer-events: none;
 }
 
@@ -148,13 +129,13 @@
   align-items: center;
   max-width: min(420px, 100%);
   overflow: hidden;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5) var(--grimoire-space-5);
-  border: 1px solid var(--background-modifier-border);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12) var(--grimoire-space-12);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-secondary);
-  box-shadow: var(--grimoire-lift-2);
-  color: var(--text-normal);
-  font-size: var(--font-ui-small);
+  background: var(--grimoire-plane);
+  box-shadow: var(--grimoire-lift-1);
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-m);
   pointer-events: auto;
 }
 
@@ -166,13 +147,13 @@
 
 .grimoire-tab-close-toast-separator {
   flex: 0 0 auto;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 button.grimoire-tab-close-toast-undo {
   flex: 0 0 auto;
   min-height: 0;
-  padding: 0 var(--grimoire-space-1);
+  padding: 0 var(--grimoire-space-2);
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -199,16 +180,30 @@ button.grimoire-tab-close-toast-undo:focus-visible {
   animation: grimoire-tab-close-toast-countdown 6s linear forwards;
 }
 
-@keyframes grimoire-tab-close-toast-countdown {
-  from { transform: scaleX(1); }
-  to { transform: scaleX(0); }
+/*
+ * The panel switch: which view of this tab the reader is in, and the
+ * transcript's own three controls at the other end of the same row.
+ *
+ * A segment is a glyph. The active one wears the hover wash and says its word,
+ * so the rail names where the reader is without naming everywhere they are not;
+ * `showPanelLabels` names the rest for a reader who prefers words.
+ */
+.grimoire-panel-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-8) var(--grimoire-window-padding-x) 0;
 }
 
 .grimoire-panel-tabs {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-1);
-  margin: 0 var(--grimoire-window-padding-x) var(--grimoire-space-1);
+  min-width: 0;
+  gap: var(--grimoire-space-2);
+  margin: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -223,45 +218,88 @@ button.grimoire-tab-close-toast-undo:focus-visible {
   align-items: center;
   justify-content: center;
   min-width: 0;
-  height: 26px;
+  height: var(--grimoire-segment-h);
+  gap: var(--grimoire-space-6);
   overflow: visible;
-  padding: 0 var(--grimoire-space-5);
+  padding: 0 var(--grimoire-space-8);
   border: 0;
-  border-radius: 0;
+  border-radius: var(--grimoire-radius-1);
   background: transparent;
-  color: var(--grimoire-workbench-faint);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
   box-shadow: none;
   cursor: pointer;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color var(--grimoire-duration) var(--grimoire-ease);
+  transition: color var(--grimoire-duration) var(--grimoire-ease), background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-panel-tabs button.grimoire-panel-tab:hover {
-  background: transparent;
-  color: var(--grimoire-workbench-muted);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
   box-shadow: none;
 }
 
 .grimoire-panel-tabs button.grimoire-panel-tab.is-active {
-  color: var(--text-normal);
-  background: transparent;
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
+  font-weight: var(--grimoire-weight-medium);
   box-shadow: none;
 }
 
-.grimoire-panel-tabs button.grimoire-panel-tab.is-active::after {
-  content: "";
-  position: absolute;
-  right: 11px;
-  bottom: 0;
-  left: 11px;
-  height: 1.5px;
-  border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-brand);
-  opacity: 1;
+.grimoire-panel-tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.grimoire-panel-tab-icon svg {
+  width: var(--grimoire-icon-m);
+  height: var(--grimoire-icon-m);
+  stroke-width: var(--grimoire-stroke);
+}
+
+.grimoire-panel-tab-label {
+  display: none;
+}
+
+.grimoire-panel-tab.is-active .grimoire-panel-tab-label,
+.grimoire-panel-switch--labelled .grimoire-panel-tab-label {
+  display: inline;
+}
+
+/* Below the composer's narrow breakpoint the rail is glyphs, whatever the setting. */
+@container grimoire-chat (max-width: 380px) {
+  .grimoire-panel-switch--labelled .grimoire-panel-tab:not(.is-active) .grimoire-panel-tab-label {
+    display: none;
+  }
+}
+
+/*
+ * The end of the switch row, which belongs to the open view: the transcript's
+ * jump controls in Chat, All / Linked / Current in Sources. One of them is
+ * showing at a time, so the row never has two right-hand groups.
+ */
+.grimoire-panel-aside {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: var(--grimoire-space-8);
+  margin-inline-start: auto;
+}
+
+.grimoire-panel-jump {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: var(--grimoire-space-2);
+}
+
+.grimoire-tab-chat-window:not([data-panel-view="sources"]) .grimoire-source-filters {
+  display: none;
 }
 
 .grimoire-tab-content-container {

@@ -2,7 +2,7 @@
 
 ## 2.0.0 - Unreleased
 
-The provider runtime is rebuilt on an execution kernel. Every provider runs through it, and what a chat surface draws is read from the kernel's record of a turn rather than from whether the provider stopped talking. Existing conversations, settings, and provider-owned files are read as they are; nothing needs migrating.
+The provider runtime is rebuilt on an execution kernel, and the chat surfaces are redrawn on the Nordic design system. Every provider runs through the kernel, and what a chat surface draws is read from the kernel's record of a turn rather than from whether the provider stopped talking. Existing conversations, settings, and provider-owned files are read as they are; nothing needs migrating.
 
 ### Changed
 
@@ -10,20 +10,35 @@ The provider runtime is rebuilt on an execution kernel. Every provider runs thro
 - A turn that never reached the provider - a permission check that refuses on the default mode, a session the CLI would not open - now says so in the conversation, where before it left an empty assistant message.
 - Cancelling a turn dispatches the cancel and waits for the provider to confirm it stopped. The interruption is drawn at once, as before; what changed is that the record of the turn is no longer written until the provider has actually answered.
 - The plugin follows the vault's theme and accent colour on every surface. The accent had been a fixed violet on thirty-two of them, because Obsidian defines no accent triple and the fallback was silently used. Scrollbars, hovers, menus, and backdrops no longer carry dark-only colours into light themes, and the settings sheet is drawn with Obsidian's own controls.
+- The chat view is redrawn. Tabs are a strip under one rule with the open tab underlined in your accent; a tab that is working shows a pulsing dot and a tab waiting on you shows a hollow one. The panel switch is a rail of icons that names the panel you are in, and the transcript's jump controls move into it from the five translucent circles that used to float over the text you were reading.
+- Your own message sits on the vault's second background instead of inside an accent-tinted card, and the line above an answer says which provider and model produced it as a caption rather than as a heading. A run of tool steps is drawn against a single hairline, with the argument in monospace and the result right-aligned.
+- The composer is one card with one line, and Send is a single square that becomes Stop while a turn runs. Stop used to appear only once a subagent was seen working, so an ordinary turn could not be stopped from the composer at all.
+- Chat history opens as a popover beside the button rather than as a sheet covering the conversation you were reading.
+- Every decision Grimoire asks for - a plan to approve, a question to answer, a permission to grant - now wears one shape: a glyph, what is being decided, the material it acts on, and numbered choices, with the chosen one marked by a rule rather than a filled card.
+- A provider is identified by its own mark drawn in the theme's muted ink. The nine brand colours are gone, and status is carried by a dot beside a word rather than by a hue.
+- The tab menu can be opened from the header. It was reachable only by right-click, which put closing, renaming, auto-renaming and duplicating a tab out of the keyboard's reach.
 - Nineteen clickable elements that only a mouse could reach - including a modal that offered a choice the keyboard could only decline - now have a role, a name, a tab stop, and Enter/Space handling.
 - Session metadata in `.grimoire/sessions/` is written as a versioned record. A file written before the envelope existed is read as revision 1 and rewritten in place at its next write, never renamed. A writer applies only the fields it changed, so two views of one conversation no longer overwrite each other's edits.
 
 ### Added
 
+- Context management. Everything attached to your next message - the open note, notes you mentioned, files from outside the vault - is now one list. One file the composer draws as a chip; from the second it says how many, roughly what they cost, and what share of the model's context window they would take, on a line the same height as the chip it replaces, so attaching a file never shrinks the box you write in. A Manage dialog lists all of it grouped and searchable, with per-file removal, multi-select, and a window budget in the footer. An Add picker searches the vault and stays open on Tab so attaching six notes takes one visit, and its footer can reach a file or a folder from outside the vault as well as the note you are looking at. Costs are estimates and are labelled as such. Nothing is dropped silently: a file that moved keeps its row and says so, and going over the window warns you without disabling Send.
+- The Manage dialog opens from wherever you are: a list control beside the composer's Add chip, Manage on the summary line, Review when the context will not fit, and a "Manage context" command you can bind a shortcut to.
+- A setting for panel labels. The Chat / Sources / Context switch ships as icons with the current panel named; turn on "Show panel labels" to name all three.
 - `.grimoire/control/` holds the kernel's lifecycle records: which run owns which process, generations, state, terminals, and the evidence needed to recover after a crash or a quit mid-turn. They carry no prompts, no transcripts, no secrets, and no provider payloads, and deleting a conversation deletes its records with it. An older plugin build ignores the directory, so a downgrade is safe.
 - A run left `dispatching` or `running` by a quit is classified honestly at the next load instead of being shown as still running.
 - Agent work started from a conversation is durable: a restart shows what became of it rather than forgetting it.
+- A setting for how long one turn may run. A turn is stopped after ten minutes of silence, which is the check meant for a provider that has stopped answering; separately, no turn may run longer than the ceiling this setting names - thirty minutes by default. Raise it for long agentic work, or set it to 0 to remove it. Advanced, under Conversations (#145).
+- A conversation records who wrote its title - the placeholder cut from your first message, the model, or you - and the history list marks it before the name: a spark for a title a model wrote, a pencil for one you typed, nothing for a placeholder nobody has named yet. The mark is a shape rather than a colour, and names itself on hover. "Regenerate title" is now offered for any conversation instead of only after a failed generation: a title you are not happy with is not a failed one. Conversations from before this say nothing rather than guess (#161).
 
 ### Fixed
 
 - Grok Build's context meter, Kimi Code's, and Qwen Code's read usage from the turn that produced it, so the meter no longer lags a turn behind or stays empty on a provider that reports usage only after the prompt returns.
 - Resuming an OpenCode session no longer opens a fresh session on every reload. OpenCode answers `session/load` with its config options and no session id, and requiring the echo turned every resume into "the agent returned another session".
 - Stopping the title generation for one tab no longer stops it for every other open tab.
+- The history list no longer spins on a conversation nothing is naming. A generation that finished after the list was drawn never reached it, so the spinner it raised stayed up; one that failed outright recorded no outcome at all and spun for good, across restarts included; and a run left unfinished by quitting Obsidian came back still spinning. The regenerate control is no longer drawn on a row where pressing it would refuse without a word (#161).
+- A history row is two lines now, and its hover controls no longer sit on the last words of the title. They are wider than the stamp they used to float over, so nothing could reserve room for them; they have their own place on the second line, opposite the stamp, and the title has the first line to itself. The popover is a little wider to go with it (#161).
+- A turn that is still working is no longer stopped for taking too long. The run timeout was armed once when the turn was dispatched and never moved afterwards, so ten minutes of streaming output ended exactly like ten minutes of silence - on Claude, on Codex, and on every provider running through the ACP backend. The window now measures silence and is restarted by everything the turn produces, and a finished turn no longer leaves a live timer behind it (#145).
 
 ## 1.3.2 - 2026-09-06
 

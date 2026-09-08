@@ -1,23 +1,23 @@
 /* MCP Server Settings */
 .grimoire-mcp-settings-desc {
-  margin-bottom: var(--grimoire-space-5);
+  margin-bottom: var(--grimoire-space-12);
 }
 
 .grimoire-mcp-container {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-mcp-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--grimoire-space-5);
-  padding: 0 var(--grimoire-space-5);
+  margin-bottom: var(--grimoire-space-12);
+  padding: 0 var(--grimoire-space-12);
 }
 
 .grimoire-mcp-label {
-  font-size: var(--font-ui-small);
-  color: var(--text-muted);
+  font-size: var(--grimoire-text-m);
+  color: var(--grimoire-ink-muted);
   font-weight: var(--grimoire-weight-normal);
 }
 
@@ -30,10 +30,10 @@
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: var(--grimoire-space-2);
+  margin-top: var(--grimoire-space-4);
   min-width: 180px;
-  background-color: var(--modal-background, var(--background-primary));
-  border: 1px solid var(--background-modifier-border);
+  background-color: var(--modal-background, var(--grimoire-ground));
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
   box-shadow: var(--grimoire-lift-1);
   z-index: 100;
@@ -47,21 +47,21 @@
 .grimoire-mcp-add-option {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
   cursor: pointer;
   font-size: var(--grimoire-text-m);
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-mcp-add-option:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-mcp-add-option-icon {
   display: flex;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-mcp-add-option-icon svg {
@@ -70,32 +70,32 @@
 }
 
 .grimoire-mcp-empty {
-  padding: var(--grimoire-space-6);
+  padding: var(--grimoire-space-16);
   text-align: center;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-m);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
   border-radius: var(--grimoire-radius-2);
 }
 
 .grimoire-mcp-list {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
 }
 
 .grimoire-mcp-item {
   display: flex;
   align-items: flex-start;
-  gap: var(--grimoire-space-5);
-  padding: var(--grimoire-space-5) var(--grimoire-space-6);
-  background: var(--background-secondary);
+  gap: var(--grimoire-space-12);
+  padding: var(--grimoire-space-12) var(--grimoire-space-16);
+  background: var(--grimoire-plane);
   border-radius: var(--grimoire-radius-2);
   transition: background var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-mcp-item:hover {
-  background: var(--background-modifier-hover);
+  background: var(--grimoire-hover);
 }
 
 .grimoire-mcp-item-disabled {
@@ -106,16 +106,16 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  margin-top: var(--grimoire-space-3);
+  margin-top: var(--grimoire-space-6);
   flex-shrink: 0;
 }
 
 .grimoire-mcp-status-enabled {
-  background: var(--color-green);
+  background: var(--grimoire-ok);
 }
 
 .grimoire-mcp-status-disabled {
-  background: var(--text-muted);
+  background: var(--grimoire-ink-muted);
 }
 
 .grimoire-mcp-info {
@@ -126,7 +126,7 @@
 .grimoire-mcp-name-row {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
+  gap: var(--grimoire-space-8);
   flex-wrap: wrap;
 }
 
@@ -136,26 +136,26 @@
 
 .grimoire-mcp-type-badge {
   font-size: var(--grimoire-text-2xs);
-  padding: var(--grimoire-space-1) var(--grimoire-space-3);
-  background: var(--background-modifier-border);
+  padding: var(--grimoire-space-2) var(--grimoire-space-6);
+  background: var(--grimoire-line);
   border-radius: var(--grimoire-radius-1);
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   text-transform: uppercase;
 }
 
 .grimoire-mcp-context-saving-badge {
   font-size: var(--grimoire-text-xs);
-  padding: var(--grimoire-space-1) var(--grimoire-space-3);
+  padding: var(--grimoire-space-2) var(--grimoire-space-6);
   background: var(--grimoire-accent);
-  color: var(--text-on-accent);
+  color: var(--grimoire-accent-contrast);
   border-radius: var(--grimoire-radius-1);
   font-weight: var(--grimoire-weight-normal);
 }
 
 .grimoire-mcp-preview {
   font-size: var(--grimoire-text-s);
-  color: var(--text-muted);
-  margin-top: var(--grimoire-space-2);
+  color: var(--grimoire-ink-muted);
+  margin-top: var(--grimoire-space-4);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -163,11 +163,11 @@
 
 .grimoire-mcp-actions {
   display: flex;
-  gap: var(--grimoire-space-2);
+  gap: var(--grimoire-space-4);
   flex-shrink: 0;
 }
 
-.grimoire-mcp-action-btn {
+button.grimoire-mcp-action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,13 +178,13 @@
   background: transparent;
   border-radius: var(--grimoire-radius-1);
   cursor: pointer;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-mcp-action-btn:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-mcp-action-btn svg {
@@ -193,5 +193,5 @@
 }
 
 .grimoire-mcp-delete-btn:hover {
-  color: var(--text-error);
+  color: var(--grimoire-error);
 }

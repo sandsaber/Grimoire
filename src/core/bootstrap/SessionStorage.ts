@@ -61,11 +61,19 @@ function cloneAssistantResponseMetadata(
   return Object.keys(clone).length > 0 ? clone : undefined;
 }
 
+/**
+ * A copy of the transcript fit to store, or `undefined` if it could not be made.
+ *
+ * The two answers used to be one. An empty list and a clone that threw both
+ * came back `undefined`, and on the partial-write path `undefined` is not "no
+ * messages" but *delete the messages that are there* — so a transcript this
+ * function merely failed to copy was removed from the record instead.
+ */
 function cloneMessagesForMetadata(
   messages: ChatMessage[] | undefined,
 ): ChatMessage[] | undefined {
-  if (!messages || messages.length === 0) {
-    return undefined;
+  if (!messages) {
+    return [];
   }
 
   try {
@@ -99,6 +107,14 @@ export function clonePersistedMessages(
   messages: ChatMessage[] | undefined,
 ): ChatMessage[] {
   return cloneMessagesForMetadata(messages) ?? [];
+}
+
+/** What a whole-record write stores: an empty transcript is no transcript. */
+function messagesForWholeRecord(
+  messages: ChatMessage[] | undefined,
+): ChatMessage[] | undefined {
+  const cloned = cloneMessagesForMetadata(messages);
+  return cloned && cloned.length > 0 ? cloned : undefined;
 }
 
 /** A conversation the vault holds and this build must not act on. */
@@ -327,6 +343,7 @@ function requireStorableId(id: string): string {
 export const CONVERSATION_METADATA_FIELDS = [
   'title',
   'titleGenerationStatus',
+  'titleSource',
   'lastResponseAt',
   'sessionId',
   'model',
@@ -561,6 +578,7 @@ export class SessionStorage {
         sourceCount: countSessionSources(meta),
         usagePercentage: meta.usage?.percentage,
         titleGenerationStatus: meta.titleGenerationStatus,
+        titleSource: meta.titleSource,
       };
     });
 
@@ -601,7 +619,19 @@ export class SessionStorage {
       enabledMcpServers: metadata.enabledMcpServers,
       orchestratorMode: metadata.orchestratorMode,
       usage: metadata.usage,
-      titleGenerationStatus: metadata.titleGenerationStatus,
+      /*
+       * A generation runs in the session that started it and nowhere else, so
+       * `pending` read off the disk is an attempt whose session is over — the
+       * app was quit while a title was being written. Kept, it drew a spinner
+       * on that row for the life of the vault, on work nothing was doing.
+       *
+       * `undefined` rather than `failed`: nobody knows it failed. What is known
+       * is that nothing is watching it any more, which is what no status means.
+       */
+      titleGenerationStatus: metadata.titleGenerationStatus === 'pending'
+        ? undefined
+        : metadata.titleGenerationStatus,
+      titleSource: metadata.titleSource,
       resumeAtMessageId: metadata.resumeAtMessageId,
       vaultSearchContexts: metadata.vaultSearchContexts,
       assistantResponseMetadata: metadata.assistantResponseMetadata,
@@ -614,13 +644,14 @@ export class SessionStorage {
       providerId: conversation.providerId,
       title: conversation.title,
       titleGenerationStatus: conversation.titleGenerationStatus,
+      titleSource: conversation.titleSource,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       lastResponseAt: conversation.lastResponseAt,
       sessionId: conversation.sessionId,
       model: conversation.model,
       providerState: buildPersistedProviderState(conversation),
-      messages: cloneMessagesForMetadata(conversation.messages),
+      messages: messagesForWholeRecord(conversation.messages),
       currentNote: conversation.currentNote,
       externalContextPaths: conversation.externalContextPaths,
       enabledMcpServers: conversation.enabledMcpServers,
@@ -694,11 +725,19 @@ function projectConversationFields(
   const fields: Partial<SessionMetadata> = { updatedAt: conversation.updatedAt };
   for (const field of new Set(changed)) {
     switch (field) {
-      case 'messages':
-        fields.messages = cloneMessagesForMetadata(conversation.messages);
+      case 'messages': {
+        const cloned = cloneMessagesForMetadata(conversation.messages);
+        // A copy that could not be made says nothing about the transcript on
+        // disk, so it must not be spread over it: an absent field here is a
+        // deletion, not a no-op.
+        if (!cloned) {
+          break;
+        }
+        fields.messages = cloned;
         fields.vaultSearchContexts = collectVaultSearchContexts(conversation.messages);
         fields.assistantResponseMetadata = collectAssistantResponseMetadata(conversation.messages);
         break;
+      }
       case 'providerState':
         fields.providerState = buildPersistedProviderState(conversation);
         break;

@@ -1,14 +1,12 @@
 import { Menu, Notice, setIcon, setTooltip } from 'obsidian';
 
-import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
-
 import { buildFallbackTitle } from '../../../core/prompt/fallbackTitle';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
 import type { ProviderId, TitleGenerationService } from '../../../core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatRewindMode } from '../../../core/runtime/types';
 import type { ChatMessage, Conversation, ConversationMeta } from '../../../core/types';
-import { t } from '../../../i18n/i18n';
+import { getLocale, t } from '../../../i18n/i18n';
 import type GrimoirePlugin from '../../../main';
 import { confirm } from '../../../shared/modals/ConfirmModal';
 import type { MessageRenderer } from '../rendering/MessageRenderer';
@@ -20,6 +18,7 @@ import type { FileContextManager } from '../ui/FileContext';
 import type { ImageContextManager } from '../ui/ImageContext';
 import type { ExternalContextSelector, McpServerSelector } from '../ui/InputToolbar';
 import type { StatusPanel } from '../ui/StatusPanel';
+import { appendTitleSourceMark } from '../ui/titleSourceMarker';
 import { getRandomGreeting } from '../utils/greetings';
 
 function runConversationAction(action: () => Promise<void>, failureMessage: string): void {
@@ -75,6 +74,16 @@ export interface ConversationControllerDeps {
     cancel(): Promise<void>;
     readonly executionSessionId: string | null;
   } | null;
+  /**
+   * The conversation this tab is bound to, as the tab knows it.
+   *
+   * `state.currentConversationId` is one of two places that binding lives: the
+   * kernel creates a conversation lazily and tells the tab, and the tab is
+   * what the projection reads. A save that trusted only the state field found
+   * it null at the end of a turn, took the runtime's live session id for an
+   * id, and wrote the whole conversation a second time under it.
+   */
+  getBoundConversationId?: () => string | null;
   getActiveProviderSettings?: () => Record<string, unknown>;
   getOrchestratorMode?: () => boolean;
   ensureServiceForConversation?: (conversation: Conversation | null) => Promise<void>;
@@ -117,6 +126,27 @@ type HistoryRenderOptions = {
   onClose?: () => void;
   onRerender: () => void;
 };
+
+/**
+ * Settles tools a stored transcript still calls running.
+ *
+ * Nothing is running: the process that ran them is gone, and the turn ends
+ * where the record does. A tool row spins on `running`, so a conversation
+ * stored mid-turn — a reload, a crash, or a turn from a build that did not
+ * settle its own — reopened with a spinner that could never stop, on every
+ * reopen after that too. Repaired as it is read rather than migrated on disk:
+ * the next write carries the repair, and a vault that is only read is not
+ * touched.
+ */
+function settleToolCallsLeftRunning(messages: readonly ChatMessage[]): void {
+  for (const message of messages) {
+    for (const toolCall of message.toolCalls ?? []) {
+      if (toolCall.status === 'running') {
+        toolCall.status = 'unfinished';
+      }
+    }
+  }
+}
 
 export class ConversationController {
   private deps: ConversationControllerDeps;
@@ -362,6 +392,12 @@ export class ConversationController {
       plugin.recordDebugLog?.({
         data: {
           hasSessionId: !!conversation.sessionId,
+          // What the provider's own transcript did for this open. A conversation
+          // that looks stale after a fix to how its tools are named is either a
+          // hydration that never ran or one that ran and was overruled, and
+          // those are opposite repairs — the outcome is already computed and
+          // was the one thing the log did not say.
+          hydration: plugin.getHistoryHydration?.(conversation.id)?.outcome ?? 'unknown',
           messageCount: conversation.messages.length,
           providerId: conversation.providerId,
         },
@@ -518,8 +554,40 @@ export class ConversationController {
    * For native sessions (new conversations with sessionId from SDK),
    * only metadata is saved - the SDK handles message persistence.
    */
+  /**
+   * Takes the tab's binding into state, if state has lost it.
+   *
+   * `state.currentConversationId` is one of two places that binding lives, and
+   * only one of them is written when the kernel creates the conversation
+   * lazily. A path that trusted the state field alone found it null at the end
+   * of a turn, took the runtime's live session id for an id, and wrote the
+   * whole conversation a second time under it - which is how one ten-message
+   * Codex chat came to be stored twice at 11:40:22.135 on 2026-09-07, one
+   * millisecond after its own turn ended.
+   *
+   * **Only when there is a turn to save.** A tab that is bound but has not read
+   * its conversation yet holds no messages, and `switchTo` saves before it
+   * loads — so every restored tab passes through exactly that state. Adopting
+   * the binding there made an empty save look legitimate: it wrote its empty
+   * message list over a ten-minute chat, in the record and in the copy
+   * hydration had just filled from the provider's own transcript, and
+   * hydration runs once per conversation so nothing put them back. Holding a
+   * conversation id has always meant *this tab has that conversation open*;
+   * this keeps meaning it.
+   */
+  adoptBoundConversationId(): string | null {
+    const { state } = this.deps;
+    if (state.currentConversationId) return state.currentConversationId;
+    if (state.messages.length === 0) return null;
+    const bound = this.deps.getBoundConversationId?.() ?? null;
+    if (bound) state.currentConversationId = bound;
+    return state.currentConversationId;
+  }
+
   async save(updateLastResponse = false, options?: SaveOptions): Promise<void> {
     const { plugin, state } = this.deps;
+
+    this.adoptBoundConversationId();
 
     // Entry point with no messages - nothing to save
     if (!state.currentConversationId && state.messages.length === 0) {
@@ -596,6 +664,7 @@ export class ConversationController {
 
     state.currentConversationId = conversation.id;
     state.messages = [...conversation.messages];
+    settleToolCallsLeftRunning(state.messages);
     state.usage = conversation.usage ?? null;
     state.autoScrollEnabled = plugin.settings.enableAutoScroll ?? true;
     state.hasPendingConversationSave = false;
@@ -686,15 +755,40 @@ export class ConversationController {
     }
   }
 
+  /** Where the view last had the history drawn, so a later change can reach it. */
+  private lastHistoryRender: {
+    readonly container: HTMLElement;
+    readonly options: Omit<HistoryRenderOptions, 'onRerender'>;
+  } | null = null;
+
   updateHistoryDropdown(): void {
     const dropdown = this.deps.getHistoryDropdown();
-    if (!dropdown) return;
+    if (dropdown) {
+      this.renderHistoryItems(dropdown, {
+        onSelectConversation: (id) => this.switchTo(id),
+        onClose: () => dropdown.removeClass('visible'),
+        onRerender: () => this.updateHistoryDropdown(),
+      });
+      return;
+    }
 
-    this.renderHistoryItems(dropdown, {
-      onSelectConversation: (id) => this.switchTo(id),
-      onClose: () => dropdown.removeClass('visible'),
-      onRerender: () => this.updateHistoryDropdown(),
-    });
+    /*
+     * A tab's controller owns no dropdown — `getHistoryDropdown` answers null
+     * for every one of them, because the popover belongs to the view and is
+     * handed here to be drawn. So this returned without drawing anything, and
+     * everything a turn learned about a title after the list was on screen
+     * reached nothing: the spinner a regeneration puts up, and the one it takes
+     * down. What the reader saw was the title change and a spinner start, drawn
+     * by a refresh that happened to land between the two, and stay for ever.
+     *
+     * Redrawn where it was last drawn. Not when that container has left the
+     * document: the popover is torn down when it closes, and there is nothing
+     * to say to a node nobody is looking at. Explicitly `false`, because a
+     * container that does not answer the question at all is not a torn-down one.
+     */
+    const last = this.lastHistoryRender;
+    if (!last || last.container.isConnected === false) return;
+    this.renderHistoryDropdown(last.container, last.options);
   }
 
   /**
@@ -710,13 +804,29 @@ export class ConversationController {
     container.empty();
     const allConversations = plugin.getConversationList();
 
-    const dropdownHeader = container.createDiv({ cls: 'grimoire-history-header' });
-    dropdownHeader.createEl('strong', { cls: 'grimoire-history-title', text: t('chat.ui.history.title') });
-    dropdownHeader.createSpan({
-      cls: 'grimoire-history-count',
-      text: String(allConversations.length),
+    /*
+     * The panel opens on its search band. It used to open on a header saying
+     * "History", the number 80 and a red "Delete all" - a title for a thing
+     * the reader had just clicked, a count nobody acts on, and the most
+     * destructive action on the surface given the best seat. Emptying the
+     * whole history is the last row of the list instead.
+     */
+    const searchRow = container.createDiv({ cls: 'grimoire-history-search' });
+    const searchIcon = searchRow.createSpan({ cls: 'grimoire-history-search-icon' });
+    setIcon(searchIcon, 'search');
+    const searchInput = searchRow.createEl('input', {
+      cls: 'grimoire-history-search-input',
+      attr: {
+        type: 'search',
+        placeholder: t('chat.ui.history.searchPlaceholder'),
+        autocomplete: 'off',
+      },
     });
-    const deleteAllBtn = dropdownHeader.createEl('button', {
+    this.renderUnreadableConversations(container);
+    const list = container.createDiv({ cls: 'grimoire-history-list' });
+
+    const footer = container.createDiv({ cls: 'grimoire-history-footer' });
+    const deleteAllBtn = footer.createEl('button', {
       cls: 'grimoire-history-delete-all',
       text: t('chat.history.deleteAll'),
       attr: {
@@ -731,33 +841,6 @@ export class ConversationController {
         new Notice(t('chat.history.deleteAllFailed'));
       });
     });
-    dropdownHeader.createSpan({ cls: 'grimoire-history-header-spacer' });
-    const closeBtn = dropdownHeader.createEl('button', {
-      cls: 'grimoire-history-close',
-      attr: {
-        type: 'button',
-        'aria-label': t('chat.ui.history.close'),
-      },
-    });
-    setIcon(closeBtn, 'x');
-    closeBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      options.onClose?.();
-    });
-
-    const searchRow = container.createDiv({ cls: 'grimoire-history-search' });
-    const searchIcon = searchRow.createSpan({ cls: 'grimoire-history-search-icon' });
-    setIcon(searchIcon, 'search');
-    const searchInput = searchRow.createEl('input', {
-      cls: 'grimoire-history-search-input',
-      attr: {
-        type: 'search',
-        placeholder: t('chat.ui.history.searchPlaceholder'),
-        autocomplete: 'off',
-      },
-    });
-    this.renderUnreadableConversations(container);
-    const list = container.createDiv({ cls: 'grimoire-history-list' });
 
     const renderList = (rawQuery = ''): void => {
       list.empty();
@@ -865,21 +948,25 @@ export class ConversationController {
     item.setAttribute('data-conversation-id', conv.id);
     item.setAttribute('tabindex', isCurrent ? '-1' : '0');
 
-    const providerDot = item.createSpan({ cls: 'grimoire-history-provider-dot' });
-    (providerDot.style as CSSStyleDeclaration & Record<string, string>)['--grimoire-history-provider-color'] =
-      this.getHistoryProviderColor(conv.providerId);
-
+    /*
+     * One line: the title, and one piece of meta at its end. The row carried a
+     * second line of provider, prompt preview, source count and usage - four
+     * facts in 11px mono under every title, which turned a list you scan into
+     * a wall you read. What is left of that line is the tooltip.
+     */
     const content = item.createDiv({ cls: 'grimoire-history-item-content' });
-    const titleEl = content.createDiv({ cls: 'grimoire-history-item-title', text: conv.title });
-    titleEl.setAttribute('title', conv.title);
-    content.createDiv({
-      cls: 'grimoire-history-item-meta',
-      text: this.formatHistoryMeta(conv),
-    });
+    // A conversation whose title never generated still has to be findable, so
+    // it says when it happened rather than nothing at all.
+    const title = conv.title?.trim() || this.formatDate(this.getHistoryTimestamp(conv));
+    const titleRow = content.createDiv({ cls: 'grimoire-history-item-title-row' });
+    appendTitleSourceMark(titleRow, conv.titleSource);
+    const titleEl = titleRow.createDiv({ cls: 'grimoire-history-item-title', text: title });
+    const meta = this.formatHistoryMeta(conv);
+    titleEl.setAttribute('title', meta ? `${title}\n${meta}` : title);
 
     item.createSpan({
       cls: 'grimoire-history-item-time',
-      text: isCurrent ? t('chat.ui.history.current') : this.formatRelativeTime(this.getHistoryTimestamp(conv)),
+      text: isCurrent ? t('chat.ui.history.current') : this.formatHistoryStamp(conv),
     });
 
     const canOpenInNewTab = !!options.onOpenConversationInNewTab;
@@ -954,7 +1041,16 @@ export class ConversationController {
       const loadingEl = actions.createSpan({ cls: 'grimoire-action-btn grimoire-action-loading' });
       setIcon(loadingEl, 'loader-2');
       loadingEl.setAttribute('aria-label', t('chat.ui.history.generatingTitle'));
-    } else if (conv.titleGenerationStatus === 'failed') {
+    } else if (
+      // Only when it can actually run. The control was drawn on the strength of
+      // the title alone, while `regenerateTitle` refuses on gates the row never
+      // asked about — no service, no user message, title generation switched
+      // off — and refuses silently. What the reader got was a button that did
+      // nothing and said nothing. The menu item beside it has always been
+      // greyed on the same question.
+      this.canSuggestTitle(conv.id)
+      && (conv.titleSource ? conv.titleSource === 'fallback' : conv.titleGenerationStatus === 'failed')
+    ) {
       const regenerateBtn = actions.createEl('button', { cls: 'grimoire-action-btn grimoire-history-regenerate-btn' });
       setIcon(regenerateBtn, 'refresh-cw');
       regenerateBtn.setAttribute('aria-label', t('chat.ui.history.regenerateTitle'));
@@ -978,8 +1074,12 @@ export class ConversationController {
       this.showRenameInput(item, conv.id, conv.title, options);
     });
 
-    const deleteBtn = actions.createEl('button', { cls: 'grimoire-action-btn grimoire-delete-btn' });
-    setIcon(deleteBtn, 'trash-2');
+    // Deleting a conversation is the one thing on this row that cannot be
+    // taken back, so it says the word rather than showing a bin.
+    const deleteBtn = actions.createEl('button', {
+      cls: 'grimoire-action-btn grimoire-delete-btn',
+      text: t('common.delete'),
+    });
     deleteBtn.setAttribute('aria-label', t('common.delete'));
     deleteBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1042,6 +1142,40 @@ export class ConversationController {
     return t('chat.ui.history.earlier');
   }
 
+  /**
+   * The one fact at the end of a history row.
+   *
+   * Today's rows say when, because the day is already the group's heading and
+   * the hour is what separates them. Older rows say who answered, because by
+   * then the hour has stopped meaning anything and the provider has not.
+   */
+  private formatHistoryStamp(conv: ConversationMeta): string {
+    const timestamp = this.getHistoryTimestamp(conv);
+    if (this.getHistoryGroupLabel(timestamp) === 'Today') {
+      return new Intl.DateTimeFormat(getLocale(), {
+        hour: '2-digit',
+        hour12: false,
+        minute: '2-digit',
+      }).format(new Date(timestamp));
+    }
+    return this.shortenModelLabel(conv.modelLabel) || this.formatRelativeTime(timestamp);
+  }
+
+  /**
+   * The part of a model label that identifies the model.
+   *
+   * A label can arrive as a whole billing path - "MiniMax Token Plan
+   * (minimax.io)/MiniMax-M3" - and at the end of a history row that reads as
+   * the row, with the title crushed to "Describe th…" beside it. The segment
+   * after the last slash is the name; the plan in front of it is not.
+   */
+  private shortenModelLabel(label: string | undefined): string {
+    const trimmed = label?.trim();
+    if (!trimmed) return '';
+    const lastSegment = trimmed.split('/').pop()?.trim();
+    return lastSegment || trimmed;
+  }
+
   private formatHistoryMeta(conv: ConversationMeta): string {
     const parts: string[] = [];
     const modelLabel = conv.modelLabel?.trim();
@@ -1065,16 +1199,6 @@ export class ConversationController {
     }
 
     return parts.join(' · ');
-  }
-
-  private getHistoryProviderColor(providerId: string | undefined): string {
-    // The product default, not one provider's colour picked out of the list: a
-    // conversation whose provider is not registered was showing Claude's dot,
-    // which reads as a claim about which provider it belongs to.
-    const resolvedProviderId = providerId && providerCatalog().has(providerId)
-      ? providerId
-      : DEFAULT_CHAT_PROVIDER_ID;
-    return `var(--grimoire-provider-${resolvedProviderId})`;
   }
 
   private formatRelativeTime(timestamp: number): string {
@@ -1146,16 +1270,18 @@ export class ConversationController {
       }
     }
 
-    if (conv.titleGenerationStatus === 'failed') {
-      menu.addItem((menuItem) => menuItem
-        .setTitle(t('chat.ui.history.regenerateTitle'))
-        .onClick(() => {
-          runConversationAction(
-            () => this.regenerateTitle(conv.id),
-            t('chat.ui.errors.regenerateFailed'),
-          );
-        }));
-    }
+    // Offered whatever the title is now. Gating this on a failed generation made
+    // «the model named it, but name it again» reachable only from the tab menu,
+    // and a title one is not happy with is not a failed one.
+    menu.addItem((menuItem) => menuItem
+      .setTitle(t('chat.ui.history.regenerateTitle'))
+      .setDisabled(!this.canSuggestTitle(conv.id))
+      .onClick(() => {
+        runConversationAction(
+          () => this.regenerateTitle(conv.id),
+          t('chat.ui.errors.regenerateFailed'),
+        );
+      }));
 
     menu.addItem((menuItem) => menuItem
       .setTitle(t('chat.ui.history.rename'))
@@ -1222,7 +1348,7 @@ export class ConversationController {
 
       const newTitle = input.value.trim() || currentTitle;
       try {
-        await this.deps.plugin.renameConversation(convId, newTitle);
+        await this.deps.plugin.renameConversation(convId, newTitle, 'manual');
       } finally {
         options.onRerender();
       }
@@ -1418,7 +1544,7 @@ export class ConversationController {
       // User renamed it manually while we were generating: their choice wins.
       await plugin.updateConversation(conversationId, { titleGenerationStatus: undefined });
     } else if (suggestion.ok) {
-      await plugin.renameConversation(conversationId, suggestion.title);
+      await plugin.renameConversation(conversationId, suggestion.title, 'model');
       await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
     } else {
       // Logged rather than only stored: `failed` in the record is a state, and
@@ -1462,6 +1588,7 @@ export class ConversationController {
     container: HTMLElement,
     options: Omit<HistoryRenderOptions, 'onRerender'>,
   ): void {
+    this.lastHistoryRender = { container, options };
     this.renderHistoryItems(container, {
       ...options,
       onRerender: () => this.renderHistoryDropdown(container, options),

@@ -51,6 +51,7 @@ import type {
   CodexExecutionConnection,
   CodexExecutionServerRequestHandler,
 } from '../runtime/CodexExecutionConnection';
+import { CodexRpcResponseError } from '../runtime/CodexRpcTransport';
 
 export interface CodexExecutionConnectionFactory {
   create(): CodexExecutionConnection;
@@ -83,6 +84,16 @@ export interface CodexExecutionInvocation {
 export interface CodexExecutionRequestResolver {
   resolve(requestRef: string): Promise<CodexExecutionInvocation>;
   resolveSteer(requestRef: string): Promise<readonly UserInput[]>;
+  /**
+   * Keeps what a definite rejection said, for the terminal that follows it.
+   *
+   * The kernel's terminal names a category — the turn was rejected before it
+   * could act — and the sentence a user can do something about lives only in
+   * the refusal itself: a thread already open elsewhere, a model the account
+   * cannot reach. The store this reaches is the one a refused turn already
+   * reads from, so both kinds of rejection are described the same way.
+   */
+  recordRefusal(requestRef: string, message: string): void;
 }
 
 export interface CodexExecutionResultSink {
@@ -170,7 +181,20 @@ export interface CodexExecutionBackendContext {
   readonly resultCommitTimeoutMs?: number;
   readonly recoveryDelayMs?: number;
   readonly cancellationTurnIdTimeoutMs?: number;
+  /**
+   * How long a run may go **without saying anything** before it is stopped.
+   *
+   * Re-armed by every event the run produces: a turn that keeps working is the
+   * healthy case, and used to die exactly like a silent one.
+   */
   readonly runTimeoutMs?: number;
+  /**
+   * The ceiling a run cannot pass however alive it stays, or `0` for none.
+   *
+   * Asked when the run arms it, not read once when the backend is built, so
+   * the setting behind it reaches the next turn without reloading the plugin.
+   */
+  readonly runAbsoluteTimeoutMs?: () => number;
   readonly maxResultBytes?: number;
 }
 
@@ -189,6 +213,36 @@ interface PendingInteraction {
   settled: boolean;
 }
 
+/**
+ * A refusal this backend issued itself, before saying anything to the daemon.
+ *
+ * Carried as its own type because the run has to classify it: a binding this
+ * backend declined is as definite as one the app-server declined, and neither
+ * can have changed a workspace. A bare `Error` here would be read as a failure
+ * of unknown consequence and reported as `effects-unknown`.
+ */
+export class CodexThreadOwnershipError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CodexThreadOwnershipError';
+  }
+}
+
+/**
+ * Who owns which native thread, and which threads this daemon already holds.
+ *
+ * Load state is the backend's rather than the session's because the conflict it
+ * prevents is the daemon's: `thread/resume` is refused for a thread already
+ * open, no matter which execution session asks. A session that tracked only its
+ * own loads could not see the load another session — or the recovery path —
+ * had already performed, and would ask a second time.
+ */
+interface CodexThreadRegistry {
+  bind(threadId: string, session: CodexExecutionSession): void;
+  markLoaded(threadId: string): void;
+  isLoaded(threadId: string): boolean;
+}
+
 interface CodexExecutionServices {
   readonly connection: CodexExecutionConnection;
   readonly turnReconciler: CodexTurnReconciler;
@@ -203,6 +257,13 @@ ExecutionRecoveryPort {
   readonly descriptor = CODEX_EXECUTION_DESCRIPTOR;
   private readonly sessions = new Set<CodexExecutionSession>();
   private readonly sessionsByThread = new Map<string, CodexExecutionSession>();
+  /**
+   * The threads this app-server generation has open.
+   *
+   * Emptied whenever the connection behind them goes: a new daemon holds no
+   * thread, so every reference has to be resumed again.
+   */
+  private readonly loadedThreads = new Set<string>();
   private readonly interactions = new Map<InteractionId, PendingInteraction>();
   private readonly interactionsByNativeRequest = new Map<string, PendingInteraction>();
   private servicesTask: Promise<CodexExecutionServices> | undefined;
@@ -239,7 +300,7 @@ ExecutionRecoveryPort {
       config,
       this.context,
       () => this.ensureServices(),
-      (threadId, owner) => this.bindThread(threadId, owner),
+      this.threadRegistry,
       () => this.sessions.delete(session),
       run => this.handleRunTerminal(run),
     );
@@ -298,13 +359,15 @@ ExecutionRecoveryPort {
     }
     try {
       const services = await this.ensureServices();
-      const session = this.sessionsByThread.get(query.nativeSessionRef);
-      if (!session?.getThreadState().loaded) {
+      if (!this.loadedThreads.has(query.nativeSessionRef)) {
         await services.connection.request<ThreadResumeResult>('thread/resume', {
           ...this.context.defaultResumeParams,
           threadId: query.nativeSessionRef,
         });
-        session?.markLoaded();
+        // Recorded on the backend rather than on a session: recovery runs for
+        // threads no live session owns, and the load it performs is what a
+        // later run would otherwise repeat into an active-writer conflict.
+        this.loadedThreads.add(query.nativeSessionRef);
       }
       const evidence = await services.turnReconciler.reconcile({
         threadId: query.nativeSessionRef,
@@ -426,6 +489,8 @@ ExecutionRecoveryPort {
       this.activeServices = undefined;
       this.servicesTask = undefined;
     }
+    // Every thread this daemon held is gone with it.
+    this.loadedThreads.clear();
     if (!this.disposing) {
       for (const session of this.sessions) {
         session.handleConnectionLost(error);
@@ -588,6 +653,26 @@ ExecutionRecoveryPort {
     }
   }
 
+  private readonly threadRegistry: CodexThreadRegistry = {
+    bind: (threadId, session) => this.bindThread(threadId, session),
+    markLoaded: threadId => this.loadedThreads.add(threadId),
+    isLoaded: threadId => this.loadedThreads.has(threadId),
+  };
+
+  /**
+   * Moves a native thread to the session that is about to use it.
+   *
+   * A restart leaves one conversation holding two execution sessions: the
+   * restored one carries the native reference, and the replacement the kernel
+   * opens for the reopened tab carries none. Refusing the replacement outright
+   * left the conversation unusable, because the session that owned the thread
+   * was not the session the next turn was dispatched through.
+   *
+   * So an idle binding is handed over. A binding whose session still has a run
+   * in flight is not: that run is producing an answer through this thread, and
+   * moving it would leave the turn writing into a session nobody is watching.
+   * The refusal is definite, and typed so the run reports it as such.
+   */
   private bindThread(threadId: string, session: CodexExecutionSession): void {
     for (const [existingThreadId, owner] of this.sessionsByThread) {
       if (owner === session && existingThreadId !== threadId) {
@@ -596,7 +681,16 @@ ExecutionRecoveryPort {
     }
     const existing = this.sessionsByThread.get(threadId);
     if (existing && existing !== session) {
-      throw new Error('Codex native thread is already owned by another execution session.');
+      if (existing.activeExecutionRun) {
+        throw new CodexThreadOwnershipError(
+          'Codex native thread is in use by another execution session.',
+        );
+      }
+      // The turn the thread ended on travels with it. `turn/started` for a turn
+      // that already finished is recognised by comparing against that id, and a
+      // session that inherited the thread but not the id has nothing to compare
+      // against — it would take the previous turn for its own.
+      session.inheritThreadHistory(existing.releaseThread());
     }
     this.sessionsByThread.set(threadId, session);
   }
@@ -630,14 +724,13 @@ class CodexExecutionSession implements ExecutionSession {
   private activeRun: CodexExecutionRun | undefined;
   private nativeThreadId: string | undefined;
   private lastNativeTurnId: string | undefined;
-  private loadedInConnection = false;
   private disposed = false;
 
   constructor(
     private readonly config: ExecutionSessionConfig,
     private readonly context: CodexExecutionBackendContext,
     private readonly servicesProvider: CodexExecutionServicesProvider,
-    private readonly onBindThread: (threadId: string, session: CodexExecutionSession) => void,
+    private readonly threads: CodexThreadRegistry,
     private readonly onDispose: () => void,
     private readonly onRunTerminal: (run: CodexExecutionRun) => void,
   ) {
@@ -712,11 +805,51 @@ class CodexExecutionSession implements ExecutionSession {
 
   handleConnectionLost(_error?: Error): void {
     this.activeRun?.handleConnectionLost();
-    this.loadedInConnection = false;
   }
 
   getThreadState(): { readonly threadId?: string; readonly loaded: boolean } {
-    return { threadId: this.nativeThreadId, loaded: this.loadedInConnection };
+    return {
+      threadId: this.nativeThreadId,
+      // Asked of the daemon's registry, not remembered here: another session
+      // may have loaded this same thread, and resuming it again is the
+      // active-writer conflict.
+      loaded: this.nativeThreadId ? this.threads.isLoaded(this.nativeThreadId) : false,
+    };
+  }
+
+  /**
+   * Takes a thread this daemon already holds open, without resuming it.
+   *
+   * Answers `false` when the thread is not loaded, which leaves the caller to
+   * resume it as before. Throws when a live run owns it.
+   */
+  adoptLoadedThread(threadId: string): boolean {
+    requireNativeId(threadId, 'Codex thread id');
+    if (!this.threads.isLoaded(threadId)) {
+      return false;
+    }
+    this.threads.bind(threadId, this);
+    this.nativeThreadId = threadId;
+    return true;
+  }
+
+  /**
+   * Gives up a binding another session is taking over, naming the turn it
+   * ended on so the session taking over can keep telling that turn from its own.
+   */
+  releaseThread(): string | undefined {
+    this.nativeThreadId = undefined;
+    return this.lastNativeTurnId;
+  }
+
+  /**
+   * Takes on the turn the session that held this thread ended on.
+   *
+   * Never overwrites a turn this session ran itself: what it knows first-hand
+   * is later than anything it is being told.
+   */
+  inheritThreadHistory(lastNativeTurnId: string | undefined): void {
+    this.lastNativeTurnId ??= lastNativeTurnId;
   }
 
   getPreviousNativeTurnId(): string | undefined {
@@ -725,20 +858,29 @@ class CodexExecutionSession implements ExecutionSession {
 
   bindThread(threadId: string): void {
     requireNativeId(threadId, 'Codex thread id');
-    this.onBindThread(threadId, this);
+    this.threads.bind(threadId, this);
     this.nativeThreadId = threadId;
-    this.loadedInConnection = true;
+    this.threads.markLoaded(threadId);
   }
 
   restoreThreadRef(threadId: string): void {
     requireNativeId(threadId, 'Codex restored thread id');
-    this.onBindThread(threadId, this);
+    this.threads.bind(threadId, this);
     this.nativeThreadId = threadId;
-    this.loadedInConnection = false;
   }
 
-  markLoaded(): void {
-    this.loadedInConnection = true;
+  /**
+   * Records a load with the daemon's registry.
+   *
+   * Takes a thread id for the fork path, which resumes a thread before it is
+   * bound to anything: the binding is the last step there, and a failure
+   * between the two would otherwise leave a thread this daemon holds open with
+   * nothing remembering it — which the next run resumes into a writer conflict.
+   */
+  markLoaded(threadId: string | undefined = this.nativeThreadId): void {
+    if (threadId) {
+      this.threads.markLoaded(threadId);
+    }
   }
 
   async dispose(): Promise<void> {
@@ -778,6 +920,7 @@ class CodexExecutionRun implements ExecutionRun {
   private cancellationAcknowledged = false;
   private timeoutTriggered = false;
   private runTimeoutHandle: unknown;
+  private runAbsoluteTimeoutHandle: unknown;
   private recoveryTask: Promise<void> | undefined;
   private completionTask: Promise<void> | undefined;
   private terminationTask: Promise<void> | undefined;
@@ -988,9 +1131,13 @@ class CodexExecutionRun implements ExecutionRun {
         return;
       }
       this.turnDispatchStarted = true;
-      this.runTimeoutHandle = this.context.scheduler.setTimeout(() => {
-        void this.handleTimeout();
-      }, this.context.runTimeoutMs ?? 10 * 60_000);
+      this.armInactivityTimeout();
+      const ceilingMs = this.context.runAbsoluteTimeoutMs?.() ?? 30 * 60_000;
+      if (ceilingMs > 0) {
+        this.runAbsoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
+          void this.handleTimeout();
+        }, ceilingMs);
+      }
       if (invocation.turn.kind === 'compact') {
         this.turnStartedMayEstablish = true;
         await services.connection.request('thread/compact/start', { threadId });
@@ -1006,18 +1153,53 @@ class CodexExecutionRun implements ExecutionRun {
       if (this.cancellation && !this.terminal) {
         void this.cancel(this.cancellation);
       }
-    } catch {
+    } catch (error) {
       if (!this.terminal) {
-        const effectsPossible = this.turnDispatchStarted || this.nativePreparationStarted;
-        this.finish(
-          effectsPossible ? 'indeterminate' : 'invalidated',
-          effectsPossible
-            ? (this.turnDispatchStarted ? 'dispatch-unknown' : 'effects-unknown')
-            : 'pre-dispatch-rejected',
-          !effectsPossible,
-        );
+        this.finishFailedDispatch(error);
       }
     }
+  }
+
+  /**
+   * Says what a failed dispatch is allowed to claim about the workspace.
+   *
+   * The old rule read one flag — had any native preparation been *started* —
+   * and answered `effects-unknown` for everything after it. The flag is set
+   * before the request is awaited, so a `thread/resume` the app-server refused
+   * outright was reported as a run whose effects could not be established. That
+   * is the harshest verdict the kernel has, and it was being given to the one
+   * case that is certain: the daemon answered, and answered no.
+   *
+   * What matters is not whether a request was sent but whether an answer came
+   * back. A structured error response is an answer. A transport failure, a
+   * timeout or a process exit are not, and those keep the old verdict, because
+   * a `thread/start` whose acknowledgement was lost may well have created a
+   * thread.
+   *
+   * Anything after `turn/start` was reached stays `dispatch-unknown` regardless:
+   * a definite refusal of the turn itself is not worth distinguishing from a
+   * lost one while the turn may already be running.
+   */
+  private finishFailedDispatch(error: unknown): void {
+    if (this.turnDispatchStarted) {
+      this.finish('indeterminate', 'dispatch-unknown');
+      return;
+    }
+    if (isDefiniteRejection(error)) {
+      // The provider's own words, and only its words: a structured `data`
+      // payload is untrusted and is never rendered.
+      const message = error.message.trim();
+      if (message) {
+        this.context.requestResolver.recordRefusal(this.request.requestRef, message);
+      }
+      this.finish('invalidated', 'side-effect-free-rejection', true);
+      return;
+    }
+    if (this.nativePreparationStarted) {
+      this.finish('indeterminate', 'effects-unknown');
+      return;
+    }
+    this.finish('invalidated', 'pre-dispatch-rejected', true);
   }
 
   private async ensureThread(intent: CodexThreadIntent): Promise<string> {
@@ -1041,6 +1223,13 @@ class CodexExecutionRun implements ExecutionRun {
       return result.thread.id;
     }
     if (intent.kind === 'resume') {
+      // The thread may already be open in this daemon — loaded by the session
+      // this one replaces, or by startup recovery. Resuming it a second time is
+      // what the app-server answers with an active-writer conflict, so the
+      // binding moves and the existing load stands.
+      if (this.session.adoptLoadedThread(intent.threadId)) {
+        return intent.threadId;
+      }
       const result = await this.requestNativePreparation<ThreadResumeResult>('thread/resume', {
         ...intent.params,
         threadId: intent.threadId,
@@ -1060,6 +1249,7 @@ class CodexExecutionRun implements ExecutionRun {
       ...intent.resumeParams,
       threadId,
     });
+    this.session.markLoaded(threadId);
     const rollback = fork.thread.turns.length - checkpoint - 1;
     if (rollback > 0) {
       await this.requestNativePreparation('thread/rollback', { threadId, numTurns: rollback });
@@ -1601,7 +1791,28 @@ class CodexExecutionRun implements ExecutionRun {
     return this.turnReconciler;
   }
 
+  /**
+   * (Re)starts the silence window, so a talking turn keeps living.
+   *
+   * Not past the end of the run: `finish` clears both timers and *then* emits
+   * the terminal event, and the emit is what re-arms this one. Without the
+   * guard every finished run left a live ten-minute timer holding it, and the
+   * completion work after `turn/completed` kept pushing the window out.
+   */
+  private armInactivityTimeout(): void {
+    if (this.terminal) {
+      return;
+    }
+    if (this.runTimeoutHandle !== undefined) {
+      this.context.scheduler.clearTimeout(this.runTimeoutHandle);
+    }
+    this.runTimeoutHandle = this.context.scheduler.setTimeout(() => {
+      void this.handleTimeout();
+    }, this.context.runTimeoutMs ?? 10 * 60_000);
+  }
+
   private emit(event: ProviderExecutionEvent['event']): void {
+    this.armInactivityTimeout();
     const delivery: ProviderExecutionEvent = {
       backendId: CODEX_EXECUTION_DESCRIPTOR.backendId,
       backendGeneration: this.config.backendGeneration,
@@ -1632,6 +1843,10 @@ class CodexExecutionRun implements ExecutionRun {
     if (this.runTimeoutHandle !== undefined) {
       this.context.scheduler.clearTimeout(this.runTimeoutHandle);
       this.runTimeoutHandle = undefined;
+    }
+    if (this.runAbsoluteTimeoutHandle !== undefined) {
+      this.context.scheduler.clearTimeout(this.runAbsoluteTimeoutHandle);
+      this.runAbsoluteTimeoutHandle = undefined;
     }
     for (const abort of this.resultCommitAborts) {
       abort.abort();
@@ -1685,6 +1900,18 @@ function validatePreparedInteraction(prepared: CodexPreparedInteraction): void {
   if (!prepared.responseIds.includes(prepared.providerResolvedResponseId)) {
     throw new Error('Codex interaction must include its provider-resolved response.');
   }
+}
+
+/**
+ * Whether the failure is an answer rather than a silence.
+ *
+ * Both cases are decisions taken and reported: one by the app-server, one by
+ * this backend. Neither can have left work running.
+ */
+function isDefiniteRejection(
+  error: unknown,
+): error is CodexRpcResponseError | CodexThreadOwnershipError {
+  return error instanceof CodexRpcResponseError || error instanceof CodexThreadOwnershipError;
 }
 
 function resumeParams(intent: CodexThreadIntent): Omit<ThreadResumeParams, 'threadId'> {

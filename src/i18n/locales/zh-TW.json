@@ -13,6 +13,7 @@
     "success": "成功",
     "warning": "警告",
     "confirm": "確認",
+    "done": "完成",
     "settings": "設置",
     "advanced": "高級",
     "enabled": "已啟用",
@@ -254,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "跳至最新訊息",
-        "placeholder": "請 Grimoire 編輯、搜尋、比較、生成或執行指令…",
+        "placeholder": "問 Grimoire…",
         "send": "傳送",
         "sendMessage": "傳送訊息",
         "stopResponse": "停止回覆",
@@ -303,6 +304,9 @@
         "permissionSafe": "安全",
         "permissionAuto": "自動",
         "permissionPlan": "計畫",
+        "permissionSafeDetail": "每次編輯和指令都先確認",
+        "permissionAutoDetail": "編輯和指令直接執行，不再詢問",
+        "permissionPlanDetail": "在你核准計畫前唯讀",
         "effortLevels": {
           "low": "輕度",
           "medium": "中",
@@ -327,6 +331,8 @@
         "absolutePathRequired": "路徑必須為絕對路徑。用法：/add-dir /absolute/path",
         "duplicate": "此資料夾已新增為外部脈絡。",
         "selectTitle": "選取外部脈絡",
+        "selectFileTitle": "選擇外部檔案",
+        "selectFolderTitle": "選擇外部資料夾",
         "pickerFailed": "無法開啟資料夾選擇器。",
         "conflictInside": "無法新增「{path}」— 它位於既有路徑「{existing}」內",
         "conflictContains": "無法新增「{path}」— 它包含既有路徑「{existing}」",
@@ -378,9 +384,53 @@
         "safeMode": "安全模式",
         "loadedThisSession": "已於此工作階段載入"
       },
+      "contextManager": {
+        "title": "脈絡",
+        "headerCount": "{count} 個檔案 · 約 {tokens} 個 token",
+        "searchPlaceholder": "篩選已附加內容，或輸入以從保管庫加入",
+        "add": "加入",
+        "addContext": "加入脈絡",
+        "addNamed": "加入 {name}",
+        "manage": "管理",
+        "review": "檢視",
+        "selected": "已選 {count} 項",
+        "estimatedTokens": "約 {tokens}（估算）",
+        "clearSelection": "取消選取",
+        "selectNamed": "選取 {name}",
+        "removeNamed": "移除 {name}",
+        "removeAll": "全部移除",
+        "removeAllConfirm": "移除 {count} 個檔案？",
+        "empty": "尚未附加任何內容。可以加入筆記、資料夾或連結。",
+        "noMatches": "沒有符合項目。",
+        "groupVault": "保管庫",
+        "groupExternal": "外部",
+        "groupFromVault": "來自保管庫",
+        "fileCount": "{count} 個檔案",
+        "summaryCost": "約 {tokens} · 佔視窗 {percent}%",
+        "overBudget": "{count} 個檔案 · 約 {tokens} 超出此模型的視窗",
+        "overBudgetBy": "超出約 {tokens}",
+        "windowShare": "送出後佔視窗 {percent}%",
+        "windowUnknown": "此模型未回報脈絡視窗大小",
+        "exceedsBy": "超出此模型視窗約 {tokens}",
+        "notCounted": "{count} 個檔案未計入",
+        "unreadable": "無法讀取",
+        "missing": "找不到 — 已移動或刪除",
+        "inFlight": "傳送中",
+        "attached": "已附加",
+        "pickerPlaceholder": "搜尋保管庫",
+        "pickerHint": "⏎ 加入 · ⇥ 保持開啟",
+        "quickOpenFile": "開啟的檔案",
+        "quickBrowseFile": "外部檔案…",
+        "quickBrowseFolder": "外部資料夾…",
+        "detailExternal": "保管庫之外",
+        "detailOpenNote": "開啟的筆記",
+        "folderDetail": "{count} 篇筆記"
+      },
       "tabs": {
         "createFailed": "無法建立分頁",
         "newTab": "新增分頁",
+        "tabLabel": "分頁 {index} · {title}",
+        "tabActions": "分頁操作",
         "history": "聊天記錄",
         "switchFailed": "無法切換分頁",
         "closeFailed": "無法關閉分頁",
@@ -403,7 +453,8 @@
         "closed": "已關閉 {title}",
         "closedMany": "已關閉 {count} 個分頁",
         "undo": "復原",
-        "restoreFailed": "無法還原分頁"
+        "restoreFailed": "無法還原分頁",
+        "titleSourceFallbackPrefix": "占位標題"
       },
       "messages": {
         "interrupted": "已中斷",
@@ -414,8 +465,6 @@
         "conversationCompacted": "對話已壓縮",
         "sessionRestarted": "新工作階段",
         "sessionRestartedHint": "代理無法還原先前的工作階段，因此這段對話會在新的工作階段中繼續。上方的訊息不在它的脈絡中——請重述仍然需要的內容，或在新分頁中重新開始。",
-        "completed": "已完成",
-        "duration": "* {flavor}，持續 {duration}",
         "copied": "已複製！",
         "renderFailed": "無法呈現訊息內容。",
         "copyMessage": "複製訊息",
@@ -492,7 +541,9 @@
         "openBackgroundTab": "在背景分頁開啟",
         "switchOpenSession": "切換至已開啟的工作階段",
         "rename": "重新命名",
-        "noneToResume": "沒有可繼續的對話"
+        "noneToResume": "沒有可繼續的對話",
+        "titleSourceModel": "自動生成",
+        "titleSourceManual": "手動"
       },
       "thinking": {
         "expandAriaLabel": "延伸思考 — 點擊以展開",
@@ -528,17 +579,17 @@
         "shellCommand": "shell 指令"
       },
       "plan": {
-        "requestedPermissions": "請求的權限：",
-        "approveCurrentSession": "核准（目前工作階段）",
-        "continueFeedbackPlaceholder": "輸入意見以繼續規劃…",
-        "keyboardHints": "方向鍵可瀏覽 · Enter 可選取 · Esc 可取消",
+        "requestedPermissions": "請求的權限",
+        "approveCurrentSession": "在本次工作階段核准",
+        "continueFeedbackPlaceholder": "修訂計畫的意見…",
+        "keyboardHints": "↑↓ 瀏覽 · ⏎ 選取 · esc 取消",
         "complete": "計畫完成",
         "reviewBeforeProceeding": "繼續前請檢閱計畫",
         "label": "計畫",
         "expand": "展開計畫",
         "collapse": "收合計畫",
         "implement": "實作",
-        "reviseFeedbackPlaceholder": "輸入意見以修訂計畫…"
+        "reviseFeedbackPlaceholder": "修訂計畫的意見…"
       },
       "images": {
         "dropHere": "將圖片拖放至此",
@@ -586,6 +637,7 @@
         "runningEllipsis": "執行中…",
         "completed": "已完成",
         "blocked": "已阻擋",
+        "unfinished": "未完成",
         "error": "錯誤",
         "orphaned": "孤立",
         "inProgress": "進行中",
@@ -659,10 +711,12 @@
         "queryCountOne": "{count} 個查詢",
         "queryCountMany": "{count} 個查詢",
         "stepCountOne": "{count} 個步驟",
-        "stepCountMany": "{count} 個步驟"
+        "stepCountMany": "{count} 個步驟",
+        "resultSkipped": "已略過",
+        "resultStopped": "已停止"
       },
       "responseMetadata": {
-        "effort": "推理強度 {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -712,6 +766,10 @@
       "name": "標題生成模型",
       "desc": "用於自動生成對話標題的模型。",
       "auto": "自動 (作用中提供方)"
+    },
+    "runAbsoluteTimeout": {
+      "name": "單一回合最長執行時間",
+      "desc": "無論一個回合多麼活躍，超過此分鐘數後都會被停止。完全沒有輸出的回合會更早停止——靜默十分鐘即中止。執行長時間的代理任務時可調大，填 0 則取消上限。"
     },
     "navMappings": {
       "name": "Vim 風格導航映射",
@@ -900,6 +958,10 @@
       "name": "最大聊天標籤數",
       "desc": "同時開啟的最大聊天標籤數（1-10）。每個標籤使用獨立的 Claude 對話。",
       "warning": "超過 5 個標籤可能會影響效能和記憶體使用。"
+    },
+    "showPanelLabels": {
+      "name": "顯示面板名稱",
+      "desc": "在對話上方的切換器中為每個面板顯示名稱。目前面板一律顯示名稱，其餘面板在開啟前只顯示圖示。"
     },
     "tabBarPosition": {
       "name": "標籤列位置",
@@ -1518,6 +1580,7 @@
     "newTab": "新增分頁",
     "newSession": "新增工作階段（目前分頁）",
     "closeCurrentTab": "關閉目前分頁",
+    "manageContext": "管理上下文",
     "switchToTab": "切換至分頁 {index}",
     "environmentRestartFailed": "環境變更已套用，但有 {count} 個受影響的分頁無法重新啟動。",
     "environmentAppliedRebuild": "已套用環境變數。工作階段將在下一則訊息時重建。",
@@ -1525,6 +1588,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "內建",
+        "vault": "保管庫",
+        "user": "使用者",
+        "system": "系統",
+        "runtime": "執行階段"
+      },
       "noMatches": "沒有相符的命令"
     },
     "resumeConversation": {

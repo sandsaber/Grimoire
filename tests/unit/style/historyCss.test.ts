@@ -12,18 +12,40 @@ function getRule(css: string, selector: string): string {
 }
 
 describe('history.css', () => {
-  it('opens history as a full chat-pane sheet', () => {
+  it('hangs history off the control that opened it, not over the conversation', () => {
     const css = readHistoryCss();
 
+    // It was a sheet inset 13px on all four sides, so looking for another
+    // conversation meant losing sight of this one.
     const menuRule = getRule(css, '.grimoire-history-menu');
     expect(menuRule).toContain('position: absolute');
-    expect(menuRule).toContain('left: 13px');
-    expect(menuRule).toContain('right: 13px');
-    expect(menuRule).toContain('top: 13px');
-    expect(menuRule).toContain('bottom: 13px');
+    expect(menuRule).toContain('top: calc(var(--grimoire-header-h) + var(--grimoire-space-4))');
+    expect(menuRule).toContain('right: var(--grimoire-space-8)');
+    expect(menuRule).toContain('bottom: auto');
+    expect(menuRule).toContain('left: auto');
+    expect(menuRule).toContain('width: min(352px, calc(100% - var(--grimoire-space-16)))');
+    expect(menuRule).toContain('box-shadow: var(--grimoire-lift-1)');
     expect(getRule(css, '.grimoire-history-menu.visible')).toContain('display: grid');
-    expect(getRule(css, '.grimoire-history-close')).toContain('display: inline-grid');
+    // No header band, so no close button in one: the panel opens on its search
+    // row and closes on an outside click or Escape.
+    expect(css).not.toContain('.grimoire-history-close');
+    expect(getRule(css, '.grimoire-history-footer')).toContain('border-top: 1px solid var(--grimoire-line)');
     expect(css).not.toContain('.grimoire-history-btn[aria-expanded="true"]');
+  });
+
+  it('marks the open conversation with a rule rather than a fill', () => {
+    const css = readHistoryCss();
+
+    const rowRule = getRule(css, '.grimoire-history-item');
+    expect(rowRule).toContain('height: 56px');
+    expect(rowRule).toContain('border-left: 1.5px solid transparent');
+    expect(getRule(css, '.grimoire-history-item.active'))
+      .toContain('border-left-color: var(--grimoire-accent)');
+    // Open in another tab is the same rule at the accent's border weight, not
+    // the hover ground: a row nobody was pointing at looked pointed at.
+    const openElsewhere = getRule(css, '.grimoire-history-item.is-open:not(.active)');
+    expect(openElsewhere).toContain('border-left-color: var(--grimoire-accent-line)');
+    expect(openElsewhere).toContain('background: transparent');
   });
 
   it('styles the redesigned search and grouped history list', () => {
@@ -31,17 +53,27 @@ describe('history.css', () => {
 
     expect(getRule(css, '.grimoire-history-search')).toContain('display: flex');
     expect(getRule(css, '.grimoire-history-group')).toContain('display: grid');
-    expect(getRule(css, '.grimoire-history-provider-dot')).toContain('background: var(--grimoire-history-provider-color');
+    expect(css).not.toContain('.grimoire-history-provider-dot');
   });
 
-  it('reveals history actions without changing row width', () => {
+  it('reveals history actions without moving anything, the title included', () => {
     const css = readHistoryCss();
 
+    // Floated over the stamp, the controls reached back across the title and
+    // sat on its last words: they are wider than the column they hovered. They
+    // hold a cell of their own now, on the second line, opposite the stamp -
+    // so the space is theirs at rest and revealing them shifts nothing.
     const actionsRule = getRule(css, '.grimoire-history-item-actions');
-    expect(actionsRule).toContain('position: absolute');
+    expect(actionsRule).toContain('grid-area: 2 / 2');
+    expect(actionsRule).not.toContain('position: absolute');
     expect(actionsRule).toContain('opacity: 0');
     expect(getRule(css, '.grimoire-history-item:hover .grimoire-history-item-actions')).toContain('opacity: 1');
-    expect(getRule(css, '.grimoire-history-item:hover .grimoire-history-item-time')).toContain('opacity: 0');
+    // The title spans both columns of the first line and yields none of it.
+    expect(getRule(css, '.grimoire-history-item-content')).toContain('grid-area: 1 / 1 / 2 / 3');
+    // The stamp has its own end of the second line, so it no longer has to
+    // vanish to make room for them.
+    expect(getRule(css, '.grimoire-history-item-time')).toContain('grid-area: 2 / 1');
+    expect(css).not.toContain('.grimoire-history-item:hover .grimoire-history-item-time');
   });
 
   it('keeps new-tab controls in the same hover action row as rename', () => {
@@ -49,6 +81,6 @@ describe('history.css', () => {
 
     expect(css).not.toContain('.grimoire-history-quick-open');
     expect(css).not.toContain('.grimoire-history-item.has-quick-open');
-    expect(getRule(css, '.grimoire-history-item-actions')).toContain('right: 8px');
+    expect(getRule(css, '.grimoire-history-item-actions')).toContain('justify-self: end');
   });
 });

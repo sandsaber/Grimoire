@@ -1,4 +1,5 @@
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import type { ProviderChatIcon } from '../../../core/providers/ProviderModule';
 import type { ProviderId } from '../../../core/providers/types';
 import type { AssistantResponseMetadata } from '../../../core/types';
 
@@ -17,6 +18,22 @@ const CHAT_PROVIDER_LABELS: Record<string, string> = {
 
 export function getAssistantResponseProviderLabel(providerId: ProviderId): string {
   return CHAT_PROVIDER_LABELS[providerId] ?? providerCatalog().displayName(providerId);
+}
+
+/**
+ * The provider's own mark, for the meta line above a response.
+ *
+ * Identity is the vendor's glyph drawn in ink. It used to be a 6px disc in one
+ * of nine brand colours, which said nothing to a reader who had not learnt the
+ * palette and nothing at all to one who cannot separate the hues.
+ */
+export function getAssistantResponseProviderIcon(providerId: ProviderId): ProviderChatIcon | null {
+  try {
+    return providerCatalog().declarations(providerId).chatUI.icon() ?? null;
+  } catch {
+    // A conversation can name a provider this build does not register.
+    return null;
+  }
 }
 
 function normalizeDisplayString(value: unknown): string | undefined {

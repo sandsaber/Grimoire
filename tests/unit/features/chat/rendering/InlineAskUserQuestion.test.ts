@@ -468,12 +468,15 @@ describe('InlineAskUserQuestion', () => {
       expect(skip?.textContent).toBe('Decide for me');
     });
 
-    it('submit button text contains Send answers', () => {
+    it('names the action, then points where it sends you', () => {
+      // The arrow used to lead, which reads as an icon button that happens to
+      // carry a label rather than a verb with a direction.
       const input = makeInput([{ question: 'Q', options: ['A'] }]);
       const { container } = renderWidget(input);
       const submit = getSubmitBtn(container);
       const spans = submit?._children?.filter((c: any) => c.tagName === 'SPAN') || [];
-      expect(spans[spans.length - 1]?.textContent).toBe('Send answers');
+      expect(spans[0]?.textContent).toBe('Send answers');
+      expect(spans[spans.length - 1]?.hasClass('grimoire-ask-btn-arrow')).toBe(true);
     });
 
     it('does not render shortcut hints in the action bar', () => {

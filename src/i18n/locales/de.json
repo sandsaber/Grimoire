@@ -13,6 +13,7 @@
     "success": "Erfolg",
     "warning": "Warnung",
     "confirm": "Bestätigen",
+    "done": "Fertig",
     "settings": "Einstellungen",
     "advanced": "Erweitert",
     "enabled": "Aktiviert",
@@ -254,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "Zur neuesten Nachricht springen",
-        "placeholder": "Bitte Grimoire, etwas zu bearbeiten, zu suchen, zu vergleichen, zu generieren oder einen Befehl auszuführen ...",
+        "placeholder": "Grimoire fragen…",
         "send": "Senden",
         "sendMessage": "Nachricht senden",
         "stopResponse": "Antwort stoppen",
@@ -303,6 +304,9 @@
         "permissionSafe": "Sicher",
         "permissionAuto": "Auto",
         "permissionPlan": "Plan",
+        "permissionSafeDetail": "Jede Änderung und jeden Befehl bestätigen",
+        "permissionAutoDetail": "Änderungen und Befehle laufen ohne Rückfrage",
+        "permissionPlanDetail": "Nur Lesezugriff, bis Sie einen Plan freigeben",
         "effortLevels": {
           "low": "Niedrig",
           "medium": "Mittel",
@@ -327,6 +331,8 @@
         "absolutePathRequired": "Der Pfad muss absolut sein. Verwendung: /add-dir /absolute/path",
         "duplicate": "Dieser Ordner wurde bereits als externer Kontext hinzugefügt.",
         "selectTitle": "Externen Kontext auswählen",
+        "selectFileTitle": "Externe Datei auswählen",
+        "selectFolderTitle": "Externen Ordner auswählen",
         "pickerFailed": "Ordnerauswahl konnte nicht geöffnet werden.",
         "conflictInside": "„{path}“ kann nicht hinzugefügt werden — er liegt innerhalb des vorhandenen Pfads „{existing}“",
         "conflictContains": "„{path}“ kann nicht hinzugefügt werden — er enthält den vorhandenen Pfad „{existing}“",
@@ -378,9 +384,53 @@
         "safeMode": "Sicherer Modus",
         "loadedThisSession": "In dieser Sitzung geladen"
       },
+      "contextManager": {
+        "title": "Kontext",
+        "headerCount": "{count} Dateien · ~{tokens} Token",
+        "searchPlaceholder": "Angehängtes filtern oder tippen, um aus dem Tresor hinzuzufügen",
+        "add": "Hinzufügen",
+        "addContext": "Kontext hinzufügen",
+        "addNamed": "{name} hinzufügen",
+        "manage": "Verwalten",
+        "review": "Prüfen",
+        "selected": "{count} ausgewählt",
+        "estimatedTokens": "~{tokens} geschätzt",
+        "clearSelection": "Aufheben",
+        "selectNamed": "{name} auswählen",
+        "removeNamed": "{name} entfernen",
+        "removeAll": "Alle entfernen",
+        "removeAllConfirm": "{count} Dateien entfernen?",
+        "empty": "Nichts angehängt. Füge eine Notiz, einen Ordner oder einen Link hinzu.",
+        "noMatches": "Keine Treffer.",
+        "groupVault": "Tresor",
+        "groupExternal": "Extern",
+        "groupFromVault": "Aus dem Tresor",
+        "fileCount": "{count} Dateien",
+        "summaryCost": "~{tokens} · {percent}% des Fensters",
+        "overBudget": "{count} Dateien · ~{tokens} sprengt das Fenster dieses Modells",
+        "overBudgetBy": "~{tokens} darüber",
+        "windowShare": "{percent}% des Fensters nach dieser Nachricht",
+        "windowUnknown": "Dieses Modell hat kein Kontextfenster gemeldet",
+        "exceedsBy": "überschreitet das Fenster dieses Modells um ~{tokens}",
+        "notCounted": "{count} Dateien nicht gezählt",
+        "unreadable": "nicht lesbar",
+        "missing": "nicht gefunden — verschoben oder gelöscht",
+        "inFlight": "unterwegs",
+        "attached": "angehängt",
+        "pickerPlaceholder": "Tresor durchsuchen",
+        "pickerHint": "⏎ hinzufügen · ⇥ offen lassen",
+        "quickOpenFile": "Geöffnete Datei",
+        "quickBrowseFile": "Externe Datei…",
+        "quickBrowseFolder": "Externer Ordner…",
+        "detailExternal": "außerhalb des Tresors",
+        "detailOpenNote": "geöffnete Notiz",
+        "folderDetail": "{count} Notizen"
+      },
       "tabs": {
         "createFailed": "Tab konnte nicht erstellt werden",
         "newTab": "Neuer Tab",
+        "tabLabel": "Tab {index} · {title}",
+        "tabActions": "Tab-Aktionen",
         "history": "Chatverlauf",
         "switchFailed": "Tab konnte nicht gewechselt werden",
         "closeFailed": "Tab konnte nicht geschlossen werden",
@@ -403,7 +453,8 @@
         "closed": "{title} geschlossen",
         "closedMany": "{count} Tabs geschlossen",
         "undo": "Rückgängig",
-        "restoreFailed": "Tab konnte nicht wiederhergestellt werden"
+        "restoreFailed": "Tab konnte nicht wiederhergestellt werden",
+        "titleSourceFallbackPrefix": "Platzhalter"
       },
       "messages": {
         "interrupted": "Unterbrochen",
@@ -414,8 +465,6 @@
         "conversationCompacted": "Unterhaltung komprimiert",
         "sessionRestarted": "Neue Sitzung",
         "sessionRestartedHint": "Der Agent konnte die vorherige Sitzung nicht wiederherstellen, daher wird diese Unterhaltung in einer neuen fortgesetzt. Die Nachrichten oben sind nicht in ihrem Kontext - wiederhole, was weiterhin gebraucht wird, oder beginne neu in einem neuen Tab.",
-        "completed": "Fertig",
-        "duration": "* {flavor} für {duration}",
         "copied": "Kopiert!",
         "renderFailed": "Nachrichteninhalt konnte nicht gerendert werden.",
         "copyMessage": "Nachricht kopieren",
@@ -492,7 +541,9 @@
         "openBackgroundTab": "In Tab im Hintergrund öffnen",
         "switchOpenSession": "Zu geöffneter Sitzung wechseln",
         "rename": "Umbenennen",
-        "noneToResume": "Keine Unterhaltungen zum Fortsetzen"
+        "noneToResume": "Keine Unterhaltungen zum Fortsetzen",
+        "titleSourceModel": "Automatisch erzeugt",
+        "titleSourceManual": "Manuell"
       },
       "thinking": {
         "expandAriaLabel": "Erweitertes Denken — klicken zum Aufklappen",
@@ -528,17 +579,17 @@
         "shellCommand": "Shell-Befehl"
       },
       "plan": {
-        "requestedPermissions": "Angeforderte Berechtigungen:",
-        "approveCurrentSession": "Genehmigen (aktuelle Sitzung)",
-        "continueFeedbackPlaceholder": "Feedback eingeben, um die Planung fortzusetzen ...",
-        "keyboardHints": "Pfeiltasten zum Navigieren · Eingabetaste zum Auswählen · Esc zum Abbrechen",
+        "requestedPermissions": "Angeforderte Berechtigungen",
+        "approveCurrentSession": "Für diese Sitzung genehmigen",
+        "continueFeedbackPlaceholder": "Feedback zur Überarbeitung des Plans…",
+        "keyboardHints": "↑↓ navigieren · ⏎ auswählen · esc abbrechen",
         "complete": "Plan fertig",
         "reviewBeforeProceeding": "Prüfe den Plan, bevor du fortfährst",
         "label": "Plan",
         "expand": "Plan aufklappen",
         "collapse": "Plan einklappen",
         "implement": "Umsetzen",
-        "reviseFeedbackPlaceholder": "Feedback eingeben, um den Plan zu überarbeiten ..."
+        "reviseFeedbackPlaceholder": "Feedback zur Überarbeitung des Plans…"
       },
       "images": {
         "dropHere": "Bild hier ablegen",
@@ -586,6 +637,7 @@
         "runningEllipsis": "Läuft ...",
         "completed": "abgeschlossen",
         "blocked": "blockiert",
+        "unfinished": "unvollendet",
         "error": "Fehler",
         "orphaned": "Verwaist",
         "inProgress": "in Bearbeitung",
@@ -659,10 +711,12 @@
         "queryCountOne": "{count} Abfrage",
         "queryCountMany": "{count} Abfragen",
         "stepCountOne": "{count} Schritt",
-        "stepCountMany": "{count} Schritte"
+        "stepCountMany": "{count} Schritte",
+        "resultSkipped": "übersprungen",
+        "resultStopped": "gestoppt"
       },
       "responseMetadata": {
-        "effort": "Aufwand: {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -712,6 +766,10 @@
       "name": "Titel-Generierungsmodell",
       "desc": "Modell zur automatischen Generierung von Konversationstiteln.",
       "auto": "Automatisch (aktiver Anbieter)"
+    },
+    "runAbsoluteTimeout": {
+      "name": "Maximale Dauer eines Zuges",
+      "desc": "Minuten, die ein Zug laufen darf, bevor er gestoppt wird — unabhängig davon, wie aktiv er bleibt. Ein stiller Zug wird früher gestoppt, nach zehn Minuten ohne ein Wort. Für lange agentische Arbeit erhöhen oder 0 setzen, um die Obergrenze aufzuheben."
     },
     "navMappings": {
       "name": "Vim-Style Navigationszuordnungen",
@@ -900,6 +958,10 @@
       "name": "Maximale Chat-Tabs",
       "desc": "Maximale Anzahl gleichzeitiger Chat-Tabs (1-10). Jeder Tab verwendet eine separate Claude-Sitzung.",
       "warning": "Mehr als 5 Tabs können Leistung und Speichernutzung beeinträchtigen."
+    },
+    "showPanelLabels": {
+      "name": "Bereichsnamen anzeigen",
+      "desc": "Benennt jeden Bereich im Umschalter über dem Verlauf. Der aktive Bereich wird immer benannt; die übrigen bleiben Symbole, bis du dies einschaltest."
     },
     "tabBarPosition": {
       "name": "Tab-Leiste Position",
@@ -1518,6 +1580,7 @@
     "newTab": "Neuer Tab",
     "newSession": "Neue Sitzung (im aktuellen Tab)",
     "closeCurrentTab": "Aktuellen Tab schließen",
+    "manageContext": "Kontext verwalten",
     "switchToTab": "Zu Tab {index} wechseln",
     "environmentRestartFailed": "Umgebungsänderungen wurden angewendet, aber {count} betroffene Tabs konnten nicht neu gestartet werden.",
     "environmentAppliedRebuild": "Umgebungsvariablen angewendet. Sitzungen werden bei der nächsten Nachricht neu aufgebaut.",
@@ -1525,6 +1588,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "Integriert",
+        "vault": "Tresor",
+        "user": "Benutzer",
+        "system": "System",
+        "runtime": "Laufzeit"
+      },
       "noMatches": "Keine passenden Befehle"
     },
     "resumeConversation": {

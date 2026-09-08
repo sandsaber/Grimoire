@@ -1,17 +1,30 @@
+/*
+ * A turn's own progress, hung on a rule that says how it is going.
+ *
+ * The state was a coloured glyph and nothing else — green for done, amber for
+ * blocked — so the block had no edge and the colours were two more meanings for
+ * hues the system does not use. The rule is the accent while it runs, ordinary
+ * line when it is done, and the error colour when it stopped.
+ */
 .grimoire-progress-block {
-  margin: var(--grimoire-space-4) 0;
-  padding-inline-start: var(--grimoire-space-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--grimoire-space-6);
+  margin: var(--grimoire-space-8) 0;
+  padding-inline-start: var(--grimoire-space-12);
+  border-inline-start: 1.5px solid var(--grimoire-line);
 }
 
 .grimoire-container--chat-window .grimoire-message-content > .grimoire-progress-block {
-  margin: var(--grimoire-space-1) 0;
+  margin: var(--grimoire-space-2) 0;
 }
 
 .grimoire-progress-header {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-3);
-  min-height: 22px;
+  gap: var(--grimoire-space-8);
+  min-height: 0;
+  font-size: var(--grimoire-text-s);
 }
 
 .grimoire-progress-icon,
@@ -20,45 +33,47 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-progress-icon svg {
-  width: 15px;
-  height: 15px;
+  width: var(--grimoire-icon-s);
+  height: var(--grimoire-icon-s);
+  stroke-width: var(--grimoire-stroke);
 }
 
 .grimoire-progress-block--running .grimoire-progress-icon,
 .grimoire-progress-item--in_progress .grimoire-progress-item-icon {
-  color: var(--grimoire-brand);
-  animation: grimoire-progress-spin 1.2s linear infinite;
+  color: var(--grimoire-accent);
+  animation: grimoire-spin 0.9s linear infinite;
 }
 
 .grimoire-progress-block--completed .grimoire-progress-icon,
 .grimoire-progress-item--completed .grimoire-progress-item-icon {
-  color: var(--color-green);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-progress-block--waiting .grimoire-progress-icon {
-  color: var(--grimoire-brand);
+  color: var(--grimoire-accent);
 }
 
 .grimoire-progress-block--blocked .grimoire-progress-icon {
-  color: var(--color-orange);
+  color: var(--grimoire-error);
 }
 
 .grimoire-progress-meta {
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
+  font-weight: var(--grimoire-weight-medium);
   font-variant-numeric: tabular-nums;
 }
 
 .grimoire-progress-content {
-  margin-top: var(--grimoire-space-1);
-  padding-inline-start: var(--grimoire-space-7);
-  color: var(--text-normal);
-  font-size: var(--font-ui-small);
-  line-height: 1.5;
+  margin-top: 0;
+  padding-inline-start: 0;
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
+  line-height: var(--grimoire-leading-body);
 }
 
 .grimoire-progress-content p {
@@ -68,22 +83,22 @@
 .grimoire-progress-items {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-1);
-  margin-top: var(--grimoire-space-3);
-  padding-inline-start: var(--grimoire-space-7);
+  gap: var(--grimoire-space-2);
+  margin-top: var(--grimoire-space-6);
+  padding-inline-start: var(--grimoire-space-20);
 }
 
 .grimoire-progress-item {
   display: flex;
   align-items: flex-start;
-  gap: var(--grimoire-space-3);
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  gap: var(--grimoire-space-6);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-s);
   line-height: 1.4;
 }
 
 .grimoire-progress-item-icon {
-  margin-top: var(--grimoire-space-1);
+  margin-top: var(--grimoire-space-2);
 }
 
 .grimoire-progress-item-icon svg {
@@ -92,7 +107,7 @@
 }
 
 .grimoire-progress-item--in_progress {
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-progress-item--completed .grimoire-progress-item-label {
@@ -103,18 +118,12 @@
 .grimoire-tool-call + .grimoire-progress-block,
 .grimoire-progress-block + .grimoire-text-block,
 .grimoire-text-block + .grimoire-progress-block {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
 }
 
 .grimoire-text-block--commentary {
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
-}
-
-@keyframes grimoire-progress-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-m);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -122,4 +131,18 @@
   .grimoire-progress-item--in_progress .grimoire-progress-item-icon {
     animation: none;
   }
+}
+
+/* The rule carries the state; the block that follows keeps its own colour. */
+.grimoire-progress-block--running,
+.grimoire-progress-block--waiting {
+  border-inline-start-color: var(--grimoire-accent);
+}
+
+.grimoire-progress-block--completed {
+  border-inline-start-color: var(--grimoire-line);
+}
+
+.grimoire-progress-block--blocked {
+  border-inline-start-color: var(--grimoire-error);
 }

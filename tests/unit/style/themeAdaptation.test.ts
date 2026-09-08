@@ -142,7 +142,7 @@ describe('theme adaptation', () => {
     // at every hue by design; it is the one token here that must not move.
     const FIXED_BY_DESIGN = new Set(['--grimoire-accent-contrast']);
     const accentTokens = Object.keys(tokenLayer())
-      .filter(name => name.startsWith('--grimoire-accent') || name === '--grimoire-brand')
+      .filter(name => name.startsWith('--grimoire-accent') || name === '--grimoire-accent')
       .filter(name => !FIXED_BY_DESIGN.has(name));
     expect(accentTokens.length).toBeGreaterThan(4);
 
@@ -152,12 +152,16 @@ describe('theme adaptation', () => {
     }
   });
 
-  it('keeps the provider marks fixed, because those are identity rather than theme', () => {
-    const light = resolveAll('light');
-    const dark = resolveAll('dark');
+  it('pins nothing, now that provider identity is a glyph rather than a hue', () => {
+    // Nine vendor colours used to be the one fixed thing in the layer. Nordic
+    // draws a provider as its mark in --text-muted, so a Grimoire surface has
+    // no colour left that the user's theme does not choose.
+    const layer = tokenLayer();
+    const fixed = Object.entries(layer)
+      .filter(([, value]) => /#[0-9a-fA-F]{3,8}\b|\brgba?\(\s*[0-9]/.test(value))
+      .map(([name, value]) => `${name}: ${value}`);
 
-    expect(light['--grimoire-provider-claude']).toBe('#d97757');
-    expect(dark['--grimoire-provider-claude']).toBe('#d97757');
+    expect(fixed).toEqual([]);
   });
 
   it('lands each type step where the literal it replaced stood', () => {
@@ -187,16 +191,16 @@ describe('theme adaptation', () => {
     expect(px('--grimoire-text-xs')).toBeCloseTo(11, 0);
     expect(px('--grimoire-text-s')).toBeCloseTo(12, 0);
     expect(px('--grimoire-text-m')).toBeCloseTo(13, 0);
-    expect(px('--grimoire-text-l')).toBeCloseTo(14, 0);
-    expect(px('--grimoire-text-xl')).toBeCloseTo(16, 0);
-    expect(px('--grimoire-text-2xl')).toBeCloseTo(20, 0);
+    expect(px('--grimoire-text-l')).toBeCloseTo(15, 0);
+    expect(px('--grimoire-text-xl')).toBeCloseTo(20, 0);
   });
 
   it('scales type with the reader rather than pinning it', () => {
     const normal = resolveAll('dark');
-    const larger = resolveAll('dark', { '--font-ui-small': '20px' });
+    const larger = resolveAll('dark', { '--font-ui-small': '20px', '--font-ui-smaller': '18px' });
 
     expect(normal['--grimoire-text-m']).not.toBe(larger['--grimoire-text-m']);
     expect(larger['--grimoire-text-m']).toContain('20px');
+    expect(larger['--grimoire-text-s']).toContain('18px');
   });
 });

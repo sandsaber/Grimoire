@@ -13,6 +13,7 @@
     "success": "Sucesso",
     "warning": "Aviso",
     "confirm": "Confirmar",
+    "done": "Concluído",
     "settings": "Configurações",
     "advanced": "Avançado",
     "enabled": "Ativado",
@@ -254,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "Ir para a mensagem mais recente",
-        "placeholder": "Peça ao Grimoire para editar, pesquisar, comparar, gerar ou executar um comando...",
+        "placeholder": "Pergunte ao Grimoire…",
         "send": "Enviar",
         "sendMessage": "Enviar mensagem",
         "stopResponse": "Parar resposta",
@@ -303,6 +304,9 @@
         "permissionSafe": "Seguro",
         "permissionAuto": "Auto",
         "permissionPlan": "Plano",
+        "permissionSafeDetail": "Confirmar cada edição e cada comando",
+        "permissionAutoDetail": "Edições e comandos são executados sem perguntar",
+        "permissionPlanDetail": "Somente leitura até você aprovar um plano",
         "effortLevels": {
           "low": "Baixo",
           "medium": "Médio",
@@ -327,6 +331,8 @@
         "absolutePathRequired": "O caminho deve ser absoluto. Uso: /add-dir /absolute/path",
         "duplicate": "Esta pasta já foi adicionada como contexto externo.",
         "selectTitle": "Selecionar contexto externo",
+        "selectFileTitle": "Selecionar um ficheiro externo",
+        "selectFolderTitle": "Selecionar uma pasta externa",
         "pickerFailed": "Não foi possível abrir o seletor de pastas.",
         "conflictInside": "Não é possível adicionar “{path}” — ele está dentro do caminho existente “{existing}”",
         "conflictContains": "Não é possível adicionar “{path}” — ele contém o caminho existente “{existing}”",
@@ -378,9 +384,53 @@
         "safeMode": "Modo seguro",
         "loadedThisSession": "Carregado nesta sessão"
       },
+      "contextManager": {
+        "title": "Contexto",
+        "headerCount": "{count} arquivos · ~{tokens} tokens",
+        "searchPlaceholder": "Filtrar o anexado, ou digitar para adicionar do cofre",
+        "add": "Adicionar",
+        "addContext": "Adicionar contexto",
+        "addNamed": "Adicionar {name}",
+        "manage": "Gerenciar",
+        "review": "Revisar",
+        "selected": "{count} selecionados",
+        "estimatedTokens": "~{tokens} aprox.",
+        "clearSelection": "Limpar seleção",
+        "selectNamed": "Selecionar {name}",
+        "removeNamed": "Remover {name}",
+        "removeAll": "Remover tudo",
+        "removeAllConfirm": "Remover {count} arquivos?",
+        "empty": "Nada anexado. Adicione uma nota, uma pasta ou um link.",
+        "noMatches": "Sem correspondências.",
+        "groupVault": "Cofre",
+        "groupExternal": "Externo",
+        "groupFromVault": "Do cofre",
+        "fileCount": "{count} arquivos",
+        "summaryCost": "~{tokens} · {percent}% da janela",
+        "overBudget": "{count} arquivos · ~{tokens} excede a janela deste modelo",
+        "overBudgetBy": "~{tokens} além",
+        "windowShare": "{percent}% da janela após esta mensagem",
+        "windowUnknown": "Este modelo não informou a janela de contexto",
+        "exceedsBy": "excede a janela deste modelo em ~{tokens}",
+        "notCounted": "{count} arquivos não contados",
+        "unreadable": "ilegível",
+        "missing": "sumiu — movido ou excluído",
+        "inFlight": "em andamento",
+        "attached": "anexado",
+        "pickerPlaceholder": "Buscar no cofre",
+        "pickerHint": "⏎ adicionar · ⇥ manter aberto",
+        "quickOpenFile": "Arquivo aberto",
+        "quickBrowseFile": "Ficheiro externo…",
+        "quickBrowseFolder": "Pasta externa…",
+        "detailExternal": "fora do cofre",
+        "detailOpenNote": "nota aberta",
+        "folderDetail": "{count} notas"
+      },
       "tabs": {
         "createFailed": "Não foi possível criar a aba",
         "newTab": "Nova aba",
+        "tabLabel": "Aba {index} · {title}",
+        "tabActions": "Ações da aba",
         "history": "Histórico de chats",
         "switchFailed": "Não foi possível trocar de aba",
         "closeFailed": "Não foi possível fechar a aba",
@@ -403,7 +453,8 @@
         "closed": "A aba {title} foi fechada",
         "closedMany": "{count} abas foram fechadas",
         "undo": "Desfazer",
-        "restoreFailed": "Não foi possível restaurar a aba"
+        "restoreFailed": "Não foi possível restaurar a aba",
+        "titleSourceFallbackPrefix": "Provisório"
       },
       "messages": {
         "interrupted": "Interrompido",
@@ -414,8 +465,6 @@
         "conversationCompacted": "Conversa compactada",
         "sessionRestarted": "Nova sessão",
         "sessionRestartedHint": "O agente não conseguiu restaurar a sessão anterior, portanto esta conversa continua em uma nova. As mensagens acima não estão no contexto dela - repita o que ainda for necessário ou comece do zero em uma nova aba.",
-        "completed": "Concluído",
-        "duration": "* {flavor} por {duration}",
         "copied": "Copiado!",
         "renderFailed": "Não foi possível renderizar o conteúdo da mensagem.",
         "copyMessage": "Copiar mensagem",
@@ -492,7 +541,9 @@
         "openBackgroundTab": "Abrir em aba em segundo plano",
         "switchOpenSession": "Alternar para a sessão aberta",
         "rename": "Renomear",
-        "noneToResume": "Nenhuma conversa para retomar"
+        "noneToResume": "Nenhuma conversa para retomar",
+        "titleSourceModel": "Gerado automaticamente",
+        "titleSourceManual": "Manual"
       },
       "thinking": {
         "expandAriaLabel": "Raciocínio estendido — clique para expandir",
@@ -528,17 +579,17 @@
         "shellCommand": "comando de shell"
       },
       "plan": {
-        "requestedPermissions": "Permissões solicitadas:",
-        "approveCurrentSession": "Aprovar (sessão atual)",
-        "continueFeedbackPlaceholder": "Digite o feedback para continuar o planejamento...",
-        "keyboardHints": "Setas para navegar · Enter para selecionar · Esc para cancelar",
+        "requestedPermissions": "Permissões solicitadas",
+        "approveCurrentSession": "Aprovar para esta sessão",
+        "continueFeedbackPlaceholder": "Feedback para revisar o plano…",
+        "keyboardHints": "↑↓ navegar · ⏎ selecionar · esc cancelar",
         "complete": "Plano concluído",
         "reviewBeforeProceeding": "Revise o plano antes de continuar",
         "label": "plano",
         "expand": "Expandir plano",
         "collapse": "Recolher plano",
         "implement": "Implementar",
-        "reviseFeedbackPlaceholder": "Digite o feedback para revisar o plano..."
+        "reviseFeedbackPlaceholder": "Feedback para revisar o plano…"
       },
       "images": {
         "dropHere": "Solte a imagem aqui",
@@ -586,6 +637,7 @@
         "runningEllipsis": "Em execução...",
         "completed": "concluído",
         "blocked": "bloqueado",
+        "unfinished": "inacabado",
         "error": "Erro",
         "orphaned": "Órfão",
         "inProgress": "em andamento",
@@ -659,10 +711,12 @@
         "queryCountOne": "{count} consulta",
         "queryCountMany": "{count} consultas",
         "stepCountOne": "{count} etapa",
-        "stepCountMany": "{count} etapas"
+        "stepCountMany": "{count} etapas",
+        "resultSkipped": "ignorado",
+        "resultStopped": "parado"
       },
       "responseMetadata": {
-        "effort": "Esforço {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -712,6 +766,10 @@
       "name": "Modelo de geração de título",
       "desc": "Modelo usado para gerar automaticamente títulos de conversa.",
       "auto": "Automático (provedor ativo)"
+    },
+    "runAbsoluteTimeout": {
+      "name": "Duração máxima de um turno",
+      "desc": "Minutos que um turno pode executar antes de ser interrompido, por mais ativo que continue. Um turno silencioso é interrompido antes, após dez minutos sem dizer nada. Aumente para trabalhos agênticos longos, ou defina 0 para remover o limite."
     },
     "navMappings": {
       "name": "Mapeamentos de navegação estilo Vim",
@@ -900,6 +958,10 @@
       "name": "Máximo de abas de chat",
       "desc": "Número máximo de abas de chat simultâneas (1-10). Cada aba usa uma sessão Claude separada.",
       "warning": "Mais de 5 abas pode afetar o desempenho e o uso de memória."
+    },
+    "showPanelLabels": {
+      "name": "Mostrar nomes dos painéis",
+      "desc": "Nomeia cada painel no seletor acima da conversa. O painel atual é sempre nomeado; os outros ficam como ícones até você ativar isto."
     },
     "tabBarPosition": {
       "name": "Posição da barra de abas",
@@ -1518,6 +1580,7 @@
     "newTab": "Nova aba",
     "newSession": "Nova sessão (na aba atual)",
     "closeCurrentTab": "Fechar aba atual",
+    "manageContext": "Gerir contexto",
     "switchToTab": "Alternar para a aba {index}",
     "environmentRestartFailed": "As alterações de ambiente foram aplicadas, mas não foi possível reiniciar {count} abas afetadas.",
     "environmentAppliedRebuild": "Variáveis de ambiente aplicadas. As sessões serão recriadas na próxima mensagem.",
@@ -1525,6 +1588,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "Integrado",
+        "vault": "Cofre",
+        "user": "Usuário",
+        "system": "Sistema",
+        "runtime": "Execução"
+      },
       "noMatches": "Nenhum comando correspondente"
     },
     "resumeConversation": {

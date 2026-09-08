@@ -13,6 +13,7 @@
     "success": "Успех",
     "warning": "Предупреждение",
     "confirm": "Подтвердить",
+    "done": "Готово",
     "settings": "Настройки",
     "advanced": "Дополнительно",
     "enabled": "Включено",
@@ -254,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "К последнему сообщению",
-        "placeholder": "Попросите Grimoire отредактировать, найти, сравнить, сгенерировать или выполнить команду...",
+        "placeholder": "Спросить Grimoire…",
         "send": "Отправить",
         "sendMessage": "Отправить сообщение",
         "stopResponse": "Остановить ответ",
@@ -303,6 +304,9 @@
         "permissionSafe": "Безопасный",
         "permissionAuto": "Авто",
         "permissionPlan": "План",
+        "permissionSafeDetail": "Подтверждать каждую правку и команду",
+        "permissionAutoDetail": "Правки и команды выполняются без вопросов",
+        "permissionPlanDetail": "Только чтение, пока вы не одобрите план",
         "effortLevels": {
           "low": "Низкий",
           "medium": "Средний",
@@ -327,6 +331,8 @@
         "absolutePathRequired": "Путь должен быть абсолютным. Использование: /add-dir /absolute/path",
         "duplicate": "Эта папка уже добавлена как внешний контекст.",
         "selectTitle": "Выбрать внешний контекст",
+        "selectFileTitle": "Выберите внешний файл",
+        "selectFolderTitle": "Выберите внешнюю папку",
         "pickerFailed": "Не удалось открыть выбор папки.",
         "conflictInside": "Невозможно добавить “{path}” — он находится внутри существующего пути “{existing}”",
         "conflictContains": "Невозможно добавить “{path}” — он содержит существующий путь “{existing}”",
@@ -378,9 +384,53 @@
         "safeMode": "Безопасный режим",
         "loadedThisSession": "Загружено в этом сеансе"
       },
+      "contextManager": {
+        "title": "Контекст",
+        "headerCount": "файлов: {count} · ~{tokens} токенов",
+        "searchPlaceholder": "Фильтр по прикреплённым или ввод для добавления из хранилища",
+        "add": "Добавить",
+        "addContext": "Добавить контекст",
+        "addNamed": "Добавить {name}",
+        "manage": "Управлять",
+        "review": "Разобрать",
+        "selected": "выбрано: {count}",
+        "estimatedTokens": "~{tokens} прибл.",
+        "clearSelection": "Снять",
+        "selectNamed": "Выбрать {name}",
+        "removeNamed": "Убрать {name}",
+        "removeAll": "Убрать всё",
+        "removeAllConfirm": "Убрать файлов: {count}?",
+        "empty": "Ничего не прикреплено. Добавьте заметку, папку или ссылку.",
+        "noMatches": "Совпадений нет.",
+        "groupVault": "Хранилище",
+        "groupExternal": "Извне",
+        "groupFromVault": "Из хранилища",
+        "fileCount": "файлов: {count}",
+        "summaryCost": "~{tokens} · {percent}% окна",
+        "overBudget": "файлов: {count} · ~{tokens} не помещается в окно этой модели",
+        "overBudgetBy": "сверх на ~{tokens}",
+        "windowShare": "{percent}% окна после этого сообщения",
+        "windowUnknown": "Модель не сообщила размер окна контекста",
+        "exceedsBy": "больше окна этой модели на ~{tokens}",
+        "notCounted": "не посчитано файлов: {count}",
+        "unreadable": "не читается",
+        "missing": "нет на месте — перемещён или удалён",
+        "inFlight": "в работе",
+        "attached": "прикреплено",
+        "pickerPlaceholder": "Поиск по хранилищу",
+        "pickerHint": "⏎ добавить · ⇥ не закрывать",
+        "quickOpenFile": "Открытый файл",
+        "quickBrowseFile": "Внешний файл…",
+        "quickBrowseFolder": "Внешняя папка…",
+        "detailExternal": "вне хранилища",
+        "detailOpenNote": "открытая заметка",
+        "folderDetail": "заметок: {count}"
+      },
       "tabs": {
         "createFailed": "Не удалось создать вкладку",
         "newTab": "Новая вкладка",
+        "tabLabel": "Вкладка {index} · {title}",
+        "tabActions": "Действия вкладки",
         "history": "История чата",
         "switchFailed": "Не удалось переключить вкладку",
         "closeFailed": "Не удалось закрыть вкладку",
@@ -403,7 +453,8 @@
         "closed": "Вкладка «{title}» закрыта",
         "closedMany": "Закрыто: {count} вкладок",
         "undo": "Отменить",
-        "restoreFailed": "Не удалось восстановить вкладку"
+        "restoreFailed": "Не удалось восстановить вкладку",
+        "titleSourceFallbackPrefix": "Заглушка"
       },
       "messages": {
         "interrupted": "Прервано",
@@ -414,8 +465,6 @@
         "conversationCompacted": "Диалог сжат",
         "sessionRestarted": "Новая сессия",
         "sessionRestartedHint": "Агенту не удалось восстановить предыдущую сессию, поэтому диалог продолжается в новой. Сообщения выше не входят в её контекст - повторите то, что всё ещё нужно, или начните заново в новой вкладке.",
-        "completed": "Готово",
-        "duration": "* {flavor} · {duration}",
         "copied": "Скопировано!",
         "renderFailed": "Не удалось отобразить содержимое сообщения.",
         "copyMessage": "Копировать сообщение",
@@ -492,7 +541,9 @@
         "openBackgroundTab": "Открыть в фоновой вкладке",
         "switchOpenSession": "Перейти к открытому сеансу",
         "rename": "Переименовать",
-        "noneToResume": "Нет диалогов для возобновления"
+        "noneToResume": "Нет диалогов для возобновления",
+        "titleSourceModel": "Сгенерирован автоматически",
+        "titleSourceManual": "Вручную"
       },
       "thinking": {
         "expandAriaLabel": "Расширенные размышления — нажмите, чтобы развернуть",
@@ -528,17 +579,17 @@
         "shellCommand": "команда оболочки"
       },
       "plan": {
-        "requestedPermissions": "Запрошенные разрешения:",
-        "approveCurrentSession": "Одобрить (текущий сеанс)",
-        "continueFeedbackPlaceholder": "Введите отзыв, чтобы продолжить планирование...",
-        "keyboardHints": "Стрелки — навигация · Enter — выбрать · Esc — отменить",
+        "requestedPermissions": "Запрошенные разрешения",
+        "approveCurrentSession": "Одобрить для этого сеанса",
+        "continueFeedbackPlaceholder": "Отзыв, чтобы изменить план…",
+        "keyboardHints": "↑↓ навигация · ⏎ выбрать · esc отменить",
         "complete": "План готов",
         "reviewBeforeProceeding": "Проверьте план перед продолжением",
         "label": "план",
         "expand": "Развернуть план",
         "collapse": "Свернуть план",
         "implement": "Реализовать",
-        "reviseFeedbackPlaceholder": "Введите отзыв, чтобы изменить план..."
+        "reviseFeedbackPlaceholder": "Отзыв, чтобы изменить план…"
       },
       "images": {
         "dropHere": "Перетащите изображение сюда",
@@ -586,6 +637,7 @@
         "runningEllipsis": "Выполняется...",
         "completed": "готово",
         "blocked": "заблокировано",
+        "unfinished": "не завершено",
         "error": "Ошибка",
         "orphaned": "Отсоединено",
         "inProgress": "в процессе",
@@ -659,10 +711,12 @@
         "queryCountOne": "Запросов: {count}",
         "queryCountMany": "Запросов: {count}",
         "stepCountOne": "Шагов: {count}",
-        "stepCountMany": "Шагов: {count}"
+        "stepCountMany": "Шагов: {count}",
+        "resultSkipped": "пропущено",
+        "resultStopped": "прервано"
       },
       "responseMetadata": {
-        "effort": "Усилия: {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -712,6 +766,10 @@
       "name": "Модель генерации заголовков",
       "desc": "Модель, используемая для автоматической генерации заголовков бесед.",
       "auto": "Авто (активный провайдер)"
+    },
+    "runAbsoluteTimeout": {
+      "name": "Максимальная длительность хода",
+      "desc": "Сколько минут ход может выполняться до остановки, каким бы активным он ни оставался. Молчащий ход останавливается раньше — через десять минут без единого слова. Увеличьте значение для долгой агентной работы или укажите 0, чтобы снять ограничение."
     },
     "navMappings": {
       "name": "Сопоставления навигации в стиле Vim",
@@ -900,6 +958,10 @@
       "name": "Максимум вкладок чата",
       "desc": "Максимальное количество одновременных вкладок чата (1-10). Каждая вкладка использует отдельную сессию Claude.",
       "warning": "Более 5 вкладок может повлиять на производительность и использование памяти."
+    },
+    "showPanelLabels": {
+      "name": "Показывать названия панелей",
+      "desc": "Подписывает каждую панель в переключателе над перепиской. Открытая панель подписана всегда; остальные остаются значками, пока это выключено."
     },
     "tabBarPosition": {
       "name": "Положение панели вкладок",
@@ -1518,6 +1580,7 @@
     "newTab": "Новая вкладка",
     "newSession": "Новая сессия (в текущей вкладке)",
     "closeCurrentTab": "Закрыть текущую вкладку",
+    "manageContext": "Управление контекстом",
     "switchToTab": "Перейти на вкладку {index}",
     "environmentRestartFailed": "Изменения окружения применены, но не удалось перезапустить затронутые вкладки: {count}.",
     "environmentAppliedRebuild": "Переменные окружения применены. Сессии будут пересозданы при следующем сообщении.",
@@ -1525,6 +1588,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "Встроенная",
+        "vault": "Хранилище",
+        "user": "Пользователь",
+        "system": "Система",
+        "runtime": "Среда"
+      },
       "noMatches": "Нет подходящих команд"
     },
     "resumeConversation": {

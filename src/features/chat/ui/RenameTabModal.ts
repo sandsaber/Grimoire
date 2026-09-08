@@ -39,30 +39,27 @@ export class RenameTabModal extends Modal {
     this.modalEl.addClass('grimoire-rename-tab-modal');
     this.setTitle(t('chat.ui.tabs.renameTitle'));
 
-    const form = this.contentEl.createEl('form', { cls: 'grimoire-rename-tab-form' });
-    const inputId = 'grimoire-rename-tab-input';
-    form.createEl('label', {
-      cls: 'grimoire-rename-tab-label',
-      text: t('chat.ui.tabs.name'),
-      attr: { for: inputId },
+    const form = this.contentEl.createEl('form', {
+      cls: 'grimoire-rename-tab-form grimoire-dialog-body',
     });
-    const field = form.createDiv({ cls: 'grimoire-rename-tab-field' });
+    // The dialog's own title already names the field, so a second label above it
+    // would say the same word twice; the input carries the name instead.
+    const field = form.createDiv({ cls: 'grimoire-rename-tab-field grimoire-dialog-field' });
     const input = field.createEl('input', {
-      cls: 'grimoire-rename-tab-input',
+      cls: 'grimoire-rename-tab-input grimoire-dialog-input',
       attr: {
         type: 'text',
-        id: inputId,
+        id: 'grimoire-rename-tab-input',
         maxlength: String(MAX_TAB_TITLE_LENGTH),
         autocomplete: 'off',
         spellcheck: 'false',
+        'aria-label': t('chat.ui.tabs.name'),
       },
     });
     input.value = this.currentTitle.slice(0, MAX_TAB_TITLE_LENGTH);
 
-    const suggestButton = this.createSuggestButton(field);
-
     const resetButton = field.createEl('button', {
-      cls: 'grimoire-rename-tab-reset',
+      cls: 'grimoire-rename-tab-reset grimoire-dialog-field-btn',
       attr: {
         type: 'button',
         'aria-label': t('chat.ui.tabs.resetName'),
@@ -71,9 +68,11 @@ export class RenameTabModal extends Modal {
     setIcon(resetButton, 'rotate-ccw');
     setTooltip(resetButton, t('chat.ui.tabs.resetName'), { placement: 'top' });
 
-    const footer = form.createDiv({ cls: 'grimoire-rename-tab-footer' });
-    const counter = footer.createDiv({ cls: 'grimoire-rename-tab-counter' });
-    const actions = footer.createDiv({ cls: 'grimoire-rename-tab-actions' });
+    const suggestButton = this.createSuggestButton(field);
+
+    const footer = form.createDiv({ cls: 'grimoire-rename-tab-footer grimoire-dialog-footer' });
+    const counter = footer.createDiv({ cls: 'grimoire-rename-tab-counter grimoire-dialog-note' });
+    const actions = footer.createDiv({ cls: 'grimoire-rename-tab-actions grimoire-dialog-actions' });
     const cancelButton = actions.createEl('button', {
       cls: 'grimoire-rename-tab-cancel',
       text: t('common.cancel'),
@@ -162,7 +161,7 @@ export class RenameTabModal extends Modal {
 
     const available = source.controller.canSuggestTitle(source.conversationId);
     const button = field.createEl('button', {
-      cls: 'grimoire-rename-tab-suggest',
+      cls: 'grimoire-rename-tab-suggest grimoire-dialog-field-btn grimoire-dialog-field-btn--accent',
       attr: {
         type: 'button',
         'aria-label': t('chat.ui.tabs.autoRename'),

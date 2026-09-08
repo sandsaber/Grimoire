@@ -24,6 +24,7 @@ import {
   type TabCreateOptions,
   wireTabInputEvents,
 } from '@/features/chat/tabs/Tab';
+import { syncComposerStopButton } from '@/features/chat/tabs/tabContextUI';
 import { getTabPermissionMode } from '@/features/chat/tabs/tabSettings';
 import { setLocale } from '@/i18n/i18n';
 import {
@@ -723,9 +724,14 @@ describe('Tab - Creation', () => {
       expect(tab.dom.workbenchGridEl.hasClass('grimoire-chat-window-grid')).toBe(true);
       expect(tab.dom.panelTabsEl?.hasClass('grimoire-panel-tabs')).toBe(true);
       expect(tab.dom.panelTabsEl?.getAttribute('aria-label')).toBeNull();
-      expect(tab.dom.chatPanelButtonEl?.textContent).toBe('Chat');
-      expect(tab.dom.sourcesPanelButtonEl?.textContent).toBe('Sources');
-      expect(tab.dom.contextPanelButtonEl?.textContent).toBe('Context');
+      // A segment is a glyph and a word, and the word is only shown for the
+      // segment the reader is in — so the name has to live on the control.
+      expect(tab.dom.chatPanelButtonEl?.getAttribute('aria-label')).toBe('Chat');
+      expect(tab.dom.sourcesPanelButtonEl?.getAttribute('aria-label')).toBe('Sources');
+      expect(tab.dom.contextPanelButtonEl?.getAttribute('aria-label')).toBe('Context');
+      expect(tab.dom.chatPanelButtonEl?.querySelector('.grimoire-panel-tab-label')?.textContent).toBe('Chat');
+      expect(tab.dom.chatPanelButtonEl?.querySelector('.grimoire-panel-tab-icon')?.getAttribute('aria-hidden')).toBe('true');
+      expect(tab.dom.panelJumpEl?.hasClass('grimoire-panel-jump')).toBe(true);
       expect(Array.from(tab.dom.sourceFiltersEl.querySelectorAll('.grimoire-source-filter')).map(button => button.getAttribute('data-source-filter'))).toEqual([
         'all',
         'linked',
@@ -1960,7 +1966,7 @@ describe('Tab - UI Initialization', () => {
       expect(tab.dom.selectionIndicatorEl!.style.display).toBe('none');
     });
 
-    it('should keep the stop button hidden for normal streaming', () => {
+    it('swaps send for stop in place, and back', () => {
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -1973,16 +1979,27 @@ describe('Tab - UI Initialization', () => {
       expect(tab.dom.stopButtonEl?.getAttribute('title')).toBeNull();
       expect(setIcon).toHaveBeenCalledWith(tab.dom.stopButtonEl, 'square');
 
+      // Send is a glyph, not a word: a verb that is always the same verb is
+      // learnt once, and Enter sends anyway.
+      expect(tab.dom.sendButtonEl?.textContent).toBe('');
+      expect(setIcon).toHaveBeenCalledWith(tab.dom.sendButtonEl, 'arrow-up');
+
       const actionGroup = tab.dom.inputContainerEl.querySelector('.grimoire-send-actions');
       expect(actionGroup?.hasClass('grimoire-send-actions')).toBe(true);
       expect(actionGroup?.children[actionGroup.children.length - 2]).toBe(tab.dom.stopButtonEl);
       expect(actionGroup?.children[actionGroup.children.length - 1]).toBe(tab.dom.sendButtonEl);
 
+      // One square, two jobs. Stop used to wait for a subagent to be seen
+      // working, so an ordinary turn could not be stopped from the composer.
       tab.state.isStreaming = true;
-      expect(tab.dom.stopButtonEl?.hasClass('grimoire-hidden')).toBe(true);
+      syncComposerStopButton(tab);
+      expect(tab.dom.stopButtonEl?.hasClass('grimoire-hidden')).toBe(false);
+      expect(tab.dom.sendButtonEl?.hasClass('grimoire-hidden')).toBe(true);
 
       tab.state.isStreaming = false;
+      syncComposerStopButton(tab);
       expect(tab.dom.stopButtonEl?.hasClass('grimoire-hidden')).toBe(true);
+      expect(tab.dom.sendButtonEl?.hasClass('grimoire-hidden')).toBe(false);
     });
 
     it('should create SlashCommandDropdown', () => {
@@ -2975,7 +2992,7 @@ describe('Tab - UI Callback Wiring', () => {
       expect(saveSettings).toHaveBeenCalled();
     });
 
-    it('should show selected external files as chips without inserting path text into the composer', () => {
+    it('shows a selected external file in the one attachment list, not in the composer text', () => {
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -2985,20 +3002,24 @@ describe('Tab - UI Callback Wiring', () => {
       const toolbarCallbacks = toolbarModule.createInputToolbar.mock.calls.at(-1)?.[1];
 
       tab.dom.inputEl.value = 'Summarize';
+      mockExternalContextSelector.getExternalContexts.mockReturnValue(['/vault/docs/brief.pdf']);
       toolbarCallbacks.onExternalContextFileSelect('/vault/docs/brief.pdf');
 
       expect(tab.dom.inputEl.value).toBe('Summarize');
       expect(tab.ui.fileContextManager?.hideMentionDropdown).toHaveBeenCalled();
       expect(tab.ui.fileContextManager?.handleInputChange).not.toHaveBeenCalled();
 
-      const chip = tab.dom.contextRowEl.querySelector('.grimoire-external-file-chip');
+      // External files used to have a chip row of their own beside the vault
+      // one, so nine attachments could span two rows that never agreed on a
+      // count.
+      expect(tab.dom.contextRowEl.querySelector('.grimoire-external-file-indicator')).toBeNull();
+      const chip = tab.dom.contextRowEl.querySelector('.grimoire-file-chip');
       expect(chip).not.toBeNull();
-      expect(chip?.querySelector('.grimoire-external-file-chip-name')?.textContent).toBe('brief.pdf');
-      expect(chip?.getAttribute('title')).toBe('/vault/docs/brief.pdf');
+      expect(chip?.querySelector('.grimoire-file-chip-name')?.textContent).toBe('brief.pdf');
       expect(tab.dom.contextRowEl.hasClass('has-content')).toBe(true);
     });
 
-    it('should remove selected external file chips through the Files selector', () => {
+    it('removes an external file at its source when its chip is removed', () => {
       const options = createMockOptions();
       const tab = createTab(options);
 
@@ -3007,8 +3028,9 @@ describe('Tab - UI Callback Wiring', () => {
       const toolbarModule = jest.requireMock('@/features/chat/ui/InputToolbar');
       const toolbarCallbacks = toolbarModule.createInputToolbar.mock.calls.at(-1)?.[1];
 
+      mockExternalContextSelector.getExternalContexts.mockReturnValue(['/vault/docs/brief.pdf']);
       toolbarCallbacks.onExternalContextFileSelect('/vault/docs/brief.pdf');
-      const removeButton = tab.dom.contextRowEl.querySelector<HTMLElement>('.grimoire-external-file-chip-remove');
+      const removeButton = tab.dom.contextRowEl.querySelector<HTMLElement>('.grimoire-file-chip-remove');
 
       removeButton?.click();
 

@@ -57,6 +57,19 @@ function findByTag(element: any, tagName: string): any {
   return null;
 }
 
+function thinkingGears(root: any): any[] {
+  const children = root.querySelector('.grimoire-thinking-options')?.children ?? [];
+  return children.filter((child: any) => child.hasClass('grimoire-thinking-gear'));
+}
+
+function gearLabel(gear: any): string | undefined {
+  return gear?.querySelector('.grimoire-thinking-gear-label')?.textContent;
+}
+
+function findGear(root: any, label: string): any {
+  return thinkingGears(root).find((gear: any) => gearLabel(gear) === label);
+}
+
 function getModelOptionLabel(option: any): string | undefined {
   return option.querySelector('.grimoire-model-option-label')?.textContent;
 }
@@ -1321,9 +1334,35 @@ describe('ThinkingBudgetSelector', () => {
       expect(budget?.style?.display).toBe('none');
     });
 
-    it('should display current effort level for Claude models', () => {
+    it('shows the effort level as a meter, and names it for a reader who cannot see one', () => {
       const current = parentEl.querySelector('.grimoire-thinking-current');
-      expect(current?.textContent).toBe('High');
+
+      // "High" needs the other three names to mean anything; a meter filled to
+      // three of four says it at a glance. The word stays as the accessible
+      // name, and the dropdown still lists all four.
+      expect(current?.getAttribute('aria-label')).toBe('Effort · High');
+      const dots = current?.querySelector('.grimoire-thinking-meter')?.children ?? [];
+      expect(dots).toHaveLength(4);
+      expect(dots.filter((dot: any) => dot.hasClass('is-filled'))).toHaveLength(3);
+    });
+
+    /*
+     * A stored level this model does not offer is not a level. It left the
+     * meter with no filled dot while the label quietly showed the first
+     * option's name, so the control said a word and a level of none at once.
+     */
+    it('falls back to the declared default when the stored level is not on offer', () => {
+      const parentEl2 = createMockEl();
+      callbacks.getSettings = jest.fn(() => ({
+        ...createMockCallbacks().getSettings(),
+        effortLevel: 'ultra',
+      }));
+      new ThinkingBudgetSelector(parentEl2, callbacks);
+
+      const current = parentEl2.querySelector('.grimoire-thinking-current');
+      const dots = current?.querySelector('.grimoire-thinking-meter')?.children ?? [];
+      expect(dots.filter((dot: any) => dot.hasClass('is-filled')).length).toBeGreaterThan(0);
+      expect(current?.getAttribute('aria-label')).not.toBe('Effort · ');
     });
 
     it('should localize all reasoning levels in Simplified Chinese', () => {
@@ -1331,8 +1370,7 @@ describe('ThinkingBudgetSelector', () => {
       const parentEl2 = createMockEl();
       new ThinkingBudgetSelector(parentEl2, callbacks);
 
-      const options = parentEl2.querySelector('.grimoire-thinking-options')?.children ?? [];
-      expect(options.map((option: any) => option.textContent)).toEqual(['最高', '高', '中', '轻度']);
+      expect(thinkingGears(parentEl2).map(gearLabel)).toEqual(['轻度', '中', '高', '最高']);
       setLocale('en');
     });
 
@@ -1354,8 +1392,7 @@ describe('ThinkingBudgetSelector', () => {
     it('should expose the effort menu and options to the keyboard', async () => {
       const current = parentEl.querySelector('.grimoire-thinking-current');
       const gears = parentEl.querySelector('.grimoire-thinking-gears');
-      const mediumGear = parentEl.querySelector('.grimoire-thinking-options')?.children
-        .find((gear: any) => gear.textContent === 'Medium');
+      const mediumGear = findGear(parentEl, 'Medium');
 
       expect(current?.getAttribute('tabindex')).toBe('0');
       expect(mediumGear?.getAttribute('tabindex')).toBe('0');
@@ -1396,8 +1433,7 @@ describe('ThinkingBudgetSelector', () => {
     it('should close effort options after selecting an effort item', async () => {
       const current = parentEl.querySelector('.grimoire-thinking-current');
       const gears = parentEl.querySelector('.grimoire-thinking-gears');
-      const options = parentEl.querySelector('.grimoire-thinking-options');
-      const mediumGear = options?.children.find((gear: any) => gear.textContent === 'Medium');
+      const mediumGear = findGear(parentEl, 'Medium');
 
       await current?.dispatchEvent('click', { stopPropagation: () => {} });
       expect(gears?.hasClass('open')).toBe(true);
@@ -1456,44 +1492,35 @@ describe('ThinkingBudgetSelector', () => {
       expect(current?.textContent).toBe('Off');
     });
 
-    it('should render budget options in reverse order', () => {
+    it('lists budgets from least to most, under the label naming them', () => {
+      // The menu opens above the composer but it is still read downwards, and
+      // it now carries the same uppercase label every other Grimoire menu puts
+      // over its list, so the order has to agree with the reading direction.
       const options = parentEl.querySelector('.grimoire-thinking-options');
-      expect(options).not.toBeNull();
-      // THINKING_BUDGETS reversed: [xhigh, high, medium, low, off]
-      const gears = options?.children || [];
-      expect(gears.length).toBe(5);
-      expect(gears[0]?.textContent).toBe('Extra high');
-      expect(gears[4]?.textContent).toBe('Off');
+      expect(options?.children[0]?.hasClass('grimoire-group-label')).toBe(true);
+      const gears = thinkingGears(parentEl);
+      expect(gears.map(gearLabel)).toEqual(['Off', 'Low', 'Medium', 'High', 'Extra high']);
     });
 
     it('should mark current budget as selected', () => {
-      const options = parentEl.querySelector('.grimoire-thinking-options');
-      const gears = options?.children || [];
-      const lowGear = gears.find((g: any) => g.textContent === 'Low');
+      const lowGear = findGear(parentEl, 'Low');
       expect(lowGear?.hasClass('selected')).toBe(true);
+      expect(lowGear?.querySelector('.grimoire-menu-check')).not.toBeNull();
     });
 
     it('should call onThinkingBudgetChange when gear clicked', async () => {
-      const options = parentEl.querySelector('.grimoire-thinking-options');
-      const gears = options?.children || [];
-      const highGear = gears.find((g: any) => g.textContent === 'High');
+      const highGear = findGear(parentEl, 'High');
 
       await highGear?.dispatchEvent('click', { stopPropagation: () => {} });
       expect(callbacks.onThinkingBudgetChange).toHaveBeenCalledWith('high');
     });
 
     it('should set title with token count for non-off budgets', () => {
-      const options = parentEl.querySelector('.grimoire-thinking-options');
-      const gears = options?.children || [];
-      const highGear = gears.find((g: any) => g.textContent === 'High');
-      expect(highGear?.getAttribute('title')).toContain('16,000 tokens');
+      expect(findGear(parentEl, 'High')?.getAttribute('title')).toContain('16,000 tokens');
     });
 
     it('should set title as Disabled for off budget', () => {
-      const options = parentEl.querySelector('.grimoire-thinking-options');
-      const gears = options?.children || [];
-      const offGear = gears.find((g: any) => g.textContent === 'Off');
-      expect(offGear?.getAttribute('title')).toBe('Disabled');
+      expect(findGear(parentEl, 'Off')?.getAttribute('title')).toBe('Disabled');
     });
   });
 });
@@ -1510,17 +1537,39 @@ describe('PermissionToggle', () => {
     new PermissionToggle(parentEl, callbacks);
   });
 
-  const findOption = (root: any, label: string) => {
-    const options = root.querySelector('.grimoire-permission-options');
-    return options?.children.find((option: any) => option.textContent === label);
+  const permissionOptions = (root: any): any[] => {
+    const children = root.querySelector('.grimoire-permission-options')?.children ?? [];
+    return children.filter((child: any) => child.hasClass('grimoire-permission-option'));
   };
+
+  const optionTitle = (option: any): string | undefined =>
+    option?.querySelector('.grimoire-permission-option-title')?.textContent;
+
+  const findOption = (root: any, label: string) =>
+    permissionOptions(root).find((option: any) => optionTitle(option) === label);
 
   it('should create a container with permission-toggle class', () => {
     expect(parentEl.querySelector('.grimoire-permission-toggle')).not.toBeNull();
   });
 
-  it('should display the localized current mode', () => {
-    expect(parentEl.querySelector('.grimoire-permission-label')?.textContent).toBe('Safe');
+  it('gives each mode its own glyph, and names it', () => {
+    // The mode was a word in the toolbar at the same weight as the model's
+    // name, which gave three rarely-changed words equal billing with the one
+    // choice a reader makes often. It is a glyph now, and the word is its name.
+    //
+    // One glyph is not enough for three modes: there are no fixed colours in
+    // this system and the accent is one colour, so Auto and Plan were the same
+    // raised shield on the same wash. The guard is up, the guard is down, or
+    // the work is a route staked out before anything is touched - the glyph
+    // the design draws for plan mode.
+    const glyphFor = (root: any): string | undefined =>
+      (setIcon as jest.Mock).mock.calls
+        .filter(([element]) => element === root.querySelector('.grimoire-permission-label'))
+        .at(-1)?.[1];
+
+    expect(parentEl.querySelector('.grimoire-permission-label')?.getAttribute('aria-label'))
+      .toBe('Work mode · Safe');
+    expect(glyphFor(parentEl)).toBe('shield');
 
     callbacks.getSettings.mockReturnValue({
       ...callbacks.getSettings(),
@@ -1528,7 +1577,9 @@ describe('PermissionToggle', () => {
     });
     const parentEl2 = createMockEl();
     new PermissionToggle(parentEl2, callbacks);
-    expect(parentEl2.querySelector('.grimoire-permission-label')?.textContent).toBe('Auto');
+    expect(parentEl2.querySelector('.grimoire-permission-label')?.getAttribute('aria-label'))
+      .toBe('Work mode · Auto');
+    expect(glyphFor(parentEl2)).toBe('shield-off');
 
     callbacks.getSettings.mockReturnValue({
       ...callbacks.getSettings(),
@@ -1536,7 +1587,9 @@ describe('PermissionToggle', () => {
     });
     const parentEl3 = createMockEl();
     new PermissionToggle(parentEl3, callbacks);
-    expect(parentEl3.querySelector('.grimoire-permission-label')?.textContent).toBe('Plan');
+    expect(parentEl3.querySelector('.grimoire-permission-label')?.getAttribute('aria-label'))
+      .toBe('Work mode · Plan');
+    expect(glyphFor(parentEl3)).toBe('route');
   });
 
   it('should open the mode options without changing mode immediately', async () => {
@@ -1604,14 +1657,13 @@ describe('PermissionToggle', () => {
     const parentEl2 = createMockEl();
     new PermissionToggle(parentEl2, callbacks);
 
-    const options = parentEl2.querySelector('.grimoire-permission-options')?.children ?? [];
-    expect(options.map((option: any) => option.textContent)).toEqual(['Auto', 'Safe']);
+    expect(permissionOptions(parentEl2).map(optionTitle)).toEqual(['Safe', 'Auto']);
   });
 
   it('should use an Obsidian localized mode tooltip', () => {
     const label = parentEl.querySelector('.grimoire-permission-label');
     expect(label?.getAttribute('title')).toBeNull();
-    expect(setTooltip).toHaveBeenCalledWith(label, 'Work mode', { placement: 'top' });
+    expect(setTooltip).toHaveBeenCalledWith(label, 'Work mode · Safe', { placement: 'top' });
 
     jest.clearAllMocks();
     setLocale('zh-CN');
@@ -1619,8 +1671,8 @@ describe('PermissionToggle', () => {
     new PermissionToggle(parentEl2, callbacks);
 
     const localizedLabel = parentEl2.querySelector('.grimoire-permission-label');
-    expect(localizedLabel?.textContent).toBe('安全');
-    expect(setTooltip).toHaveBeenCalledWith(localizedLabel, '工作模式', { placement: 'top' });
+    expect(localizedLabel?.getAttribute('aria-label')).toBe('工作模式 · 安全');
+    expect(setTooltip).toHaveBeenCalledWith(localizedLabel, '工作模式 · 安全', { placement: 'top' });
   });
 
   it('should localize all Chinese mode options', () => {
@@ -1628,8 +1680,7 @@ describe('PermissionToggle', () => {
     const parentEl2 = createMockEl();
     new PermissionToggle(parentEl2, callbacks);
 
-    const options = parentEl2.querySelector('.grimoire-permission-options')?.children ?? [];
-    expect(options.map((option: any) => option.textContent)).toEqual(['计划', '自动', '安全']);
+    expect(permissionOptions(parentEl2).map(optionTitle)).toEqual(['安全', '自动', '计划']);
   });
 
   it('should hide the control when provider exposes no permission toggle UI', () => {
@@ -2236,9 +2287,12 @@ describe('createInputToolbar', () => {
 
     expect(stack).toBeDefined();
     expect(modelRow).toBe(actionsRow);
+    // Model, then how hard it thinks: both describe what is answering, and the
+    // right of the row is left for what the message carries.
     expect(stack.children[0]?.hasClass('grimoire-model-selector')).toBe(true);
-    expect(stack.children[1]?.hasClass('grimoire-plan-usage-badge')).toBe(true);
-    expect(stack.children[2]).toBe(toolbar.relevantNotesContainerEl);
+    expect(stack.children[1]?.hasClass('grimoire-thinking-selector')).toBe(true);
+    expect(stack.children[2]?.hasClass('grimoire-plan-usage-badge')).toBe(true);
+    expect(stack.children[3]).toBe(toolbar.relevantNotesContainerEl);
     expect(toolbar.relevantNotesContainerEl.hasClass('grimoire-relevant-notes-slot')).toBe(true);
   });
 });

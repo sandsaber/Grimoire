@@ -3,7 +3,6 @@ import '@/providers';
 import { createMockEl } from '@test/helpers/mockElement';
 import { Menu, Notice } from 'obsidian';
 
-import { DEFAULT_CHAT_PROVIDER_ID } from '@/core/providers/types';
 import { ConversationController, type ConversationControllerDeps } from '@/features/chat/controllers/ConversationController';
 import { ChatState } from '@/features/chat/state/ChatState';
 import { t } from '@/i18n/i18n';
@@ -124,7 +123,7 @@ function getHistoryTitle(item: any): string | undefined {
 }
 
 function getHistoryMeta(item: any): string | undefined {
-  return item.querySelector('.grimoire-history-item-meta')?.textContent;
+  return item.querySelector('.grimoire-history-item-title')?.getAttribute('title');
 }
 
 describe('ConversationController', () => {
@@ -472,6 +471,34 @@ describe('ConversationController', () => {
   });
 
   describe('save edge cases', () => {
+    it('adopts the binding the tab already holds instead of creating a second conversation', async () => {
+      // `state.currentConversationId` is one of two places the binding lives,
+      // and the kernel writes only the other one when it creates the
+      // conversation lazily. Trusting the state field alone made a duplicate
+      // of a ten-message Codex chat, keyed by that chat's own session id, one
+      // millisecond after its turn ended.
+      deps.state.currentConversationId = null;
+      deps.state.messages = [{ content: 'hi', id: '1', role: 'user', timestamp: Date.now() }];
+      deps.getBoundConversationId = () => 'conv-already-bound';
+
+      await controller.save();
+
+      expect(deps.plugin.createConversation).not.toHaveBeenCalled();
+      expect(deps.plugin.updateConversation)
+        .toHaveBeenCalledWith('conv-already-bound', expect.any(Object));
+      expect(deps.state.currentConversationId).toBe('conv-already-bound');
+    });
+
+    it('still creates one lazily when nothing has bound the tab', async () => {
+      deps.state.currentConversationId = null;
+      deps.state.messages = [{ content: 'hi', id: '1', role: 'user', timestamp: Date.now() }];
+      deps.getBoundConversationId = () => null;
+
+      await controller.save();
+
+      expect(deps.plugin.createConversation).toHaveBeenCalled();
+    });
+
     it('should return early when no conversationId and no messages', async () => {
       deps.state.currentConversationId = null;
       deps.state.messages = [];
@@ -480,6 +507,28 @@ describe('ConversationController', () => {
 
       expect(deps.plugin.updateConversation).not.toHaveBeenCalled();
       expect(deps.plugin.createConversation).not.toHaveBeenCalled();
+    });
+
+    /*
+     * A tab bound to a conversation it has not read yet holds no messages, and
+     * what it must do with them is nothing.
+     *
+     * `switchTo` saves before it loads, so this is the state every restored tab
+     * passes through. Adopting the binding here made the save look legitimate:
+     * it wrote its empty message list over a ten-minute chat, in the record and
+     * in the copy hydration had just filled from the provider's own transcript,
+     * and hydration is once per conversation so nothing put them back.
+     */
+    it('does not adopt the tab binding when it holds no messages to save', async () => {
+      deps.state.currentConversationId = null;
+      deps.state.messages = [];
+      deps.getBoundConversationId = () => 'conv-already-bound';
+
+      await controller.save();
+
+      expect(deps.plugin.updateConversation).not.toHaveBeenCalled();
+      expect(deps.plugin.createConversation).not.toHaveBeenCalled();
+      expect(deps.state.currentConversationId).toBeNull();
     });
 
     it('should lazily create conversation when entry point has messages', async () => {
@@ -763,7 +812,6 @@ describe('ConversationController', () => {
         controller.updateHistoryDropdown();
 
         expect(dropdown.children.length).toBe(3);
-        expect(dropdown.querySelector('.grimoire-history-count')?.textContent).toBe('2');
         expect(dropdown.querySelector('.grimoire-history-search')).toBeTruthy();
         const list = getHistoryList(dropdown);
         expect(list.hasClass('grimoire-history-list')).toBe(true);
@@ -888,6 +936,16 @@ describe('ConversationController', () => {
       });
 
       it('should show regenerate button for failed title generation', () => {
+        // The control is drawn only where regeneration can run: a service to
+        // ask and a message to name.
+        deps.getTitleGenerationService = () => ({
+          generateTitle: jest.fn().mockResolvedValue(undefined),
+          cancel: jest.fn(),
+        });
+        (deps.plugin.getConversationSync as jest.Mock).mockReturnValue({
+          id: 'conv-1',
+          messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+        });
         (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
           { id: 'conv-1', providerId: 'claude', title: 'Fallback Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'failed' },
         ]);
@@ -898,6 +956,93 @@ describe('ConversationController', () => {
         const actions = item.querySelector('.grimoire-history-item-actions');
         expect(actions).toBeTruthy();
         expect(actions!.querySelector('.grimoire-history-regenerate-btn')).toBeTruthy();
+      });
+
+      it('draws no regenerate control where regeneration would refuse', () => {
+        // Title generation switched off is one of the gates `regenerateTitle`
+        // refuses on, and it refuses without a word. The row used to draw the
+        // control anyway, on the strength of the title alone: a button that
+        // did nothing and explained nothing.
+        deps.plugin.settings.enableAutoTitleGeneration = false;
+        deps.getTitleGenerationService = () => ({
+          generateTitle: jest.fn().mockResolvedValue(undefined),
+          cancel: jest.fn(),
+        });
+        (deps.plugin.getConversationSync as jest.Mock).mockReturnValue({
+          id: 'conv-1',
+          messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+        });
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          { id: 'conv-1', providerId: 'claude', title: 'Fallback Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleSource: 'fallback' },
+        ]);
+
+        controller.updateHistoryDropdown();
+
+        expect(getHistoryItem(dropdown, 'conv-1').querySelector('.grimoire-history-regenerate-btn'))
+          .toBeNull();
+      });
+
+      it('redraws the popover the view owns, which no tab controller holds', () => {
+        // `getHistoryDropdown` answers null for every tab controller: the
+        // popover belongs to the view and is handed here to be drawn. So this
+        // used to return without drawing, and a title generation that finished
+        // after the list was on screen reached nothing - the spinner it put up
+        // stayed up, on a row nothing was working on.
+        const viewDeps = createMockDeps({ getHistoryDropdown: () => null });
+        const viewController = new ConversationController(viewDeps);
+        const viewDropdown = createMockEl();
+        (viewDeps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          { id: 'conv-1', providerId: 'claude', title: 'Naming it', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'pending' },
+        ]);
+        viewController.renderHistoryDropdown(viewDropdown, {
+          onSelectConversation: jest.fn(),
+          onClose: jest.fn(),
+        });
+        expect(getHistoryItem(viewDropdown, 'conv-1').querySelector('.grimoire-action-loading')).toBeTruthy();
+
+        (viewDeps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          { id: 'conv-1', providerId: 'claude', title: 'A name it was given', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'success', titleSource: 'model' },
+        ]);
+        viewController.updateHistoryDropdown();
+
+        expect(getHistoryItem(viewDropdown, 'conv-1').querySelector('.grimoire-action-loading')).toBeNull();
+      });
+
+      it('marks the row with where its title came from', () => {
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          { id: 'conv-1', providerId: 'claude', title: 'Named by the model', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleSource: 'model' },
+          { id: 'conv-2', providerId: 'claude', title: 'Older conversation', createdAt: 900, lastResponseAt: 900, messageCount: 1, preview: 'Preview' },
+        ]);
+
+        controller.updateHistoryDropdown();
+
+        const marked = getHistoryItem(dropdown, 'conv-1');
+        expect(marked.querySelector('.grimoire-title-source-model')).toBeTruthy();
+        // A conversation older than the field says nothing rather than guessing.
+        expect(getHistoryItem(dropdown, 'conv-2').querySelector('.grimoire-title-source')).toBeNull();
+      });
+
+      it('offers to regenerate a placeholder, whatever the last attempt did', () => {
+        // The control is drawn only where regeneration can run: a service to
+        // ask and a message to name.
+        deps.getTitleGenerationService = () => ({
+          generateTitle: jest.fn().mockResolvedValue(undefined),
+          cancel: jest.fn(),
+        });
+        (deps.plugin.getConversationSync as jest.Mock).mockReturnValue({
+          id: 'conv-1',
+          messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+        });
+        (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
+          { id: 'conv-1', providerId: 'claude', title: 'Fallback Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'success', titleSource: 'fallback' },
+          { id: 'conv-2', providerId: 'claude', title: 'Named by hand', createdAt: 900, lastResponseAt: 900, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'failed', titleSource: 'manual' },
+        ]);
+
+        controller.updateHistoryDropdown();
+
+        expect(getHistoryItem(dropdown, 'conv-1').querySelector('.grimoire-history-regenerate-btn')).toBeTruthy();
+        // Renamed by hand after a failed generation: their title, not a failure.
+        expect(getHistoryItem(dropdown, 'conv-2').querySelector('.grimoire-history-regenerate-btn')).toBeNull();
       });
 
       it('should not show select click handler on current conversation', () => {
@@ -952,36 +1097,24 @@ describe('ConversationController', () => {
     });
 
     describe('renderHistoryDropdown', () => {
-      it('uses registered provider CSS variables, and the product default for invalid IDs', () => {
+      it('names a provider in ink rather than painting the row its vendor colour', () => {
         const container = createMockEl();
         (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
           { id: 'claude', providerId: 'claude', title: 'Claude', createdAt: 1000, messageCount: 1, preview: '' },
           { id: 'codex', providerId: 'codex', title: 'Codex', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'opencode', providerId: 'opencode', title: 'OpenCode', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'mimocode', providerId: 'mimocode', title: 'MiMoCode', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'kimicode', providerId: 'kimicode', title: 'Kimi Code', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'grok', providerId: 'grok', title: 'Grok Build', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'antigravity', providerId: 'antigravity', title: 'Antigravity', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'gemini', providerId: 'gemini', title: 'Gemini CLI', createdAt: 1000, messageCount: 1, preview: '' },
-          { id: 'qwen', providerId: 'qwen', title: 'Qwen Code', createdAt: 1000, messageCount: 1, preview: '' },
           { id: 'invalid', providerId: 'invalid', title: 'Invalid', createdAt: 1000, messageCount: 1, preview: '' },
         ]);
 
         controller.renderHistoryDropdown(container, { onSelectConversation: jest.fn() });
 
-        for (const providerId of ['claude', 'codex', 'opencode', 'mimocode', 'kimicode', 'grok', 'antigravity', 'gemini', 'qwen']) {
+        // Nordic spends no hue on identity: the nine vendor colours are gone,
+        // and with them the dot that existed only to carry one. An
+        // unregistered provider had been showing Claude's, which reads as a
+        // claim about which provider the conversation belongs to.
+        for (const providerId of ['claude', 'codex', 'invalid']) {
           expect(getHistoryItem(container, providerId)
-            .querySelector('.grimoire-history-provider-dot')
-            .style['--grimoire-history-provider-color'])
-            .toBe(`var(--grimoire-provider-${providerId})`);
+            .querySelector('.grimoire-history-provider-dot')).toBeNull();
         }
-        // The product default, not one provider's colour picked out of the
-        // list: an unregistered provider used to show Claude's dot, which reads
-        // as a claim about which provider the conversation belongs to.
-        expect(getHistoryItem(container, 'invalid')
-          .querySelector('.grimoire-history-provider-dot')
-          .style['--grimoire-history-provider-color'])
-          .toBe(`var(--grimoire-provider-${DEFAULT_CHAT_PROVIDER_ID})`);
       });
 
       it('should render history items to provided container', () => {
@@ -995,13 +1128,19 @@ describe('ConversationController', () => {
 
         controller.renderHistoryDropdown(container, { onSelectConversation, onClose });
 
-        expect(container.children.length).toBe(3); // header + search + list
-        expect(container.querySelector('.grimoire-history-title')?.textContent).toBe('History');
-        expect(container.querySelector('.grimoire-history-close')).not.toBeNull();
-
-        container.querySelector('.grimoire-history-close')?.click();
-
-        expect(onClose).toHaveBeenCalled();
+        // The panel opens on its search band: no title for a thing just
+        // clicked, no count nobody acts on, and no close button - it closes on
+        // an outside click or Escape, which the view already wires.
+        expect(container.children.length).toBe(3); // search + list + footer
+        expect(container.querySelector('.grimoire-history-header')).toBeNull();
+        expect(container.querySelector('.grimoire-history-title')).toBeNull();
+        expect(container.querySelector('.grimoire-history-close')).toBeNull();
+        expect(container.querySelector('.grimoire-history-search')).not.toBeNull();
+        // Emptying the whole history is the last row rather than the header's.
+        const deleteAll = container.querySelector('.grimoire-history-delete-all');
+        expect(deleteAll).not.toBeNull();
+        expect(container.children[2].hasClass('grimoire-history-footer')).toBe(true);
+        expect(onClose).not.toHaveBeenCalled();
       });
 
       it('confirms before deleting every conversation from history', async () => {
@@ -1055,7 +1194,11 @@ describe('ConversationController', () => {
         expect(deps.plugin.deleteConversation).not.toHaveBeenCalled();
       });
 
-      it('renders model, sources, and usage without noisy zero message counts', () => {
+      it('keeps model, sources and usage as the row\'s tooltip, not a second line', () => {
+        // Provider, prompt preview, source count and usage in 11px mono under
+        // every title turned a list you scan into a wall you read. The row is
+        // one line; the rest is what hovering it tells you.
+
         const container = createMockEl();
 
         (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
@@ -1078,6 +1221,8 @@ describe('ConversationController', () => {
         const item = getHistoryItem(container, 'conv-1');
         const meta = getHistoryMeta(item);
 
+        expect(item.querySelector('.grimoire-history-item-meta')).toBeNull();
+        expect(meta).toContain('Chapter 03.md');
         expect(meta).toContain('GPT-5.4');
         expect(meta).toContain('Rewrite plan - three pressure beats');
         expect(meta).toContain('2 src');
@@ -1176,6 +1321,7 @@ describe('ConversationController', () => {
         expect(menu.items.map(item => item.title)).toEqual([
           'Open in new tab',
           'Open in background tab',
+          'Regenerate title',
           'Rename',
           'Delete',
         ]);
@@ -1206,6 +1352,7 @@ describe('ConversationController', () => {
         const menu = (Menu as typeof Menu & { instances: Array<{ items: Array<{ title: string }> }> }).instances[0];
         expect(menu.items.map(item => item.title)).toEqual([
           'Switch to open session',
+          'Regenerate title',
           'Rename',
           'Delete',
         ]);
@@ -1247,6 +1394,10 @@ describe('ConversationController', () => {
         cancel: jest.fn(),
       };
       deps.getTitleGenerationService = () => mockTitleService;
+      (deps.plugin.getConversationSync as jest.Mock).mockReturnValue({
+        id: 'conv-1',
+        messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+      });
 
       (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
         { id: 'conv-1', providerId: 'claude', title: 'Failed', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview', titleGenerationStatus: 'failed' },
@@ -1631,7 +1782,7 @@ describe('ConversationController - Title Generation', () => {
 
       await controller.regenerateTitle('conv-1');
 
-      expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'New Generated Title');
+      expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'New Generated Title', 'model');
     });
   });
 
@@ -2984,7 +3135,7 @@ describe('ConversationController.regenerateTitle', () => {
     await controller.regenerateTitle('conv-1');
 
     expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', { titleGenerationStatus: 'pending' });
-    expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'Drying PETG');
+    expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'Drying PETG', 'model');
     expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', { titleGenerationStatus: 'success' });
   });
 
@@ -3013,5 +3164,45 @@ describe('ConversationController.regenerateTitle', () => {
 
     expect(deps.plugin.updateConversation).not.toHaveBeenCalled();
     expect(deps.plugin.renameConversation).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * A stored transcript cannot have anything running in it: the process that ran
+ * it is gone. A tool row spins on `running`, so a conversation stored mid-turn
+ * — a reload, a crash, or a turn from a build that did not settle its own —
+ * reopened with a spinner that could never stop, and reopened that way again
+ * every time after.
+ */
+describe('ConversationController restore', () => {
+  it('settles tools the stored transcript still calls running', async () => {
+    const deps = createMockDeps();
+    const controller = new ConversationController(deps, {});
+    const conversation = {
+      id: 'conv-restored',
+      providerId: 'claude',
+      title: 'Plan',
+      createdAt: 1,
+      updatedAt: 2,
+      sessionId: null,
+      messages: [{
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '',
+        timestamp: 1,
+        toolCalls: [
+          { id: 'exit-plan', name: 'ExitPlanMode', input: {}, status: 'running' },
+          { id: 'read', name: 'Read', input: {}, status: 'completed' },
+        ],
+      }],
+    };
+    (deps.plugin.switchConversation as jest.Mock) = jest.fn().mockResolvedValue(conversation);
+    deps.state.currentConversationId = 'other';
+
+    await controller.switchTo('conv-restored');
+
+    const restored = deps.state.messages[0]?.toolCalls ?? [];
+    expect(restored.find(call => call.id === 'exit-plan')?.status).toBe('unfinished');
+    expect(restored.find(call => call.id === 'read')?.status).toBe('completed');
   });
 });

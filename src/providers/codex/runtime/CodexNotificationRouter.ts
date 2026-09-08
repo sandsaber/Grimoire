@@ -1,4 +1,5 @@
 import type { ChatTurnMetadata } from '../../../core/runtime/types';
+import { TOOL_ASK_USER_QUESTION } from '../../../core/tools/toolNames';
 import type { AssistantTextPhase, StreamChunk, UsageInfo } from '../../../core/types';
 import { sanitizeCodexAssistantText } from '../normalization/codexAssistantTextSanitizer';
 import {
@@ -502,7 +503,20 @@ export class CodexNotificationRouter {
       isError: isCodexToolOutputError(stringifyRawOutput(rawOutput)),
     };
 
-    if (item.type === 'custom_tool_call_output') {
+    /*
+     * Held back for the item that will report this call, or emitted now if
+     * nothing will.
+     *
+     * A `function_call_output` is normally the raw half of an item the item
+     * stream also completes, and emitting both would end the call twice — so it
+     * waits at `rawToolOutputsByCallId` for `item/completed` to collect it.
+     * `request_user_input` has no item at all: a turn that asked four questions
+     * completed thirteen items and not one of them was the ask. So its answer
+     * sat in the stash until the turn ended, and a question the reader had
+     * already answered kept its spinner for the rest of the turn — which for a
+     * planning turn means until they approve the plan.
+     */
+    if (item.type === 'custom_tool_call_output' || RAW_ONLY_TOOLS.has(normalizedName)) {
       this.emit({ type: 'tool_result', id: callId, ...result });
       return;
     }
@@ -896,6 +910,11 @@ function normalizeAssistantTextPhase(value: unknown): AssistantTextPhase | undef
 function getItemId(item: { id?: string } | Record<string, unknown>): string | undefined {
   return typeof item.id === 'string' ? item.id : undefined;
 }
+
+/**
+ * Tools the item stream never reports, so the raw output is the only end they get.
+ */
+const RAW_ONLY_TOOLS = new Set<string>([TOOL_ASK_USER_QUESTION]);
 
 function readRawCallId(item: Record<string, unknown>): string {
   return firstString(item.call_id, item.id);

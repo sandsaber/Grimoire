@@ -13,6 +13,7 @@
     "success": "Success",
     "warning": "Warning",
     "confirm": "Confirm",
+    "done": "Done",
     "settings": "Settings",
     "advanced": "Advanced",
     "enabled": "Enabled",
@@ -254,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "Jump to latest message",
-        "placeholder": "Ask Grimoire to edit, search, compare, generate, or run a command...",
+        "placeholder": "Ask Grimoire…",
         "send": "Send",
         "sendMessage": "Send message",
         "stopResponse": "Stop response",
@@ -303,6 +304,9 @@
         "permissionSafe": "Safe",
         "permissionAuto": "Auto",
         "permissionPlan": "Plan",
+        "permissionSafeDetail": "Confirm every edit and command",
+        "permissionAutoDetail": "Edits and commands run without asking",
+        "permissionPlanDetail": "Read-only until you approve a plan",
         "effortLevels": {
           "low": "Low",
           "medium": "Medium",
@@ -327,6 +331,8 @@
         "absolutePathRequired": "Path must be absolute. Usage: /add-dir /absolute/path",
         "duplicate": "This folder is already added as an external context.",
         "selectTitle": "Select external context",
+        "selectFileTitle": "Select an external file",
+        "selectFolderTitle": "Select an external folder",
         "pickerFailed": "Unable to open folder picker.",
         "conflictInside": "Cannot add “{path}” — it is inside existing path “{existing}”",
         "conflictContains": "Cannot add “{path}” — it contains existing path “{existing}”",
@@ -378,9 +384,53 @@
         "safeMode": "Safe mode",
         "loadedThisSession": "Loaded this session"
       },
+      "contextManager": {
+        "title": "Context",
+        "headerCount": "{count} files · ~{tokens} tokens",
+        "searchPlaceholder": "Filter attached, or type to add from the vault",
+        "add": "Add",
+        "addContext": "Add context",
+        "addNamed": "Add {name}",
+        "manage": "Manage",
+        "review": "Review",
+        "selected": "{count} selected",
+        "estimatedTokens": "~{tokens} est.",
+        "clearSelection": "Clear",
+        "selectNamed": "Select {name}",
+        "removeNamed": "Remove {name}",
+        "removeAll": "Remove all",
+        "removeAllConfirm": "Remove {count} files?",
+        "empty": "Nothing attached. Add a note, a folder, or a link.",
+        "noMatches": "Nothing matches.",
+        "groupVault": "Vault",
+        "groupExternal": "External",
+        "groupFromVault": "From the vault",
+        "fileCount": "{count} files",
+        "summaryCost": "~{tokens} · {percent}% of window",
+        "overBudget": "{count} files · ~{tokens} exceeds this model’s window",
+        "overBudgetBy": "over by ~{tokens}",
+        "windowShare": "{percent}% of window after this message",
+        "windowUnknown": "This model has not reported a context window",
+        "exceedsBy": "exceeds this model’s window by ~{tokens}",
+        "notCounted": "{count} files not counted",
+        "unreadable": "unreadable",
+        "missing": "missing — moved or deleted",
+        "inFlight": "in flight",
+        "attached": "attached",
+        "pickerPlaceholder": "Search the vault",
+        "pickerHint": "⏎ add · ⇥ keep open",
+        "quickOpenFile": "Open file",
+        "quickBrowseFile": "External file…",
+        "quickBrowseFolder": "External folder…",
+        "detailExternal": "outside the vault",
+        "detailOpenNote": "open note",
+        "folderDetail": "{count} notes"
+      },
       "tabs": {
         "createFailed": "Failed to create tab",
         "newTab": "New tab",
+        "tabLabel": "Tab {index} · {title}",
+        "tabActions": "Tab actions",
         "history": "Chat history",
         "switchFailed": "Failed to switch tab",
         "closeFailed": "Failed to close tab",
@@ -403,7 +453,8 @@
         "closed": "Closed {title}",
         "closedMany": "Closed {count} tabs",
         "undo": "Undo",
-        "restoreFailed": "Failed to restore tab"
+        "restoreFailed": "Failed to restore tab",
+        "titleSourceFallbackPrefix": "Placeholder"
       },
       "messages": {
         "interrupted": "Interrupted",
@@ -414,8 +465,6 @@
         "conversationCompacted": "Conversation compacted",
         "sessionRestarted": "New session",
         "sessionRestartedHint": "The agent could not restore the previous session, so this conversation continues in a new one. The messages above are not in its context - repeat anything it still needs, or start fresh in a new tab.",
-        "completed": "Baked",
-        "duration": "* {flavor} for {duration}",
         "copied": "Copied!",
         "renderFailed": "Failed to render message content.",
         "copyMessage": "Copy message",
@@ -492,7 +541,9 @@
         "openBackgroundTab": "Open in background tab",
         "switchOpenSession": "Switch to open session",
         "rename": "Rename",
-        "noneToResume": "No conversations to resume"
+        "noneToResume": "No conversations to resume",
+        "titleSourceModel": "Auto-generated",
+        "titleSourceManual": "Manual"
       },
       "thinking": {
         "expandAriaLabel": "Extended thinking — click to expand",
@@ -528,17 +579,17 @@
         "shellCommand": "shell command"
       },
       "plan": {
-        "requestedPermissions": "Requested permissions:",
-        "approveCurrentSession": "Approve (current session)",
-        "continueFeedbackPlaceholder": "Enter feedback to continue planning...",
-        "keyboardHints": "Arrow keys to navigate · Enter to select · Esc to cancel",
+        "requestedPermissions": "Requested permissions",
+        "approveCurrentSession": "Approve for this session",
+        "continueFeedbackPlaceholder": "Feedback to revise the plan…",
+        "keyboardHints": "↑↓ navigate · ⏎ select · esc cancel",
         "complete": "Plan complete",
         "reviewBeforeProceeding": "Review the plan before proceeding",
         "label": "plan",
         "expand": "Expand plan",
         "collapse": "Collapse plan",
         "implement": "Implement",
-        "reviseFeedbackPlaceholder": "Enter feedback to revise plan..."
+        "reviseFeedbackPlaceholder": "Feedback to revise the plan…"
       },
       "images": {
         "dropHere": "Drop image here",
@@ -586,6 +637,7 @@
         "runningEllipsis": "Running...",
         "completed": "completed",
         "blocked": "blocked",
+        "unfinished": "unfinished",
         "error": "Error",
         "orphaned": "Orphaned",
         "inProgress": "in progress",
@@ -659,10 +711,12 @@
         "queryCountOne": "{count} query",
         "queryCountMany": "{count} queries",
         "stepCountOne": "{count} step",
-        "stepCountMany": "{count} steps"
+        "stepCountMany": "{count} steps",
+        "resultSkipped": "skipped",
+        "resultStopped": "stopped"
       },
       "responseMetadata": {
-        "effort": "Effort {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -712,6 +766,10 @@
       "name": "Title generation model",
       "desc": "Model used for auto-generating conversation titles.",
       "auto": "Auto (active provider)"
+    },
+    "runAbsoluteTimeout": {
+      "name": "Maximum turn duration",
+      "desc": "Minutes one turn may run before it is stopped, however active it stays. A silent turn is stopped sooner, after ten minutes without a word. Raise this for long agentic work, or set 0 to remove the ceiling."
     },
     "navMappings": {
       "name": "Vim-style navigation mappings",
@@ -900,6 +958,10 @@
       "name": "Maximum chat tabs",
       "desc": "Maximum number of concurrent chat tabs (1-10).",
       "warning": "Higher tab counts may affect performance and memory usage."
+    },
+    "showPanelLabels": {
+      "name": "Show panel labels",
+      "desc": "Name every panel in the switch above the transcript. The panel you are in is always named; the others are glyphs until you turn this on."
     },
     "tabBarPosition": {
       "name": "Tab bar position",
@@ -1518,6 +1580,7 @@
     "newTab": "New tab",
     "newSession": "New session (in current tab)",
     "closeCurrentTab": "Close current tab",
+    "manageContext": "Manage context",
     "switchToTab": "Switch to tab {index}",
     "environmentRestartFailed": "Environment changes applied, but {count} affected tab(s) failed to restart.",
     "environmentAppliedRebuild": "Environment variables applied. Sessions will be rebuilt on next message.",
@@ -1525,6 +1588,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "Built-in",
+        "vault": "Vault",
+        "user": "User",
+        "system": "System",
+        "runtime": "Runtime"
+      },
       "noMatches": "No matching commands"
     },
     "resumeConversation": {

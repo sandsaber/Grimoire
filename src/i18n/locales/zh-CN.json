@@ -13,6 +13,7 @@
     "success": "成功",
     "warning": "警告",
     "confirm": "确认",
+    "done": "完成",
     "settings": "设置",
     "advanced": "高级",
     "enabled": "已启用",
@@ -254,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "跳转到最新消息",
-        "placeholder": "让 Grimoire 编辑、搜索、比较、生成内容或运行命令……",
+        "placeholder": "问 Grimoire…",
         "send": "发送",
         "sendMessage": "发送消息",
         "stopResponse": "停止响应",
@@ -303,6 +304,9 @@
         "permissionSafe": "安全",
         "permissionAuto": "自动",
         "permissionPlan": "计划",
+        "permissionSafeDetail": "每次编辑和命令都先确认",
+        "permissionAutoDetail": "编辑和命令直接执行，不再询问",
+        "permissionPlanDetail": "在你批准计划前只读",
         "effortLevels": {
           "low": "轻度",
           "medium": "中",
@@ -327,6 +331,8 @@
         "absolutePathRequired": "必须使用绝对路径。用法：/add-dir /绝对路径",
         "duplicate": "此文件夹已添加为外部上下文。",
         "selectTitle": "选择外部上下文",
+        "selectFileTitle": "选择外部文件",
+        "selectFolderTitle": "选择外部文件夹",
         "pickerFailed": "无法打开文件夹选择器。",
         "conflictInside": "无法添加“{path}”：它位于已有路径“{existing}”内",
         "conflictContains": "无法添加“{path}”：它包含已有路径“{existing}”",
@@ -378,9 +384,53 @@
         "safeMode": "安全模式",
         "loadedThisSession": "本次会话已加载"
       },
+      "contextManager": {
+        "title": "上下文",
+        "headerCount": "{count} 个文件 · 约 {tokens} 个 token",
+        "searchPlaceholder": "筛选已附加内容，或输入以从仓库添加",
+        "add": "添加",
+        "addContext": "添加上下文",
+        "addNamed": "添加 {name}",
+        "manage": "管理",
+        "review": "查看",
+        "selected": "已选 {count} 项",
+        "estimatedTokens": "约 {tokens}（估算）",
+        "clearSelection": "取消选择",
+        "selectNamed": "选择 {name}",
+        "removeNamed": "移除 {name}",
+        "removeAll": "全部移除",
+        "removeAllConfirm": "移除 {count} 个文件？",
+        "empty": "尚未附加任何内容。可以添加笔记、文件夹或链接。",
+        "noMatches": "没有匹配项。",
+        "groupVault": "仓库",
+        "groupExternal": "外部",
+        "groupFromVault": "来自仓库",
+        "fileCount": "{count} 个文件",
+        "summaryCost": "约 {tokens} · 占窗口 {percent}%",
+        "overBudget": "{count} 个文件 · 约 {tokens} 超出该模型的窗口",
+        "overBudgetBy": "超出约 {tokens}",
+        "windowShare": "发送后占窗口 {percent}%",
+        "windowUnknown": "该模型未报告上下文窗口大小",
+        "exceedsBy": "超出该模型窗口约 {tokens}",
+        "notCounted": "{count} 个文件未计入",
+        "unreadable": "无法读取",
+        "missing": "找不到 — 已移动或删除",
+        "inFlight": "发送中",
+        "attached": "已附加",
+        "pickerPlaceholder": "搜索仓库",
+        "pickerHint": "⏎ 添加 · ⇥ 保持打开",
+        "quickOpenFile": "打开的文件",
+        "quickBrowseFile": "外部文件…",
+        "quickBrowseFolder": "外部文件夹…",
+        "detailExternal": "仓库之外",
+        "detailOpenNote": "打开的笔记",
+        "folderDetail": "{count} 篇笔记"
+      },
       "tabs": {
         "createFailed": "创建标签页失败",
         "newTab": "新建标签页",
+        "tabLabel": "标签页 {index} · {title}",
+        "tabActions": "标签页操作",
         "history": "对话历史",
         "switchFailed": "切换标签页失败",
         "closeFailed": "关闭标签页失败",
@@ -403,7 +453,8 @@
         "closed": "已关闭 {title}",
         "closedMany": "已关闭 {count} 个标签页",
         "undo": "撤销",
-        "restoreFailed": "无法恢复标签页"
+        "restoreFailed": "无法恢复标签页",
+        "titleSourceFallbackPrefix": "占位标题"
       },
       "messages": {
         "interrupted": "已中断",
@@ -414,8 +465,6 @@
         "conversationCompacted": "对话已压缩",
         "sessionRestarted": "新会话",
         "sessionRestartedHint": "智能体无法恢复上一个会话，因此本对话将在新会话中继续。上面的消息不在它的上下文中——请重述仍然需要的内容，或在新标签页中重新开始。",
-        "completed": "完成",
-        "duration": "* {flavor}，用时 {duration}",
         "copied": "已复制！",
         "renderFailed": "消息内容渲染失败。",
         "copyMessage": "复制消息",
@@ -492,7 +541,9 @@
         "openBackgroundTab": "在后台标签页中打开",
         "switchOpenSession": "切换到已打开的会话",
         "rename": "重命名",
-        "noneToResume": "没有可恢复的对话"
+        "noneToResume": "没有可恢复的对话",
+        "titleSourceModel": "自动生成",
+        "titleSourceManual": "手动"
       },
       "thinking": {
         "expandAriaLabel": "扩展思考内容，点击展开",
@@ -528,17 +579,17 @@
         "shellCommand": "Shell 命令"
       },
       "plan": {
-        "requestedPermissions": "请求的权限：",
-        "approveCurrentSession": "批准（仅当前会话）",
-        "continueFeedbackPlaceholder": "输入反馈以继续规划……",
-        "keyboardHints": "方向键导航 · Enter 选择 · Esc 取消",
+        "requestedPermissions": "请求的权限",
+        "approveCurrentSession": "在本次会话中批准",
+        "continueFeedbackPlaceholder": "修改规划的反馈…",
+        "keyboardHints": "↑↓ 导航 · ⏎ 选择 · esc 取消",
         "complete": "规划已完成",
         "reviewBeforeProceeding": "继续前请先审阅规划",
         "label": "规划",
         "expand": "展开规划",
         "collapse": "折叠规划",
         "implement": "开始实施",
-        "reviseFeedbackPlaceholder": "输入反馈以修改规划……"
+        "reviseFeedbackPlaceholder": "修改规划的反馈…"
       },
       "images": {
         "dropHere": "将图片拖放到此处",
@@ -586,6 +637,7 @@
         "runningEllipsis": "运行中……",
         "completed": "已完成",
         "blocked": "已阻塞",
+        "unfinished": "未完成",
         "error": "错误",
         "orphaned": "已失联",
         "inProgress": "进行中",
@@ -659,10 +711,12 @@
         "queryCountOne": "{count} 个查询",
         "queryCountMany": "{count} 个查询",
         "stepCountOne": "{count} 个步骤",
-        "stepCountMany": "{count} 个步骤"
+        "stepCountMany": "{count} 个步骤",
+        "resultSkipped": "已跳过",
+        "resultStopped": "已停止"
       },
       "responseMetadata": {
-        "effort": "推理强度 {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -712,6 +766,10 @@
       "name": "标题生成模型",
       "desc": "用于自动生成对话标题的模型。",
       "auto": "自动 (活动提供方)"
+    },
+    "runAbsoluteTimeout": {
+      "name": "单轮最长运行时间",
+      "desc": "无论一轮任务多么活跃，超过该分钟数后都会被停止。完全没有输出的一轮会更早停止——静默十分钟即中止。执行长时间的智能体任务时可调大，填 0 则取消上限。"
     },
     "navMappings": {
       "name": "Vim 风格导航映射",
@@ -900,6 +958,10 @@
       "name": "最大聊天标签数",
       "desc": "同时开启的最大聊天标签数（1-10）。每个标签使用独立的 Claude 会话。",
       "warning": "超过 5 个标签可能会影响性能和内存使用。"
+    },
+    "showPanelLabels": {
+      "name": "显示面板名称",
+      "desc": "在对话上方的切换器中为每个面板显示名称。当前面板始终显示名称，其余面板在开启前只显示图标。"
     },
     "tabBarPosition": {
       "name": "标签栏位置",
@@ -1518,6 +1580,7 @@
     "newTab": "新建标签页",
     "newSession": "新建会话（当前标签页）",
     "closeCurrentTab": "关闭当前标签页",
+    "manageContext": "管理上下文",
     "switchToTab": "切换到标签页 {index}",
     "environmentRestartFailed": "环境更改已应用，但有 {count} 个受影响的标签页无法重启。",
     "environmentAppliedRebuild": "环境变量已应用。会话将在下一条消息时重建。",
@@ -1525,6 +1588,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "内置",
+        "vault": "仓库",
+        "user": "用户",
+        "system": "系统",
+        "runtime": "运行时"
+      },
       "noMatches": "没有匹配的命令"
     },
     "resumeConversation": {

@@ -967,6 +967,48 @@ describe('ClaudeExecutionBackend', () => {
     expect(timeoutFixture.stored).toHaveLength(0);
   });
 
+  it('lets a working turn outlive the inactivity window, and still bounds it absolutely', async () => {
+    // The run timeout was armed once at dispatch and only ever cleared, so ten
+    // minutes of *work* ended the same way ten minutes of silence would. A turn
+    // that streams the whole time is the healthy case, not the stuck one.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 'native-session');
+    void collectEvents(session.createRun(request('1', 'default')));
+    await waitFor(() => fixture.query.received.length === 1);
+
+    const armed = fixture.scheduler.pending(60_000);
+    expect(armed).toHaveLength(1);
+    const absolute = fixture.scheduler.pending(30 * 60_000);
+    expect(absolute).toHaveLength(1);
+
+    // The provider says something: the turn is alive.
+    fixture.query.emit(textDeltaMessage('still working'));
+    await flushPromises();
+
+    const rearmed = fixture.scheduler.pending(60_000);
+    expect(rearmed).toHaveLength(1);
+    expect(rearmed[0]).not.toBe(armed[0]);
+    // The ceiling is not a liveness timer and does not move.
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual(absolute);
+  });
+
+  it('leaves no live timer behind a finished run', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 'native-session');
+    const events = collectEvents(session.createRun(request('1', 'default')));
+    await waitFor(() => fixture.query.received.length === 1);
+    fixture.query.emit(initMessage('native-session'));
+    fixture.query.emit(resultMessage('message-1', 'answer', 'result-1'));
+
+    expectTerminal(await events, 'succeeded', 'completed');
+    await flushPromises();
+    // The terminal event is emitted after both timers are cleared, and the
+    // emit re-arms the window: the guard in `armInactivityTimeout` is what
+    // keeps a finished run from holding one.
+    expect(fixture.scheduler.pending(60_000)).toEqual([]);
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual([]);
+  });
+
   it('keeps the persistent query usable for the next turn after an acknowledged interrupt', async () => {
     const fixture = createFixture({
       invocations: {
@@ -1190,16 +1232,24 @@ class FakeQuery implements ClaudeExecutionQuery {
 
 class FakeScheduler implements ClaudeExecutionScheduler {
   private readonly tasks = new Map<object, () => void>();
+  private readonly delays = new Map<object, number>();
 
-  setTimeout(callback: () => void): object {
+  setTimeout(callback: () => void, ms?: number): object {
     const handle = {};
     this.tasks.set(handle, callback);
+    this.delays.set(handle, ms ?? 0);
     return handle;
+  }
+
+  /** Live timers, so a test can tell a re-armed timer from a surviving one. */
+  pending(ms: number): object[] {
+    return [...this.tasks.keys()].filter(handle => this.delays.get(handle) === ms);
   }
 
   clearTimeout(handle: unknown): void {
     if (typeof handle === 'object' && handle !== null) {
       this.tasks.delete(handle);
+      this.delays.delete(handle);
     }
   }
 

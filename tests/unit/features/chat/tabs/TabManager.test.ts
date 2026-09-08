@@ -715,10 +715,35 @@ describe('TabManager - Browser-style tab actions', () => {
     const bound = await manager.createTab('conv-1');
     await manager.renameTab(bound!.id, '  Finished research  ');
 
-    expect(renameConversation).toHaveBeenCalledWith('conv-1', 'Finished research');
+    expect(renameConversation).toHaveBeenCalledWith('conv-1', 'Finished research', 'manual');
 
     await manager.renameTab(bound!.id, `  ${'x'.repeat(120)}  `);
-    expect(renameConversation).toHaveBeenLastCalledWith('conv-1', 'x'.repeat(100));
+    expect(renameConversation).toHaveBeenLastCalledWith('conv-1', 'x'.repeat(100), 'manual');
+  });
+
+  it('reports where the displayed name of a tab came from', async () => {
+    const plugin = createMockPlugin({
+      getConversationSync: jest.fn().mockReturnValue({ id: 'conv-1', titleSource: 'model' }),
+      renameConversation: jest.fn(),
+    });
+    const manager = createManager({ plugin });
+    let counter = 0;
+    mockCreateTab.mockImplementation((config: any) => createMockTabData({
+      id: `tab-${++counter}`,
+      conversationId: config.conversation?.id ?? null,
+    }));
+
+    plugin.getConversationById.mockResolvedValue({ id: 'conv-1' });
+    const bound = await manager.createTab('conv-1');
+    expect(manager.getTabTitleSource(bound!.id)).toBe('model');
+
+    // A tab-local name is the user's, whatever the conversation last recorded.
+    bound!.titleOverride = 'By hand';
+    expect(manager.getTabTitleSource(bound!.id)).toBe('manual');
+
+    const blank = await manager.createTab();
+    expect(manager.getTabTitleSource(blank!.id)).toBeUndefined();
+    expect(manager.getTabTitleSource('tab-missing')).toBeUndefined();
   });
 
   it('duplicates a bound tab into an independent conversation next to the source', async () => {

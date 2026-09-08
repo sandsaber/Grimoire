@@ -5,11 +5,13 @@
 @import "./base/variables.css";
 @import "./base/container.css";
 @import "./base/animations.css";
+@import "./base/primitives.css";
 
 /* Components */
 @import "./components/header.css";
 @import "./components/tabs.css";
 @import "./components/history.css";
+@import "./components/title-source.css";
 @import "./components/messages.css";
 @import "./components/nav-sidebar.css";
 @import "./components/code.css";
@@ -34,6 +36,7 @@
 
 /* Features */
 @import "./features/file-context.css";
+@import "./features/context-manager.css";
 @import "./features/vault-search.css";
 @import "./features/file-link.css";
 @import "./features/image-context.css";
@@ -48,6 +51,7 @@
 @import "./features/orchestrator-plan.css";
 
 /* Modals */
+@import "./modals/dialog.css";
 @import "./modals/instruction.css";
 @import "./modals/mcp-modal.css";
 @import "./modals/fork-target.css";

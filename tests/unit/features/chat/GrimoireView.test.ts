@@ -29,7 +29,9 @@ function createViewHarness(options: {
     getTabCount: jest.fn().mockReturnValue(options.tabCount ?? 1),
   };
   view.tabBarContainerEl = createMockEl();
-  view.newTabButtonEl = newTabButtonEl;
+  // The add control belongs to the strip it extends, so that is where the
+  // view asks for it.
+  view.tabBar = { getNewTabButton: () => newTabButtonEl };
 
   return { newTabButtonEl, view };
 }
@@ -58,7 +60,9 @@ describe('GrimoireView tab controls', () => {
 
     expect(nav.querySelector('.grimoire-tab-bar-container')).not.toBeNull();
     expect(nav.querySelector('.grimoire-context-meter')).not.toBeNull();
-    expect(nav.querySelector('.grimoire-new-tab-btn')).not.toBeNull();
+    // The add control moved into the strip, so it is not one of the header's
+    // actions any more.
+    expect(nav.querySelector('.grimoire-new-tab-btn')).toBeNull();
   });
 
   it('places the shared session controls above the panel-view row', () => {
@@ -74,7 +78,7 @@ describe('GrimoireView tab controls', () => {
     expect(sessionStripEl.children).toContain(navContentEl);
   });
 
-  it('places the history button after the new-tab control without appearance controls', () => {
+  it('offers history and the tab menu as the header\'s two actions', () => {
     const containerEl = createMockEl();
     const view = Object.create(GrimoireView.prototype);
 
@@ -84,8 +88,9 @@ describe('GrimoireView tab controls', () => {
     (setIcon as jest.Mock).mockClear();
     const nav = view.buildNavRowContent();
     const actions = nav.querySelector('.grimoire-header-actions');
-    const newTabButton = nav.querySelector('.grimoire-new-tab-btn');
+    const meter = nav.querySelector('.grimoire-context-meter');
     const historyButton = nav.querySelector('.grimoire-history-btn');
+    const tabMenuButton = nav.querySelector('.grimoire-tab-menu-btn');
     const appearanceButton = nav.querySelector('.grimoire-appearance-btn');
 
     expect(historyButton).not.toBeNull();
@@ -96,8 +101,19 @@ describe('GrimoireView tab controls', () => {
     expect(historyButton?.getAttribute('role')).toBe('button');
     expect(historyButton?.getAttribute('tabindex')).toBe('0');
     expect(historyButton?.children.some((child: any) => child.tagName === 'svg'.toUpperCase())).toBe(true);
-    expect(setIcon).not.toHaveBeenCalled();
-    expect(actions?.children.indexOf(newTabButton)).toBeLessThan(actions?.children.indexOf(historyButton) ?? -1);
+
+    // The tab menu had one way in and it was a right-click, which the keyboard
+    // cannot perform.
+    expect(tabMenuButton).not.toBeNull();
+    expect(tabMenuButton?.getAttribute('aria-label')).toBe('Tab actions');
+    expect(tabMenuButton?.getAttribute('role')).toBe('button');
+    expect(tabMenuButton?.getAttribute('tabindex')).toBe('0');
+    expect(tabMenuButton?.getAttribute('aria-haspopup')).toBe('menu');
+
+    // Reading order: how much context is spent, then the two things to do.
+    expect(actions?.children.indexOf(meter)).toBe(0);
+    expect(actions?.children.indexOf(historyButton)).toBe(1);
+    expect(actions?.children.indexOf(tabMenuButton)).toBe(2);
     expect(appearanceButton).toBeNull();
   });
 
@@ -164,7 +180,6 @@ describe('GrimoireView tab controls', () => {
     view.registerDomEvent = jest.fn();
     view.registerEvent = jest.fn();
     view.restoreOrCreateTabs = jest.fn().mockResolvedValue(undefined);
-    view.syncProviderBrandColor = jest.fn();
     view.wireEventHandlers = jest.fn();
 
     await view.onOpen();
@@ -205,7 +220,6 @@ describe('GrimoireView tab controls', () => {
     view.registerDomEvent = jest.fn();
     view.registerEvent = jest.fn();
     view.restoreOrCreateTabs = jest.fn().mockResolvedValue(undefined);
-    view.syncProviderBrandColor = jest.fn();
     view.wireEventHandlers = jest.fn();
 
     await view.onOpen();
@@ -247,7 +261,6 @@ describe('GrimoireView tab controls', () => {
     view.registerDomEvent = jest.fn();
     view.registerEvent = jest.fn();
     view.restoreOrCreateTabs = jest.fn().mockResolvedValue(undefined);
-    view.syncProviderBrandColor = jest.fn();
     view.wireEventHandlers = jest.fn();
 
     await view.onOpen();
@@ -289,7 +302,6 @@ describe('GrimoireView tab controls', () => {
     view.registerDomEvent = jest.fn();
     view.registerEvent = jest.fn();
     view.restoreOrCreateTabs = jest.fn().mockResolvedValue(undefined);
-    view.syncProviderBrandColor = jest.fn();
     view.syncHeaderContextUsage = jest.fn();
     view.wireEventHandlers = jest.fn();
 
@@ -304,7 +316,6 @@ describe('GrimoireView tab controls', () => {
 
     expect(view.updateTabBar).toHaveBeenCalled();
     expect(view.persistTabState).toHaveBeenCalled();
-    expect(view.syncProviderBrandColor).toHaveBeenCalled();
     expect(view.syncHeaderContextUsage).toHaveBeenCalled();
   });
 
@@ -329,7 +340,6 @@ describe('GrimoireView tab controls', () => {
     view.registerDomEvent = jest.fn();
     view.registerEvent = jest.fn();
     view.restoreOrCreateTabs = jest.fn().mockResolvedValue(undefined);
-    view.syncProviderBrandColor = jest.fn();
     view.wireEventHandlers = jest.fn();
 
     await view.onOpen();
@@ -518,18 +528,23 @@ describe('GrimoireView Escape handling', () => {
 });
 
 describe('GrimoireView permission mode shortcut', () => {
-  function createPermissionShortcutHarness(permissionMode: string) {
+  function createPermissionShortcutHarness(
+    permissionMode: string,
+    tabOverrides: Record<string, unknown> = {},
+  ) {
     const handlers: Array<(event: KeyboardEvent) => void> = [];
     const inputWrapper = createMockEl();
     const activeTab = {
       providerId: 'claude',
-      lifecycleState: 'active',
+      lifecycleState: 'bound_active',
       conversationId: null,
       draftModel: null,
+      draftSettings: null,
       service: null,
       state: { prePlanPermissionMode: null },
       ui: { permissionToggle: { updateDisplay: jest.fn() } },
       dom: { inputWrapper },
+      ...tabOverrides,
     };
     const view = Object.create(GrimoireView.prototype);
 
@@ -585,6 +600,34 @@ describe('GrimoireView permission mode shortcut', () => {
 
     pressShiftTab();
     expect(view.plugin.settings.permissionMode).toBe('normal');
+    expect(activeTab.state.prePlanPermissionMode).toBeNull();
+    // A bound tab reads the shared settings, so it has no draft to grow one.
+    expect(activeTab.draftSettings).toBeNull();
+  });
+
+  /*
+   * A tab that has not sent anything yet keeps its own draft of the composer's
+   * settings, and the toolbar reads that draft. The shortcut wrote the shared
+   * provider settings and left the draft alone, so on the surface where a mode
+   * is most often chosen - a new chat - Shift+Tab moved nothing the eye could
+   * see, and cycled from whatever the last bound tab had left behind.
+   */
+  it('cycles the draft of a blank tab rather than the shared settings', () => {
+    const { activeTab, pressShiftTab, view } = createPermissionShortcutHarness('plan', {
+      draftSettings: { permissionMode: 'normal' },
+      lifecycleState: 'blank',
+    });
+
+    pressShiftTab();
+    expect(activeTab.draftSettings).toMatchObject({ permissionMode: 'full_access' });
+    expect(view.plugin.settings.permissionMode).toBe('full_access');
+
+    pressShiftTab();
+    expect(activeTab.draftSettings).toMatchObject({ permissionMode: 'plan' });
+    expect(activeTab.state.prePlanPermissionMode).toBe('full_access');
+
+    pressShiftTab();
+    expect(activeTab.draftSettings).toMatchObject({ permissionMode: 'normal' });
     expect(activeTab.state.prePlanPermissionMode).toBeNull();
   });
 });
@@ -807,6 +850,9 @@ describe('GrimoireView tab context menu auto-rename', () => {
       getTab: jest.fn().mockReturnValue(tab),
       getTabIds: jest.fn().mockReturnValue(['tab-1', 'tab-2']),
       canCreateTab: jest.fn().mockReturnValue(true),
+      // The heading asks the manager who named the tab. A double that answers
+      // nothing is a tab with no recorded source, which is what these cases are.
+      getTabTitleSource: jest.fn().mockReturnValue(undefined),
     };
 
     MockMenu.instances.length = 0;

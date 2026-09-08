@@ -68,10 +68,12 @@ class DiffWidget extends WidgetType {
 
     const rejectBtn = btns.createEl('button', { cls: 'grimoire-inline-diff-btn reject', text: '✕' });
     rejectBtn.title = t('inlineEdit.rejectTitle');
+    rejectBtn.setAttribute('aria-label', t('inlineEdit.rejectTitle'));
     rejectBtn.onclick = () => this.controller.reject();
 
     const acceptBtn = btns.createEl('button', { cls: 'grimoire-inline-diff-btn accept', text: '✓' });
     acceptBtn.title = t('inlineEdit.acceptTitle');
+    acceptBtn.setAttribute('aria-label', t('inlineEdit.acceptTitle'));
     acceptBtn.onclick = () => this.controller.accept();
 
     return span;

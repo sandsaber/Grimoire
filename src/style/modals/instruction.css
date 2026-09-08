@@ -1,161 +1,171 @@
-/* Instruction Mode */
-
-/* Instruction Confirm Modal */
+/*
+ * Refine instruction — what you wrote, and what Grimoire read it as.
+ *
+ * The two are a label and a value on one line, not two stacked cards: the
+ * question the dialog asks is whether the second says the same thing as the
+ * first, and that is a comparison, so they belong side by side. The reading
+ * Grimoire proposes carries the one accent line; the words you typed do not,
+ * because they are not the thing being decided.
+ */
 .grimoire-instruction-modal {
-  max-width: 500px;
+  width: min(560px, calc(100vw - 32px));
 }
 
 .grimoire-instruction-section {
-  margin-bottom: var(--grimoire-space-6);
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--grimoire-space-10) var(--grimoire-space-16);
+  margin-bottom: var(--grimoire-space-16);
+  font-size: var(--grimoire-text-m);
+  line-height: var(--grimoire-leading-body);
 }
 
 .grimoire-instruction-label {
-  font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-medium);
-  color: var(--text-muted);
-  margin-bottom: var(--grimoire-space-3);
+  padding-top: var(--grimoire-space-2);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: var(--grimoire-label-tracking);
+  text-transform: uppercase;
 }
 
 .grimoire-instruction-original {
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  background: var(--background-secondary);
-  border-radius: var(--grimoire-radius-2);
-  font-size: var(--grimoire-text-m);
-  color: var(--text-muted);
-  font-style: italic;
+  color: var(--grimoire-ink-muted);
   white-space: pre-wrap;
 }
 
-.grimoire-instruction-refined {
-  padding: var(--grimoire-space-5);
-  background: var(--background-primary-alt);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--grimoire-radius-2);
-  font-size: var(--grimoire-text-l);
-  color: var(--text-normal);
-  line-height: 1.5;
+/* The reading being proposed, marked by the line that says "this is the claim". */
+.grimoire-instruction-refined,
+.grimoire-instruction-clarification {
+  padding-left: var(--grimoire-space-10);
+  border-left: 1.5px solid var(--grimoire-accent);
+  color: var(--grimoire-ink);
+  text-wrap: pretty;
   white-space: pre-wrap;
 }
 
 .grimoire-instruction-clarification {
-  padding: var(--grimoire-space-5);
-  background: var(--background-primary-alt);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--grimoire-radius-2);
-  font-size: var(--grimoire-text-l);
-  color: var(--text-normal);
-  line-height: 1.5;
-  white-space: pre-wrap;
+  grid-column: 2;
 }
 
 .grimoire-instruction-edit-container {
-  margin-top: var(--grimoire-space-3);
+  grid-column: 2;
 }
 
-.grimoire-instruction-edit-textarea {
-  width: 100%;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  font-size: var(--grimoire-text-l);
-  line-height: 1.5;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--grimoire-radius-2);
-  background: var(--background-primary);
-  color: var(--text-normal);
-  resize: vertical;
-  min-height: 80px;
-}
-
-.grimoire-instruction-edit-textarea:focus {
-  outline: none;
-  border-color: var(--grimoire-accent);
-}
-
+.grimoire-instruction-edit-textarea,
 .grimoire-instruction-response-textarea {
+  box-sizing: border-box;
   width: 100%;
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
-  font-size: var(--grimoire-text-l);
-  line-height: 1.5;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--grimoire-radius-2);
-  background: var(--background-primary);
-  color: var(--text-normal);
+  min-height: 72px;
+  padding: var(--grimoire-space-6) var(--grimoire-space-10);
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-1);
+  background: var(--grimoire-field);
+  color: var(--grimoire-ink);
+  font: inherit;
+  font-size: var(--grimoire-text-m);
+  line-height: var(--grimoire-leading-body);
   resize: vertical;
-  min-height: 60px;
 }
 
+.grimoire-instruction-edit-textarea:focus,
 .grimoire-instruction-response-textarea:focus {
-  outline: none;
   border-color: var(--grimoire-accent);
+  box-shadow: var(--grimoire-focus-ring);
+  outline: none;
 }
 
 .grimoire-instruction-buttons {
   display: flex;
-  gap: var(--grimoire-space-4);
+  align-items: center;
   justify-content: flex-end;
-  margin-top: var(--grimoire-space-6);
+  gap: var(--grimoire-space-6);
+  margin-top: var(--grimoire-space-16);
 }
 
-.grimoire-instruction-btn {
-  padding: var(--grimoire-space-4) var(--grimoire-space-6);
-  font-size: var(--grimoire-text-m);
-  border: none;
-  border-radius: var(--grimoire-radius-2);
+button.grimoire-instruction-btn {
+  box-sizing: border-box;
+  height: var(--grimoire-field-h);
+  padding: 0 var(--grimoire-space-12);
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-1);
+  background: transparent;
+  box-shadow: none;
+  color: var(--grimoire-ink);
   cursor: pointer;
-  font-weight: var(--grimoire-weight-medium);
+  font: inherit;
+  font-size: var(--grimoire-text-m);
+  transition: border-color var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
-.grimoire-instruction-reject-btn {
-  background: var(--background-modifier-border);
-  color: var(--text-normal);
+.grimoire-instruction-btn:hover {
+  border-color: var(--grimoire-line-3);
+  background: transparent;
+}
+
+.grimoire-instruction-btn:focus-visible {
+  box-shadow: var(--grimoire-focus-ring);
+  outline: none;
+}
+
+/* Declining costs nothing and needs no frame around it. */
+button.grimoire-instruction-reject-btn {
+  padding: 0 var(--grimoire-space-10);
+  border-color: transparent;
+  color: var(--grimoire-ink-muted);
 }
 
 .grimoire-instruction-reject-btn:hover {
-  background: var(--background-modifier-border-hover);
+  border-color: transparent;
+  color: var(--grimoire-ink);
 }
 
-.grimoire-instruction-edit-btn {
-  background: var(--background-modifier-border);
-  color: var(--text-normal);
-}
-
-.grimoire-instruction-edit-btn:hover {
-  background: var(--background-modifier-border-hover);
-}
-
-.grimoire-instruction-accept-btn {
+/* The one fill: sending is what the dialog is for. */
+button.grimoire-instruction-accept-btn {
+  padding: 0 var(--grimoire-space-14);
+  border-color: transparent;
   background: var(--grimoire-accent);
-  color: var(--text-on-accent);
+  color: var(--grimoire-accent-contrast);
+  font-weight: var(--grimoire-weight-medium);
 }
 
 .grimoire-instruction-accept-btn:hover {
-  opacity: 0.9;
+  border-color: transparent;
+  background: var(--grimoire-accent-hover);
 }
 
-/* Instruction loading state */
 .grimoire-instruction-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-7);
-  color: var(--text-muted);
+  gap: var(--grimoire-space-8);
+  padding: var(--grimoire-space-20);
+  color: var(--grimoire-ink-muted);
+  font-size: var(--grimoire-text-m);
 }
 
 .grimoire-instruction-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--background-modifier-border);
+  width: var(--grimoire-icon-l);
+  height: var(--grimoire-icon-l);
+  border: 2px solid var(--grimoire-line);
   border-top-color: var(--grimoire-accent);
-  border-radius: 50%;
-  animation: grimoire-spin 0.8s linear infinite;
+  border-radius: var(--grimoire-radius-circle);
+  animation: grimoire-spin 0.9s linear infinite;
 }
 
-/* Instruction modal content sections */
 .grimoire-instruction-content-section {
-  margin: var(--grimoire-space-4) 0;
+  margin: var(--grimoire-space-8) 0;
 }
 
 .grimoire-instruction-clarification-section,
 .grimoire-instruction-confirmation-section {
-  margin-top: var(--grimoire-space-4);
+  margin-top: var(--grimoire-space-8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grimoire-instruction-btn {
+    transition: none;
+  }
 }

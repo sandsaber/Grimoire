@@ -277,7 +277,7 @@ describe('NavigationSidebar', () => {
       expect(container).not.toBeNull();
     });
 
-    it('should create five navigation buttons', () => {
+    it('should create three navigation buttons', () => {
       sidebar = new NavigationSidebar(
         parentEl as unknown as HTMLElement,
         messagesEl as unknown as HTMLElement
@@ -285,7 +285,9 @@ describe('NavigationSidebar', () => {
 
       const container = parentEl.querySelector('.grimoire-nav-sidebar');
       expect(container).not.toBeNull();
-      expect(container!.children.length).toBe(5);
+      // Prev and next went with the float: the outline reaches any message in
+              // one press and names it, which is what stepping was for.
+              expect(container!.children.length).toBe(3);
     });
 
     it('should set correct aria-labels on buttons', () => {
@@ -298,10 +300,8 @@ describe('NavigationSidebar', () => {
       const buttons = container!.children;
 
       expect(buttons[0].getAttribute('aria-label')).toBe('Scroll to top');
-      expect(buttons[1].getAttribute('aria-label')).toBe('Previous prompt');
-      expect(buttons[2].getAttribute('aria-label')).toBe('Thread outline');
-      expect(buttons[3].getAttribute('aria-label')).toBe('Next prompt');
-      expect(buttons[4].getAttribute('aria-label')).toBe('Scroll to bottom');
+      expect(buttons[1].getAttribute('aria-label')).toBe('Thread outline');
+      expect(buttons[2].getAttribute('aria-label')).toBe('Scroll to bottom');
     });
 
     it('should set correct icons on buttons', () => {
@@ -313,11 +313,9 @@ describe('NavigationSidebar', () => {
       const container = parentEl.querySelector('.grimoire-nav-sidebar');
       const buttons = container!.children;
 
-      expect(buttons[0].getAttribute('data-icon')).toBe('chevrons-up');
-      expect(buttons[1].getAttribute('data-icon')).toBe('chevron-up');
-      expect(buttons[2].getAttribute('data-icon')).toBe('logs');
-      expect(buttons[3].getAttribute('data-icon')).toBe('chevron-down');
-      expect(buttons[4].getAttribute('data-icon')).toBe('chevrons-down');
+      expect(buttons[0].getAttribute('data-icon')).toBe('arrow-up-to-line');
+      expect(buttons[1].getAttribute('data-icon')).toBe('list');
+      expect(buttons[2].getAttribute('data-icon')).toBe('arrow-down-to-line');
     });
 
     it('should localize navigation labels in Simplified Chinese', () => {
@@ -329,8 +327,8 @@ describe('NavigationSidebar', () => {
 
       const buttons = parentEl.querySelector('.grimoire-nav-sidebar')!.children;
       expect(buttons[0].getAttribute('aria-label')).toBe('滚动至顶部');
-      expect(buttons[2].getAttribute('aria-label')).toBe('对话大纲');
-      expect(buttons[4].getAttribute('aria-label')).toBe('滚动至底部');
+      expect(buttons[1].getAttribute('aria-label')).toBe('对话大纲');
+      expect(buttons[2].getAttribute('aria-label')).toBe('滚动至底部');
     });
   });
 
@@ -436,7 +434,7 @@ describe('NavigationSidebar', () => {
       );
 
       const container = parentEl.querySelector('.grimoire-nav-sidebar');
-      const bottomBtn = container!.children[4];
+      const bottomBtn = container!.children[2];
       bottomBtn.click();
 
       expect(messagesEl.scrollToCalls.length).toBe(1);
@@ -453,161 +451,10 @@ describe('NavigationSidebar', () => {
         onScrollBottom,
       );
 
-      parentEl.querySelector('.grimoire-nav-sidebar')!.children[4].click();
+      parentEl.querySelector('.grimoire-nav-sidebar')!.children[2].click();
 
       expect(onScrollBottom).toHaveBeenCalledTimes(1);
       expect(messagesEl.scrollToCalls).toHaveLength(0);
-    });
-  });
-
-  describe('previous/next message navigation', () => {
-    function addUserMessage(el: MockElement, offset: number): MockElement {
-      const msg = el.createDiv({ cls: 'grimoire-message grimoire-message-user' });
-      msg.offsetTop = offset;
-      return msg;
-    }
-
-    function addAssistantMessage(el: MockElement, offset: number): MockElement {
-      const msg = el.createDiv({ cls: 'grimoire-message grimoire-message-assistant' });
-      msg.offsetTop = offset;
-      return msg;
-    }
-
-    function addConversation(el: MockElement, userOffsets: number[], assistantOffsets: number[]): void {
-      // Interleave user and assistant messages in order
-      const all = [
-        ...userOffsets.map(o => ({ offset: o, role: 'user' as const })),
-        ...assistantOffsets.map(o => ({ offset: o, role: 'assistant' as const })),
-      ].sort((a, b) => a.offset - b.offset);
-      for (const m of all) {
-        if (m.role === 'user') addUserMessage(el, m.offset);
-        else addAssistantMessage(el, m.offset);
-      }
-    }
-
-    function getButtons(parent: MockElement) {
-      const container = parent.querySelector('.grimoire-nav-sidebar')!;
-      return {
-        prev: container.children[1],
-        next: container.children[3],
-      };
-    }
-
-    it('should scroll to next user message below current scroll position', () => {
-      messagesEl.scrollHeight = 2000;
-      messagesEl.clientHeight = 500;
-      // user@0, assistant@100, user@400, assistant@500, user@800
-      addConversation(messagesEl, [0, 400, 800], [100, 500]);
-      messagesEl.scrollTop = 0;
-
-      sidebar = new NavigationSidebar(
-        parentEl as unknown as HTMLElement,
-        messagesEl as unknown as HTMLElement
-      );
-
-      const { next } = getButtons(parentEl);
-      next.click();
-
-      const lastCall = messagesEl.scrollToCalls[messagesEl.scrollToCalls.length - 1];
-      // Should skip assistant@100 and go to user@400
-      expect(lastCall.top).toBe(390); // offsetTop(400) - 10
-      expect(lastCall.behavior).toBe('smooth');
-    });
-
-    it('should scroll to previous user message above current scroll position', () => {
-      messagesEl.scrollHeight = 2000;
-      messagesEl.clientHeight = 500;
-      addConversation(messagesEl, [0, 400, 800], [100, 500]);
-      messagesEl.scrollTop = 800;
-
-      sidebar = new NavigationSidebar(
-        parentEl as unknown as HTMLElement,
-        messagesEl as unknown as HTMLElement
-      );
-
-      const { prev } = getButtons(parentEl);
-      prev.click();
-
-      const lastCall = messagesEl.scrollToCalls[messagesEl.scrollToCalls.length - 1];
-      // Should skip assistant@500 and go to user@400
-      expect(lastCall.top).toBe(390); // offsetTop(400) - 10
-      expect(lastCall.behavior).toBe('smooth');
-    });
-
-    it('should not require double-click when scrolled to a user message', () => {
-      messagesEl.scrollHeight = 2000;
-      messagesEl.clientHeight = 500;
-      addConversation(messagesEl, [0, 400, 800], [100, 500]);
-      // Scrolled to user message at offset 400 (scroll position = 390)
-      messagesEl.scrollTop = 390;
-
-      sidebar = new NavigationSidebar(
-        parentEl as unknown as HTMLElement,
-        messagesEl as unknown as HTMLElement
-      );
-
-      const { next } = getButtons(parentEl);
-      next.click();
-
-      const lastCall = messagesEl.scrollToCalls[messagesEl.scrollToCalls.length - 1];
-      // Should go to user@800, not stay at user@400
-      expect(lastCall.top).toBe(790); // offsetTop(800) - 10
-    });
-
-    it('should not require double-click for prev when scrolled to a user message', () => {
-      messagesEl.scrollHeight = 2000;
-      messagesEl.clientHeight = 500;
-      addConversation(messagesEl, [0, 400, 800], [100, 500]);
-      // Scrolled to user message at offset 800
-      messagesEl.scrollTop = 790;
-
-      sidebar = new NavigationSidebar(
-        parentEl as unknown as HTMLElement,
-        messagesEl as unknown as HTMLElement
-      );
-
-      const { prev } = getButtons(parentEl);
-      prev.click();
-
-      const lastCall = messagesEl.scrollToCalls[messagesEl.scrollToCalls.length - 1];
-      // Should go to user@400, not stay at user@800
-      expect(lastCall.top).toBe(390); // offsetTop(400) - 10
-    });
-
-    it('should scroll to bottom when at the last user message and next is clicked', () => {
-      messagesEl.scrollHeight = 2000;
-      messagesEl.clientHeight = 500;
-      addConversation(messagesEl, [0, 400, 800], [100, 500]);
-      messagesEl.scrollTop = 790;
-
-      sidebar = new NavigationSidebar(
-        parentEl as unknown as HTMLElement,
-        messagesEl as unknown as HTMLElement
-      );
-
-      const { next } = getButtons(parentEl);
-      next.click();
-
-      const lastCall = messagesEl.scrollToCalls[messagesEl.scrollToCalls.length - 1];
-      expect(lastCall.top).toBe(2000);
-    });
-
-    it('should scroll to top when at the first user message and prev is clicked', () => {
-      messagesEl.scrollHeight = 2000;
-      messagesEl.clientHeight = 500;
-      addConversation(messagesEl, [0, 400, 800], [100, 500]);
-      messagesEl.scrollTop = 0;
-
-      sidebar = new NavigationSidebar(
-        parentEl as unknown as HTMLElement,
-        messagesEl as unknown as HTMLElement
-      );
-
-      const { prev } = getButtons(parentEl);
-      prev.click();
-
-      const lastCall = messagesEl.scrollToCalls[messagesEl.scrollToCalls.length - 1];
-      expect(lastCall.top).toBe(0);
     });
   });
 
@@ -632,7 +479,7 @@ describe('NavigationSidebar', () => {
         messageListEl as unknown as HTMLElement,
       );
 
-      const directoryButton = parent.querySelector('.grimoire-nav-sidebar')!.children[2];
+      const directoryButton = parent.querySelector('.grimoire-nav-sidebar')!.children[1];
       directoryButton.click();
 
       const directory = parent.querySelector('.grimoire-nav-directory');
@@ -666,7 +513,7 @@ describe('NavigationSidebar', () => {
         messagesEl as unknown as HTMLElement,
       );
 
-      parentEl.querySelector('.grimoire-nav-sidebar')!.children[2].click();
+      parentEl.querySelector('.grimoire-nav-sidebar')!.children[1].click();
 
       expect(parentEl.querySelector('.grimoire-nav-directory-title')?.textContent).toBe('对话大纲');
       expect(parentEl.querySelector('.grimoire-nav-directory-empty')?.textContent).toBe('此会话中还没有提问');
@@ -693,7 +540,7 @@ describe('NavigationSidebar', () => {
         messageListEl as unknown as HTMLElement,
       );
 
-      parent.querySelector('.grimoire-nav-sidebar')!.children[2].click();
+      parent.querySelector('.grimoire-nav-sidebar')!.children[1].click();
 
       const items = parent.querySelector('.grimoire-nav-directory-list')!.children;
       expect(items[0].hasClass('is-active')).toBe(false);
@@ -722,11 +569,13 @@ describe('NavigationSidebar', () => {
       );
 
       const controls = parent.querySelector('.grimoire-nav-sidebar')!.children;
-      controls[2].click();
+      controls[1].click();
       const items = parent.querySelector('.grimoire-nav-directory-list')!.children;
       expect(items[0].hasClass('is-active')).toBe(true);
 
-      controls[3].click();
+      // Jumping to the latest message moves the reader past the second prompt,
+      // and the open outline has to say so without being reopened.
+      controls[2].click();
 
       expect(items[0].hasClass('is-active')).toBe(false);
       expect(items[0].getAttribute('aria-current')).toBeNull();

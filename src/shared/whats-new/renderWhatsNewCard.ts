@@ -1,5 +1,8 @@
+import { setIcon } from 'obsidian';
+
 import type { ChangelogRelease } from '../../app/changelog/types';
 import { t } from '../../i18n/i18n';
+import { markDecorative } from '../components/activatable';
 
 export interface RenderWhatsNewCardOptions {
   release: ChangelogRelease;
@@ -30,26 +33,18 @@ export function renderWhatsNewCard(
       : t('shared.whatsNew.latestReleaseNotes'),
   });
 
-  if (fullChangelogUrl) {
-    headerEl.createEl('a', {
-      cls: 'grimoire-whats-new-card-link',
-      text: t('shared.whatsNew.fullChangelog'),
-      attr: {
-        href: fullChangelogUrl,
-        rel: 'noopener',
-        target: '_blank',
-      },
-    });
-  }
-
+  // A close glyph, not the word "Got it" in a frame: the card is an aside, and
+  // the release it announces stays one link away, so dismissing costs nothing.
   const dismissButton = headerEl.createEl('button', {
     cls: 'grimoire-whats-new-card-dismiss',
-    text: t('shared.whatsNew.gotIt'),
     attr: {
       type: 'button',
       'aria-label': t('shared.whatsNew.gotIt'),
     },
   });
+  const dismissGlyph = dismissButton.createSpan({ cls: 'grimoire-whats-new-card-dismiss-icon' });
+  setIcon(dismissGlyph, 'x');
+  markDecorative(dismissGlyph);
 
   const listEl = cardEl.createDiv({
     cls: 'grimoire-whats-new-card-list',
@@ -66,6 +61,20 @@ export function renderWhatsNewCard(
     for (const item of category.items) {
       itemsEl.createEl('li', { cls: 'grimoire-whats-new-card-item', text: item });
     }
+  }
+
+  // The way out of the card sits after what it says, not beside its title: it is
+  // where a reader arrives once they have read the list, not a header control.
+  if (fullChangelogUrl) {
+    cardEl.createEl('a', {
+      cls: 'grimoire-whats-new-card-link',
+      text: t('shared.whatsNew.fullChangelog'),
+      attr: {
+        href: fullChangelogUrl,
+        rel: 'noopener',
+        target: '_blank',
+      },
+    });
   }
 
   let dismissing = false;

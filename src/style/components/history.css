@@ -1,18 +1,24 @@
+/*
+ * History is a popover hanging off the control that opened it, not a sheet
+ * covering the conversation behind it. Looking for another conversation is not
+ * a reason to lose sight of this one.
+ */
 .grimoire-history-menu {
   position: absolute;
-  top: 13px;
-  right: 13px;
-  bottom: 13px;
-  left: 13px;
+  top: calc(var(--grimoire-header-h) + var(--grimoire-space-4));
+  right: var(--grimoire-space-8);
+  bottom: auto;
+  left: auto;
   z-index: 40;
   display: none;
+  box-sizing: border-box;
+  width: min(352px, calc(100% - var(--grimoire-space-16)));
+  max-height: min(520px, calc(100% - var(--grimoire-header-h) - var(--grimoire-space-24)));
   overflow: hidden;
-  border: 1px solid var(--grimoire-accent-line);
-  border-radius: var(--grimoire-radius-3);
-  background: var(--grimoire-plane);
-  box-shadow:
-    var(--grimoire-lift-2);
-  animation: grimoire-pop 0.14s ease-out;
+  border: 1px solid var(--grimoire-line);
+  border-radius: var(--grimoire-radius-2);
+  background: var(--grimoire-ground);
+  box-shadow: var(--grimoire-lift-1);
 }
 
 .grimoire-history-menu.visible {
@@ -20,89 +26,53 @@
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
-.grimoire-history-header {
+/*
+ * Emptying the whole history, at the foot of the list rather than in a header
+ * band above it: it was the loudest thing on the panel, in red, beside a count
+ * nobody acts on and a title for a thing the reader had just opened.
+ */
+.grimoire-history-footer {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-5) var(--grimoire-space-5);
-  border-bottom: 1px solid var(--grimoire-line);
+  flex: none;
+  padding: var(--grimoire-space-4) var(--grimoire-space-6);
+  border-top: 1px solid var(--grimoire-line);
 }
 
-.grimoire-history-title {
-  min-width: 0;
-  color: var(--text-normal);
-  font-size: var(--grimoire-text-m);
-  font-weight: var(--grimoire-weight-semibold);
-  line-height: 1.2;
-}
-
-.grimoire-history-header-spacer {
-  flex: 1 1 auto;
-}
-
-.grimoire-history-count {
-  padding: var(--grimoire-space-2) var(--grimoire-space-3);
-  border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-raise-2);
-  color: var(--grimoire-workbench-faint);
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
-  line-height: 1;
-}
-
-.grimoire-history-delete-all {
-  padding: var(--grimoire-space-2) var(--grimoire-space-3);
+button.grimoire-history-delete-all {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--grimoire-hit-s);
+  padding: 0 var(--grimoire-space-6);
   border: 0;
   border-radius: var(--grimoire-radius-1);
-  background: transparent;
-  color: var(--text-error);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-semibold);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-xs);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1;
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-history-delete-all:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--text-error) 14%, transparent);
-  color: var(--text-error-hover, var(--text-error));
+  background: var(--grimoire-error-wash);
+  color: var(--grimoire-error);
 }
 
 .grimoire-history-delete-all:disabled {
-  color: var(--text-faint);
+  color: var(--grimoire-ink-ghost);
   cursor: default;
-}
-
-.grimoire-history-close {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--grimoire-radius-1);
-  background: transparent;
-  color: var(--grimoire-workbench-faint);
-  cursor: pointer;
-  transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
-}
-
-.grimoire-history-close:hover {
-  background: var(--grimoire-hover);
-  color: var(--text-normal);
-}
-
-.grimoire-history-close svg {
-  width: 15px;
-  height: 15px;
 }
 
 .grimoire-history-search {
   display: flex;
   align-items: center;
-  gap: var(--grimoire-space-4);
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  height: var(--grimoire-list-row-h);
+  gap: var(--grimoire-space-8);
+  padding: 0 var(--grimoire-space-12);
   border-bottom: 1px solid var(--grimoire-line);
 }
 
@@ -117,15 +87,17 @@
   height: 14px;
 }
 
-.grimoire-history-search-input {
+input.grimoire-history-search-input {
   min-width: 0;
   flex: 1 1 auto;
+  height: 100%;
+  padding: 0;
   border: 0;
   box-shadow: none;
   outline: 0;
   background: transparent;
-  color: var(--text-normal);
-  font-size: var(--grimoire-text-m);
+  color: var(--grimoire-ink);
+  font-size: var(--grimoire-text-s);
   line-height: 1.2;
 }
 
@@ -142,27 +114,27 @@
 .grimoire-history-list {
   min-height: 0;
   overflow: hidden auto;
-  padding: var(--grimoire-space-4);
+  padding: var(--grimoire-space-4) var(--grimoire-space-8) var(--grimoire-space-8);
   scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb-bg, var(--grimoire-line-2)) transparent;
+  scrollbar-color: var(--grimoire-line-2) transparent;
 }
 
 .grimoire-history-group {
   display: grid;
-  gap: var(--grimoire-space-1);
+  gap: var(--grimoire-space-2);
 }
 
 .grimoire-history-group + .grimoire-history-group {
-  margin-top: var(--grimoire-space-3);
+  margin-top: var(--grimoire-space-6);
 }
 
 .grimoire-history-group-label {
-  padding: var(--grimoire-space-4) var(--grimoire-space-4) var(--grimoire-space-3);
-  color: var(--text-faint);
-  font-family: var(--font-monospace);
+  padding: var(--grimoire-space-10) var(--grimoire-space-8) var(--grimoire-space-4);
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
   font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-bold);
-  letter-spacing: 0.12em;
+  font-weight: var(--grimoire-weight-normal);
+  letter-spacing: var(--grimoire-label-tracking);
   line-height: 1;
   text-transform: uppercase;
 }
@@ -171,8 +143,8 @@
   display: grid;
   place-items: center;
   min-height: 130px;
-  padding: 32px var(--grimoire-space-7);
-  color: var(--text-muted);
+  padding: 32px var(--grimoire-space-20);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-m);
   text-align: center;
 }
@@ -180,39 +152,69 @@
 .grimoire-history-unreadable {
   display: flex;
   flex-direction: column;
-  gap: var(--grimoire-space-2);
-  padding: var(--grimoire-space-4) var(--grimoire-space-5);
+  gap: var(--grimoire-space-4);
+  padding: var(--grimoire-space-8) var(--grimoire-space-12);
 }
 
 .grimoire-history-unreadable-item {
-  padding: var(--grimoire-space-4) var(--grimoire-space-4);
-  border: 1px solid var(--background-modifier-border);
+  padding: var(--grimoire-space-8) var(--grimoire-space-8);
+  border: 1px solid var(--grimoire-line);
   border-radius: var(--grimoire-radius-2);
-  background: var(--background-secondary);
+  background: var(--grimoire-plane);
 }
 
 .grimoire-history-unreadable-title {
-  color: var(--text-muted);
+  color: var(--grimoire-ink-muted);
   font-size: var(--grimoire-text-m);
   font-style: italic;
 }
 
 .grimoire-history-unreadable-reason {
-  margin-top: var(--grimoire-space-1);
-  color: var(--text-faint);
+  margin-top: var(--grimoire-space-2);
+  color: var(--grimoire-ink-faint);
   font-size: var(--grimoire-text-s);
 }
 
+/*
+ * Two lines, and the title has the first of them to itself.
+ *
+ * It was one line with the stamp beside it and the controls floated over that
+ * stamp on hover — so the controls, which are wider than a time, reached back
+ * across the title and sat on top of its last few words. Nothing reserved room
+ * for them, because nothing could: they are wider at hover than the column they
+ * hovered over.
+ *
+ * So they moved down. The title gets the full width at rest and keeps it while
+ * the row is hovered; the stamp and the controls share the second line, at
+ * opposite ends, and both occupy their space at rest. Revealing the controls
+ * still shifts nothing, which is what §11.5 always claimed and this is the
+ * first arrangement in which it is true.
+ *
+ * The cost is the row: 36px became 48, so about a third fewer conversations
+ * are in view. This is not the second line Nordic removed — that one carried
+ * four facts in mono under every title and turned a list into a wall. This one
+ * carries what was already on the row, moved off the title's line.
+ */
 .grimoire-history-item {
   position: relative;
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  grid-template-rows: auto auto;
   align-items: center;
-  gap: var(--grimoire-space-5);
+  height: 56px;
+  gap: var(--grimoire-space-2) var(--grimoire-space-10);
   min-width: 0;
   width: 100%;
-  padding: var(--grimoire-space-4) var(--grimoire-space-4);
-  border-radius: var(--grimoire-radius-2);
+  /*
+   * The hover wash is the row, so the row needs room inside it. Two lines and
+   * a 24px hit target come to 42px; at 48 with no vertical padding the ground
+   * closed on the title above and the controls below with three pixels to
+   * spare. The horizontal 8 is left alone: it is what aligns a row's title
+   * with its group label.
+   */
+  padding: var(--grimoire-space-6) var(--grimoire-space-8);
+  border-left: 1.5px solid transparent;
+  border-radius: var(--grimoire-radius-1);
   cursor: pointer;
   outline: 0;
   transition: background var(--grimoire-duration) var(--grimoire-ease);
@@ -220,63 +222,76 @@
 
 .grimoire-history-item:hover,
 .grimoire-history-item:focus-visible {
-  background: var(--grimoire-raise-2);
-}
-
-.grimoire-history-item.active {
-  cursor: default;
-  background: transparent;
-}
-
-.grimoire-history-item.is-open:not(.active) {
   background: var(--grimoire-hover);
 }
 
-.grimoire-history-provider-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--grimoire-radius-pill);
-  background: var(--grimoire-history-provider-color);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--grimoire-history-provider-color) 17%, transparent);
+/* The conversation already open: a rule, which is what the accent draws. */
+.grimoire-history-item.active {
+  cursor: default;
+  border-left-color: var(--grimoire-accent);
+  background: transparent;
+}
+
+/*
+ * Open in another tab: the same rule the current one wears, at the weight the
+ * accent uses for a border. It was the hover ground, so a row nobody was
+ * pointing at looked permanently pointed at - and on a list of twelve, one of
+ * them always did.
+ */
+.grimoire-history-item.is-open:not(.active) {
+  border-left-color: var(--grimoire-accent-line);
+  background: transparent;
 }
 
 .grimoire-history-item-content {
+  grid-area: 1 / 1 / 2 / 3;
   display: grid;
   min-width: 0;
-  gap: var(--grimoire-space-1);
+}
+
+/*
+ * The title sits in a flex row so a mark can precede it, and a flex item does
+ * not shrink below its content unless it is told to: without `min-width`, the
+ * ellipsis never fires and a long name runs on under the hover controls.
+ */
+.grimoire-history-item-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--grimoire-space-4);
 }
 
 .grimoire-history-item-title {
+  min-width: 0;
   overflow: hidden;
-  color: var(--text-normal);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-s);
-  font-weight: var(--grimoire-weight-semibold);
+  font-weight: var(--grimoire-weight-normal);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.grimoire-history-item-meta {
+/*
+ * The stamp yields to the title, not the other way round. A model label can
+ * arrive as a whole billing path, and an `auto` track took every pixel it
+ * asked for - so "Describe the image" became "Describe th…" to make room for
+ * "Z.AI Coding Plan/GLM-5.3-Flash", and a row whose title had not generated
+ * yet read as a model name and nothing else.
+ */
+.grimoire-history-item-time {
+  grid-area: 2 / 1;
+  justify-self: start;
+  min-width: 0;
+  max-width: 160px;
   overflow: hidden;
-  color: var(--text-faint);
-  font-size: var(--grimoire-text-xs);
-  line-height: 1.25;
+  color: var(--grimoire-ink-faint);
+  font-family: var(--grimoire-mono);
+  font-size: var(--grimoire-text-2xs);
+  font-weight: var(--grimoire-weight-normal);
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.grimoire-history-item-time {
-  color: var(--grimoire-workbench-ghost);
-  font-family: var(--font-monospace);
-  font-size: var(--grimoire-text-2xs);
-  font-weight: var(--grimoire-weight-bold);
-  line-height: 1;
-  white-space: nowrap;
-  transition: opacity var(--grimoire-duration) var(--grimoire-ease);
-}
-
-.grimoire-history-item:hover .grimoire-history-item-time {
-  opacity: 0;
 }
 
 .grimoire-history-item:focus-within .grimoire-history-item-time {
@@ -284,14 +299,12 @@
 }
 
 .grimoire-history-item-actions {
-  position: absolute;
-  top: 50%;
-  right: 8px;
+  grid-area: 2 / 2;
+  justify-self: end;
   display: flex;
-  gap: var(--grimoire-space-1);
+  gap: var(--grimoire-space-2);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-50%);
   transition: opacity var(--grimoire-duration) var(--grimoire-ease);
 }
 
@@ -305,42 +318,57 @@
   pointer-events: auto;
 }
 
-.grimoire-action-btn {
+/*
+ * What can be done to a row: glyphs, and the word for the one that cannot be
+ * taken back. They were 26px chips on a raised ground, so hovering a row put
+ * three filled boxes where its title had been.
+ */
+.grimoire-action-btn,
+button.grimoire-action-btn {
   display: inline-grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  box-sizing: border-box;
+  width: var(--grimoire-hit-s);
+  height: var(--grimoire-hit-s);
   padding: 0;
   border: 0;
   border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-raise);
-  color: var(--text-faint);
+  background: none;
+  box-shadow: none;
+  color: var(--grimoire-ink-faint);
+  font-size: var(--grimoire-text-s);
   cursor: pointer;
   transition: background var(--grimoire-duration) var(--grimoire-ease), color var(--grimoire-duration) var(--grimoire-ease);
 }
 
 .grimoire-action-btn:hover {
-  background: var(--grimoire-raise-2);
-  color: var(--text-normal);
+  background: var(--grimoire-hover);
+  color: var(--grimoire-ink);
 }
 
 .grimoire-action-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
+  stroke-width: var(--grimoire-stroke);
+}
+
+button.grimoire-delete-btn {
+  width: auto;
+  padding: 0 var(--grimoire-space-6);
 }
 
 .grimoire-delete-btn:hover {
-  background: color-mix(in srgb, var(--color-red) 16%, transparent);
-  color: var(--color-red);
+  background: none;
+  color: var(--grimoire-error);
 }
 
 .grimoire-rename-input {
   width: 100%;
-  padding: var(--grimoire-space-1) var(--grimoire-space-2);
+  padding: var(--grimoire-space-2) var(--grimoire-space-4);
   border: 1px solid var(--grimoire-accent);
   border-radius: var(--grimoire-radius-1);
-  background: var(--background-primary);
-  color: var(--text-normal);
+  background: var(--grimoire-ground);
+  color: var(--grimoire-ink);
   font-size: var(--grimoire-text-m);
   font-weight: var(--grimoire-weight-normal);
 }
@@ -350,14 +378,30 @@
   box-shadow: var(--grimoire-focus-ring);
 }
 
-/* Loading indicator for title generation. */
+/*
+ * Loading indicator for title generation.
+ *
+ * The glyph turns, not the control around it. Spinning the element spun its
+ * rounded ground with it, so what the reader saw was a tilting square with an
+ * arc inside rather than an arc going round. It wears the button's class for
+ * its size and place in the row, and it is not a button: nothing happens when
+ * it is pressed, so nothing lights up when it is pointed at either.
+ */
 .grimoire-action-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: spin 1s linear infinite;
   opacity: 0.6;
   cursor: default;
+}
+
+.grimoire-action-loading:hover {
+  background: none;
+  color: var(--grimoire-ink-faint);
+}
+
+.grimoire-action-loading svg {
+  animation: grimoire-spin 0.9s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -365,6 +409,7 @@
   .grimoire-history-item,
   .grimoire-history-item-actions,
   .grimoire-history-item-time,
+  .grimoire-action-loading svg,
   .grimoire-action-btn {
     animation: none;
     transition: none;

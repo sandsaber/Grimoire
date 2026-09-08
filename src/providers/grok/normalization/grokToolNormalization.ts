@@ -4,6 +4,7 @@ import {
   TOOL_EDIT,
   TOOL_GLOB,
   TOOL_GREP,
+  TOOL_LS,
   TOOL_READ,
   TOOL_SKILL,
   TOOL_TASK,
@@ -16,14 +17,27 @@ import type { AskUserAnswers, AskUserQuestionItem } from '../../../core/types';
 import type { SDKToolUseResult } from '../../../core/types/diff';
 import { AcpToolStreamAdapter } from '../../acp';
 
+/*
+ * The names Grok actually sends, taken from its own session histories rather
+ * than guessed from the shapes its siblings use. Its four commonest tools —
+ * `read_file`, `list_dir`, `search_replace`, `run_terminal_command` — were not
+ * here at all, so they fell through to the raw name and drew as a wrench and a
+ * snake_case word: six identical `read_file` rows where Claude says which note
+ * it read. `write` and `grep` matched by accident, which is why the same
+ * transcript had one properly named `Write` row among them.
+ */
 const TOOL_NAME_MAP: Record<string, string> = {
   askuserquestion: TOOL_ASK_USER_QUESTION,
   bash: TOOL_BASH,
   edit: TOOL_EDIT,
   glob: TOOL_GLOB,
   grep: TOOL_GREP,
+  list_dir: TOOL_LS,
   question: TOOL_ASK_USER_QUESTION,
   read: TOOL_READ,
+  read_file: TOOL_READ,
+  run_terminal_command: TOOL_BASH,
+  search_replace: TOOL_EDIT,
   shell: TOOL_BASH,
   skill: TOOL_SKILL,
   strreplace: TOOL_EDIT,
@@ -324,14 +338,21 @@ export function normalizeGrokToolInput(
   switch (knownName) {
     case 'question':
       return { questions: normalizeQuestionItems(input.questions) };
+    // `target_file` is Grok's own key for the path, and without it the row knew
+    // the tool was a Read and still had nothing to name.
     case 'read':
+    case 'read_file':
       return {
-        ...(firstString(input.file_path, input.filePath, input.filepath, input.path)
-          ? { file_path: firstString(input.file_path, input.filePath, input.filepath, input.path) }
+        ...(firstString(input.target_file, input.file_path, input.filePath, input.filepath, input.path)
+          ? { file_path: firstString(input.target_file, input.file_path, input.filePath, input.filepath, input.path) }
           : {}),
         ...(typeof input.limit === 'number' ? { limit: input.limit } : {}),
         ...(typeof input.offset === 'number' ? { offset: input.offset } : {}),
       };
+    case 'list_dir':
+      return firstString(input.target_directory, input.path)
+        ? { path: firstString(input.target_directory, input.path) }
+        : {};
     case 'write':
       return {
         ...(typeof input.content === 'string' ? { content: input.content } : {}),
@@ -340,6 +361,7 @@ export function normalizeGrokToolInput(
           : {}),
       };
     case 'edit':
+    case 'search_replace':
       return {
         ...(firstString(input.file_path, input.filePath, input.filepath, input.path)
           ? { file_path: firstString(input.file_path, input.filePath, input.filepath, input.path) }

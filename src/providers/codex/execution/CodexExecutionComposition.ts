@@ -31,6 +31,7 @@ import type {
   PreparedChatTurn,
 } from '@/core/runtime/types';
 import type { ChatMessage } from '@/core/types';
+import { resolveRunAbsoluteTimeoutMs } from '@/core/types/settings';
 import type GrimoirePlugin from '@/main';
 import { createCodexModuleContext } from '@/providers/codex/app/CodexModuleContext';
 import { codexPlanUsageStore } from '@/providers/codex/app/CodexPlanUsageStore';
@@ -209,6 +210,7 @@ export class CodexExecution {
       },
       sessionInstanceIdFactory: () => sessionInstanceId(opaqueId('si')),
       interactionIdFactory: () => interactionId(opaqueId('ix')),
+      runAbsoluteTimeoutMs: () => resolveRunAbsoluteTimeoutMs(this.plugin.settings),
     };
     this.backend = new CodexExecutionBackend(context);
     return this.backend;
@@ -362,7 +364,10 @@ export class CodexExecution {
         if (reason === 'provider-failure') {
           return content.lastFailure();
         }
-        return reason === 'pre-dispatch-rejected'
+        // Both rejections read the same store: one refused by the resolver
+        // before anything was sent, one refused by the daemon before the turn
+        // was. Neither ran, and neither is explained by the kernel's wording.
+        return reason === 'pre-dispatch-rejected' || reason === 'side-effect-free-rejection'
           ? this.requests.refusalFor(lastRequestRef)
           : undefined;
       },

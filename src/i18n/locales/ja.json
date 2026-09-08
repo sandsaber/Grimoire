@@ -13,6 +13,7 @@
     "success": "成功",
     "warning": "警告",
     "confirm": "確認",
+    "done": "完了",
     "settings": "設定",
     "advanced": "詳細",
     "enabled": "有効",
@@ -254,7 +255,7 @@
       },
       "composer": {
         "jumpToLatest": "最新メッセージへ移動",
-        "placeholder": "Grimoireに編集、検索、比較、生成、またはコマンド実行を依頼...",
+        "placeholder": "Grimoire に質問…",
         "send": "送信",
         "sendMessage": "メッセージを送信",
         "stopResponse": "応答を停止",
@@ -303,6 +304,9 @@
         "permissionSafe": "安全",
         "permissionAuto": "自動",
         "permissionPlan": "計画",
+        "permissionSafeDetail": "編集とコマンドを毎回確認します",
+        "permissionAutoDetail": "編集とコマンドを確認なしで実行します",
+        "permissionPlanDetail": "計画を承認するまで読み取り専用です",
         "effortLevels": {
           "low": "低",
           "medium": "中",
@@ -327,6 +331,8 @@
         "absolutePathRequired": "絶対パスが必要です。使用法: /add-dir /absolute/path",
         "duplicate": "このフォルダはすでに外部コンテキストとして追加されています。",
         "selectTitle": "外部コンテキストを選択",
+        "selectFileTitle": "外部ファイルを選択",
+        "selectFolderTitle": "外部フォルダを選択",
         "pickerFailed": "フォルダ選択を開けませんでした。",
         "conflictInside": "“{path}”は追加できません — 既存のパス“{existing}”内にあります",
         "conflictContains": "“{path}”は追加できません — 既存のパス“{existing}”を含みます",
@@ -378,9 +384,53 @@
         "safeMode": "安全モード",
         "loadedThisSession": "このセッションで読み込み済み"
       },
+      "contextManager": {
+        "title": "コンテキスト",
+        "headerCount": "{count} 件 · 約 {tokens} トークン",
+        "searchPlaceholder": "添付を絞り込む、または入力して保管庫から追加",
+        "add": "追加",
+        "addContext": "コンテキストを追加",
+        "addNamed": "{name} を追加",
+        "manage": "管理",
+        "review": "確認",
+        "selected": "{count} 件選択",
+        "estimatedTokens": "約 {tokens}（推定）",
+        "clearSelection": "選択解除",
+        "selectNamed": "{name} を選択",
+        "removeNamed": "{name} を外す",
+        "removeAll": "すべて外す",
+        "removeAllConfirm": "{count} 件を外しますか？",
+        "empty": "何も添付されていません。ノート、フォルダ、リンクを追加できます。",
+        "noMatches": "一致するものがありません。",
+        "groupVault": "保管庫",
+        "groupExternal": "外部",
+        "groupFromVault": "保管庫から",
+        "fileCount": "{count} 件",
+        "summaryCost": "約 {tokens} · ウィンドウの {percent}%",
+        "overBudget": "{count} 件 · 約 {tokens} はこのモデルのウィンドウを超えます",
+        "overBudgetBy": "約 {tokens} 超過",
+        "windowShare": "この送信後でウィンドウの {percent}%",
+        "windowUnknown": "このモデルはコンテキストウィンドウを報告していません",
+        "exceedsBy": "このモデルのウィンドウを約 {tokens} 超えています",
+        "notCounted": "{count} 件は未計測",
+        "unreadable": "読み取れません",
+        "missing": "見つかりません — 移動または削除",
+        "inFlight": "送信中",
+        "attached": "添付済み",
+        "pickerPlaceholder": "保管庫を検索",
+        "pickerHint": "⏎ 追加 · ⇥ 開いたまま",
+        "quickOpenFile": "開いているファイル",
+        "quickBrowseFile": "外部ファイル…",
+        "quickBrowseFolder": "外部フォルダ…",
+        "detailExternal": "保管庫の外",
+        "detailOpenNote": "開いているノート",
+        "folderDetail": "ノート {count} 件"
+      },
       "tabs": {
         "createFailed": "タブを作成できませんでした",
         "newTab": "新規タブ",
+        "tabLabel": "タブ {index} · {title}",
+        "tabActions": "タブの操作",
         "history": "チャット履歴",
         "switchFailed": "タブを切り替えられませんでした",
         "closeFailed": "タブを閉じられませんでした",
@@ -403,7 +453,8 @@
         "closed": "{title} を閉じました",
         "closedMany": "{count} 個のタブを閉じました",
         "undo": "元に戻す",
-        "restoreFailed": "タブを復元できませんでした"
+        "restoreFailed": "タブを復元できませんでした",
+        "titleSourceFallbackPrefix": "仮題"
       },
       "messages": {
         "interrupted": "中断されました",
@@ -414,8 +465,6 @@
         "conversationCompacted": "会話を圧縮しました",
         "sessionRestarted": "新しいセッション",
         "sessionRestartedHint": "エージェントが前のセッションを復元できなかったため、この会話は新しいセッションで続きます。上のメッセージはそのコンテキストに含まれていません。必要な内容は伝え直すか、新しいタブで始めてください。",
-        "completed": "完了",
-        "duration": "* {flavor}、{duration}",
         "copied": "コピーしました！",
         "renderFailed": "メッセージ内容をレンダリングできませんでした。",
         "copyMessage": "メッセージをコピー",
@@ -492,7 +541,9 @@
         "openBackgroundTab": "バックグラウンドタブで開く",
         "switchOpenSession": "開いているセッションに切り替え",
         "rename": "名前を変更",
-        "noneToResume": "再開する会話はありません"
+        "noneToResume": "再開する会話はありません",
+        "titleSourceModel": "自動生成",
+        "titleSourceManual": "手動"
       },
       "thinking": {
         "expandAriaLabel": "拡張思考 — クリックして展開",
@@ -528,17 +579,17 @@
         "shellCommand": "シェルコマンド"
       },
       "plan": {
-        "requestedPermissions": "要求された権限:",
-        "approveCurrentSession": "承認（現在のセッション）",
-        "continueFeedbackPlaceholder": "計画を続けるためのフィードバックを入力...",
-        "keyboardHints": "矢印キーで移動 · Enterで選択 · Escでキャンセル",
+        "requestedPermissions": "要求された権限",
+        "approveCurrentSession": "このセッションで承認",
+        "continueFeedbackPlaceholder": "計画を修正するフィードバック…",
+        "keyboardHints": "↑↓ 移動 · ⏎ 選択 · esc キャンセル",
         "complete": "計画完了",
         "reviewBeforeProceeding": "続行前に計画を確認",
         "label": "計画",
         "expand": "計画を展開",
         "collapse": "計画を折りたたむ",
         "implement": "実装",
-        "reviseFeedbackPlaceholder": "計画を修正するためのフィードバックを入力..."
+        "reviseFeedbackPlaceholder": "計画を修正するフィードバック…"
       },
       "images": {
         "dropHere": "ここに画像をドロップ",
@@ -586,6 +637,7 @@
         "runningEllipsis": "実行中...",
         "completed": "完了",
         "blocked": "ブロック済み",
+        "unfinished": "未完了",
         "error": "エラー",
         "orphaned": "孤立",
         "inProgress": "進行中",
@@ -659,10 +711,12 @@
         "queryCountOne": "{count}件のクエリ",
         "queryCountMany": "{count}件のクエリ",
         "stepCountOne": "{count}ステップ",
-        "stepCountMany": "{count}ステップ"
+        "stepCountMany": "{count}ステップ",
+        "resultSkipped": "スキップ",
+        "resultStopped": "中断"
       },
       "responseMetadata": {
-        "effort": "推論量 {value}"
+        "effort": "{value}"
       }
     }
   },
@@ -712,6 +766,10 @@
       "name": "タイトル生成モデル",
       "desc": "会話タイトルを自動生成するために使用されるモデル。",
       "auto": "自動 (アクティブなプロバイダー)"
+    },
+    "runAbsoluteTimeout": {
+      "name": "1ターンの最大実行時間",
+      "desc": "どれだけ動き続けていても、1つのターンが停止されるまでの分数です。無言のターンはこれより早く、10分間何も応答がない時点で停止されます。長時間のエージェント作業では大きくし、上限をなくすには0を指定します。"
     },
     "navMappings": {
       "name": "Vimスタイルナビゲーションマッピング",
@@ -900,6 +958,10 @@
       "name": "最大チャットタブ数",
       "desc": "同時に開ける最大チャットタブ数（1-10）。各タブは個別の Claude セッションを使用します。",
       "warning": "5 タブを超えるとパフォーマンスやメモリ使用量に影響する可能性があります。"
+    },
+    "showPanelLabels": {
+      "name": "パネル名を表示",
+      "desc": "会話の上の切り替えで各パネルに名前を表示します。開いているパネルは常に名前が出ます。ほかはオンにするまでアイコンのままです。"
     },
     "tabBarPosition": {
       "name": "タブバーの位置",
@@ -1518,6 +1580,7 @@
     "newTab": "新しいタブ",
     "newSession": "新しいセッション（現在のタブ）",
     "closeCurrentTab": "現在のタブを閉じる",
+    "manageContext": "コンテキストを管理",
     "switchToTab": "タブ {index} に切り替え",
     "environmentRestartFailed": "環境の変更は適用されましたが、影響を受けた {count} 個のタブを再起動できませんでした。",
     "environmentAppliedRebuild": "環境変数を適用しました。次のメッセージでセッションを再構築します。",
@@ -1525,6 +1588,13 @@
   },
   "shared": {
     "slashCommands": {
+      "scope": {
+        "builtin": "組み込み",
+        "vault": "保管庫",
+        "user": "ユーザー",
+        "system": "システム",
+        "runtime": "実行時"
+      },
       "noMatches": "一致するコマンドはありません"
     },
     "resumeConversation": {
