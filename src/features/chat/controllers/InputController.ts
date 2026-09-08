@@ -1536,7 +1536,19 @@ export class InputController {
           await plugin.renameConversation(conversationId, result.title);
           await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
         } else if (!userManuallyRenamed) {
-          // Keep fallback title, mark as failed (only if user hasn't renamed)
+          // Keep fallback title, mark as failed (only if user hasn't renamed).
+          // The status is a state; the reason the service gave for it exists
+          // only here, and the log is the one place it survives the tick.
+          plugin.recordDebugLog?.({
+            data: {
+              providerId: this.getActiveProviderId(),
+              source: 'auto',
+            },
+            ...(result.success ? {} : { error: result.error }),
+            event: 'generation.failed',
+            level: 'warn',
+            scope: 'title',
+          });
           await plugin.updateConversation(conversationId, { titleGenerationStatus: 'failed' });
         } else {
           // User manually renamed, clear the status (user's choice takes precedence)
@@ -1544,8 +1556,20 @@ export class InputController {
         }
         conversationController.updateHistoryDropdown();
       }
-    ).catch(() => {
-      // Silently ignore title generation errors
+    ).catch((error: unknown) => {
+      // The service reports failures through the callback, so reaching here is
+      // the generation breaking outside its own contract. Swallowed as before —
+      // a title must never break a turn — but no longer unobservable.
+      plugin.recordDebugLog?.({
+        data: {
+          providerId: this.getActiveProviderId(),
+          source: 'auto',
+        },
+        error,
+        event: 'generation.threw',
+        level: 'warn',
+        scope: 'title',
+      });
     });
   }
 

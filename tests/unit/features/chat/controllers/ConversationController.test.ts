@@ -2308,6 +2308,40 @@ describe('ConversationController - regenerateTitle callback branches', () => {
     });
   });
 
+  it('logs the reason the manual regeneration failed', async () => {
+    const recordDebugLog = jest.fn();
+    (deps.plugin as any).recordDebugLog = recordDebugLog;
+    (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
+      id: 'conv-1',
+      providerId: 'opencode',
+      title: 'Original Title',
+      messages: [
+        { role: 'user', content: 'Hello' },
+        { role: 'assistant', content: 'Hi!' },
+      ],
+    });
+
+    mockTitleService.generateTitle.mockImplementation(
+      async (_convId: string, _user: string, callback: any) => {
+        await callback('conv-1', { success: false, error: 'Failed to parse title from response' });
+      }
+    );
+
+    await controller.regenerateTitle('conv-1');
+
+    expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', {
+      titleGenerationStatus: 'failed',
+    });
+    expect(recordDebugLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'Failed to parse title from response',
+        event: 'generation.failed',
+        level: 'warn',
+        scope: 'title',
+      })
+    );
+  });
+
   it('should clear status when user manually renamed during generation', async () => {
     (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
       id: 'conv-1',
@@ -2854,7 +2888,10 @@ describe('ConversationController title suggestion', () => {
       },
     });
 
-    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: false, reason: 'failed' });
+    // The provider's reason travels with the outcome: `failed` alone is what
+    // made every distinct failure look the same in the log.
+    await expect(controller.suggestTitle('conv-1'))
+      .resolves.toEqual({ ok: false, reason: 'failed', error: 'boom' });
   });
 
   it('maps a thrown provider error to failed instead of rejecting', async () => {
@@ -2865,7 +2902,8 @@ describe('ConversationController title suggestion', () => {
       },
     });
 
-    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: false, reason: 'failed' });
+    await expect(controller.suggestTitle('conv-1'))
+      .resolves.toEqual({ ok: false, reason: 'failed', error: 'network down' });
   });
 
   it('maps a provider that never calls back to failed', async () => {
@@ -2876,7 +2914,8 @@ describe('ConversationController title suggestion', () => {
       },
     });
 
-    await expect(controller.suggestTitle('conv-1')).resolves.toEqual({ ok: false, reason: 'failed' });
+    await expect(controller.suggestTitle('conv-1'))
+      .resolves.toEqual({ ok: false, reason: 'failed', error: 'Title generation returned no result.' });
   });
 
   it('resolves once even if the provider calls back twice', async () => {

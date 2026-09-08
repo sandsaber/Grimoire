@@ -91,7 +91,20 @@ export type HistoryConversationOpenState = 'closed' | 'open' | 'current';
 
 export type TitleSuggestion =
   | { ok: true; title: string }
-  | { ok: false; reason: 'disabled' | 'no-messages' | 'no-service' | 'failed' };
+  | {
+    ok: false;
+    reason: 'disabled' | 'no-messages' | 'no-service' | 'failed';
+    /**
+     * What the generation said when it failed, carried for the log.
+     *
+     * The service reports a reason for every failure — a parse that found no
+     * title, a runner that threw, a budget that ran out — and until this field
+     * existed the caller replaced all of them with the word `failed`. A title
+     * that never generates is then indistinguishable from one that generated
+     * badly, in the UI and in the log alike.
+     */
+    error?: string;
+  };
 
 type TitleSuggestionSource =
   | { ok: true; userContent: string; service: TitleGenerationService }
@@ -1348,11 +1361,18 @@ export class ConversationController {
         async (_convId, result) => {
           settle(result.success
             ? { ok: true, title: result.title }
-            : { ok: false, reason: 'failed' });
+            : { ok: false, reason: 'failed', ...(result.error ? { error: result.error } : {}) });
         },
       ).then(
-        () => settle({ ok: false, reason: 'failed' }),
-        () => settle({ ok: false, reason: 'failed' }),
+        // Resolving after the callback settled changes nothing; reaching here
+        // first means the service returned without ever calling back, and that
+        // is its own failure and says so.
+        () => settle({ ok: false, reason: 'failed', error: 'Title generation returned no result.' }),
+        (error: unknown) => settle({
+          ok: false,
+          reason: 'failed',
+          error: error instanceof Error ? error.message : 'Title generation threw.',
+        }),
       );
     });
   }
@@ -1401,6 +1421,18 @@ export class ConversationController {
       await plugin.renameConversation(conversationId, suggestion.title);
       await plugin.updateConversation(conversationId, { titleGenerationStatus: 'success' });
     } else {
+      // Logged rather than only stored: `failed` in the record is a state, and
+      // the reason behind it lives for one tick unless something writes it down.
+      plugin.recordDebugLog?.({
+        data: {
+          providerId: currentConv.providerId,
+          source: 'manual',
+        },
+        ...(suggestion.error ? { error: suggestion.error } : {}),
+        event: 'generation.failed',
+        level: 'warn',
+        scope: 'title',
+      });
       await plugin.updateConversation(conversationId, { titleGenerationStatus: 'failed' });
     }
 
