@@ -742,15 +742,40 @@ export class ConversationController {
     }
   }
 
+  /** Where the view last had the history drawn, so a later change can reach it. */
+  private lastHistoryRender: {
+    readonly container: HTMLElement;
+    readonly options: Omit<HistoryRenderOptions, 'onRerender'>;
+  } | null = null;
+
   updateHistoryDropdown(): void {
     const dropdown = this.deps.getHistoryDropdown();
-    if (!dropdown) return;
+    if (dropdown) {
+      this.renderHistoryItems(dropdown, {
+        onSelectConversation: (id) => this.switchTo(id),
+        onClose: () => dropdown.removeClass('visible'),
+        onRerender: () => this.updateHistoryDropdown(),
+      });
+      return;
+    }
 
-    this.renderHistoryItems(dropdown, {
-      onSelectConversation: (id) => this.switchTo(id),
-      onClose: () => dropdown.removeClass('visible'),
-      onRerender: () => this.updateHistoryDropdown(),
-    });
+    /*
+     * A tab's controller owns no dropdown — `getHistoryDropdown` answers null
+     * for every one of them, because the popover belongs to the view and is
+     * handed here to be drawn. So this returned without drawing anything, and
+     * everything a turn learned about a title after the list was on screen
+     * reached nothing: the spinner a regeneration puts up, and the one it takes
+     * down. What the reader saw was the title change and a spinner start, drawn
+     * by a refresh that happened to land between the two, and stay for ever.
+     *
+     * Redrawn where it was last drawn. Not when that container has left the
+     * document: the popover is torn down when it closes, and there is nothing
+     * to say to a node nobody is looking at. Explicitly `false`, because a
+     * container that does not answer the question at all is not a torn-down one.
+     */
+    const last = this.lastHistoryRender;
+    if (!last || last.container.isConnected === false) return;
+    this.renderHistoryDropdown(last.container, last.options);
   }
 
   /**
@@ -1003,7 +1028,16 @@ export class ConversationController {
       const loadingEl = actions.createSpan({ cls: 'grimoire-action-btn grimoire-action-loading' });
       setIcon(loadingEl, 'loader-2');
       loadingEl.setAttribute('aria-label', t('chat.ui.history.generatingTitle'));
-    } else if (conv.titleSource ? conv.titleSource === 'fallback' : conv.titleGenerationStatus === 'failed') {
+    } else if (
+      // Only when it can actually run. The control was drawn on the strength of
+      // the title alone, while `regenerateTitle` refuses on gates the row never
+      // asked about — no service, no user message, title generation switched
+      // off — and refuses silently. What the reader got was a button that did
+      // nothing and said nothing. The menu item beside it has always been
+      // greyed on the same question.
+      this.canSuggestTitle(conv.id)
+      && (conv.titleSource ? conv.titleSource === 'fallback' : conv.titleGenerationStatus === 'failed')
+    ) {
       const regenerateBtn = actions.createEl('button', { cls: 'grimoire-action-btn grimoire-history-regenerate-btn' });
       setIcon(regenerateBtn, 'refresh-cw');
       regenerateBtn.setAttribute('aria-label', t('chat.ui.history.regenerateTitle'));
@@ -1522,6 +1556,7 @@ export class ConversationController {
     container: HTMLElement,
     options: Omit<HistoryRenderOptions, 'onRerender'>,
   ): void {
+    this.lastHistoryRender = { container, options };
     this.renderHistoryItems(container, {
       ...options,
       onRerender: () => this.renderHistoryDropdown(container, options),

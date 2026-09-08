@@ -2947,6 +2947,44 @@ describe('InputController - Message Queue', () => {
         titleGenerationStatus: 'failed',
       });
     });
+
+    it('gives a rejected generation a terminal, so the row stops spinning', async () => {
+      // The status is set to `pending` before the service is asked, and the
+      // callback is what clears it. A rejection never calls back, and the
+      // rejection was being swallowed whole - so the history row kept the
+      // spinner for the life of the vault, on a title nothing was generating.
+      const mockTitleService = {
+        generateTitle: jest.fn().mockRejectedValue(new Error('title service is gone')),
+        cancel: jest.fn(),
+      };
+
+      deps = createSendableDeps({
+        getTitleGenerationService: () => mockTitleService,
+      });
+      (deps.plugin.getConversationById as jest.Mock).mockResolvedValue({
+        id: 'conv-1',
+        title: 'Hello world',
+        titleGenerationStatus: 'pending',
+      });
+
+      ((deps as any).mockAgentService.query as jest.Mock).mockReturnValue(
+        createMockStream([{ type: 'text', content: 'Response' }, { type: 'done' }])
+      );
+      (deps.streamController.handleStreamChunk as jest.Mock).mockImplementation(async (chunk, msg) => {
+        if (chunk.type === 'text') msg.content = chunk.content;
+      });
+
+      inputEl = deps.getInputEl();
+      inputEl.value = 'Hello world';
+      controller = new InputController(deps);
+
+      await controller.sendMessage();
+      await new Promise(resolve => window.setTimeout(resolve, 0));
+
+      expect(deps.plugin.updateConversation).toHaveBeenCalledWith('conv-1', {
+        titleGenerationStatus: 'failed',
+      });
+    });
   });
 
   describe('handleApprovalRequest', () => {

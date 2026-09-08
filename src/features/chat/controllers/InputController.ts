@@ -1555,8 +1555,19 @@ export class InputController {
         }
         conversationController.updateHistoryDropdown();
       }
-    ).catch(() => {
-      // Silently ignore title generation errors
+    ).catch(async () => {
+      // A rejection is an outcome, and it was the one outcome that wrote none.
+      // `pending` is set before the service is asked and the callback is what
+      // clears it, so a service that throws instead of calling back left the
+      // history row spinning on a title nothing was generating - for the life
+      // of the vault, because the status is persisted.
+      //
+      // Only when it is still pending: a callback that already answered has
+      // said something truer than this, and a promise can reject after it.
+      const conversation = await plugin.getConversationById(convId);
+      if (conversation?.titleGenerationStatus !== 'pending') return;
+      await plugin.updateConversation(convId, { titleGenerationStatus: 'failed' });
+      conversationController.updateHistoryDropdown();
     });
   }
 

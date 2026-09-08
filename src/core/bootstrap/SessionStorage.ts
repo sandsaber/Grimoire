@@ -619,7 +619,18 @@ export class SessionStorage {
       enabledMcpServers: metadata.enabledMcpServers,
       orchestratorMode: metadata.orchestratorMode,
       usage: metadata.usage,
-      titleGenerationStatus: metadata.titleGenerationStatus,
+      /*
+       * A generation runs in the session that started it and nowhere else, so
+       * `pending` read off the disk is an attempt whose session is over — the
+       * app was quit while a title was being written. Kept, it drew a spinner
+       * on that row for the life of the vault, on work nothing was doing.
+       *
+       * `undefined` rather than `failed`: nobody knows it failed. What is known
+       * is that nothing is watching it any more, which is what no status means.
+       */
+      titleGenerationStatus: metadata.titleGenerationStatus === 'pending'
+        ? undefined
+        : metadata.titleGenerationStatus,
       titleSource: metadata.titleSource,
       resumeAtMessageId: metadata.resumeAtMessageId,
       vaultSearchContexts: metadata.vaultSearchContexts,

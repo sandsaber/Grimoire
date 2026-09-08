@@ -12,7 +12,7 @@
   z-index: 40;
   display: none;
   box-sizing: border-box;
-  width: min(320px, calc(100% - var(--grimoire-space-16)));
+  width: min(352px, calc(100% - var(--grimoire-space-16)));
   max-height: min(520px, calc(100% - var(--grimoire-header-h) - var(--grimoire-space-24)));
   overflow: hidden;
   border: 1px solid var(--grimoire-line);
@@ -175,16 +175,44 @@ input.grimoire-history-search-input {
   font-size: var(--grimoire-text-s);
 }
 
+/*
+ * Two lines, and the title has the first of them to itself.
+ *
+ * It was one line with the stamp beside it and the controls floated over that
+ * stamp on hover — so the controls, which are wider than a time, reached back
+ * across the title and sat on top of its last few words. Nothing reserved room
+ * for them, because nothing could: they are wider at hover than the column they
+ * hovered over.
+ *
+ * So they moved down. The title gets the full width at rest and keeps it while
+ * the row is hovered; the stamp and the controls share the second line, at
+ * opposite ends, and both occupy their space at rest. Revealing the controls
+ * still shifts nothing, which is what §11.5 always claimed and this is the
+ * first arrangement in which it is true.
+ *
+ * The cost is the row: 36px became 48, so about a third fewer conversations
+ * are in view. This is not the second line Nordic removed — that one carried
+ * four facts in mono under every title and turned a list into a wall. This one
+ * carries what was already on the row, moved off the title's line.
+ */
 .grimoire-history-item {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  grid-template-rows: auto auto;
   align-items: center;
-  height: 36px;
-  gap: var(--grimoire-space-10);
+  height: 56px;
+  gap: var(--grimoire-space-2) var(--grimoire-space-10);
   min-width: 0;
   width: 100%;
-  padding: 0 var(--grimoire-space-8);
+  /*
+   * The hover wash is the row, so the row needs room inside it. Two lines and
+   * a 24px hit target come to 42px; at 48 with no vertical padding the ground
+   * closed on the title above and the controls below with three pixels to
+   * spare. The horizontal 8 is left alone: it is what aligns a row's title
+   * with its group label.
+   */
+  padding: var(--grimoire-space-6) var(--grimoire-space-8);
   border-left: 1.5px solid transparent;
   border-radius: var(--grimoire-radius-1);
   cursor: pointer;
@@ -216,11 +244,25 @@ input.grimoire-history-search-input {
 }
 
 .grimoire-history-item-content {
+  grid-area: 1 / 1 / 2 / 3;
   display: grid;
   min-width: 0;
 }
 
+/*
+ * The title sits in a flex row so a mark can precede it, and a flex item does
+ * not shrink below its content unless it is told to: without `min-width`, the
+ * ellipsis never fires and a long name runs on under the hover controls.
+ */
+.grimoire-history-item-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--grimoire-space-4);
+}
+
 .grimoire-history-item-title {
+  min-width: 0;
   overflow: hidden;
   color: var(--grimoire-ink);
   font-size: var(--grimoire-text-s);
@@ -238,8 +280,10 @@ input.grimoire-history-search-input {
  * yet read as a model name and nothing else.
  */
 .grimoire-history-item-time {
+  grid-area: 2 / 1;
+  justify-self: start;
   min-width: 0;
-  max-width: 96px;
+  max-width: 160px;
   overflow: hidden;
   color: var(--grimoire-ink-faint);
   font-family: var(--grimoire-mono);
@@ -248,11 +292,6 @@ input.grimoire-history-search-input {
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: opacity var(--grimoire-duration) var(--grimoire-ease);
-}
-
-.grimoire-history-item:hover .grimoire-history-item-time {
-  opacity: 0;
 }
 
 .grimoire-history-item:focus-within .grimoire-history-item-time {
@@ -260,14 +299,12 @@ input.grimoire-history-search-input {
 }
 
 .grimoire-history-item-actions {
-  position: absolute;
-  top: 50%;
-  right: 8px;
+  grid-area: 2 / 2;
+  justify-self: end;
   display: flex;
   gap: var(--grimoire-space-2);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-50%);
   transition: opacity var(--grimoire-duration) var(--grimoire-ease);
 }
 
@@ -341,14 +378,30 @@ button.grimoire-delete-btn {
   box-shadow: var(--grimoire-focus-ring);
 }
 
-/* Loading indicator for title generation. */
+/*
+ * Loading indicator for title generation.
+ *
+ * The glyph turns, not the control around it. Spinning the element spun its
+ * rounded ground with it, so what the reader saw was a tilting square with an
+ * arc inside rather than an arc going round. It wears the button's class for
+ * its size and place in the row, and it is not a button: nothing happens when
+ * it is pressed, so nothing lights up when it is pointed at either.
+ */
 .grimoire-action-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: grimoire-spin 0.9s linear infinite;
   opacity: 0.6;
   cursor: default;
+}
+
+.grimoire-action-loading:hover {
+  background: none;
+  color: var(--grimoire-ink-faint);
+}
+
+.grimoire-action-loading svg {
+  animation: grimoire-spin 0.9s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -356,6 +409,7 @@ button.grimoire-delete-btn {
   .grimoire-history-item,
   .grimoire-history-item-actions,
   .grimoire-history-item-time,
+  .grimoire-action-loading svg,
   .grimoire-action-btn {
     animation: none;
     transition: none;

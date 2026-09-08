@@ -23,7 +23,7 @@ describe('history.css', () => {
     expect(menuRule).toContain('right: var(--grimoire-space-8)');
     expect(menuRule).toContain('bottom: auto');
     expect(menuRule).toContain('left: auto');
-    expect(menuRule).toContain('width: min(320px, calc(100% - var(--grimoire-space-16)))');
+    expect(menuRule).toContain('width: min(352px, calc(100% - var(--grimoire-space-16)))');
     expect(menuRule).toContain('box-shadow: var(--grimoire-lift-1)');
     expect(getRule(css, '.grimoire-history-menu.visible')).toContain('display: grid');
     // No header band, so no close button in one: the panel opens on its search
@@ -37,7 +37,7 @@ describe('history.css', () => {
     const css = readHistoryCss();
 
     const rowRule = getRule(css, '.grimoire-history-item');
-    expect(rowRule).toContain('height: 36px');
+    expect(rowRule).toContain('height: 56px');
     expect(rowRule).toContain('border-left: 1.5px solid transparent');
     expect(getRule(css, '.grimoire-history-item.active'))
       .toContain('border-left-color: var(--grimoire-accent)');
@@ -56,14 +56,24 @@ describe('history.css', () => {
     expect(css).not.toContain('.grimoire-history-provider-dot');
   });
 
-  it('reveals history actions without changing row width', () => {
+  it('reveals history actions without moving anything, the title included', () => {
     const css = readHistoryCss();
 
+    // Floated over the stamp, the controls reached back across the title and
+    // sat on its last words: they are wider than the column they hovered. They
+    // hold a cell of their own now, on the second line, opposite the stamp -
+    // so the space is theirs at rest and revealing them shifts nothing.
     const actionsRule = getRule(css, '.grimoire-history-item-actions');
-    expect(actionsRule).toContain('position: absolute');
+    expect(actionsRule).toContain('grid-area: 2 / 2');
+    expect(actionsRule).not.toContain('position: absolute');
     expect(actionsRule).toContain('opacity: 0');
     expect(getRule(css, '.grimoire-history-item:hover .grimoire-history-item-actions')).toContain('opacity: 1');
-    expect(getRule(css, '.grimoire-history-item:hover .grimoire-history-item-time')).toContain('opacity: 0');
+    // The title spans both columns of the first line and yields none of it.
+    expect(getRule(css, '.grimoire-history-item-content')).toContain('grid-area: 1 / 1 / 2 / 3');
+    // The stamp has its own end of the second line, so it no longer has to
+    // vanish to make room for them.
+    expect(getRule(css, '.grimoire-history-item-time')).toContain('grid-area: 2 / 1');
+    expect(css).not.toContain('.grimoire-history-item:hover .grimoire-history-item-time');
   });
 
   it('keeps new-tab controls in the same hover action row as rename', () => {
@@ -71,6 +81,6 @@ describe('history.css', () => {
 
     expect(css).not.toContain('.grimoire-history-quick-open');
     expect(css).not.toContain('.grimoire-history-item.has-quick-open');
-    expect(getRule(css, '.grimoire-history-item-actions')).toContain('right: 8px');
+    expect(getRule(css, '.grimoire-history-item-actions')).toContain('justify-self: end');
   });
 });

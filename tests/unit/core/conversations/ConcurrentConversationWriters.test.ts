@@ -159,6 +159,19 @@ describe('two writers on one conversation', () => {
     expect(stored.titleGenerationStatus).toBe('success');
   });
 
+  it('drops a pending title generation left behind by a closed session', async () => {
+    // A generation runs in the session that started it. Read back from disk, a
+    // `pending` is an attempt nobody is making any more — and the history row
+    // it belongs to kept a spinner on it for the life of the vault.
+    const { storage } = createStorage();
+    const stored = storage.toSessionMetadata(conversation({ titleGenerationStatus: 'pending' }));
+
+    expect(storage.toConversation(stored, 'codex').titleGenerationStatus).toBeUndefined();
+    // An attempt that finished says what it did, and keeps saying it.
+    const done = storage.toSessionMetadata(conversation({ titleGenerationStatus: 'failed' }));
+    expect(storage.toConversation(done, 'codex').titleGenerationStatus).toBe('failed');
+  });
+
   it('carries the title source with the title, and only when a writer names it', async () => {
     const { storage, read } = createStorage();
     await storage.createMetadata(storage.toSessionMetadata(conversation()));

@@ -542,8 +542,7 @@
         "switchOpenSession": "切換至已開啟的工作階段",
         "rename": "重新命名",
         "noneToResume": "沒有可繼續的對話",
-        "titleSourceFallback": "占位標題",
-        "titleSourceModel": "模型",
+        "titleSourceModel": "自動生成",
         "titleSourceManual": "手動"
       },
       "thinking": {

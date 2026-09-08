@@ -18,10 +18,10 @@ function createController(options: {
   };
 }
 
-function openModal(controller: any, currentTitle = 'New Chat', titleSource?: any) {
+function openModal(controller: any, currentTitle = 'New Chat') {
   const resolveResult = jest.fn();
   const autoSource = controller ? { controller, conversationId: 'conv-1' } : null;
-  const modal = new RenameTabModal({} as any, currentTitle, autoSource, resolveResult, titleSource);
+  const modal = new RenameTabModal({} as any, currentTitle, autoSource, resolveResult);
   const contentEl = createMockEl();
 
   (modal as any).contentEl = contentEl;
@@ -41,26 +41,8 @@ function openModal(controller: any, currentTitle = 'New Chat', titleSource?: any
     input: contentEl.querySelector('.grimoire-rename-tab-input'),
     suggestBtn: contentEl.querySelector('.grimoire-rename-tab-suggest'),
     saveBtn: contentEl.querySelector('.grimoire-rename-tab-save'),
-    star: contentEl.querySelector('.grimoire-title-source'),
   };
 }
-
-describe('RenameTabModal title source marker', () => {
-  it('marks the source beside the field, never inside the value being edited', () => {
-    const { star, input } = openModal(createController(), 'Fallback Title', 'fallback');
-
-    expect(star).not.toBeNull();
-    expect(star?._classList.has('grimoire-title-source-fallback')).toBe(true);
-    // The prefix must not reach the input: it would be saved as part of the name.
-    expect(input?.value).toBe('Fallback Title');
-  });
-
-  it('says nothing for a conversation that records no source', () => {
-    const { star } = openModal(createController(), 'Fallback Title');
-
-    expect(star).toBeNull();
-  });
-});
 
 describe('RenameTabModal auto-rename control', () => {
   beforeEach(() => {

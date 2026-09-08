@@ -23,13 +23,6 @@
   stroke-width: var(--grimoire-stroke);
 }
 
-.grimoire-history-item-title-row {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--grimoire-space-2);
-}
-
 .grimoire-rename-tab-field .grimoire-title-source {
   margin-inline-end: var(--grimoire-space-2);
 }

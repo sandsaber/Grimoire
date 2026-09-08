@@ -542,8 +542,7 @@
         "switchOpenSession": "Switch to open session",
         "rename": "Rename",
         "noneToResume": "No conversations to resume",
-        "titleSourceFallback": "Placeholder",
-        "titleSourceModel": "Model",
+        "titleSourceModel": "Auto-generated",
         "titleSourceManual": "Manual"
       },
       "thinking": {

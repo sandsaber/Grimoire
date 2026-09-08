@@ -542,8 +542,7 @@
         "switchOpenSession": "Zu geöffneter Sitzung wechseln",
         "rename": "Umbenennen",
         "noneToResume": "Keine Unterhaltungen zum Fortsetzen",
-        "titleSourceFallback": "Platzhalter",
-        "titleSourceModel": "Modell",
+        "titleSourceModel": "Automatisch erzeugt",
         "titleSourceManual": "Manuell"
       },
       "thinking": {

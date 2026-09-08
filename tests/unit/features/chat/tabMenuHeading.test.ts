@@ -45,23 +45,6 @@ describe('buildTabMenuHeading', () => {
     expect(shown).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
   });
 
-  it('marks where a short title came from, which a plain string cannot carry', () => {
-    const heading = buildTabMenuHeading('Объяснить логику Grimoire', 'fallback') as DocumentFragment;
-    const star = heading.firstElementChild;
-
-    expect(star?.classList.contains('grimoire-title-source-fallback')).toBe(true);
-    expect(star?.getAttribute('aria-label')).toBe('Placeholder');
-    expect(heading.textContent).toContain('Объяснить логику Grimoire');
-  });
-
-  it('marks a shortened title without losing the shortening', () => {
-    const heading = buildTabMenuHeading(LONG_TITLE, 'model') as DocumentFragment;
-    const star = heading.firstElementChild;
-
-    expect(star?.classList.contains('grimoire-title-source-model')).toBe(true);
-    expect(heading.textContent?.endsWith('...')).toBe(true);
-  });
-
   it('still exposes the whole name through the accessible label and tooltip', () => {
     (setTooltip as jest.Mock).mockClear();
 

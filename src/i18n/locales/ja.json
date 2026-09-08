@@ -542,8 +542,7 @@
         "switchOpenSession": "開いているセッションに切り替え",
         "rename": "名前を変更",
         "noneToResume": "再開する会話はありません",
-        "titleSourceFallback": "仮題",
-        "titleSourceModel": "モデル",
+        "titleSourceModel": "自動生成",
         "titleSourceManual": "手動"
       },
       "thinking": {

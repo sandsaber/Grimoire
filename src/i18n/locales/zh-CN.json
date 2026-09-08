@@ -542,8 +542,7 @@
         "switchOpenSession": "切换到已打开的会话",
         "rename": "重命名",
         "noneToResume": "没有可恢复的对话",
-        "titleSourceFallback": "占位标题",
-        "titleSourceModel": "模型",
+        "titleSourceModel": "自动生成",
         "titleSourceManual": "手动"
       },
       "thinking": {

@@ -376,31 +376,50 @@ the toolbar, because a line inside a box that has one is a second box.
 
 ### 11.5 History
 
-A 320px popover hanging off the button that opened it, at `top: 44px; right: 8px`, radius 8,
+A 352px popover hanging off the button that opened it, at `top: 44px; right: 8px`, radius 8,
 `--grimoire-lift-1`. It was a sheet inset 13px on all four sides: looking for another conversation is
 not a reason to lose sight of this one.
 
-A 34px search row, then rows of 36px at radius 4 with a hover wash. The open conversation carries a
-1.5px accent leading rule. The title truncates; the right side is a monospace 11px time or the
-provider's name. On hover a row reveals pin and rename at 24px and a "Delete" text control that turns
-`--grimoire-error` — the buttons occupy their space at rest, so revealing them shifts nothing. Group
-labels ("Today", "Yesterday") are the uppercase monospace micro-label.
+A 34px search row, then rows of 56px at radius 4 with a hover wash. The open conversation carries a
+1.5px accent leading rule. A row is two lines: the title has the first to itself, full width, and
+truncates; the second carries the monospace 11px time or the provider's name at one end and, on
+hover, an open-in-tab and a rename at 24px plus a "Delete" text control that turns `--grimoire-error`
+at the other. The buttons occupy their space at rest, so revealing them shifts nothing — including
+the title, which is what a single line could not deliver: floated over the stamp, controls wider than
+that stamp reached back across the title and sat on its last words. Group labels ("Today",
+"Yesterday") are the uppercase monospace micro-label.
 
-**Who named the conversation** is an 11px mark before the title: `circle-dashed` for the placeholder
-cut from the first message, `sparkles` for a title a model wrote, `pencil` for one the user typed.
-All three are `--grimoire-ink-muted`, and each carries its word as an `aria-label` and a tooltip.
+This is not the second line Nordic removed. That one carried provider, prompt preview, source count
+and usage in mono under every title and turned a list you scan into a wall you read; this one carries
+what the row already showed, moved off the title's line. It costs about a third of the rows in view.
+
+**Who named the conversation** is an 11px mark before the title, and only here: `sparkles` for a
+title a model wrote, `pencil` for one the user typed. Both are `--grimoire-ink-muted` and carry the
+word as an `aria-label` and a tooltip.
+
+Two marks, not three. The mark answers "who named this", and for the placeholder cut from the first
+message the answer is nobody — so its absence is the answer, and the row already draws the
+regenerate control on exactly those rows. A third glyph standing for "no one" read as neither, and
+it indented the one kind of row that has least to say.
 
 The shape is the meaning and the colour is none, for the reason §3.9 gives and for a second one this
-mark found: the first draft told the three apart by hue — muted, `--grimoire-ok`, `--grimoire-accent-text` —
-and in a vault whose accent is green two of the three are the same colour. The same mark heads the
-tab context menu and sits beside the field in the rename dialog. Three places it deliberately does
-not appear: the tab badge, which shows a number rather than a name; the rename input, where a prefix
-inside the edited value would be saved as part of the title; and the tab's `aria-label`, a string
-with no DOM to colour and a reader who cannot see one, which names the placeholder in words instead.
+mark found: the first draft told the sources apart by hue — muted, `--grimoire-ok`,
+`--grimoire-accent-text` — and in a vault whose accent is green two of them are the same colour.
+Nowhere else draws it: not the tab badge, which shows a number rather than a name; not the tab
+context menu; not the rename dialog, whose input holds the title itself and would save a prefix as
+part of the name. The tab's `aria-label` is the one other place the provenance is said at all, and
+it says the placeholder in words — a string has no DOM to colour, and its reader cannot see one.
+
+While a title is being generated the row shows a turning `loader-2` where its controls are. The
+glyph turns and the control around it does not: animating the element spun its rounded ground too,
+which reads as a tilting square rather than an arc going round. It wears the action button's class
+for its size and its place in the row and is not one — nothing happens when it is pressed, so
+nothing lights up when it is pointed at.
 
 **What the drawing shows.** [`Grimoire Nordic.html`](design/Grimoire%20Nordic.html) draws the history
-rows without this mark: it was added after the drawing was checked in, and the drawing is edited in
-its own canvas rather than by hand. It goes in at the next pass over that file.
+popover at 320px, its rows at 36px on one line, and no mark on them: all of that changed after the
+drawing was checked in, and the drawing is edited in its own canvas rather than by hand. It goes in
+at the next pass over that file.
 
 ### 11.6 Decisions — one shape for every ask
 

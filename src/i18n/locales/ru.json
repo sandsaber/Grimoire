@@ -542,8 +542,7 @@
         "switchOpenSession": "Перейти к открытому сеансу",
         "rename": "Переименовать",
         "noneToResume": "Нет диалогов для возобновления",
-        "titleSourceFallback": "Заглушка",
-        "titleSourceModel": "Модель",
+        "titleSourceModel": "Сгенерирован автоматически",
         "titleSourceManual": "Вручную"
       },
       "thinking": {

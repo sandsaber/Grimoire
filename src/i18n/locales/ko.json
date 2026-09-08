@@ -542,8 +542,7 @@
         "switchOpenSession": "열린 세션으로 전환",
         "rename": "이름 바꾸기",
         "noneToResume": "재개할 대화가 없습니다",
-        "titleSourceFallback": "임시 제목",
-        "titleSourceModel": "모델",
+        "titleSourceModel": "자동 생성",
         "titleSourceManual": "수동"
       },
       "thinking": {
