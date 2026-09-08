@@ -5,12 +5,22 @@ import { Menu, Notice } from 'obsidian';
 
 import { ConversationController, type ConversationControllerDeps } from '@/features/chat/controllers/ConversationController';
 import { ChatState } from '@/features/chat/state/ChatState';
+import { requestTabRename } from '@/features/chat/ui/RenameTabModal';
 import { t } from '@/i18n/i18n';
 import { confirm } from '@/shared/modals/ConfirmModal';
 
 jest.mock('@/shared/modals/ConfirmModal', () => ({
   confirm: jest.fn().mockResolvedValue(true),
 }));
+
+jest.mock('@/features/chat/ui/RenameTabModal', () => ({
+  requestTabRename: jest.fn().mockResolvedValue(null),
+}));
+
+const renameModalMock = requestTabRename as jest.Mock;
+
+/** Lets the dialog's promise and the rename that follows it settle. */
+const flushPromises = () => new Promise(resolve => { setImmediate(resolve); });
 
 const mockNotice = Notice as jest.Mock;
 
@@ -1424,7 +1434,7 @@ describe('ConversationController', () => {
       });
     });
 
-    it('should invoke rename handler from the context menu', () => {
+    it('opens the rename dialog from the context menu, not a field in the row', async () => {
       (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
         { id: 'conv-1', providerId: 'claude', title: 'Test Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview' },
       ]);
@@ -1441,33 +1451,25 @@ describe('ConversationController', () => {
       const renameItem = menu.items.find(entry => entry.title === 'Rename');
       expect(renameItem).toBeDefined();
 
-      const mockInput = createMockEl();
-      (mockInput).type = '';
-      (mockInput).className = '';
-      (mockInput).value = '';
-      (mockInput).focus = jest.fn();
-      (mockInput).select = jest.fn();
-
-      const titleEl = item.querySelector('.grimoire-history-item-title');
-      if (titleEl) {
-        (titleEl).replaceWith = jest.fn();
-      }
-      const createElSpy = jest.spyOn(item, 'createEl').mockReturnValue(mockInput);
+      const createElSpy = jest.spyOn(item, 'createEl');
+      renameModalMock.mockResolvedValue('A name the reader typed');
 
       renameItem!.clickHandler();
+      await flushPromises();
 
-      expect(createElSpy).toHaveBeenCalledWith('input');
-      expect((mockInput).value).toBe('Test Title');
-      expect(titleEl!.replaceWith).toHaveBeenCalledWith(mockInput);
+      // The row is not where a name is edited any more.
+      expect(createElSpy).not.toHaveBeenCalledWith('input');
+      expect(renameModalMock).toHaveBeenCalledWith(
+        deps.plugin.app,
+        'Test Title',
+        expect.objectContaining({ conversationId: 'conv-1' }),
+      );
+      expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'A name the reader typed', 'manual');
     });
 
-    it('does not commit a rename the user never typed when the menu takes the focus back', () => {
-      // Obsidian's Menu closes after onClick and returns focus to the document,
-      // so the field the rename item just opened is blurred before it is ever
-      // focused. Committing on that blur renamed a conversation to the title it
-      // already had - and recorded the title as manual, so the row grew a
-      // marker saying the reader wrote a name they never typed.
-
+    it('renames nothing when the dialog is cancelled', async () => {
+      // Cancel used to have no button at all: the field in the row committed on
+      // blur, and the blur the closing menu caused wrote a name nobody typed.
       (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
         { id: 'conv-1', providerId: 'claude', title: 'Test Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview' },
       ]);
@@ -1475,37 +1477,19 @@ describe('ConversationController', () => {
       controller.updateHistoryDropdown();
 
       const item = getHistoryItem(dropdown, 'conv-1');
-      item.dispatchEvent({
-        type: 'contextmenu',
-        stopPropagation: jest.fn(),
-        preventDefault: jest.fn(),
-      });
-      const menu = (Menu as typeof Menu & { instances: Array<{ items: Array<{ title: string; clickHandler: () => void }> }> }).instances[0];
-      const renameItem = menu.items.find(entry => entry.title === 'Rename');
+      const renameBtn = item.querySelector('.grimoire-history-rename-btn');
+      renameModalMock.mockResolvedValue(null);
 
-      const mockInput = createMockEl();
-      (mockInput).type = '';
-      (mockInput).className = '';
-      (mockInput).value = '';
-      (mockInput).focus = jest.fn();
-      (mockInput).select = jest.fn();
-      const titleEl = item.querySelector('.grimoire-history-item-title');
-      if (titleEl) {
-        (titleEl).replaceWith = jest.fn();
-      }
-      jest.spyOn(item, 'createEl').mockReturnValue(mockInput);
+      await renameBtn!._eventListeners!.get('click')![0]({ preventDefault: jest.fn(), stopPropagation: jest.fn() });
+      await flushPromises();
 
-      renameItem!.clickHandler();
-
-      // The blur that arrives without the field ever having been focused.
-      const blurHandlers = (mockInput)._eventListeners?.get('blur');
-      expect(blurHandlers).toBeDefined();
-      blurHandlers![0]({});
-
+      expect(renameModalMock).toHaveBeenCalled();
       expect(deps.plugin.renameConversation).not.toHaveBeenCalled();
     });
 
-    it('commits a rename once the field has actually been focused', () => {
+    it('does not mark a title manual when the dialog returns the name it was given', async () => {
+      // Opening the dialog and pressing OK on an untouched field is not a
+      // rename, and must not put the manual marker on the row.
       (deps.plugin.getConversationList as jest.Mock).mockReturnValue([
         { id: 'conv-1', providerId: 'claude', title: 'Test Title', createdAt: 1000, lastResponseAt: 1000, messageCount: 1, preview: 'Preview' },
       ]);
@@ -1513,33 +1497,13 @@ describe('ConversationController', () => {
       controller.updateHistoryDropdown();
 
       const item = getHistoryItem(dropdown, 'conv-1');
-      item.dispatchEvent({
-        type: 'contextmenu',
-        stopPropagation: jest.fn(),
-        preventDefault: jest.fn(),
-      });
-      const menu = (Menu as typeof Menu & { instances: Array<{ items: Array<{ title: string; clickHandler: () => void }> }> }).instances[0];
-      const renameItem = menu.items.find(entry => entry.title === 'Rename');
+      const renameBtn = item.querySelector('.grimoire-history-rename-btn');
+      renameModalMock.mockResolvedValue('Test Title');
 
-      const mockInput = createMockEl();
-      (mockInput).type = '';
-      (mockInput).className = '';
-      (mockInput).value = '';
-      (mockInput).focus = jest.fn();
-      (mockInput).select = jest.fn();
-      const titleEl = item.querySelector('.grimoire-history-item-title');
-      if (titleEl) {
-        (titleEl).replaceWith = jest.fn();
-      }
-      jest.spyOn(item, 'createEl').mockReturnValue(mockInput);
+      await renameBtn!._eventListeners!.get('click')![0]({ preventDefault: jest.fn(), stopPropagation: jest.fn() });
+      await flushPromises();
 
-      renameItem!.clickHandler();
-
-      (mockInput)._eventListeners?.get('focus')![0]({});
-      (mockInput).value = 'A name the reader typed';
-      (mockInput)._eventListeners?.get('blur')![0]({});
-
-      expect(deps.plugin.renameConversation).toHaveBeenCalledWith('conv-1', 'A name the reader typed', 'manual');
+      expect(deps.plugin.renameConversation).not.toHaveBeenCalled();
     });
 
     it('should delete conversation and reload active when deleting current conversation', async () => {

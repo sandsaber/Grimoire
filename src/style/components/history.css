@@ -362,22 +362,6 @@ button.grimoire-delete-btn {
   color: var(--grimoire-error);
 }
 
-.grimoire-rename-input {
-  width: 100%;
-  padding: var(--grimoire-space-2) var(--grimoire-space-4);
-  border: 1px solid var(--grimoire-accent);
-  border-radius: var(--grimoire-radius-1);
-  background: var(--grimoire-ground);
-  color: var(--grimoire-ink);
-  font-size: var(--grimoire-text-m);
-  font-weight: var(--grimoire-weight-normal);
-}
-
-.grimoire-rename-input:focus {
-  outline: none;
-  box-shadow: var(--grimoire-focus-ring);
-}
-
 /*
  * Loading indicator for title generation.
  *

@@ -17,6 +17,7 @@ import type { ChatState } from '../state/ChatState';
 import type { FileContextManager } from '../ui/FileContext';
 import type { ImageContextManager } from '../ui/ImageContext';
 import type { ExternalContextSelector, McpServerSelector } from '../ui/InputToolbar';
+import { requestTabRename } from '../ui/RenameTabModal';
 import type { StatusPanel } from '../ui/StatusPanel';
 import { appendTitleSourceMark } from '../ui/titleSourceMarker';
 import { getRandomGreeting } from '../utils/greetings';
@@ -1058,7 +1059,7 @@ export class ConversationController {
     renameBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.showRenameInput(item, conv.id, conv.title, options);
+      void this.requestRename(conv.id, conv.title, options);
     });
 
     // Deleting a conversation is the one thing on this row that cannot be
@@ -1273,7 +1274,7 @@ export class ConversationController {
     menu.addItem((menuItem) => menuItem
       .setTitle(t('chat.ui.history.rename'))
       .onClick(() => {
-        this.showRenameInput(item, conversationId, conv.title, options);
+        void this.requestRename(conversationId, conv.title, options);
       }));
     menu.addItem((menuItem) => menuItem
       .setTitle(t('common.delete'))
@@ -1302,80 +1303,42 @@ export class ConversationController {
     }
   }
 
-  /** Shows inline rename input for a conversation. */
-  private showRenameInput(
-    item: HTMLElement,
+  /**
+   * Renaming a conversation asks the same dialog the tabs ask.
+   *
+   * The name used to be edited in the row itself, and the row is the wrong
+   * place for it: the field inherits the row's width, so a title long enough
+   * to be worth renaming does not fit in the box offered to rename it, and
+   * there is nowhere to put a Cancel button - the only way out was Escape,
+   * unannounced. Worse, a field in a row has to guess when editing ended, and
+   * it guessed on blur; opened from the context menu it was blurred by the
+   * menu closing before it was ever focused, so it committed a name nobody
+   * typed and recorded it as `manual`.
+   *
+   * The dialog has none of these problems because it owns its own space: a
+   * full-width field, Cancel, a reset to the previous name, and a button that
+   * asks the model for one. It already existed - only the history row was not
+   * using it.
+   */
+  private async requestRename(
     convId: string,
     currentTitle: string,
     options: HistoryRenderOptions,
-  ): void {
-    const titleEl = item.querySelector('.grimoire-history-item-title') as HTMLElement;
-    if (!titleEl) return;
-
-    const input = item.createEl('input');
-    input.type = 'text';
-    input.className = 'grimoire-rename-input';
-    input.value = currentTitle;
-
-    titleEl.replaceWith(input);
-    input.focus();
-    input.select();
-    input.addEventListener('click', (event) => event.stopPropagation());
-
-    /*
-     * The field commits on blur, which is right for a field the reader is
-     * typing in and wrong for one that never got the caret. Obsidian's Menu
-     * closes after its onClick and hands focus back to the document, so a
-     * rename started from the context menu was blurred before it was focused:
-     * the conversation was renamed to the title it already had, and recorded
-     * as `manual`, which put a marker on the row claiming a name the reader
-     * never typed. From the row's pencil the same code worked, because a
-     * button click closes no menu.
-     *
-     * So blur only means "done" once focus has actually arrived, and the focus
-     * is asked for again on the next tick for the case where the menu was
-     * still closing during the first attempt.
-     */
-    let focused = false;
-    input.addEventListener('focus', () => { focused = true; });
-    window.setTimeout(() => {
-      if (focused) return;
-      input.focus();
-      input.select();
-    }, 0);
-
-    let settled = false;
-    let cancelled = false;
-    const finishRename = async () => {
-      if (settled) return;
-      settled = true;
-
-      if (cancelled) {
-        options.onRerender();
-        return;
-      }
-
-      const newTitle = input.value.trim() || currentTitle;
-      try {
-        await this.deps.plugin.renameConversation(convId, newTitle, 'manual');
-      } finally {
-        options.onRerender();
-      }
-    };
-
-    input.addEventListener('blur', () => {
-      if (!focused) return;
-      runConversationAction(finishRename, t('chat.ui.errors.renameConversationFailed'));
+  ): Promise<void> {
+    const { plugin } = this.deps;
+    const nextTitle = await requestTabRename(plugin.app, currentTitle, {
+      controller: this,
+      conversationId: convId,
     });
-    input.addEventListener('keydown', (e) => {
-      // Check !e.isComposing for IME support (Chinese, Japanese, Korean, etc.)
-      if (e.key === 'Enter' && !e.isComposing) {
-        input.blur();
-      } else if (e.key === 'Escape' && !e.isComposing) {
-        cancelled = true;
-        input.blur();
-      }
-    });
+    // `null` is Cancel, and a name equal to the old one is not a rename: both
+    // leave the title alone, and neither may mark it as manually chosen.
+    if (nextTitle === null || nextTitle === currentTitle) return;
+
+    try {
+      await plugin.renameConversation(convId, nextTitle, 'manual');
+    } finally {
+      options.onRerender();
+    }
   }
 
   // ============================================
