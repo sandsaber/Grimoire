@@ -443,7 +443,6 @@
         "name": "Nom de l’onglet",
         "charactersLeft": "{count} caractères restants",
         "resetName": "Rétablir le nom actuel",
-        "autoRename": "Renommer automatiquement",
         "autoRenaming": "Génération du titre…",
         "autoRenameNeedsMessage": "Envoyez d’abord un message : il n’y a encore rien à nommer",
         "autoRenameFailed": "Impossible de générer le titre",

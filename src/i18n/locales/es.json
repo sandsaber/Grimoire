@@ -443,7 +443,6 @@
         "name": "Nombre de la pestaña",
         "charactersLeft": "Quedan {count} caracteres",
         "resetName": "Restablecer el nombre actual",
-        "autoRename": "Renombrar automáticamente",
         "autoRenaming": "Generando un título…",
         "autoRenameNeedsMessage": "Envía primero un mensaje: todavía no hay nada que nombrar",
         "autoRenameFailed": "No se pudo generar el título",

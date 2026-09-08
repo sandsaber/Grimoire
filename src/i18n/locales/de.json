@@ -443,7 +443,6 @@
         "name": "Tabname",
         "charactersLeft": "Noch {count} Zeichen",
         "resetName": "Aktuellen Namen wiederherstellen",
-        "autoRename": "Automatisch umbenennen",
         "autoRenaming": "Titel wird generiert…",
         "autoRenameNeedsMessage": "Sende zuerst eine Nachricht — es gibt noch nichts zu benennen",
         "autoRenameFailed": "Titel konnte nicht generiert werden",

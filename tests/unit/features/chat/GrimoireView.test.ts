@@ -859,7 +859,7 @@ describe('GrimoireView tab context menu auto-rename', () => {
     view.showTabContextMenu('tab-1', {});
 
     const menu = MockMenu.instances[MockMenu.instances.length - 1];
-    const item = menu.items.find((entry: any) => entry.title === 'Auto-rename');
+    const item = menu.items.find((entry: any) => entry.title === 'Regenerate title');
     return { item, regenerateTitle, controller, menu };
   }
 
