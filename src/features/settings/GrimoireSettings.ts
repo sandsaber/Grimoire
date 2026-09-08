@@ -31,9 +31,11 @@ import type {
 } from '../../core/types';
 import {
   type ChatViewPlacement,
+  MAX_RUN_ABSOLUTE_TIMEOUT_MINUTES,
   MAX_TABS,
   MIN_TABS,
   normalizeMaxTabs,
+  normalizeRunAbsoluteTimeoutMinutes,
 } from '../../core/types/settings';
 import { getAvailableLocales, getLocaleDisplayName, setLocale, t } from '../../i18n/i18n';
 import type { Locale, TranslationKey } from '../../i18n/types';
@@ -2076,6 +2078,28 @@ export class GrimoireSettingTab extends PluginSettingTab {
             });
         });
     }
+
+    new Setting(advancedContainer)
+      .setName(t('settings.runAbsoluteTimeout.name'))
+      .setDesc(t('settings.runAbsoluteTimeout.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '0';
+        text.inputEl.max = String(MAX_RUN_ABSOLUTE_TIMEOUT_MINUTES);
+        text.inputEl.setAttribute('aria-label', t('settings.runAbsoluteTimeout.name'));
+        text
+          .setValue(String(normalizeRunAbsoluteTimeoutMinutes(
+            this.plugin.settings.runAbsoluteTimeoutMinutes,
+          )))
+          .onChange(async (rawValue) => {
+            // Normalized on the way in rather than on the way out: the stored
+            // value is what the backends ask for on every turn, and a run
+            // must never arm a ceiling from whatever was typed.
+            const minutes = normalizeRunAbsoluteTimeoutMinutes(Number(rawValue));
+            this.plugin.settings.runAbsoluteTimeoutMinutes = minutes;
+            await this.plugin.saveSettings();
+          });
+      });
 
     // --- Content (advanced) ---
 

@@ -768,6 +768,10 @@
       "desc": "Modelo utilizado para generar automáticamente títulos de conversación.",
       "auto": "Automático (proveedor activo)"
     },
+    "runAbsoluteTimeout": {
+      "name": "Duración máxima de un turno",
+      "desc": "Minutos que un turno puede ejecutarse antes de detenerse, por muy activo que siga. Un turno en silencio se detiene antes, tras diez minutos sin decir nada. Aumenta este valor para trabajos agénticos largos, o pon 0 para quitar el límite."
+    },
     "navMappings": {
       "name": "Mapeos de navegación estilo Vim",
       "desc": "Un mapeo por línea. Formato: \"map <tecla> <acción>\" (acciones: scrollUp, scrollDown, focusInput)."

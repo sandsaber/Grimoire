@@ -28,12 +28,14 @@ The provider runtime is rebuilt on an execution kernel, and the chat surfaces ar
 - `.grimoire/control/` holds the kernel's lifecycle records: which run owns which process, generations, state, terminals, and the evidence needed to recover after a crash or a quit mid-turn. They carry no prompts, no transcripts, no secrets, and no provider payloads, and deleting a conversation deletes its records with it. An older plugin build ignores the directory, so a downgrade is safe.
 - A run left `dispatching` or `running` by a quit is classified honestly at the next load instead of being shown as still running.
 - Agent work started from a conversation is durable: a restart shows what became of it rather than forgetting it.
+- A setting for how long one turn may run. A turn is stopped after ten minutes of silence, which is the check meant for a provider that has stopped answering; separately, no turn may run longer than the ceiling this setting names - thirty minutes by default. Raise it for long agentic work, or set it to 0 to remove it. Advanced, under Conversations (#145).
 
 ### Fixed
 
 - Grok Build's context meter, Kimi Code's, and Qwen Code's read usage from the turn that produced it, so the meter no longer lags a turn behind or stays empty on a provider that reports usage only after the prompt returns.
 - Resuming an OpenCode session no longer opens a fresh session on every reload. OpenCode answers `session/load` with its config options and no session id, and requiring the echo turned every resume into "the agent returned another session".
 - Stopping the title generation for one tab no longer stops it for every other open tab.
+- A turn that is still working is no longer stopped for taking too long. The run timeout was armed once when the turn was dispatched and never moved afterwards, so ten minutes of streaming output ended exactly like ten minutes of silence - on Claude, on Codex, and on every provider running through the ACP backend. The window now measures silence and is restarted by everything the turn produces, and a finished turn no longer leaves a live timer behind it (#145).
 
 ## 1.3.2 - 2026-09-06
 

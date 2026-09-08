@@ -988,6 +988,75 @@ describe('CodexExecutionBackend', () => {
       .toHaveLength(1);
   });
 
+  it('lets a working turn outlive the inactivity window, and still bounds it absolutely', async () => {
+    // The run timeout was armed once at dispatch and only ever cleared, so ten
+    // minutes of *work* ended exactly like ten minutes of silence. A turn that
+    // streams the whole time is the healthy case, not the stuck one.
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    void collectEvents(session.createRun(request(RUN_1, 'default')));
+    await fixture.connection.waitForCall('turn/start');
+
+    const armed = fixture.scheduler.pending(30_000);
+    expect(armed).toHaveLength(1);
+    const absolute = fixture.scheduler.pending(30 * 60_000);
+    expect(absolute).toHaveLength(1);
+
+    // The provider says something: the turn is alive.
+    fixture.connection.notifyExecution('item/agentMessage/delta', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'message-1',
+      delta: 'still working',
+    });
+    await flushPromises();
+
+    const rearmed = fixture.scheduler.pending(30_000);
+    expect(rearmed).toHaveLength(1);
+    expect(rearmed[0]).not.toBe(armed[0]);
+    // The ceiling is not a liveness timer and does not move.
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual(absolute);
+  });
+
+  it('leaves no live timer behind a finished run', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 1);
+    const events = collectEvents(session.createRun(request(RUN_1, 'default')));
+    await fixture.connection.waitForCall('turn/start');
+    fixture.connection.complete('thread-1', 'turn-1', 'answer');
+
+    expectTerminal(await events, 'succeeded', 'completed');
+    await flushPromises();
+    // The terminal event is emitted after both timers are cleared, and the
+    // emit re-arms the window: without a guard the run ends holding one.
+    expect(fixture.scheduler.pending(30_000)).toEqual([]);
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual([]);
+  });
+
+  it('asks for the run ceiling each turn, and arms none when it is zero', async () => {
+    let ceilingMs = 0;
+    const fixture = createFixture({ runAbsoluteTimeoutMs: () => ceilingMs });
+    const session = await createSession(fixture.backend, 1);
+    const first = collectEvents(session.createRun(request(RUN_1, 'default')));
+    await fixture.connection.waitForCall('turn/start');
+
+    // Zero is the setting that removes the ceiling, not a missing value.
+    expect(fixture.scheduler.pending(30 * 60_000)).toEqual([]);
+    fixture.connection.complete('thread-1', 'turn-1', 'first answer');
+    expectTerminal(await first, 'succeeded', 'completed');
+
+    // Raised in settings between the two turns. Asked for again rather than
+    // captured when the backend was built, so it reaches the next turn without
+    // reloading the plugin.
+    ceilingMs = 90 * 60_000;
+    const second = collectEvents(session.createRun(request(RUN_2, 'default')));
+    await fixture.connection.waitForCalls('turn/start', 2);
+
+    expect(fixture.scheduler.pending(90 * 60_000)).toHaveLength(1);
+    fixture.connection.complete('thread-1', 'turn-2', 'second answer');
+    expectTerminal(await second, 'succeeded', 'completed');
+  });
+
   it('arbitrates output-limit, cancellation, and timeout through one interrupt', async () => {
     const interrupt = deferred<Record<string, never>>();
     const fixture = createFixture({
@@ -1244,6 +1313,7 @@ interface FixtureOptions {
   readonly invocations?: Readonly<Record<string, CodexExecutionInvocation>>;
   readonly reconciliation?: CodexTurnReconciliationEvidence;
   readonly runTimeoutMs?: number;
+  readonly runAbsoluteTimeoutMs?: () => number;
   readonly maxResultBytes?: number;
   readonly connections?: readonly FakeCodexConnection[];
   readonly resultCommitOutcome?: ResultCommitOutcome;
@@ -1330,6 +1400,9 @@ function createFixture(options: FixtureOptions = {}) {
     recoveryDelayMs: 250,
     cancellationTurnIdTimeoutMs: 500,
     runTimeoutMs: options.runTimeoutMs ?? 30_000,
+    ...(options.runAbsoluteTimeoutMs
+      ? { runAbsoluteTimeoutMs: options.runAbsoluteTimeoutMs }
+      : {}),
     maxResultBytes: options.maxResultBytes ?? 1024,
   };
   const backend = new CodexExecutionBackend(context);
@@ -1484,6 +1557,11 @@ class ManualScheduler implements CodexExecutionScheduler {
     if (typeof handle === 'object' && handle !== null) {
       this.tasks.delete(handle);
     }
+  }
+
+  /** Live timers, so a test can tell a re-armed timer from a surviving one. */
+  pending(delayMs: number): object[] {
+    return [...this.tasks].filter(([, task]) => task.delay === delayMs).map(([handle]) => handle);
   }
 
   fireDelay(delayMs: number): void {

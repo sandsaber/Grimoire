@@ -280,7 +280,21 @@ export interface ClaudeExecutionBackendContext {
    */
   readonly reportConnectionLost?: (error: unknown) => void;
   readonly now?: () => number;
+  /**
+   * How long a run may go **without saying anything** before it is stopped.
+   *
+   * A liveness window, not a budget for the turn: every event the run produces
+   * re-arms it. It used to be armed once at dispatch and only cleared, so ten
+   * minutes of work ended exactly like ten minutes of silence.
+   */
   readonly runTimeoutMs?: number;
+  /**
+   * The ceiling a run cannot pass however alive it stays, or `0` for none.
+   *
+   * Asked when the run arms it, not read once when the backend is built, so
+   * the setting behind it reaches the next turn without reloading the plugin.
+   */
+  readonly runAbsoluteTimeoutMs?: () => number;
   readonly resultCommitTimeoutMs?: number;
   readonly recoveryTimeoutMs?: number;
   readonly controlTimeoutMs?: number;
@@ -1734,6 +1748,7 @@ class ClaudeExecutionRun implements ExecutionRun {
   private completionTask: Promise<void> | undefined;
   private terminationTask: Promise<void> | undefined;
   private timeoutHandle: unknown;
+  private absoluteTimeoutHandle: unknown;
   private deliverySequence = 0;
   private resolveFinished!: () => void;
   private readonly finished: Promise<void>;
@@ -2000,13 +2015,17 @@ class ClaudeExecutionRun implements ExecutionRun {
       this.dispatched = true;
       this.session.dispatch(invocation.message);
       this.emit({ kind: 'run-started' });
-      this.timeoutHandle = this.context.scheduler.setTimeout(() => {
-        if (this.providerCompletionObserved) {
-          return;
-        }
-        this.timeoutTriggered = true;
-        void this.requestTermination();
-      }, this.context.runTimeoutMs ?? 10 * 60_000);
+      this.armInactivityTimeout();
+      const ceilingMs = this.context.runAbsoluteTimeoutMs?.() ?? 30 * 60_000;
+      if (ceilingMs > 0) {
+        this.absoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
+          if (this.providerCompletionObserved) {
+            return;
+          }
+          this.timeoutTriggered = true;
+          void this.requestTermination();
+        }, ceilingMs);
+      }
     } catch (error) {
       if (this.terminal) {
         return;
@@ -2058,10 +2077,7 @@ class ClaudeExecutionRun implements ExecutionRun {
       return;
     }
     this.providerCompletionObserved = true;
-    if (this.timeoutHandle !== undefined) {
-      this.context.scheduler.clearTimeout(this.timeoutHandle);
-      this.timeoutHandle = undefined;
-    }
+    this.clearRunTimeouts();
     this.completionTask = this.completeFromResult(message);
   }
 
@@ -2070,10 +2086,7 @@ class ClaudeExecutionRun implements ExecutionRun {
       return;
     }
     this.providerCompletionObserved = true;
-    if (this.timeoutHandle !== undefined) {
-      this.context.scheduler.clearTimeout(this.timeoutHandle);
-      this.timeoutHandle = undefined;
-    }
+    this.clearRunTimeouts();
     this.completionTask = this.reconcileSafely();
   }
 
@@ -2188,7 +2201,39 @@ class ClaudeExecutionRun implements ExecutionRun {
     return false;
   }
 
+  /**
+   * (Re)starts the silence window. Called for every event the run produces, so
+   * a turn that keeps talking keeps living.
+   */
+  private armInactivityTimeout(): void {
+    if (this.terminal || this.providerCompletionObserved) {
+      return;
+    }
+    if (this.timeoutHandle !== undefined) {
+      this.context.scheduler.clearTimeout(this.timeoutHandle);
+    }
+    this.timeoutHandle = this.context.scheduler.setTimeout(() => {
+      if (this.providerCompletionObserved) {
+        return;
+      }
+      this.timeoutTriggered = true;
+      void this.requestTermination();
+    }, this.context.runTimeoutMs ?? 10 * 60_000);
+  }
+
+  private clearRunTimeouts(): void {
+    if (this.timeoutHandle !== undefined) {
+      this.context.scheduler.clearTimeout(this.timeoutHandle);
+      this.timeoutHandle = undefined;
+    }
+    if (this.absoluteTimeoutHandle !== undefined) {
+      this.context.scheduler.clearTimeout(this.absoluteTimeoutHandle);
+      this.absoluteTimeoutHandle = undefined;
+    }
+  }
+
   private emit(event: ExecutionEvent, scope?: ExecutionEventScope): void {
+    this.armInactivityTimeout();
     const delivery: ProviderExecutionEvent = {
       backendId: CLAUDE_EXECUTION_DESCRIPTOR.backendId,
       backendGeneration: this.config.backendGeneration,
@@ -2216,10 +2261,7 @@ class ClaudeExecutionRun implements ExecutionRun {
       return;
     }
     this.terminal = true;
-    if (this.timeoutHandle !== undefined) {
-      this.context.scheduler.clearTimeout(this.timeoutHandle);
-      this.timeoutHandle = undefined;
-    }
+    this.clearRunTimeouts();
     for (const abort of this.resultCommitAborts) {
       abort.abort();
     }

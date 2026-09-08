@@ -181,7 +181,20 @@ export interface CodexExecutionBackendContext {
   readonly resultCommitTimeoutMs?: number;
   readonly recoveryDelayMs?: number;
   readonly cancellationTurnIdTimeoutMs?: number;
+  /**
+   * How long a run may go **without saying anything** before it is stopped.
+   *
+   * Re-armed by every event the run produces: a turn that keeps working is the
+   * healthy case, and used to die exactly like a silent one.
+   */
   readonly runTimeoutMs?: number;
+  /**
+   * The ceiling a run cannot pass however alive it stays, or `0` for none.
+   *
+   * Asked when the run arms it, not read once when the backend is built, so
+   * the setting behind it reaches the next turn without reloading the plugin.
+   */
+  readonly runAbsoluteTimeoutMs?: () => number;
   readonly maxResultBytes?: number;
 }
 
@@ -907,6 +920,7 @@ class CodexExecutionRun implements ExecutionRun {
   private cancellationAcknowledged = false;
   private timeoutTriggered = false;
   private runTimeoutHandle: unknown;
+  private runAbsoluteTimeoutHandle: unknown;
   private recoveryTask: Promise<void> | undefined;
   private completionTask: Promise<void> | undefined;
   private terminationTask: Promise<void> | undefined;
@@ -1117,9 +1131,13 @@ class CodexExecutionRun implements ExecutionRun {
         return;
       }
       this.turnDispatchStarted = true;
-      this.runTimeoutHandle = this.context.scheduler.setTimeout(() => {
-        void this.handleTimeout();
-      }, this.context.runTimeoutMs ?? 10 * 60_000);
+      this.armInactivityTimeout();
+      const ceilingMs = this.context.runAbsoluteTimeoutMs?.() ?? 30 * 60_000;
+      if (ceilingMs > 0) {
+        this.runAbsoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
+          void this.handleTimeout();
+        }, ceilingMs);
+      }
       if (invocation.turn.kind === 'compact') {
         this.turnStartedMayEstablish = true;
         await services.connection.request('thread/compact/start', { threadId });
@@ -1773,7 +1791,28 @@ class CodexExecutionRun implements ExecutionRun {
     return this.turnReconciler;
   }
 
+  /**
+   * (Re)starts the silence window, so a talking turn keeps living.
+   *
+   * Not past the end of the run: `finish` clears both timers and *then* emits
+   * the terminal event, and the emit is what re-arms this one. Without the
+   * guard every finished run left a live ten-minute timer holding it, and the
+   * completion work after `turn/completed` kept pushing the window out.
+   */
+  private armInactivityTimeout(): void {
+    if (this.terminal) {
+      return;
+    }
+    if (this.runTimeoutHandle !== undefined) {
+      this.context.scheduler.clearTimeout(this.runTimeoutHandle);
+    }
+    this.runTimeoutHandle = this.context.scheduler.setTimeout(() => {
+      void this.handleTimeout();
+    }, this.context.runTimeoutMs ?? 10 * 60_000);
+  }
+
   private emit(event: ProviderExecutionEvent['event']): void {
+    this.armInactivityTimeout();
     const delivery: ProviderExecutionEvent = {
       backendId: CODEX_EXECUTION_DESCRIPTOR.backendId,
       backendGeneration: this.config.backendGeneration,
@@ -1804,6 +1843,10 @@ class CodexExecutionRun implements ExecutionRun {
     if (this.runTimeoutHandle !== undefined) {
       this.context.scheduler.clearTimeout(this.runTimeoutHandle);
       this.runTimeoutHandle = undefined;
+    }
+    if (this.runAbsoluteTimeoutHandle !== undefined) {
+      this.context.scheduler.clearTimeout(this.runAbsoluteTimeoutHandle);
+      this.runAbsoluteTimeoutHandle = undefined;
     }
     for (const abort of this.resultCommitAborts) {
       abort.abort();

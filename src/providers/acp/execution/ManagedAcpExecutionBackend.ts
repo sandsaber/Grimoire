@@ -251,7 +251,20 @@ export interface ManagedAcpExecutionBackendContext {
   readonly controlTimeoutMs?: number;
   readonly resultCommitTimeoutMs: number;
   readonly recoveryTimeoutMs: number;
+  /**
+   * How long a run may go **without saying anything** before it is stopped.
+   *
+   * Re-armed by every event the run produces. Armed once and only cleared, it
+   * ended a working turn exactly like a silent one.
+   */
   readonly runTimeoutMs: number;
+  /**
+   * The ceiling a run cannot pass however alive it stays, or `0` for none.
+   *
+   * Asked when the run arms it, not read once when the backend is built, so
+   * the setting behind it reaches the next turn without reloading the plugin.
+   */
+  readonly runAbsoluteTimeoutMs?: () => number;
   readonly maxResultBytes: number;
   /**
    * Whether a failed `session/load` means the saved session is gone.
@@ -1079,6 +1092,7 @@ class ManagedAcpExecutionRun implements ExecutionRun {
   private output = '';
   private observedProviderActivity = false;
   private timeoutHandle?: unknown;
+  private absoluteTimeoutHandle?: unknown;
   private attempt = 0;
   private recoveringAttempt?: number;
   private terminationTask?: Promise<void>;
@@ -1139,10 +1153,13 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     this.nativeRunRef = nativeRunRef;
     this.attempt += 1;
     this.recoveringAttempt = undefined;
-    if (this.timeoutHandle !== undefined) this.context.scheduler.clearTimeout(this.timeoutHandle);
-    this.timeoutHandle = this.context.scheduler.setTimeout(() => {
-      void this.terminate('timeout');
-    }, this.context.runTimeoutMs);
+    this.armInactivityTimeout();
+    const ceilingMs = this.context.runAbsoluteTimeoutMs?.() ?? 30 * 60_000;
+    if (this.absoluteTimeoutHandle === undefined && ceilingMs > 0) {
+      this.absoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
+        void this.terminate('timeout');
+      }, ceilingMs);
+    }
     return this.attempt;
   }
 
@@ -1511,7 +1528,23 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     }
   }
 
+  /**
+   * (Re)starts the silence window, so a talking turn keeps living.
+   *
+   * Not past the end of the run: `finish` clears both timers and *then* emits
+   * the terminal event, and the emit is what re-arms this one. Without the
+   * guard every finished run left a live window behind it.
+   */
+  private armInactivityTimeout(): void {
+    if (this.terminal) return;
+    if (this.timeoutHandle !== undefined) this.context.scheduler.clearTimeout(this.timeoutHandle);
+    this.timeoutHandle = this.context.scheduler.setTimeout(() => {
+      void this.terminate('timeout');
+    }, this.context.runTimeoutMs);
+  }
+
   private emit(event: ExecutionEvent): void {
+    this.armInactivityTimeout();
     const delivery: ProviderExecutionEvent = {
       backendId: this.context.descriptor.backendId,
       backendGeneration: this.session.backendGeneration,
@@ -1538,6 +1571,10 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     if (this.terminal) return;
     this.terminal = true;
     if (this.timeoutHandle !== undefined) this.context.scheduler.clearTimeout(this.timeoutHandle);
+    if (this.absoluteTimeoutHandle !== undefined) {
+      this.context.scheduler.clearTimeout(this.absoluteTimeoutHandle);
+      this.absoluteTimeoutHandle = undefined;
+    }
     this.cancelInteractions(this);
     this.emit({ kind: 'terminal', terminal, reason, sideEffectFree });
     this.events.close();

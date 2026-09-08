@@ -768,6 +768,10 @@
       "desc": "Model used for auto-generating conversation titles.",
       "auto": "Auto (active provider)"
     },
+    "runAbsoluteTimeout": {
+      "name": "Maximum turn duration",
+      "desc": "Minutes one turn may run before it is stopped, however active it stays. A silent turn is stopped sooner, after ten minutes without a word. Raise this for long agentic work, or set 0 to remove the ceiling."
+    },
     "navMappings": {
       "name": "Vim-style navigation mappings",
       "desc": "One mapping per line. Format: \"map <key> <action>\" (actions: scrollUp, scrollDown, focusInput)."
