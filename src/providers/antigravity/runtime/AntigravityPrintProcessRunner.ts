@@ -252,13 +252,10 @@ export class AntigravityPrintProcessRunner implements AntigravityProcessRunner {
       sawResultBeforeWait = parser?.getResult() != null;
       if (sawResultBeforeWait) {
         void child.terminate('graceful');
-        exit = await Promise.race([
-          child.exited,
-          delay(this.drainGraceMs()).then(() => undefined),
-        ]);
+        exit = await withinGrace(child.exited, this.drainGraceMs());
       } else {
         exit = await child.exited;
-        await Promise.race([drained, delay(this.drainGraceMs())]);
+        await withinGrace(drained, this.drainGraceMs());
       }
       // **The frame, not the pipe.** In stream-json the answer is one field of
       // the last `result` frame, and the frames around it are progress this
@@ -455,8 +452,29 @@ async function consumeFrames(
   }
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => { window.setTimeout(resolve, ms); });
+/**
+ * The value if it arrives inside the grace period, `undefined` if it does not.
+ *
+ * The timer is cleared either way. A race leaves its loser running, and the
+ * loser here is a two-second timer armed on every turn — `AntigravityCliCapabilities`
+ * and `AntigravityModelDiscovery` both pair `window.setTimeout` with a
+ * `clearTimeout` for the same reason, and a plugin that can be unloaded should
+ * not leave one behind to fire into a torn-down renderer.
+ */
+async function withinGrace<T>(value: Promise<T>, ms: number): Promise<T | undefined> {
+  let handle: number | undefined;
+  try {
+    return await Promise.race([
+      value,
+      new Promise<undefined>(resolve => {
+        handle = window.setTimeout(() => resolve(undefined), ms);
+      }),
+    ]);
+  } finally {
+    if (handle !== undefined) {
+      window.clearTimeout(handle);
+    }
+  }
 }
 
 function removeLog(logFilePath: string): Promise<void> {

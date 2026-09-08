@@ -295,6 +295,47 @@ describe('AntigravityPrintProcessRunner', () => {
     expect(child.terminationModes.length).toBeGreaterThan(0);
   });
 
+  it('does not leave the grace timer armed when the turn ends before it', async () => {
+    // The grace period is the loser of a race on every turn that ends normally,
+    // and a loser left running is a timer per turn firing into a renderer that
+    // may already be gone. Both neighbours in this provider pair their
+    // `window.setTimeout` with a `clearTimeout`; this one has to as well.
+    // Watched, not replaced: the timers still behave normally, and the invariant
+    // is only that the run cleared every one it armed.
+    const setSpy = jest.spyOn(window, 'setTimeout');
+    const clearSpy = jest.spyOn(window, 'clearTimeout');
+
+    try {
+      const child = new FakeManagedChild({
+        stdout: [
+          '{"event":"result","result":{"status":"ok","response":"done","error":null}}\n',
+        ],
+      });
+      child.exit.resolve({ code: 0 });
+      const runner = new AntigravityPrintProcessRunner({
+        transport: new FakeTransport(child),
+        // Long enough that a leaked timer would outlive the test itself.
+        drainGraceMs: 30_000,
+        createLogPath: () => '/tmp/antigravity.log',
+        removeLog: async () => undefined,
+      });
+
+      const handle = runner.start({
+        ...INVOCATION,
+        cliCapabilities: { addDir: false, printTimeout: false, streamJson: true },
+      });
+
+      // Awaited directly: `settledWithin` arms a timer of its own, and this row
+      // is about every timer the run itself leaves behind.
+      await expect(handle.completed).resolves.toMatchObject({ stdout: 'done' });
+      expect(setSpy.mock.calls.length).toBeGreaterThan(0);
+      expect(clearSpy).toHaveBeenCalledTimes(setSpy.mock.calls.length);
+    } finally {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    }
+  });
+
   it('keeps the run log when the turn ended without a terminal frame', async () => {
     // 1.3.2 unlinked the log only after a successful run. It is the only place
     // `agy` records the real wall-clock cause, so deleting it unconditionally
