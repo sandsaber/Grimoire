@@ -153,6 +153,18 @@ export async function recordAcpWire(
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
+  // A command that does not exist emits `error` and never `exit`. Unhandled it
+  // takes the run down; unread it is worse — the recorder wrote a fixture
+  // saying the CLI had refused a session, which is a fact about a CLI that
+  // never ran, in the file someone reads later as evidence.
+  let startupFailure: Error | undefined;
+  child.once('error', error => {
+    startupFailure = error;
+  });
+  // The other half of the same failure: writes to the stdin of a process that
+  // never started fail on their own.
+  child.stdin.on('error', () => {});
+
   let buffered = '';
   child.stdout.on('data', chunk => {
     buffered += String(chunk);
@@ -191,6 +203,10 @@ export async function recordAcpWire(
     },
   });
   await settle(timings.handshakeMs);
+  if (startupFailure) {
+    rmSync(vault, { force: true, recursive: true });
+    throw new Error(`\`${options.command}\` could not be started: ${startupFailure.message}`);
+  }
   send({ jsonrpc: '2.0', id: 2, method: 'session/new', params: { cwd: vault, mcpServers: [] } });
   await settle(timings.sessionMs);
 

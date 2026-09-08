@@ -174,6 +174,23 @@ describe('the ACP wire recorder', () => {
     expect(vaults()).toEqual(before);
   });
 
+  it('says which CLI it could not start, and leaves no vault behind', async () => {
+    const vaults = (): string[] => readdirSync(tmpdir())
+      .filter(entry => entry.startsWith('grimoire-fake-wire-'));
+    const before = vaults();
+
+    await expect(recordAcpWire({
+      providerId: 'fake',
+      command: join(workspace, 'no-such-cli'),
+      args: [],
+      transport: 'stdio JSON-RPC 2.0 (fake)',
+      fixturePath,
+      timings,
+    })).rejects.toThrow(/no-such-cli/);
+
+    expect(vaults()).toEqual(before);
+  });
+
   it('writes the recording where it was told to', async () => {
     await record('answers');
 
