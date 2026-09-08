@@ -84,6 +84,16 @@ export interface CodexExecutionInvocation {
 export interface CodexExecutionRequestResolver {
   resolve(requestRef: string): Promise<CodexExecutionInvocation>;
   resolveSteer(requestRef: string): Promise<readonly UserInput[]>;
+  /**
+   * Keeps what a definite rejection said, for the terminal that follows it.
+   *
+   * The kernel's terminal names a category — the turn was rejected before it
+   * could act — and the sentence a user can do something about lives only in
+   * the refusal itself: a thread already open elsewhere, a model the account
+   * cannot reach. The store this reaches is the one a refused turn already
+   * reads from, so both kinds of rejection are described the same way.
+   */
+  recordRefusal(requestRef: string, message: string): void;
 }
 
 export interface CodexExecutionResultSink {
@@ -663,7 +673,11 @@ ExecutionRecoveryPort {
           'Codex native thread is in use by another execution session.',
         );
       }
-      existing.releaseThread();
+      // The turn the thread ended on travels with it. `turn/started` for a turn
+      // that already finished is recognised by comparing against that id, and a
+      // session that inherited the thread but not the id has nothing to compare
+      // against — it would take the previous turn for its own.
+      session.inheritThreadHistory(existing.releaseThread());
     }
     this.sessionsByThread.set(threadId, session);
   }
@@ -806,9 +820,23 @@ class CodexExecutionSession implements ExecutionSession {
     return true;
   }
 
-  /** Gives up a binding another session is taking over. */
-  releaseThread(): void {
+  /**
+   * Gives up a binding another session is taking over, naming the turn it
+   * ended on so the session taking over can keep telling that turn from its own.
+   */
+  releaseThread(): string | undefined {
     this.nativeThreadId = undefined;
+    return this.lastNativeTurnId;
+  }
+
+  /**
+   * Takes on the turn the session that held this thread ended on.
+   *
+   * Never overwrites a turn this session ran itself: what it knows first-hand
+   * is later than anything it is being told.
+   */
+  inheritThreadHistory(lastNativeTurnId: string | undefined): void {
+    this.lastNativeTurnId ??= lastNativeTurnId;
   }
 
   getPreviousNativeTurnId(): string | undefined {
@@ -828,9 +856,17 @@ class CodexExecutionSession implements ExecutionSession {
     this.nativeThreadId = threadId;
   }
 
-  markLoaded(): void {
-    if (this.nativeThreadId) {
-      this.threads.markLoaded(this.nativeThreadId);
+  /**
+   * Records a load with the daemon's registry.
+   *
+   * Takes a thread id for the fork path, which resumes a thread before it is
+   * bound to anything: the binding is the last step there, and a failure
+   * between the two would otherwise leave a thread this daemon holds open with
+   * nothing remembering it — which the next run resumes into a writer conflict.
+   */
+  markLoaded(threadId: string | undefined = this.nativeThreadId): void {
+    if (threadId) {
+      this.threads.markLoaded(threadId);
     }
   }
 
@@ -1132,6 +1168,12 @@ class CodexExecutionRun implements ExecutionRun {
       return;
     }
     if (isDefiniteRejection(error)) {
+      // The provider's own words, and only its words: a structured `data`
+      // payload is untrusted and is never rendered.
+      const message = error.message.trim();
+      if (message) {
+        this.context.requestResolver.recordRefusal(this.request.requestRef, message);
+      }
       this.finish('invalidated', 'side-effect-free-rejection', true);
       return;
     }
@@ -1189,6 +1231,7 @@ class CodexExecutionRun implements ExecutionRun {
       ...intent.resumeParams,
       threadId,
     });
+    this.session.markLoaded(threadId);
     const rollback = fork.thread.turns.length - checkpoint - 1;
     if (rollback > 0) {
       await this.requestNativePreparation('thread/rollback', { threadId, numTurns: rollback });
@@ -1822,7 +1865,9 @@ function validatePreparedInteraction(prepared: CodexPreparedInteraction): void {
  * Both cases are decisions taken and reported: one by the app-server, one by
  * this backend. Neither can have left work running.
  */
-function isDefiniteRejection(error: unknown): boolean {
+function isDefiniteRejection(
+  error: unknown,
+): error is CodexRpcResponseError | CodexThreadOwnershipError {
   return error instanceof CodexRpcResponseError || error instanceof CodexThreadOwnershipError;
 }
 

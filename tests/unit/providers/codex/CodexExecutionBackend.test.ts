@@ -1106,6 +1106,10 @@ describe('CodexExecutionBackend', () => {
     expectTerminal(await secondEvents, 'invalidated', 'side-effect-free-rejection');
     expect(fixture.connection.calls.filter(call => call.method === 'turn/start'))
       .toHaveLength(1);
+    // The tab renders this instead of the kernel's neutral sentence, which
+    // cannot name what is holding the thread.
+    expect(fixture.refusals.get('second'))
+      .toBe('Codex native thread is in use by another execution session.');
 
     fixture.connection.complete(RESTORED_THREAD, 'turn-1', 'first answer');
     expectTerminal(await firstEvents, 'succeeded', 'completed');
@@ -1126,6 +1130,99 @@ describe('CodexExecutionBackend', () => {
     // The provider answered. Nothing was dispatched, so nothing can have run.
     expectTerminal(await events, 'invalidated', 'side-effect-free-rejection');
     expect(fixture.connection.calls.some(call => call.method === 'turn/start')).toBe(false);
+    // The daemon's own words, kept for the terminal that follows them. Only the
+    // message: the structured `data` of a provider error is never rendered.
+    expect(fixture.refusals.get('first')).toBe('thread already has an active writer');
+  });
+
+  it('fences the previous turn after a replacement session takes the thread over', async () => {
+    const fixture = createFixture({
+      invocations: {
+        first: resumeInvocation(),
+        compact: {
+          thread: { kind: 'resume', threadId: RESTORED_THREAD, params: RESUME_PARAMS },
+          turn: { kind: 'compact' },
+        },
+      },
+    });
+    const restored = await fixture.backend.createSession({
+      executionSessionId: executionSessionId(`es-${'1'.repeat(32)}`),
+      owner: OWNER,
+      backendGeneration: 1,
+      nativeSessionRef: RESTORED_THREAD,
+    });
+    const firstEvents = collectEvents(restored.createRun(request(RUN_1, 'first')));
+    await fixture.connection.waitForCalls('turn/start', 1);
+    fixture.connection.complete(RESTORED_THREAD, 'turn-1', 'first answer');
+    await firstEvents;
+
+    const replacement = await createSession(fixture.backend, 2);
+    const compactEvents = collectEvents(replacement.createRun(request(RUN_2, 'compact')));
+    await fixture.connection.waitForCall('thread/compact/start');
+    // The turn the session it replaced ended on. A compaction learns its turn
+    // id from this notification alone, so the replacement has to know which one
+    // is already over — which it can only do if the id travelled with the
+    // thread it took over.
+    fixture.connection.notifyExecution('turn/started', {
+      threadId: RESTORED_THREAD,
+      turn: turn('turn-1', 'inProgress'),
+    });
+    fixture.connection.notifyExecution('turn/started', {
+      threadId: RESTORED_THREAD,
+      turn: turn('turn-compact', 'inProgress'),
+    });
+    fixture.connection.complete(RESTORED_THREAD, 'turn-compact', 'compacted');
+
+    const settled = await compactEvents;
+    expectTerminal(settled, 'succeeded', 'completed');
+    expect(settled.filter(event => event.event.kind === 'run-started')).toEqual([
+      expect.objectContaining({ scope: expect.objectContaining({ nativeRunRef: 'turn-compact' }) }),
+    ]);
+  });
+
+  it('remembers a forked thread the daemon loaded when the rollback fails', async () => {
+    const fixture = createFixture({
+      invocations: {
+        first: {
+          thread: {
+            kind: 'fork',
+            sourceThreadId: 'thread-source',
+            resumeAtTurnId: 'source-turn-1',
+            resumeParams: RESUME_PARAMS,
+          },
+          turn: { kind: 'start', params: TURN_PARAMS },
+        },
+        second: resumeInvocation('thread-fork'),
+      },
+    });
+    fixture.connection.beforeRequest = method => {
+      if (method === 'thread/fork') {
+        return startResult(thread('thread-fork', [
+          turn('source-turn-1', 'completed'),
+          turn('source-turn-2', 'completed'),
+        ]));
+      }
+      return method === 'thread/rollback'
+        ? Promise.reject(new Error('Transport disposed'))
+        : undefined;
+    };
+    const forking = await createSession(fixture.backend, 1);
+    const forkEvents = collectEvents(forking.createRun(request(RUN_1, 'first')));
+    expectTerminal(await forkEvents, 'indeterminate', 'effects-unknown');
+
+    // The fork is resumed before it is bound to anything, and the binding is
+    // what used to record the load. A failure in between left a thread this
+    // daemon holds open with nothing remembering it, and the next run resumed
+    // it again — into the writer conflict.
+    const resuming = await createSession(fixture.backend, 2);
+    const secondEvents = collectEvents(resuming.createRun(request(RUN_2, 'second')));
+    await fixture.connection.waitForCall('turn/start');
+    fixture.connection.complete('thread-fork', 'turn-1', 'second answer');
+
+    expectTerminal(await secondEvents, 'succeeded', 'completed');
+    expect(fixture.connection.calls.filter(call => call.method === 'thread/resume'
+      && (call.params as { readonly threadId?: string }).threadId === 'thread-fork'))
+      .toHaveLength(1);
   });
 
   it('keeps an ambiguous native preparation failure indeterminate', async () => {
@@ -1161,6 +1258,8 @@ function createFixture(options: FixtureOptions = {}) {
     readonly output: string;
     readonly source: 'assistant' | 'native-agent';
   }> = [];
+  /** What a definite rejection told the store the tab reads its wording from. */
+  const refusals = new Map<string, string>();
   let connectionFactoryCalls = 0;
   let sessionInstances = 0;
   let interactionIdsCreated = 0;
@@ -1184,6 +1283,7 @@ function createFixture(options: FixtureOptions = {}) {
     requestResolver: {
       resolve: async requestRef => options.invocations?.[requestRef] ?? defaultInvocation,
       resolveSteer: async () => [{ type: 'text', text: 'Continue with the correction' }],
+      recordRefusal: (requestRef, message) => { refusals.set(requestRef, message); },
     },
     resultSink: {
       storeResult: async input => {
@@ -1240,6 +1340,7 @@ function createFixture(options: FixtureOptions = {}) {
     scheduler,
     interactionIds,
     resultSinkInputs,
+    refusals,
     get connectionFactoryCalls() {
       return connectionFactoryCalls;
     },
