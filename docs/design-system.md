@@ -443,11 +443,13 @@ which reads as a tilting square rather than an arc going round. It wears the act
 for its size and its place in the row and is not one — nothing happens when it is pressed, so
 nothing lights up when it is pointed at.
 
-**What the drawing shows.** [`Grimoire Nordic.html`](design/Grimoire%20Nordic.html) draws the history
-popover at 320px, its rows at 36px on one line, and no mark on them; its stamps read `14:02`, `Codex`
-and `Qwen`, which is the substitution above drawn as it stood. All of that changed after the drawing
-was checked in, and the drawing is edited in its own canvas rather than by hand. It goes in at the
-next pass over that file.
+**What the drawing shows.** [`Grimoire Nordic.html`](design/Grimoire%20Nordic.html) draws all of the
+above on screen `1b`: the popover at 480, a 34px search row, rows of 56px on two lines, the mark
+before the title, and stamps that say both facts. Five rows carry the five states worth drawing — the
+open conversation with its accent rule, a hovered row with its controls beside the stamp rather than
+over the title, a title still generating with the turning glyph where those controls go, a row open in
+another tab at the 40% rule, and a model label long enough to clip while the title does not. The
+"Delete all" control sits under the list, where the surface puts it.
 
 ### 11.6 Decisions — one shape for every ask
 
