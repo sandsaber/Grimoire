@@ -37,7 +37,10 @@ import type GrimoirePlugin from '@/main';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
-import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
+import type {
+  ManagedAcpClient,
+  ManagedAcpClientFactory,
+} from '@/providers/acp/execution/ManagedAcpClient';
 import { toAcpMcpServers } from '@/providers/acp/mcp/toAcpMcpServers';
 import { createDevinModuleContext } from '@/providers/devin/app/DevinModuleContext';
 import { devinPlanUsageStore } from '@/providers/devin/app/DevinPlanUsageStore';
@@ -64,7 +67,10 @@ import {
   type DevinMetadataLaunch,
   DevinMetadataSession,
 } from '@/providers/devin/execution/DevinMetadataSession';
-import type { DevinToolCallRecord } from '@/providers/devin/execution/DevinPermissionPresentation';
+import {
+  type DevinToolCallRecord,
+  recordDevinToolCall,
+} from '@/providers/devin/execution/DevinPermissionPresentation';
 import { DevinProjectionResultSink } from '@/providers/devin/execution/DevinProjectionResultSink';
 import { DevinSessionConfigState } from '@/providers/devin/execution/DevinSessionConfigState';
 import {
@@ -105,8 +111,14 @@ export class DevinExecution {
    * The tool calls every tab's session announced, by id.
    *
    * A permission request names its call by id and says nothing else about it;
-   * the `tool_call` update that preceded it said everything. Held here because
-   * the bridge is one for every tab and the updates arrive per tab.
+   * the `tool_call` update that preceded it said everything.
+   *
+   * **Filled from the client, not from a tab's presenter.** A request can
+   * arrive in the same stdin chunk as the call it is about, and the transport
+   * parses both before any microtask runs — while a presented chunk travels
+   * through the kernel's ingest queue and lands a microtask later. Recorded
+   * from a presenter, the lookup missed exactly the requests it exists for,
+   * and the prompt fell back to "Devin action requests permission."
    */
   private readonly toolCalls = new Map<string, DevinToolCallRecord>();
 
@@ -123,8 +135,6 @@ export class DevinExecution {
   private readonly writeApprovers = new Map<string, () => ApprovalCallback | undefined>();
 
   private readonly presenters = new Set<DevinInteractionPresenter>();
-
-  private backend: DevinExecutionBackend | undefined;
 
   /**
    * How many times the vault's workspace resources have changed under a
@@ -167,9 +177,12 @@ export class DevinExecution {
   createBackend(
     clientFactory: ManagedAcpClientFactory = this.clientFactory ?? this.createClientFactory(),
   ): DevinExecutionBackend {
+    // The raw factory is kept, and the backend gets the one that remembers
+    // tool calls: the metadata session runs no tool and raises no permission,
+    // so wrapping it too would only record what nobody asks about.
     this.clientFactory = clientFactory;
     const context: DevinExecutionBackendContext = {
-      clientFactory,
+      clientFactory: this.rememberingToolCalls(clientFactory),
       requestResolver: this.requests,
       dynamicApplier: new DevinAcpDynamicConfigApplier(
         { resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef) },
@@ -210,8 +223,7 @@ export class DevinExecution {
       runAbsoluteTimeoutMs: () => resolveRunAbsoluteTimeoutMs(this.plugin.settings),
       maxResultBytes: MAX_RESULT_BYTES,
     };
-    this.backend = new DevinExecutionBackend(context);
-    return this.backend;
+    return new DevinExecutionBackend(context);
   }
 
   /** The backend as the kernel registers it, with its two side ports. */
@@ -283,7 +295,6 @@ export class DevinExecution {
           this.refreshSelectors();
         }
       },
-      onToolCall: call => this.rememberToolCall(call),
     });
 
     const presenter = new DevinInteractionPresenter(
@@ -461,6 +472,27 @@ export class DevinExecution {
     }
     this.settle(this.plugin.saveSettings());
     this.refreshSelectors();
+  }
+
+  /**
+   * The same factory, with every `tool_call` it delivers written down first.
+   *
+   * The subscription is the client's own, so it runs in the tick the wire
+   * delivered the update — which is the only place early enough for a
+   * permission request that arrives in the same chunk.
+   */
+  private rememberingToolCalls(factory: ManagedAcpClientFactory): ManagedAcpClientFactory {
+    return {
+      create: async (input): Promise<ManagedAcpClient> => {
+        const client = await factory.create(input);
+        client.onSessionNotification(notification => {
+          if (notification.update.sessionUpdate === 'tool_call') {
+            this.rememberToolCall(recordDevinToolCall(notification.update));
+          }
+        });
+        return client;
+      },
+    };
   }
 
   /** Keeps a tool call for the request that may follow it, and no more than a few. */

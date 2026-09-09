@@ -22,6 +22,36 @@ export interface DevinToolCallRecord {
   readonly meta?: Record<string, unknown> | null;
 }
 
+/**
+ * What a `tool_call` update said, in the shape the permission sentence reads.
+ *
+ * Read straight off the wire rather than out of a presented chunk: a request
+ * can arrive in the same stdin chunk as the call it is about, and everything
+ * downstream of the execution kernel is at least a microtask behind.
+ */
+export function recordDevinToolCall(update: {
+  readonly sessionUpdate?: string;
+  readonly toolCallId?: string;
+  readonly title?: string | null;
+  readonly kind?: string | null;
+  readonly rawInput?: unknown;
+  readonly locations?: ReadonlyArray<{ path: string }> | null;
+  readonly content?: ReadonlyArray<{ type?: string; path?: string }> | null;
+  readonly _meta?: Record<string, unknown> | null;
+}): DevinToolCallRecord {
+  const diffPath = update.content
+    ?.find(entry => entry.type === 'diff' && typeof entry.path === 'string')?.path;
+  return {
+    toolCallId: update.toolCallId ?? '',
+    title: update.title ?? null,
+    kind: update.kind ?? null,
+    rawInput: update.rawInput,
+    locations: update.locations ?? null,
+    diffPath: diffPath ?? null,
+    meta: update._meta ?? null,
+  };
+}
+
 /** What the approval prompt says, for one Devin permission request. */
 export interface DevinPermissionPresentation {
   readonly blockedPath?: string;

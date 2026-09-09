@@ -94,30 +94,6 @@ describe('Devin content presenter', () => {
     expect(chunks.some(chunk => chunk.type === 'tool_use' && chunk.name === TOOL_READ)).toBe(false);
   });
 
-  it('remembers a tool call for the permission request that follows it', () => {
-    const recorded: unknown[] = [];
-    const presenter = new DevinContentPresenter({
-      displayModel: () => 'devin:swe-1-6-slow',
-      onToolCall: call => recorded.push(call),
-    });
-
-    presenter.present(sessionUpdate({
-      sessionUpdate: 'tool_call',
-      toolCallId: 'call_a0ee957950984567aa8eecfd',
-      title: 'Wrote /vault/plan.md',
-      kind: 'edit',
-      content: [{ type: 'diff', path: '/vault/plan.md', newText: '# plan' }],
-      _meta: { 'cognition.ai/inferenceToolName': 'write' },
-    } as unknown as AcpSessionUpdate));
-
-    expect(recorded).toEqual([expect.objectContaining({
-      toolCallId: 'call_a0ee957950984567aa8eecfd',
-      title: 'Wrote /vault/plan.md',
-      kind: 'edit',
-      diffPath: '/vault/plan.md',
-    })]);
-  });
-
   it('keeps the commands a session announces', () => {
     const { presenter, recorded } = createPresenter();
 

@@ -142,6 +142,8 @@ describe('Devin execution composition', () => {
 
   interface FakeOptions {
     asksPermission?: boolean;
+    /** Announces a tool call and asks about it in the same tick, as one stdin chunk would. */
+    asksInSameTick?: boolean;
     sessionIsGone?: boolean;
     announcesCommands?: boolean;
     distinctSessions?: boolean;
@@ -189,7 +191,13 @@ describe('Devin execution composition', () => {
             ...recordedPermission(),
           }));
         };
-        let notify: ((notification: AcpSessionNotification) => void) | undefined;
+        // A Set, as `AcpClientConnection` keeps: the composition subscribes
+        // for its own reasons beside the backend, and a fake that held one
+        // listener would silently drop whichever subscribed first.
+        const listeners = new Set<(notification: AcpSessionNotification) => void>();
+        const notify = (notification: AcpSessionNotification): void => {
+          for (const listener of [...listeners]) listener(notification);
+        };
         const client: ManagedAcpClient = {
           initialize: async () => undefined,
           newSession: async () => {
@@ -229,13 +237,37 @@ describe('Devin execution composition', () => {
             if (options.dropsFirstPrompt && turns === 1) {
               throw new Error('Request aborted: session/prompt');
             }
+            if (options.asksInSameTick) {
+              // Both frames in one chunk: the transport parses them back to
+              // back, with no microtask drain between them.
+              notify({
+                sessionId: 'acp-session-1',
+                update: {
+                  sessionUpdate: 'tool_call',
+                  toolCallId: 'call_exit',
+                  title: 'Exit plan mode',
+                  kind: 'switch_mode',
+                  _meta: { 'cognition.ai/isExitPlan': true },
+                },
+              } as unknown as AcpSessionNotification);
+              permissions.push(input.requestPermission({
+                sessionId: 'acp-session-1',
+                options: [
+                  { optionId: 'plan_accept_edits', kind: 'allow_once', name: 'Yes, implement plan and accept edits' },
+                  { optionId: 'reject_once', kind: 'reject_once', name: 'No, plan needs changes' },
+                ],
+                toolCall: { toolCallId: 'call_exit' },
+              }));
+              await permissions.at(-1);
+              await new Promise(resolve => { setTimeout(resolve, 0); });
+            }
             if (options.asksPermission) {
               ask();
               await permissions.at(-1);
               await new Promise(resolve => { setTimeout(resolve, 0); });
             }
             if (options.switchesMode) {
-              notify?.({
+              notify({
                 sessionId: 'acp-session-1',
                 update: {
                   sessionUpdate: 'current_mode_update',
@@ -244,7 +276,7 @@ describe('Devin execution composition', () => {
               } as unknown as AcpSessionNotification);
             }
             if (options.announcesCommands) {
-              notify?.({
+              notify({
                 sessionId: 'acp-session-1',
                 update: {
                   sessionUpdate: 'available_commands_update',
@@ -252,7 +284,7 @@ describe('Devin execution composition', () => {
                 },
               } as unknown as AcpSessionNotification);
             }
-            notify?.({
+            notify({
               sessionId: 'acp-session-1',
               update: {
                 sessionUpdate: 'tool_call',
@@ -265,7 +297,7 @@ describe('Devin execution composition', () => {
               },
             });
             if (!options.windowOnFirstTurnOnly || turns === 1) {
-              notify?.({
+              notify({
                 sessionId: 'acp-session-1',
                 update: {
                   sessionUpdate: 'usage_update',
@@ -275,7 +307,7 @@ describe('Devin execution composition', () => {
                 },
               });
             }
-            notify?.({
+            notify({
               sessionId: 'acp-session-1',
               update: {
                 sessionUpdate: 'agent_message_chunk',
@@ -311,8 +343,8 @@ describe('Devin execution composition', () => {
           },
           cancel: () => undefined,
           onSessionNotification: listener => {
-            notify = listener;
-            return () => { notify = undefined; };
+            listeners.add(listener);
+            return () => { listeners.delete(listener); };
           },
           onConnectionLost: () => () => undefined,
           close: async () => 'confirmed' as const,
@@ -536,6 +568,29 @@ describe('Devin execution composition', () => {
       outcome: { outcome: 'selected', optionId: 'allow_once' },
     });
     expect(execution.interactionBridge.presentation(opened.presentationRef)).toBeUndefined();
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('describes a permission asked in the same breath as the call it is for', async () => {
+    // The frames arrive together, which is what one stdin chunk looks like:
+    // the transport parses both before any microtask runs. The tool call has
+    // to be on record by then, or the prompt falls back to "Devin action" —
+    // which is the sentence the lookup exists to replace.
+    const { execution, host } = await createHarness({ asksInSameTick: true });
+    const runtime = execution.createRuntime();
+    const asked: Array<{ toolName: string; description: string }> = [];
+    runtime.installInteractions({ approval: async (toolName: string, _input: unknown, description: string) => {
+      asked.push({ toolName, description });
+      return 'allow';
+    } });
+
+    await drain(runtime.query(runtime.prepareTurn({ text: 'do it' })));
+
+    expect(asked).toEqual([{
+      toolName: 'Exit plan mode',
+      description: 'Devin wants to leave Plan mode and start implementing the plan.',
+    }]);
     execution.dispose();
     await host.dispose();
   });

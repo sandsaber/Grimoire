@@ -10,7 +10,10 @@ import type { AcpRequestPermissionRequest } from '@/providers/acp/types';
 import { DevinAcpDynamicConfigApplier } from '@/providers/devin/execution/DevinAcpDynamicConfig';
 import { DevinAcpFileSystem } from '@/providers/devin/execution/DevinAcpFileSystem';
 import { DevinInteractionBridge } from '@/providers/devin/execution/DevinInteractionBridge';
-import { buildDevinPermissionPresentation } from '@/providers/devin/execution/DevinPermissionPresentation';
+import {
+  buildDevinPermissionPresentation,
+  recordDevinToolCall,
+} from '@/providers/devin/execution/DevinPermissionPresentation';
 import { DevinProjectionResultSink } from '@/providers/devin/execution/DevinProjectionResultSink';
 
 describe('Devin dynamic configuration', () => {
@@ -198,6 +201,25 @@ describe('Devin permission presentation', () => {
     })).toEqual({
       description: 'Devin wants to run `rm out.txt`.',
       toolName: 'Shell command',
+    });
+  });
+
+  it('reads a tool call off the wire, diff path and all', () => {
+    expect(recordDevinToolCall({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'call_a0ee957950984567aa8eecfd',
+      title: 'Wrote /vault/plan.md',
+      kind: 'edit',
+      content: [{ type: 'content' }, { type: 'diff', path: '/vault/plan.md' }],
+      _meta: { 'cognition.ai/inferenceToolName': 'write' },
+    })).toEqual({
+      toolCallId: 'call_a0ee957950984567aa8eecfd',
+      title: 'Wrote /vault/plan.md',
+      kind: 'edit',
+      rawInput: undefined,
+      locations: null,
+      diffPath: '/vault/plan.md',
+      meta: { 'cognition.ai/inferenceToolName': 'write' },
     });
   });
 

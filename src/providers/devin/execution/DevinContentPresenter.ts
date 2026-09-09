@@ -13,11 +13,9 @@ import type {
   AcpSessionModelState,
   AcpSessionModeState,
   AcpSessionNotification,
-  AcpSessionUpdate,
   AcpUsage,
   AcpUsageUpdate,
 } from '@/providers/acp/types';
-import type { DevinToolCallRecord } from '@/providers/devin/execution/DevinPermissionPresentation';
 import { mapDevinModeToGrimoire } from '@/providers/devin/modes';
 
 /** What the ACP connection delivered, shared with every managed-ACP provider. */
@@ -55,11 +53,6 @@ export interface DevinContentPresenterPorts {
   readonly onCommands?: (commands: readonly SlashCommand[]) => void;
   /** What the session answered with when it opened. */
   readonly onSessionOpened?: (opening: DevinSessionOpening) => void;
-  /**
-   * A tool call the session announced, kept for the permission request that
-   * may follow it: the request names the call by id and nothing else.
-   */
-  readonly onToolCall?: (call: DevinToolCallRecord) => void;
 }
 
 /**
@@ -156,9 +149,6 @@ export class DevinContentPresenter {
   private presentSessionUpdate(notification: AcpSessionNotification): readonly StreamChunk[] {
     if (notification.sessionId) {
       this.sessionId = notification.sessionId;
-    }
-    if (notification.update.sessionUpdate === 'tool_call') {
-      this.ports.onToolCall?.(recordToolCall(notification.update));
     }
     const normalized = this.normalizer.normalize(notification.update);
     switch (normalized.type) {
@@ -279,29 +269,6 @@ function presentRefusedMode(modeId: string, detail?: string): StreamChunk {
       ? `Devin did not switch to ${asked}: ${detail} This turn ran in the mode the session was `
         + 'already in.'
       : `Devin did not switch to ${asked}. This turn ran in the mode the session was already in.`,
-  };
-}
-
-/** What a `tool_call` update said, in the shape the permission sentence reads. */
-function recordToolCall(update: AcpSessionUpdate): DevinToolCallRecord {
-  const call = update as AcpSessionUpdate & {
-    toolCallId?: string;
-    title?: string | null;
-    kind?: string | null;
-    rawInput?: unknown;
-    locations?: Array<{ path: string }> | null;
-    content?: Array<{ type?: string; path?: string }> | null;
-    _meta?: Record<string, unknown> | null;
-  };
-  const diffPath = call.content?.find(entry => entry.type === 'diff' && typeof entry.path === 'string')?.path;
-  return {
-    toolCallId: call.toolCallId ?? '',
-    title: call.title ?? null,
-    kind: call.kind ?? null,
-    rawInput: call.rawInput,
-    locations: call.locations ?? null,
-    diffPath: diffPath ?? null,
-    meta: call._meta ?? null,
   };
 }
 
