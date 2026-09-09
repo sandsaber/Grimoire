@@ -1052,6 +1052,9 @@
       },
       "qwen": {
         "desc": "Alibaba Qwen Code über seine native Agent-Client-Protocol-Laufzeit."
+      },
+      "devin": {
+        "desc": "Devin CLI von Cognition über seine native Agent-Client-Protocol-Laufzeit."
       }
     },
     "hub": {
@@ -1346,6 +1349,22 @@
           "heading": "Umgebung",
           "name": "Umgebungsvariablen",
           "desc": "Qwen-Code-Authentifizierung mit `qwen` und `/auth` konfigurieren. Optionale Anbietervariablen wie DASHSCOPE_API_KEY, OPENAI_API_KEY oder ANTHROPIC_API_KEY werden durchgereicht; Grimoire automatisiert die Anmeldung nicht."
+        }
+      },
+      "devin": {
+        "cliPath": {
+          "name": "Devin-CLI-Pfad",
+          "desc": "Benutzerdefinierter Pfad zur lokalen Devin CLI. Leer lassen, um `devin` über PATH zu starten."
+        },
+        "hiddenCommands": {
+          "name": "Ausgeblendete Befehle",
+          "desc": "Bestimmte von Devin ACP gemeldete Befehle im Dropdown ausblenden. Namen ohne führenden Schrägstrich eingeben, einen pro Zeile.",
+          "placeholder": "login\nlogout\nstatus"
+        },
+        "environment": {
+          "heading": "Umgebung",
+          "name": "Umgebungsvariablen",
+          "desc": "Vor der Nutzung mit `devin auth login` anmelden. Optionale CLI-Variablen wie DEVIN_MODEL oder RUST_LOG werden durchgereicht; Grimoire automatisiert die Anmeldung nicht."
         }
       }
     },

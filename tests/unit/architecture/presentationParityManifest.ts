@@ -61,6 +61,7 @@ const PROVIDER_CHAT_UI_CONFIGS = [
   'src/providers/mimocode/ui/MimocodeChatUIConfig.ts',
   'src/providers/opencode/ui/OpencodeChatUIConfig.ts',
   'src/providers/qwen/ui/QwenChatUIConfig.ts',
+  'src/providers/devin/ui/DevinChatUIConfig.ts',
 ];
 
 export const PARITY_SURFACES: ParitySurface[] = [
@@ -367,6 +368,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/mimocode/ui/MimocodeSettingsTab.ts',
       'src/providers/opencode/ui/OpencodeSettingsTab.ts',
       'src/providers/qwen/ui/QwenSettingsTab.ts',
+      'src/providers/devin/ui/DevinSettingsTab.ts',
     ],
   },
   {
@@ -471,6 +473,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/mimocode/commands/MimocodeCommandCatalog.ts',
       'src/providers/opencode/commands/OpencodeCommandCatalog.ts',
       'src/providers/qwen/commands/QwenCommandCatalog.ts',
+      'src/providers/devin/commands/DevinCommandCatalog.ts',
     ],
   },
   {
@@ -488,6 +491,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/mimocode/history/MimocodeConversationHistoryService.ts',
       'src/providers/opencode/history/OpencodeConversationHistoryService.ts',
       'src/providers/qwen/history/QwenConversationHistoryService.ts',
+      'src/providers/devin/history/DevinConversationHistoryService.ts',
     ],
   },
   {
@@ -505,6 +509,7 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/mimocode/runtime/MimocodeCliResolver.ts',
       'src/providers/opencode/runtime/OpencodeCliResolver.ts',
       'src/providers/qwen/runtime/QwenCliResolver.ts',
+      'src/providers/devin/runtime/DevinCliResolver.ts',
     ],
   },
   {
@@ -623,6 +628,24 @@ export const PARITY_SURFACES: ParitySurface[] = [
       'src/providers/qwen/execution/QwenPermissionPresentation.ts',
       'src/providers/qwen/execution/QwenProjectionResultSink.ts',
       'src/providers/qwen/execution/QwenSessionConfigState.ts',
+      // Devin chat execution: the seventh ACP provider on the kernel and the
+      // first added after the migration (#108). Qwen's shape minus the effort
+      // prompt, the context-usage vendor request and the question bridge, plus
+      // a permission sentence read from the tool call that preceded the
+      // request and a filesystem door for Devin's own plans directory.
+      'src/providers/devin/execution/DevinExecutionComposition.ts',
+      'src/providers/devin/execution/DevinMetadataSession.ts',
+      'src/providers/devin/DevinProviderModule.ts',
+      'src/providers/devin/app/DevinModuleContext.ts',
+      'src/providers/devin/execution/DevinAcpDynamicConfig.ts',
+      'src/providers/devin/execution/DevinAcpFileSystem.ts',
+      'src/providers/devin/execution/DevinContentPresenter.ts',
+      'src/providers/devin/execution/DevinExecutionBackend.ts',
+      'src/providers/devin/execution/DevinExecutionRequests.ts',
+      'src/providers/devin/execution/DevinInteractionBridge.ts',
+      'src/providers/devin/execution/DevinPermissionPresentation.ts',
+      'src/providers/devin/execution/DevinProjectionResultSink.ts',
+      'src/providers/devin/execution/DevinSessionConfigState.ts',
       // Grok chat execution, flipped: the second ACP provider on the kernel,
       // and the isolated session its five metadata surfaces now share.
       'src/providers/grok/execution/GrokExecutionComposition.ts',

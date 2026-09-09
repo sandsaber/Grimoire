@@ -2,6 +2,7 @@ import { ProviderCatalog } from '../core/providers/ProviderCatalog';
 import { antigravityProviderModule } from './antigravity/AntigravityProviderModule';
 import { claudeProviderModule } from './claude/ClaudeProviderModule';
 import { codexProviderModule } from './codex/CodexProviderModule';
+import { devinProviderModule } from './devin/DevinProviderModule';
 import { geminiProviderModule } from './gemini/GeminiProviderModule';
 import { grokProviderModule } from './grok/GrokProviderModule';
 import { kimicodeProviderModule } from './kimicode/KimicodeProviderModule';
@@ -10,7 +11,7 @@ import { opencodeProviderModule } from './opencode/OpencodeProviderModule';
 import { qwenProviderModule } from './qwen/QwenProviderModule';
 
 /**
- * The nine built-in provider modules, in no particular order.
+ * The ten built-in provider modules, in no particular order.
  *
  * Presentation order is `manifest.order`, which the catalog sorts by. Listing
  * them here in that order too would give a reader two sources for one fact and
@@ -20,6 +21,7 @@ const BUILT_IN_PROVIDER_MODULES = [
   antigravityProviderModule,
   claudeProviderModule,
   codexProviderModule,
+  devinProviderModule,
   geminiProviderModule,
   grokProviderModule,
   kimicodeProviderModule,

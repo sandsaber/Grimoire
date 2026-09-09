@@ -29,32 +29,32 @@
 
 > **Heads-up: 2.0 is in progress.** The next major release moves Grimoire onto a provider-based execution architecture, where one kernel drives every CLI and records exactly one outcome per turn, and brings a redesign that follows your vault's theme and accent. It is merged into `main` and is not in a published release yet. The current release is still 1.3.2. Conversations, settings, and provider files carry over unchanged.
 
-Grimoire brings agentic CLI assistants into Obsidian. Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, and Qwen Code all live in one side panel, where they read your notes, edit files, run commands, call tools, and keep session history against your real vault. Nothing routes through a Grimoire server. There's no telemetry, no hosted backend, and no proxy sitting in the middle.
+Grimoire brings agentic CLI assistants into Obsidian. Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, and Devin all live in one side panel, where they read your notes, edit files, run commands, call tools, and keep session history against your real vault. Nothing routes through a Grimoire server. There's no telemetry, no hosted backend, and no proxy sitting in the middle.
 
 It's built for people who already work in Obsidian and want AI help that behaves like part of the vault: local context, local files, a provider you pick on purpose, and usage you can actually see.
 
 ## Why Grimoire
 
 - Use the CLI agents you already trust, right inside your notes.
-- Switch providers from the composer. Claude Code, Codex, Antigravity CLI, legacy Gemini CLI, OpenCode, MiMoCode, Kimi Code, Grok Build, and Qwen Code share one model picker.
+- Switch providers from the composer. Claude Code, Codex, Antigravity CLI, legacy Gemini CLI, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, and Devin share one model picker.
 - Ground every turn in your vault. Mention notes, folders, and MCP tools instead of pasting paths by hand.
 - See cost and limits next to the model selector, where you're making the decision anyway.
 - Stay local-first. Grimoire doesn't collect telemetry, proxy prompts, or run a backend.
 
 ## What each provider can do
 
-| Capability | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Local persistent runtime | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes |
-| Native history hydration | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No |
-| Plan mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes |
-| Image attachments | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes |
-| Instruction mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes |
-| Reasoning effort controls | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Rewind | Yes | No | No | Yes | No | No | No | No | No |
-| Fork | Yes | Yes | No | Yes | No | No | No | No | No |
-| Provider slash commands | Yes | No | Yes | Yes | Yes | Yes | No | Yes | Yes |
-| Grimoire-managed MCP UI | Yes | No | Yes | Yes | Yes | Yes | No | Yes | Yes |
+| Capability | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Local persistent runtime | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
+| Native history hydration | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No | No |
+| Plan mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
+| Image attachments | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
+| Instruction mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
+| Reasoning effort controls | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No |
+| Rewind | Yes | No | No | Yes | No | No | No | No | No | No |
+| Fork | Yes | Yes | No | Yes | No | No | No | No | No | No |
+| Provider slash commands | Yes | No | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
+| Grimoire-managed MCP UI | Yes | No | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
 
 ## Installation
 
@@ -216,6 +216,30 @@ If Qwen does not start or no models appear, run `/doctor` inside Qwen Code, comp
 Choose Low, Medium, High, XHigh, or Max reasoning effort (High by default). Before a normal turn, Grimoire applies Qwen's real `/effort <tier>` command and caches it for that session; the effective tier still depends on the selected model and provider. Qwen's structured `AskUserQuestion` requests arrive through ACP permission metadata and use Grimoire's shared inline question UI, including single-select, multi-select, and freeform answers.
 
 Qwen owns its credentials and native configuration in `~/.qwen/settings.json`; prefer the CLI or Qwen-owned `.env` and environment variables for those settings. Grimoire manages an isolated project MCP list in `.grimoire/mcp/qwen.json` and injects it into ACP sessions without rewriting Qwen's native configuration. Usage appears only when Qwen emits ACP token or cost metadata. Qwen does not currently support Grimoire fork or rewind controls.
+
+### Devin
+
+Devin CLI (Cognition) is an opt-in ACP provider. Grimoire launches `devin acp`, discovers the models and modes your account offers from the live session, streams messages, thinking, and tool activity, asks before shell commands and file writes, and resumes sessions natively. The model list depends on the account you are signed in with; that is Devin's, not Grimoire's.
+
+```bash
+# macOS, Linux, WSL
+curl -fsSL https://cli.devin.ai/install.sh | bash
+
+# Homebrew
+brew install --cask devin-cli
+
+devin auth login
+devin --version
+```
+
+Sign in with `devin auth login` (a browser flow), then enable Devin in Grimoire. Safe, Auto-approve, and Plan map to Devin's `accept-edits`, `bypass`, and `plan` modes; Devin's `smart` and `ask` are shown as Safe in the shared toolbar.
+
+- [Devin CLI documentation](https://docs.devin.ai/cli)
+- [Devin ACP documentation](https://docs.devin.ai/desktop/acp)
+
+One thing to know about Safe mode: Devin decides for itself which shell commands are read-only and runs those without asking, and `echo` counts as read-only even when it redirects into a file. Grimoire approves every file write Devin makes through the protocol, but a write the agent routes through its own shell can slip past that. For a session that must not write, use Plan.
+
+Devin owns its credentials in `~/.local/share/devin/`. Vault skills are read from `.devin/skills` and `.agents/skills`, and a skill is Devin's slash command. Grimoire manages an isolated project MCP list in `.grimoire/mcp/devin.json` and injects it into ACP sessions. Usage appears when Devin reports it; there is no reasoning effort control, because the effort is part of the model id. Devin does not support Grimoire fork or rewind controls.
 
 ### OpenCode
 

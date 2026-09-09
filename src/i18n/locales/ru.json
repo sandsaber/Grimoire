@@ -1052,6 +1052,9 @@
       },
       "qwen": {
         "desc": "Alibaba Qwen Code через собственную среду выполнения Agent Client Protocol."
+      },
+      "devin": {
+        "desc": "Devin CLI от Cognition через собственную среду выполнения Agent Client Protocol."
       }
     },
     "hub": {
@@ -1346,6 +1349,22 @@
           "heading": "Среда",
           "name": "Переменные среды",
           "desc": "Настройте аутентификацию Qwen Code с помощью `qwen` и `/auth`. Необязательные переменные провайдера, например DASHSCOPE_API_KEY, OPENAI_API_KEY или ANTHROPIC_API_KEY, передаются; Grimoire не автоматизирует вход."
+        }
+      },
+      "devin": {
+        "cliPath": {
+          "name": "Путь к CLI Devin",
+          "desc": "Пользовательский путь к локальной CLI Devin. Оставьте пустым, чтобы запустить `devin` из PATH."
+        },
+        "hiddenCommands": {
+          "name": "Скрытые команды",
+          "desc": "Скрыть отдельные команды, сообщаемые Devin ACP. Введите имена без начальной косой черты, по одному в строке.",
+          "placeholder": "login\nlogout\nstatus"
+        },
+        "environment": {
+          "heading": "Среда",
+          "name": "Переменные среды",
+          "desc": "Перед использованием войдите через `devin auth login`. Необязательные переменные CLI, например DEVIN_MODEL или RUST_LOG, передаются; Grimoire не автоматизирует вход."
         }
       }
     },

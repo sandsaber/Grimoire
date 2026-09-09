@@ -18,6 +18,7 @@ import type GrimoirePlugin from '@/main';
 import { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
 import { ClaudeExecution } from '@/providers/claude/execution/ClaudeExecutionComposition';
 import { CodexExecution } from '@/providers/codex/execution/CodexExecutionComposition';
+import { DevinExecution } from '@/providers/devin/execution/DevinExecutionComposition';
 import { GeminiExecution } from '@/providers/gemini/execution/GeminiExecutionComposition';
 import { GrokExecution } from '@/providers/grok/execution/GrokExecutionComposition';
 import { KimicodeExecution } from '@/providers/kimicode/execution/KimicodeExecutionComposition';
@@ -139,6 +140,7 @@ export class ApplicationRuntime {
   readonly kimicode: KimicodeExecution;
   readonly gemini: GeminiExecution;
   readonly qwen: QwenExecution;
+  readonly devin: DevinExecution;
 
   constructor(private readonly options: ApplicationRuntimeOptions) {
     const { plugin } = options;
@@ -186,9 +188,11 @@ export class ApplicationRuntime {
     this.kernel.registerBackend(this.gemini.createBackendRegistration());
     this.qwen = new QwenExecution(plugin, registry);
     this.kernel.registerBackend(this.qwen.createBackendRegistration());
+    this.devin = new DevinExecution(plugin, registry);
+    this.kernel.registerBackend(this.devin.createBackendRegistration());
 
-    // **Absent means unsupported**, and three providers are absent: Antigravity
-    // runs in print mode, and Gemini and Qwen have never had auxiliary
+    // **Absent means unsupported**, and four providers are absent: Antigravity
+    // runs in print mode, and Gemini, Qwen and Devin have never had auxiliary
     // execution. They shipped three no-op services each instead of saying so,
     // which is a failure the UI could not tell from a real one.
     this.auxiliary = new AuxiliaryExecutionOwner({
@@ -360,6 +364,7 @@ export class ApplicationRuntime {
       case 'antigravity': return this.antigravity;
       case 'claude': return this.claude;
       case 'codex': return this.codex;
+      case 'devin': return this.devin;
       case 'gemini': return this.gemini;
       case 'grok': return this.grok;
       case 'kimicode': return this.kimicode;
@@ -594,6 +599,7 @@ export class ApplicationRuntime {
     this.kimicode.dispose();
     this.gemini.dispose();
     this.qwen.dispose();
+    this.devin.dispose();
     this.chat.dispose();
     void this.kernel.dispose();
   }

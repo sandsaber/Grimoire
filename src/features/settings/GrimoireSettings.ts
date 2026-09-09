@@ -364,6 +364,11 @@ const PROVIDER_SETTING_COPY: Record<ProviderId, {
     name: 'Grok Build',
     tabName: 'Grok',
   },
+  devin: {
+    descKey: 'settings.providers.devin.desc',
+    name: 'Devin',
+    tabName: 'Devin',
+  },
 };
 
 const GENERAL_SETTINGS_SEARCH_KEYS: TranslationKey[] = [
@@ -632,6 +637,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
       'antigravity',
       'gemini',
       'qwen',
+      'devin',
       'pi',
     ];
     const positions = new Map(preferredOrder.map((providerId, index) => [providerId, index]));
@@ -1186,6 +1192,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
       environment: [
         t('settings.environment'),
         t('settings.providerTabs.qwen.environment.heading'),
+        t('settings.providerTabs.devin.environment.heading'),
       ],
     };
     const titleMatchers: Record<WorkspaceSection, RegExp> = {

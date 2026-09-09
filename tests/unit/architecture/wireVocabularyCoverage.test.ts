@@ -8,6 +8,7 @@ import type { AcpSessionNotification } from '@/providers/acp/types';
 import { ClaudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
 import { ClaudeContentPresenter } from '@/providers/claude/execution/ClaudeContentPresenter';
 import { CODEX_EXECUTION_NOTIFICATION_METHODS } from '@/providers/codex/runtime/CodexExecutionConnection';
+import { DevinContentPresenter } from '@/providers/devin/execution/DevinContentPresenter';
 import { GeminiContentPresenter } from '@/providers/gemini/execution/GeminiContentPresenter';
 import { GrokContentPresenter } from '@/providers/grok/execution/GrokContentPresenter';
 import { GROK_SESSION_NOTIFICATION_METHODS } from '@/providers/grok/runtime/GrokSessionNotifications';
@@ -118,6 +119,11 @@ const UNMODELLED_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
   kimicode: [],
   /** Qwen's four, likewise, from the recording retaken the same day. */
   qwen: [],
+  /**
+   * Devin's seven, from a recording that answered on the day it was taken.
+   * The normalizer already knows `session_info_update` from Kimi Code's fork.
+   */
+  devin: [],
 };
 
 /**
@@ -133,7 +139,7 @@ const UNMODELLED_BY_PROVIDER: Readonly<Record<string, readonly string[]>> = {
  * with a vocabulary into a failure rather than a silence.
  */
 const SESSION_UPDATE_REPLAYS: readonly string[] = [
-  'gemini', 'grok', 'kimicode', 'mimocode', 'opencode', 'qwen',
+  'devin', 'gemini', 'grok', 'kimicode', 'mimocode', 'opencode', 'qwen',
 ];
 
 /**
@@ -212,7 +218,7 @@ describe('wire vocabulary coverage', () => {
     // flip finally needs.
     expect(recordings.map(recording => recording.providerId).sort())
       .toEqual([
-        'antigravity', 'claude', 'codex', 'gemini', 'grok', 'kimicode', 'mimocode',
+        'antigravity', 'claude', 'codex', 'devin', 'gemini', 'grok', 'kimicode', 'mimocode',
         'opencode', 'qwen',
       ]);
   });
@@ -396,6 +402,33 @@ describe('wire vocabulary coverage', () => {
     const missing = observed.filter(update => !consumed.has(update)).sort();
 
     expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.qwen].sort());
+  });
+
+  it('records every Devin session update nothing draws the surface from', () => {
+    const recording = recordings.find(entry => entry.providerId === 'devin');
+    const observed = recording?.sessionUpdatesObserved ?? [];
+    const consumed = new Set<string>(
+      readAcpSessionUpdates(recording).flatMap(notification => {
+        const effects: string[] = [];
+        const presenter = new DevinContentPresenter({
+          displayModel: () => 'model',
+          onCommands: () => effects.push('commands'),
+          onConfigOptions: () => effects.push('config'),
+          onCost: () => effects.push('cost'),
+          onCurrentMode: () => effects.push('mode'),
+          onSessionOpened: () => effects.push('session'),
+        });
+        const chunks = presenter.present({ kind: 'session-update', notification });
+        const modelled = new AcpSessionUpdateNormalizer()
+          .normalize(notification.update).type !== 'unsupported';
+        return drawsASurface(chunks, effects, modelled)
+          ? [notification.update.sessionUpdate]
+          : [];
+      }),
+    );
+    const missing = observed.filter(update => !consumed.has(update)).sort();
+
+    expect(missing).toEqual([...UNMODELLED_BY_PROVIDER.devin].sort());
   });
 
   it('replays every recording that observed session updates', () => {

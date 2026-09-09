@@ -22,6 +22,8 @@ The provider runtime is rebuilt on an execution kernel, and the chat surfaces ar
 
 ### Added
 
+- Devin CLI (Cognition) as an opt-in provider over `devin acp`: models and modes from the live session, permission requests for shell commands, file writes approved by Grimoire, native resume, and Grimoire-managed MCP servers in `.grimoire/mcp/devin.json`. (#108)
+
 - Context management. Everything attached to your next message - the open note, notes you mentioned, files from outside the vault - is now one list. One file the composer draws as a chip; from the second it says how many, roughly what they cost, and what share of the model's context window they would take, on a line the same height as the chip it replaces, so attaching a file never shrinks the box you write in. A Manage dialog lists all of it grouped and searchable, with per-file removal, multi-select, and a window budget in the footer. An Add picker searches the vault and stays open on Tab so attaching six notes takes one visit, and its footer can reach a file or a folder from outside the vault as well as the note you are looking at. Costs are estimates and are labelled as such. Nothing is dropped silently: a file that moved keeps its row and says so, and going over the window warns you without disabling Send.
 - The Manage dialog opens from wherever you are: a list control beside the composer's Add chip, Manage on the summary line, Review when the context will not fit, and a "Manage context" command you can bind a shortcut to.
 - A setting for panel labels. The Chat / Sources / Context switch ships as icons with the current panel named; turn on "Show panel labels" to name all three.

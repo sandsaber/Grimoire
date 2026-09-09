@@ -1052,6 +1052,9 @@
       },
       "qwen": {
         "desc": "기본 Agent Client Protocol 런타임을 통한 Alibaba Qwen Code입니다."
+      },
+      "devin": {
+        "desc": "기본 Agent Client Protocol 런타임을 통한 Cognition의 Devin CLI입니다."
       }
     },
     "hub": {
@@ -1346,6 +1349,22 @@
           "heading": "환경",
           "name": "환경 변수",
           "desc": "`qwen` 및 `/auth`로 Qwen Code 인증을 구성하세요. DASHSCOPE_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY 등의 선택적 제공업체 변수는 전달되지만 Grimoire는 로그인을 자동화하지 않습니다."
+        }
+      },
+      "devin": {
+        "cliPath": {
+          "name": "Devin CLI 경로",
+          "desc": "로컬 Devin CLI의 사용자 지정 경로입니다. PATH에서 `devin`을 시작하려면 비워 두세요."
+        },
+        "hiddenCommands": {
+          "name": "숨겨진 명령",
+          "desc": "Devin ACP에서 보고한 특정 명령을 숨깁니다. 앞의 슬래시 없이 이름을 한 줄에 하나씩 입력하세요.",
+          "placeholder": "login\nlogout\nstatus"
+        },
+        "environment": {
+          "heading": "환경",
+          "name": "환경 변수",
+          "desc": "사용하기 전에 `devin auth login`으로 로그인하세요. DEVIN_MODEL, RUST_LOG 등의 선택적 CLI 변수는 전달되지만 Grimoire는 로그인을 자동화하지 않습니다."
         }
       }
     },

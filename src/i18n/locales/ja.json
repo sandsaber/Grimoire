@@ -1052,6 +1052,9 @@
       },
       "qwen": {
         "desc": "ネイティブのAgent Client Protocolランタイムを通じたAlibaba Qwen Code。"
+      },
+      "devin": {
+        "desc": "ネイティブのAgent Client Protocolランタイムを通じたCognitionのDevin CLI。"
       }
     },
     "hub": {
@@ -1346,6 +1349,22 @@
           "heading": "環境",
           "name": "環境変数",
           "desc": "`qwen`と`/auth`でQwen Codeの認証を設定します。DASHSCOPE_API_KEY、OPENAI_API_KEY、ANTHROPIC_API_KEYなどの任意のプロバイダー変数は渡されます。Grimoireはサインインを自動化しません。"
+        }
+      },
+      "devin": {
+        "cliPath": {
+          "name": "Devin CLIパス",
+          "desc": "ローカルDevin CLIへのカスタムパス。PATHから`devin`を起動する場合は空欄にしてください。"
+        },
+        "hiddenCommands": {
+          "name": "非表示のコマンド",
+          "desc": "Devin ACPが報告した特定のコマンドを隠します。先頭のスラッシュを除いた名前を1行に1つ入力してください。",
+          "placeholder": "login\nlogout\nstatus"
+        },
+        "environment": {
+          "heading": "環境",
+          "name": "環境変数",
+          "desc": "使用前に`devin auth login`でサインインしてください。DEVIN_MODELやRUST_LOGなどの任意のCLI変数は渡されます。Grimoireはサインインを自動化しません。"
         }
       }
     },

@@ -1,0 +1,1167 @@
+{
+  "schemaVersion": 1,
+  "providerId": "devin",
+  "kind": "wire-recording",
+  "recordedAgainst": "devin 0.0.0-dev",
+  "transport": "stdio JSON-RPC 2.0 (`devin acp`)",
+  "coverage": "complete",
+  "cases": [
+    "initialize",
+    "session/new",
+    "session/set_config_option",
+    "session/prompt"
+  ],
+  "sessionUpdatesObserved": [
+    "agent_message_chunk",
+    "agent_thought_chunk",
+    "available_commands_update",
+    "config_option_update",
+    "current_mode_update",
+    "session_info_update",
+    "usage_update"
+  ],
+  "serverMethodsObserved": [
+    "_cognition.ai/agent_stopped",
+    "_cognition.ai/mcp/serversChanged",
+    "_cognition.ai/output",
+    "_cognition.ai/thinking_complete",
+    "session/update"
+  ],
+  "payloadPolicy": "Strings over 200 characters are elided: the recording is evidence of protocol shape, not of content.",
+  "exchange": [
+    {
+      "seq": 1,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": 1,
+          "clientCapabilities": {
+            "fs": {
+              "readTextFile": true,
+              "writeTextFile": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 2,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "promptCapabilities": {
+              "image": true,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "mcpCapabilities": {
+              "http": false,
+              "sse": false
+            },
+            "sessionCapabilities": {
+              "list": {},
+              "delete": {},
+              "additionalDirectories": {}
+            },
+            "auth": {},
+            "_meta": {
+              "cognition.ai/multiRootWorkspace": true,
+              "cognition.ai/sessionRename": true,
+              "cognition.ai/sessionShare": true,
+              "cognition.ai/documentLifecycle": true,
+              "cognition.ai/userEdits": true,
+              "cognition.ai/terminalLifecycle": true,
+              "cognition.ai/userConfig": true,
+              "cognition.ai/userShellCommand": true,
+              "cognition.ai/editableCommands": true,
+              "cognition.ai/commandRevision": true,
+              "cognition.ai/chains": true,
+              "cognition.ai/megaplan": true,
+              "cognition.ai/ruleMentions": true
+            }
+          },
+          "authMethods": [
+            {
+              "id": "devin-browser",
+              "name": "Log in with browser",
+              "description": "Sign in via your browser"
+            }
+          ],
+          "agentInfo": {
+            "name": "affogato",
+            "title": "Devin Agent",
+            "version": "0.0.0-dev"
+          },
+          "_meta": {
+            "mcpConfigPath": "/Users/grimoire/.config/devin/mcp_config.json"
+          }
+        }
+      }
+    },
+    {
+      "seq": 3,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_cognition.ai/mcp/serversChanged",
+        "params": {}
+      }
+    },
+    {
+      "seq": 4,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_cognition.ai/output",
+        "params": {
+          "channel": "MCP: codegraph",
+          "message": "Connecting to MCP server 'codegraph'",
+          "level": "info",
+          "sessionId": ""
+        }
+      }
+    },
+    {
+      "seq": 5,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_cognition.ai/output",
+        "params": {
+          "channel": "MCP: codegraph",
+          "message": "Starting stdio MCP server 'codegraph': \"codegraph\" [\"serve\", \"--mcp\"]",
+          "level": "info",
+          "sessionId": ""
+        }
+      }
+    },
+    {
+      "seq": 6,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_cognition.ai/mcp/serversChanged",
+        "params": {}
+      }
+    },
+    {
+      "seq": 7,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_cognition.ai/output",
+        "params": {
+          "channel": "MCP: codegraph",
+          "message": "MCP server 'codegraph' connected successfully",
+          "level": "info",
+          "sessionId": ""
+        }
+      }
+    },
+    {
+      "seq": 8,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_cognition.ai/mcp/serversChanged",
+        "params": {}
+      }
+    },
+    {
+      "seq": 9,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/new",
+        "params": {
+          "cwd": "/var/folders/g8/hsnrm0k94d9fy9znlf6jsnvc0000gn/T/grimoire-devin-wire-oq2HOM",
+          "mcpServers": []
+        }
+      }
+    },
+    {
+      "seq": 10,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_cognition.ai/mcp/serversChanged",
+        "params": {}
+      }
+    },
+    {
+      "seq": 11,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "config_option_update",
+            "configOptions": [
+              {
+                "id": "mode",
+                "name": "Session Mode",
+                "category": "mode",
+                "type": "select",
+                "currentValue": "accept-edits",
+                "options": [
+                  {
+                    "value": "accept-edits",
+                    "name": "Code",
+                    "description": "Write and edit code",
+                    "_meta": {
+                      "cognition.ai/icon": "code"
+                    }
+                  },
+                  {
+                    "value": "smart",
+                    "name": "Smart",
+                    "description": "Auto-approve actions the model judges safe",
+                    "_meta": {
+                      "cognition.ai/icon": "sparkles"
+                    }
+                  },
+                  {
+                    "value": "ask",
+                    "name": "Ask",
+                    "description": "Answer questions without code changes",
+                    "_meta": {
+                      "cognition.ai/icon": "message-circle"
+                    }
+                  },
+                  {
+                    "value": "plan",
+                    "name": "Plan",
+                    "description": "Plan changes before implementing",
+                    "_meta": {
+                      "cognition.ai/icon": "file-text"
+                    }
+                  },
+                  {
+                    "value": "bypass",
+                    "name": "Bypass Permissions",
+                    "description": "Auto-approve all tool calls",
+                    "_meta": {
+                      "cognition.ai/icon": "shield-off"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "model",
+                "name": "Model",
+                "description": "AI model to use",
+                "category": "model",
+                "type": "select",
+                "currentValue": "swe-1-6-slow",
+                "options": [
+                  {
+                    "value": "swe-1-6-slow",
+                    "name": "SWE-1.6 Slow",
+                    "_meta": {
+                      "cognition.ai/supportsImages": true
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "seq": 12,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "current_mode_update",
+            "currentModeId": "accept-edits"
+          }
+        }
+      }
+    },
+    {
+      "seq": 13,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+              {
+                "name": "login",
+                "description": "Authenticate with an API key",
+                "input": {
+                  "hint": "[api-key]"
+                },
+                "_meta": {
+                  "cognition.ai/icon": "log-in",
+                  "cognition.ai/category": "Account"
+                }
+              },
+              {
+                "name": "logout",
+                "description": "Clear authentication",
+                "_meta": {
+                  "cognition.ai/icon": "log-out",
+                  "cognition.ai/category": "Account"
+                }
+              },
+              {
+                "name": "status",
+                "description": "Check authentication status",
+                "_meta": {
+                  "cognition.ai/icon": "user-check",
+                  "cognition.ai/category": "Account"
+                }
+              },
+              {
+                "name": "workspace",
+                "description": "List workspace directories",
+                "_meta": {
+                  "cognition.ai/icon": "folder-open",
+                  "cognition.ai/category": "System"
+                }
+              },
+              {
+                "name": "ask",
+                "description": "Switch to Ask mode (read-only)",
+                "input": {
+                  "hint": "[question]"
+                },
+                "_meta": {
+                  "cognition.ai/icon": "message-circle",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "plan",
+                "description": "Switch to Plan mode, or plan with a prompt",
+                "input": {
+                  "hint": "[prompt]"
+                },
+                "_meta": {
+                  "cognition.ai/icon": "file-text",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "compact",
+                "description": "Force conversation compaction",
+                "_meta": {
+                  "cognition.ai/icon": "archive",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "context",
+                "description": "Show context window usage",
+                "_meta": {
+                  "cognition.ai/icon": "pie-chart",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "fast",
+                "description": "Switch to the fastest model available to you",
+                "_meta": {
+                  "cognition.ai/icon": "zap",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "loop",
+                "description": "Run a prompt then auto-review the diff in a loop",
+                "input": {
+                  "hint": "<prompt>"
+                },
+                "_meta": {
+                  "cognition.ai/icon": "repeat",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "recap",
+                "description": "Recap the session so far with a short summary",
+                "_meta": {
+                  "cognition.ai/icon": "history",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "session-stats",
+                "description": "Show session statistics",
+                "_meta": {
+                  "cognition.ai/icon": "bar-chart-2",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "rename",
+                "description": "Rename this session",
+                "input": {
+                  "hint": "<new title>"
+                },
+                "_meta": {
+                  "cognition.ai/icon": "pencil",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "share",
+                "description": "Share this conversation with your team on Devin",
+                "_meta": {
+                  "cognition.ai/icon": "share-2",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "mcp",
+                "description": "List configured MCP servers and their status",
+                "_meta": {
+                  "cognition.ai/icon": "plug",
+                  "cognition.ai/category": "System"
+                }
+              },
+              {
+                "name": "bug",
+                "description": "Report a bug to the Devin CLI developers",
+                "input": {
+                  "hint": "<description>"
+                },
+                "_meta": {
+                  "cognition.ai/icon": "bug",
+                  "cognition.ai/category": "System"
+                }
+              },
+              {
+                "name": "help",
+                "description": "Show available commands",
+                "_meta": {
+                  "cognition.ai/icon": "help-circle",
+                  "cognition.ai/category": "Session"
+                }
+              },
+              {
+                "name": "english-dev-docs",
+                "description": "Write every shared development artifact in English, whatever language the conversation is in. Trigger on the act of writing, drafting, creating, filing, rewriting, summarizing, or naming any… (elided)",
+                "_meta": {
+                  "cognition.ai/icon": "zap",
+                  "cognition.ai/category": "Skills"
+                }
+              },
+              {
+                "name": "deslop",
+                "description": "Remove conspicuous AI-style filler, formulaic rhetoric, and repetitive prose while preserving meaning and author voice. Use for deslop, humanize, убрать ИИ-паттерны, natural-sounding drafts,… (elided)",
+                "_meta": {
+                  "cognition.ai/icon": "zap",
+                  "cognition.ai/category": "Skills"
+                }
+              },
+              {
+                "name": "declarative-repo-setup",
+                "description": "Generate and verify a working environment.yaml (Devin snapshot-setup blueprint) for a repo",
+                "input": {
+                  "hint": "<owner/repo>"
+                },
+                "_meta": {
+                  "cognition.ai/icon": "zap",
+                  "cognition.ai/category": "Skills"
+                }
+              },
+              {
+                "name": "upload-secrets",
+                "description": "Securely upload local secrets (dotenv files, env vars, API keys) to the Devin Cloud secrets manager — values never enter the conversation",
+                "_meta": {
+                  "cognition.ai/icon": "zap",
+                  "cognition.ai/category": "Skills"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "seq": 14,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "sessionId": "prickly-conga",
+          "modes": {
+            "currentModeId": "accept-edits",
+            "availableModes": [
+              {
+                "id": "accept-edits",
+                "name": "Code"
+              },
+              {
+                "id": "smart",
+                "name": "Smart"
+              },
+              {
+                "id": "ask",
+                "name": "Ask"
+              },
+              {
+                "id": "plan",
+                "name": "Plan"
+              },
+              {
+                "id": "bypass",
+                "name": "Bypass Permissions"
+              }
+            ]
+          },
+          "configOptions": [
+            {
+              "id": "mode",
+              "name": "Session Mode",
+              "category": "mode",
+              "type": "select",
+              "currentValue": "accept-edits",
+              "options": [
+                {
+                  "value": "accept-edits",
+                  "name": "Code",
+                  "description": "Write and edit code",
+                  "_meta": {
+                    "cognition.ai/icon": "code"
+                  }
+                },
+                {
+                  "value": "smart",
+                  "name": "Smart",
+                  "description": "Auto-approve actions the model judges safe",
+                  "_meta": {
+                    "cognition.ai/icon": "sparkles"
+                  }
+                },
+                {
+                  "value": "ask",
+                  "name": "Ask",
+                  "description": "Answer questions without code changes",
+                  "_meta": {
+                    "cognition.ai/icon": "message-circle"
+                  }
+                },
+                {
+                  "value": "plan",
+                  "name": "Plan",
+                  "description": "Plan changes before implementing",
+                  "_meta": {
+                    "cognition.ai/icon": "file-text"
+                  }
+                },
+                {
+                  "value": "bypass",
+                  "name": "Bypass Permissions",
+                  "description": "Auto-approve all tool calls",
+                  "_meta": {
+                    "cognition.ai/icon": "shield-off"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "model",
+              "name": "Model",
+              "description": "AI model to use",
+              "category": "model",
+              "type": "select",
+              "currentValue": "swe-1-6-slow",
+              "options": [
+                {
+                  "value": "swe-1-6-slow",
+                  "name": "SWE-1.6 Slow",
+                  "_meta": {
+                    "cognition.ai/supportsImages": true
+                  }
+                }
+              ]
+            }
+          ],
+          "_meta": {
+            "cognition.ai/isLocked": false
+          }
+        }
+      }
+    },
+    {
+      "seq": 15,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "session/set_config_option",
+        "params": {
+          "sessionId": "prickly-conga",
+          "configId": "mode",
+          "value": "accept-edits"
+        }
+      }
+    },
+    {
+      "seq": 16,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "config_option_update",
+            "configOptions": [
+              {
+                "id": "mode",
+                "name": "Session Mode",
+                "category": "mode",
+                "type": "select",
+                "currentValue": "accept-edits",
+                "options": [
+                  {
+                    "value": "accept-edits",
+                    "name": "Code",
+                    "description": "Write and edit code",
+                    "_meta": {
+                      "cognition.ai/icon": "code"
+                    }
+                  },
+                  {
+                    "value": "smart",
+                    "name": "Smart",
+                    "description": "Auto-approve actions the model judges safe",
+                    "_meta": {
+                      "cognition.ai/icon": "sparkles"
+                    }
+                  },
+                  {
+                    "value": "ask",
+                    "name": "Ask",
+                    "description": "Answer questions without code changes",
+                    "_meta": {
+                      "cognition.ai/icon": "message-circle"
+                    }
+                  },
+                  {
+                    "value": "plan",
+                    "name": "Plan",
+                    "description": "Plan changes before implementing",
+                    "_meta": {
+                      "cognition.ai/icon": "file-text"
+                    }
+                  },
+                  {
+                    "value": "bypass",
+                    "name": "Bypass Permissions",
+                    "description": "Auto-approve all tool calls",
+                    "_meta": {
+                      "cognition.ai/icon": "shield-off"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "model",
+                "name": "Model",
+                "description": "AI model to use",
+                "category": "model",
+                "type": "select",
+                "currentValue": "swe-1-6-slow",
+                "options": [
+                  {
+                    "value": "swe-1-6-slow",
+                    "name": "SWE-1.6 Slow",
+                    "_meta": {
+                      "cognition.ai/supportsImages": true
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "seq": 17,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "current_mode_update",
+            "currentModeId": "accept-edits"
+          }
+        }
+      }
+    },
+    {
+      "seq": 18,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "configOptions": [
+            {
+              "id": "mode",
+              "name": "Session Mode",
+              "category": "mode",
+              "type": "select",
+              "currentValue": "accept-edits",
+              "options": [
+                {
+                  "value": "accept-edits",
+                  "name": "Code",
+                  "description": "Write and edit code",
+                  "_meta": {
+                    "cognition.ai/icon": "code"
+                  }
+                },
+                {
+                  "value": "smart",
+                  "name": "Smart",
+                  "description": "Auto-approve actions the model judges safe",
+                  "_meta": {
+                    "cognition.ai/icon": "sparkles"
+                  }
+                },
+                {
+                  "value": "ask",
+                  "name": "Ask",
+                  "description": "Answer questions without code changes",
+                  "_meta": {
+                    "cognition.ai/icon": "message-circle"
+                  }
+                },
+                {
+                  "value": "plan",
+                  "name": "Plan",
+                  "description": "Plan changes before implementing",
+                  "_meta": {
+                    "cognition.ai/icon": "file-text"
+                  }
+                },
+                {
+                  "value": "bypass",
+                  "name": "Bypass Permissions",
+                  "description": "Auto-approve all tool calls",
+                  "_meta": {
+                    "cognition.ai/icon": "shield-off"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "model",
+              "name": "Model",
+              "description": "AI model to use",
+              "category": "model",
+              "type": "select",
+              "currentValue": "swe-1-6-slow",
+              "options": [
+                {
+                  "value": "swe-1-6-slow",
+                  "name": "SWE-1.6 Slow",
+                  "_meta": {
+                    "cognition.ai/supportsImages": true
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 19,
+      "direction": "client->server",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "prickly-conga",
+          "prompt": [
+            {
+              "type": "text",
+              "text": "Reply with exactly: ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "seq": 20,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "session_info_update",
+            "title": "Reply with exactly: ok"
+          }
+        }
+      }
+    },
+    {
+      "seq": 21,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "The"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 22,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " user wants"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 23,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " me to reply"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 24,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " with exactly \"ok"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 25,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": "\". This"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 26,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " is a simple instruction"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 27,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " and"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 28,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " I should comply"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 29,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " directly"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 30,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " without"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 31,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " any additional text"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 32,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_thought_chunk",
+            "content": {
+              "type": "text",
+              "text": " or explanation."
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 33,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "ok"
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 34,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_cognition.ai/thinking_complete",
+        "params": {
+          "durationMs": 3995,
+          "blockIndex": 0,
+          "sessionId": "prickly-conga"
+        }
+      }
+    },
+    {
+      "seq": 35,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "prickly-conga",
+          "update": {
+            "sessionUpdate": "usage_update",
+            "used": 13652,
+            "size": 200000,
+            "_meta": {
+              "cognition.ai/inputTokens": 13622,
+              "cognition.ai/outputTokens": 30,
+              "cognition.ai/cachedReadTokens": 32
+            }
+          }
+        }
+      }
+    },
+    {
+      "seq": 36,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "method": "_cognition.ai/agent_stopped",
+        "params": {
+          "cause": "complete",
+          "stats": {
+            "toolCalls": 0,
+            "filesChanged": 0,
+            "commandsRun": 0,
+            "inputTokens": 13622,
+            "outputTokens": 30,
+            "ttftMs": 1569,
+            "tokensPerSec": 7.471980074719801,
+            "totalTimeMs": 5584,
+            "requestId": "a18ba2c6-9400-4869-87fd-25b436f02600",
+            "modelLabel": "SWE-1.6 Slow",
+            "responseDimensions": [
+              {
+                "uid": "agent_messages",
+                "groupTitle": "Response Statistics",
+                "label": "Agent messages",
+                "kind": {
+                  "type": "cumulativeMetric",
+                  "value": 1,
+                  "prefix": "",
+                  "tail": " message",
+                  "pluralTail": " messages"
+                }
+              },
+              {
+                "uid": "model",
+                "groupTitle": "Response Statistics",
+                "label": "Model",
+                "kind": {
+                  "type": "metric",
+                  "value": "SWE-1.6 Slow"
+                }
+              }
+            ]
+          },
+          "sessionId": "prickly-conga"
+        }
+      }
+    },
+    {
+      "seq": 37,
+      "direction": "server->client",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "stopReason": "end_turn",
+          "usage": {
+            "totalTokens": 13652,
+            "inputTokens": 13622,
+            "outputTokens": 30,
+            "cachedReadTokens": 32
+          },
+          "_meta": {
+            "cognition.ai/userMessageId": "22862678-2340-4870-a9a0-46c3f0f806b8"
+          }
+        }
+      }
+    }
+  ]
+}

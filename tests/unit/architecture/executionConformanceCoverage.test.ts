@@ -82,7 +82,7 @@ describe('execution backend conformance coverage', () => {
   it('finds a backend for every provider, so the rules below read something', () => {
     // The guard this file needs for the reason every gate here needs one: a
     // walk that matched nothing would report perfect coverage.
-    expect(backends).toHaveLength(9);
+    expect(backends).toHaveLength(10);
     expect(drivers.length).toBeGreaterThan(0);
   });
 

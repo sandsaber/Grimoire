@@ -12,6 +12,7 @@ import { addIcon, MarkdownView, Notice, Plugin, setTooltip } from 'obsidian';
 import type { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
 import type { ClaudeExecution } from '@/providers/claude/execution/ClaudeExecutionComposition';
 import type { CodexExecution } from '@/providers/codex/execution/CodexExecutionComposition';
+import type { DevinExecution } from '@/providers/devin/execution/DevinExecutionComposition';
 import type { GeminiExecution } from '@/providers/gemini/execution/GeminiExecutionComposition';
 import type { GrokExecution } from '@/providers/grok/execution/GrokExecutionComposition';
 import type { KimicodeExecution } from '@/providers/kimicode/execution/KimicodeExecutionComposition';
@@ -539,6 +540,14 @@ export default class GrimoirePlugin extends Plugin {
       throw new Error('Gemini execution is not available before plugin load.');
     }
     return this.applicationRuntime.gemini;
+  }
+
+  /** The Devin execution this plugin instance owns; see the note above. */
+  getDevinExecution(): DevinExecution {
+    if (!this.applicationRuntime) {
+      throw new Error('Devin execution is not available before plugin load.');
+    }
+    return this.applicationRuntime.devin;
   }
 
   /** The Qwen execution this plugin instance owns; see the note above. */

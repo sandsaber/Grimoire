@@ -47,6 +47,7 @@ const CONTEXTS: ReadonlyArray<{ providerId: string; path: string; notWired: numb
   { providerId: 'mimocode', path: 'src/providers/mimocode/app/MimocodeModuleContext.ts', notWired: 1 },
   { providerId: 'opencode', path: 'src/providers/opencode/app/OpencodeModuleContext.ts', notWired: 1 },
   { providerId: 'qwen', path: 'src/providers/qwen/app/QwenModuleContext.ts', notWired: 0 },
+  { providerId: 'devin', path: 'src/providers/devin/app/DevinModuleContext.ts', notWired: 0 },
 ];
 
 /**
@@ -108,6 +109,7 @@ describe('provider module context wiring', () => {
       'mimocode: 1',
       'opencode: 1',
       'qwen: 0',
+      'devin: 0',
     ]);
   });
 
@@ -136,7 +138,7 @@ describe('provider module context wiring', () => {
       .filter(path => /refreshModels:\s*\(\)\s*=>/.test(readFileSync(path, 'utf8')))
       .map(path => relative(process.cwd(), path));
 
-    expect(contexts).toHaveLength(9);
+    expect(contexts).toHaveLength(10);
     expect(offenders).toEqual([]);
   });
 

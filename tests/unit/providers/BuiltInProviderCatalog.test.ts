@@ -4,7 +4,7 @@ import { builtInProviderCatalog } from '@/providers/BuiltInProviderCatalog';
  * Constructing the catalog is the assertion.
  *
  * Every rule in `ProviderCatalog` runs at construction, so importing this file
- * already proves the nine shipped modules agree with themselves and with each
+ * already proves the ten shipped modules agree with themselves and with each
  * other. What is left to state here is the product-visible consequence.
  */
 describe('built-in provider catalog', () => {
@@ -13,6 +13,7 @@ describe('built-in provider catalog', () => {
       'antigravity',
       'claude',
       'codex',
+      'devin',
       'gemini',
       'grok',
       'kimicode',
@@ -38,6 +39,7 @@ describe('built-in provider catalog', () => {
       'antigravity',
       'gemini',
       'qwen',
+      'devin',
     ]);
   });
 
@@ -94,6 +96,7 @@ describe('built-in provider catalog', () => {
       ['ANTIGRAVITY_CLI', 'antigravity'],
       ['DASHSCOPE_API_KEY', 'qwen'],
       ['WEB_SEARCH_ENDPOINT', 'qwen'],
+      ['DEVIN_MODEL', 'devin'],
     ])('scopes %s to %s', (key, providerId) => {
       expect(builtInProviderCatalog.environmentKeyOwner(key)).toBe(providerId);
     });
@@ -139,6 +142,7 @@ describe('built-in provider catalog', () => {
       'Antigravity',
       'Gemini CLI (Legacy)',
       'Qwen Code',
+      'Devin',
     ]);
   });
 });

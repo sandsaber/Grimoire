@@ -170,3 +170,21 @@ export const QWEN_PROVIDER_CAPABILITIES: Readonly<ProviderCapabilities> = Object
   supportsTurnSteer: false,
   reasoningControl: 'effort',
 });
+
+export const DEVIN_PROVIDER_CAPABILITIES: Readonly<ProviderCapabilities> = Object.freeze({
+  providerId: 'devin',
+  supportsPersistentRuntime: true,
+  // Resume uses ACP loadSession + Grimoire-persisted messages only; the
+  // replay a `session/load` sends is not read back.
+  supportsNativeHistory: false,
+  supportsPlanMode: true,
+  supportsRewind: false,
+  supportsFork: false,
+  // The session announces its own commands on `session/new` (recorded).
+  supportsProviderCommands: true,
+  supportsImageAttachments: true,
+  supportsInstructionMode: true,
+  supportsMcpTools: false,
+  supportsTurnSteer: false,
+  reasoningControl: 'none',
+});

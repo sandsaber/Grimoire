@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Grimoire is a private, pre-release Obsidian plugin that embeds agentic CLI assistants in a vault-native workspace. It is not a standalone CLI. The plugin shell must stay provider-neutral while provider adapters wrap external tools such as Claude Code, Codex, OpenCode, Qwen Code, and Antigravity CLI.
+Grimoire is a private, pre-release Obsidian plugin that embeds agentic CLI assistants in a vault-native workspace. It is not a standalone CLI. The plugin shell must stay provider-neutral while provider adapters wrap external tools such as Claude Code, Codex, OpenCode, Qwen Code, Devin, and Antigravity CLI.
 
 Repository documentation and user-facing product copy should be in English unless the task explicitly targets localized UI text.
 
@@ -22,6 +22,7 @@ Repository documentation and user-facing product copy should be in English unles
 - `src/providers/mimocode/` - MiMoCode ACP adapter and launch/workspace artifacts.
 - `src/providers/kimicode/` - Kimi Code ACP adapter and launch/workspace artifacts.
 - `src/providers/qwen/` - Qwen Code ACP adapter and Qwen-owned runtime, history, settings, and UI behavior.
+- `src/providers/devin/` - Devin CLI (Cognition) ACP adapter and Devin-owned runtime, settings, and UI behavior.
 - `src/providers/acp/` - Shared ACP transport and normalization helpers.
 - `src/providers/shared/` - Provider-neutral helpers that need the plugin type, and so cannot live in `src/core/`. A helper belongs here only when at least two providers use it and its implementation is genuinely the same question asked twice.
 
@@ -181,7 +182,7 @@ Grimoire puts *inside* a row, never `.setting-item` and its parts.
 | `.grimoire/attachments/<sha256>.<ext>` | Image attachment bytes, addressed by content and shared by every provider |
 | `.grimoire/logs/YYYY-MM-DD.jsonl` | Optional sanitized debug logs, written only when Advanced debug logging is enabled |
 | `.grimoire/control/**` | Grimoire-owned execution lifecycle control records: ownership, generations, state-machine positions, terminals, dispatch intents, and recovery evidence. Never a second provider transcript, and never prompts, secrets, or raw payloads. Written by the execution kernel the plugin constructs at load and shuts down at unload; retention, deletion, versioning, and redaction are decided in [`docs/provider-execution-persistence-decisions.md`](docs/provider-execution-persistence-decisions.md). A plugin build that does not read these files must neither depend on them nor break on their presence, which is what makes a downgrade safe |
-| `.grimoire/mcp/<provider>.json` | Grimoire-owned MCP servers injected into ACP sessions for OpenCode, Grok Build, MiMoCode, Kimi Code, Qwen Code, and Gemini CLI |
+| `.grimoire/mcp/<provider>.json` | Grimoire-owned MCP servers injected into ACP sessions for OpenCode, Grok Build, MiMoCode, Kimi Code, Qwen Code, Gemini CLI, and Devin |
 | `.grimoire/claude/statusline-usage.json` | Claude Code status-line usage snapshot used to hydrate plan-limit indicators |
 | `.claude/settings.json` | Claude Code-compatible project settings and permissions |
 | `.claude/mcp.json` | Claude-compatible MCP servers plus Grimoire metadata under `_grimoire.servers` |
@@ -196,6 +197,7 @@ Grimoire puts *inside* a row, never `.setting-item` and its parts.
 | `.kimi-code/skills/*/SKILL.md` | Kimi Code vault skills |
 | `.grok/skills/*/SKILL.md` | Grok Build vault skills |
 | `.qwen/skills/*/SKILL.md` | Qwen Code vault skills |
+| `.devin/skills/*/SKILL.md` | Devin vault skills; the CLI also scans `.agents/skills` and `.cognition/skills`, and a skill is its slash command |
 | `.gemini/skills/*/SKILL.md` | Gemini CLI vault skills |
 | `.opencode/agent/**/*.md` | OpenCode agent definitions |
 | `.opencode/agents/**/*.md` | Legacy OpenCode agent definition root |

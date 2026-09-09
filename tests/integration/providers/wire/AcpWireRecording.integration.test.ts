@@ -71,4 +71,17 @@ record('ACP wire recordings', () => {
     expect((recording.exchange as unknown[]).length).toBeGreaterThan(1);
     expect(recording.recordedAgainst).toMatch(/\d+\.\d+/);
   });
+
+  // Devin CLI (#108): spoken to through a subcommand, like wave 6.
+  it('records what Devin answers', async () => {
+    const recording = await recordAcpWire({
+      providerId: 'devin',
+      command: process.env.GRIMOIRE_DEVIN_CLI ?? 'devin',
+      args: ['acp'],
+      transport: 'stdio JSON-RPC 2.0 (`devin acp`)',
+    });
+
+    expect((recording.exchange as unknown[]).length).toBeGreaterThan(1);
+    expect(recording.recordedAgainst).toMatch(/\d+\.\d+/);
+  });
 });

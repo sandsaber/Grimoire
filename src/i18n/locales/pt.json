@@ -1052,6 +1052,9 @@
       },
       "qwen": {
         "desc": "Alibaba Qwen Code por meio de seu ambiente de execução nativo do Agent Client Protocol."
+      },
+      "devin": {
+        "desc": "Devin CLI da Cognition por meio de seu ambiente de execução nativo do Agent Client Protocol."
       }
     },
     "hub": {
@@ -1346,6 +1349,22 @@
           "heading": "Ambiente",
           "name": "Variáveis de ambiente",
           "desc": "Configure a autenticação do Qwen Code com `qwen` e `/auth`. Variáveis opcionais do provedor, como DASHSCOPE_API_KEY, OPENAI_API_KEY ou ANTHROPIC_API_KEY, são repassadas; o Grimoire não automatiza o login."
+        }
+      },
+      "devin": {
+        "cliPath": {
+          "name": "Caminho da CLI Devin",
+          "desc": "Caminho personalizado para a CLI Devin local. Deixe vazio para executar `devin` do PATH."
+        },
+        "hiddenCommands": {
+          "name": "Comandos ocultos",
+          "desc": "Oculte comandos específicos informados pelo Devin ACP. Insira os nomes sem a barra inicial, um por linha.",
+          "placeholder": "login\nlogout\nstatus"
+        },
+        "environment": {
+          "heading": "Ambiente",
+          "name": "Variáveis de ambiente",
+          "desc": "Faça login com `devin auth login` antes de usar. Variáveis opcionais da CLI, como DEVIN_MODEL ou RUST_LOG, são repassadas; o Grimoire não automatiza o login."
         }
       }
     },

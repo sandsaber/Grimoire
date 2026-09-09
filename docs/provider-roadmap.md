@@ -50,7 +50,7 @@ This file tracks future provider integrations and the implementation sequence fo
 
 ## Current Integration Notes
 
-- Claude Code, Codex, OpenCode, MiMoCode, Kimi Code, Grok Build, and Qwen Code are current integrations. Their runtime capabilities differ, but each has a registered provider adapter; OpenCode, MiMoCode, Kimi Code, Grok Build, and Qwen Code use ACP-based runtime paths where their CLI supports them.
+- Claude Code, Codex, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, and Devin are current integrations. Their runtime capabilities differ, but each has a registered provider adapter; OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, and Devin use ACP-based runtime paths where their CLI supports them.
 - Antigravity CLI and Gemini CLI (Legacy) are current Google integrations with more limited runtime surfaces. Keep Antigravity as the recommended Google path and Gemini only for legacy-compatible accounts; treat provider-specific enhancements as runtime-limited until their CLIs expose richer event streams, safer approval flows, and stronger session/tool metadata.
 - Context visibility should stay provider-neutral. The Context tab should show both user-pinned files and provider runtime file loads when Grimoire can infer them from tool events, while avoiding provider-specific assumptions in shared feature code.
 
@@ -71,6 +71,23 @@ Current boundaries:
 - Authentication and configuration remain owned by Qwen Code. Configure it through the CLI, `~/.qwen/settings.json`, or Qwen-owned environment variables before refreshing models or starting a chat.
 - Grimoire manages an isolated Qwen project MCP list in `.grimoire/mcp/qwen.json` and injects it into ACP sessions without reconciling Qwen's native CLI configuration. Fork and rewind workflows remain unsupported.
 - Token or spend indicators depend on optional ACP usage updates. Qwen account quotas are not inferred when the CLI does not report them.
+
+## Integrated Provider: Devin
+
+Current integration (#108):
+
+- Devin is opt-in and owns its runtime, settings, model discovery, and UI under `src/providers/devin/`. It is Qwen's shape minus the three Qwen-only pieces: no `/effort` prompt, no `context_usage` vendor request, no ask-user-question.
+- Grimoire launches `devin acp` with `RUST_LOG=warn` and reuses `src/providers/acp/` for transport and session update normalization. The wire recording is `tests/fixtures/provider-traces/wire/devin-wire.json` (`devin 3000.6.14`, 2026-09-09, complete).
+- Models and modes come from the `configOptions` in `session/new`, and are set back through `session/set_config_option`; `session/set_model` answers `-32601`. What the session offers depends on the account, which is expected — `devin models list` is not the source.
+- Modes `accept-edits`, `smart`, `ask`, `plan`, `bypass` map Safe → `accept-edits`, Auto-approve → `bypass`, Plan → `plan`. Safe is made safe by the ACP write delegate, not by the mode; see the ceiling in `src/providers/devin/modes.ts`.
+- Permission requests carry only `toolCall._meta["cognition.ai/editableCommand"]`; six options are offered.
+- Resume is native: `session/load` replays the transcript, a missing session answers `-32016 Session not found`, and `session/list` is available.
+
+Current boundaries:
+
+- Authentication is `devin auth login`; credentials stay Devin-owned.
+- Skills are read from `.devin/skills` and `.agents/skills`; a skill is Devin's slash command, and there is no command file or agent file for Grimoire to manage.
+- Plan indicators are spend-only. Auxiliary execution (titles, refinement, inline edit) is not wired.
 
 ## Other Candidates
 

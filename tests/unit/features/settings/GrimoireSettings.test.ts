@@ -382,6 +382,7 @@ describe('GrimoireSettingTab settings hub', () => {
       'Antigravity',
       'Gemini CLI (Legacy)',
       'Qwen Code',
+      'Devin',
     ]);
     expect(collectText(settingEl)).not.toContain('Enabled');
     expect(collectText(settingEl)).not.toContain('Disabled');
@@ -400,6 +401,7 @@ describe('GrimoireSettingTab settings hub', () => {
       'antigravity',
       'gemini',
       'qwen',
+      'devin',
     ]);
   });
 
@@ -507,7 +509,10 @@ describe('GrimoireSettingTab settings hub', () => {
       'kimicode',
       'gemini',
       'qwen',
+      'devin',
     ]);
+    // Devin lists its session's commands but manages no command file, so it
+    // has a commands inventory and no commands manager.
     expect((tab as any).getWorkspaceManagerProviders(providerIds, 'commands')).toEqual([
       'claude',
       'opencode',
@@ -535,6 +540,7 @@ describe('GrimoireSettingTab settings hub', () => {
       'kimicode',
       'gemini',
       'qwen',
+      'devin',
     ]);
     expect((tab as any).getWorkspaceManagerProviders(providerIds, 'environment')).toEqual([
       '__shared__',

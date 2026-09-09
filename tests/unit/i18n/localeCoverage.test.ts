@@ -37,6 +37,7 @@ const SHARED_WITH_ENGLISH = new Set([
   'settings.customModels.placeholder',
   'settings.hiddenSlashCommands.placeholder',
   'settings.providerTabs.qwen.hiddenCommands.placeholder',
+  'settings.providerTabs.devin.hiddenCommands.placeholder',
   'settings.subagents.modal.namePlaceholder',
   'settings.customModelAliases.placeholder',
   'settings.agentEditor.namePlaceholder',

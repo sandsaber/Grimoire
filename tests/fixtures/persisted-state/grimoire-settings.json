@@ -41,6 +41,9 @@
     },
     "qwen": {
       "enabled": false
+    },
+    "devin": {
+      "enabled": false
     }
   },
   "sharedEnvironmentVariables": {

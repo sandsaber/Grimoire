@@ -1052,6 +1052,9 @@
       },
       "qwen": {
         "desc": "透過原生 Agent Client Protocol 執行的阿里巴巴 Qwen Code。"
+      },
+      "devin": {
+        "desc": "透過原生 Agent Client Protocol 執行的 Cognition Devin CLI。"
       }
     },
     "hub": {
@@ -1346,6 +1349,22 @@
           "heading": "環境",
           "name": "環境變數",
           "desc": "使用 `qwen` 與 `/auth` 設定 Qwen Code 驗證。DASHSCOPE_API_KEY、OPENAI_API_KEY、ANTHROPIC_API_KEY 等選用供應商變數會原樣傳遞；Grimoire 不會自動登入。"
+        }
+      },
+      "devin": {
+        "cliPath": {
+          "name": "Devin CLI 路徑",
+          "desc": "Devin CLI 的本機路徑。留空則從 PATH 啟動 `devin`。"
+        },
+        "hiddenCommands": {
+          "name": "隱藏的命令",
+          "desc": "隱藏 Devin ACP 回報的指定命令。每行輸入一個不含斜線前綴的名稱。",
+          "placeholder": "login\nlogout\nstatus"
+        },
+        "environment": {
+          "heading": "環境",
+          "name": "環境變數",
+          "desc": "使用前請先以 `devin auth login` 登入。DEVIN_MODEL、RUST_LOG 等選用 CLI 變數會原樣傳遞；Grimoire 不會自動登入。"
         }
       }
     },
