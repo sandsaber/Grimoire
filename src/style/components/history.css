@@ -198,7 +198,7 @@ input.grimoire-history-search-input {
  * still shifts nothing, which is what §11.5 always claimed and this is the
  * first arrangement in which it is true.
  *
- * The cost is the row: 36px became 48, so about a third fewer conversations
+ * The cost is the row: 36px became 56, so about a third fewer conversations
  * are in view. This is not the second line Nordic removed — that one carried
  * four facts in mono under every title and turned a list into a wall. This one
  * carries what was already on the row, moved off the title's line.
