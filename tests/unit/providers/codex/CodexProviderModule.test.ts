@@ -74,7 +74,7 @@ describe('Codex provider module', () => {
     expect(codexProviderModule.manifest).toEqual({
       id: 'codex',
       displayName: 'Codex',
-      order: 20,
+      order: 10,
     });
   });
 

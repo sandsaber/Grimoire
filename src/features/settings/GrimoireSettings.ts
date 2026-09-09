@@ -628,8 +628,8 @@ export class GrimoireSettingTab extends PluginSettingTab {
 
   private orderProviderIds(providerIds: readonly ProviderId[]): ProviderId[] {
     const preferredOrder = [
-      'claude',
       'codex',
+      'claude',
       'opencode',
       'grok',
       'mimocode',

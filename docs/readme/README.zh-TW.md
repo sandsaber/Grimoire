@@ -29,7 +29,7 @@
 
 > **提示：2.0 正在開發中。** 下一個主要版本會把 Grimoire 遷移到以提供者為基礎的執行架構：由一個核心驅動每個 CLI，並為每一輪精確記錄一個結果；同時帶來跟隨儲存庫主題與強調色的全新設計。相關工作已合併到 `main` 分支，但尚未納入任何已發布版本。目前發布版本仍是 1.3.2。對話、設定與提供者檔案將原樣保留。
 
-Grimoire 將 agentic CLI 助手帶入 Obsidian。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code 和 Devin 都在同一個側邊欄中執行：讀取筆記、編輯檔案、執行命令、呼叫工具，並把 session history 保存在真實的 vault context 中。Grimoire 不經過自家伺服器：沒有 telemetry、沒有 hosted backend，也沒有夾在你和 provider 之間的 proxy。
+Grimoire 將 agentic CLI 助手帶入 Obsidian。Codex、Claude Code、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code 和 Devin 都在同一個側邊欄中執行：讀取筆記、編輯檔案、執行命令、呼叫工具，並把 session history 保存在真實的 vault context 中。Grimoire 不經過自家伺服器：沒有 telemetry、沒有 hosted backend，也沒有夾在你和 provider 之間的 proxy。
 
 它面向已經在 Obsidian 中工作的人：你可以使用本地 context、本地檔案、明確選擇的 provider，並在介面中直接看到 usage 和 cost。
 
@@ -38,14 +38,14 @@ Grimoire 將 agentic CLI 助手帶入 Obsidian。Claude Code、Codex、Antigravi
 ## 為什麼選擇 Grimoire
 
 - 在筆記中直接使用你已經信任的 CLI 代理。
-- 從 composer 切換 provider。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code 和 Devin 共用一個 model picker。
+- 從 composer 切換 provider。Codex、Claude Code、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code 和 Devin 共用一個 model picker。
 - 讓每一次 turn 都基於 vault context。可以 mention 筆記、資料夾和 MCP tools，不需要手動複製路徑。
 - 在選擇模型的位置直接看到 cost 和 limits。
 - 保持 local-first。Grimoire 不收集 telemetry，不 proxy prompts，也不執行 backend。
 
 ## 各 provider 能做什麼
 
-| 能力 | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
+| 能力 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 本地 persistent runtime | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
 | 原生 history hydration | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 否 | 否 |
@@ -53,10 +53,10 @@ Grimoire 將 agentic CLI 助手帶入 Obsidian。Claude Code、Codex、Antigravi
 | Image attachments | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
 | Instruction mode | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
 | Reasoning effort controls | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 否 |
-| Rewind | 是 | 否 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 |
+| Rewind | 否 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 |
 | Fork | 是 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 |
-| Provider slash commands | 是 | 否 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
-| Grimoire-managed MCP UI | 是 | 否 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
+| Provider slash commands | 否 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
+| Grimoire-managed MCP UI | 否 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
 
 ## 安裝
 
@@ -110,9 +110,25 @@ cp dist/grimoire/main.js dist/grimoire/manifest.json dist/grimoire/styles.css \
 
 ### 推薦 providers
 
-為了獲得最好的 Grimoire 體驗，建議先從 Claude Code、Codex、OpenCode、MiMoCode、Kimi Code、Grok Build 或 Qwen Code 開始。這些 providers 目前為 vault-native 工作提供最強的 runtime surface：persistent sessions、plan-oriented workflows、tool activity，以及更豐富的 model controls。
+為了獲得最好的 Grimoire 體驗，建議先從 Codex、Claude Code、OpenCode、MiMoCode、Kimi Code、Grok Build 或 Qwen Code 開始。這些 providers 目前為 vault-native 工作提供最強的 runtime surface：persistent sessions、plan-oriented workflows、tool activity，以及更豐富的 model controls。
 
 Antigravity CLI 和 Gemini CLI (Legacy) 仍然可用於 Google accounts 和 compatibility 場景，但目前不建議作為 Grimoire 的主要 provider。Grimoire 以 best-effort 方式支援它們，並已實作目前 CLI 能提供的 fallback，但它們的 ACP 和 runtime surfaces 有技術限制：sessions、approvals、streaming、tool/edit metadata、model discovery 和 usage reporting 相比推薦 providers 並不完整，也不夠可靠。
+
+### Codex
+
+Codex 是首次啟動時的預設 provider。選擇它可以在本地 CLI 中使用 OpenAI Codex，並透過 ChatGPT plan 或 API key 登入。
+
+```bash
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+codex
+```
+
+先執行一次 Codex 並登入，然後在 Grimoire 中啟用。Standalone installer 現在是 primary install path；Windows、Homebrew 和 fallback package-manager options 請參考官方 Codex CLI 文件。
+
+- [Codex CLI setup](https://developers.openai.com/codex/cli)
+- [OpenAI code generation guide](https://developers.openai.com/api/docs/guides/code-generation)
+
+在 Grimoire 中，Codex 透過 app-server protocol 執行，支援 native history、fork、plan mode、image input 和 reasoning effort controls。當 Codex 回報 rate-limit metadata 時，plan usage 會顯示出來。
 
 ### Claude Code
 
@@ -140,22 +156,6 @@ claude
   }
 }
 ```
-
-### Codex
-
-Codex 是首次啟動時的預設 provider。選擇它可以在本地 CLI 中使用 OpenAI Codex，並透過 ChatGPT plan 或 API key 登入。
-
-```bash
-curl -fsSL https://chatgpt.com/codex/install.sh | sh
-codex
-```
-
-先執行一次 Codex 並登入，然後在 Grimoire 中啟用。Standalone installer 現在是 primary install path；Windows、Homebrew 和 fallback package-manager options 請參考官方 Codex CLI 文件。
-
-- [Codex CLI setup](https://developers.openai.com/codex/cli)
-- [OpenAI code generation guide](https://developers.openai.com/api/docs/guides/code-generation)
-
-在 Grimoire 中，Codex 透過 app-server protocol 執行，支援 native history、fork、plan mode、image input 和 reasoning effort controls。當 Codex 回報 rate-limit metadata 時，plan usage 會顯示出來。
 
 ### Antigravity CLI
 
@@ -341,8 +341,8 @@ Model selector 旁邊的 badge 會持續顯示目前 provider 的 usage；model 
 
 | Provider | Usage 來源 |
 | --- | --- |
-| Claude Code | SDK rate-limit events、可選的 `.grimoire/claude/statusline-usage.json` 和 SDK result cost metadata |
 | Codex | Account rate-limit notifications，以及可用時的 `account/rateLimits/read` |
+| Claude Code | SDK rate-limit events、可選的 `.grimoire/claude/statusline-usage.json` 和 SDK result cost metadata |
 | Antigravity CLI | `agy --print` 目前尚無法可靠提供 |
 | Gemini CLI (Legacy) | Gemini CLI 回傳時的 ACP cost metadata；僅 legacy provider |
 | Qwen Code | 僅在 Qwen Code 回傳時的 ACP token 和 cost metadata |
@@ -454,7 +454,7 @@ Obsidian Community plugins 是推薦的使用者安裝方式。GitHub Releases �
 
 ## Roadmap
 
-目前 Grimoire 隨 Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code 和 Devin 一起發布。
+目前 Grimoire 隨 Codex、Claude Code、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code 和 Devin 一起發布。
 
 下一步計畫：GitHub Copilot CLI、其他 ACP-compatible providers，以及當 runtime 足夠穩定可嵌入 Obsidian 時的 local model CLIs。Implementation notes 位於 [docs/provider-roadmap.md](../provider-roadmap.md)。
 

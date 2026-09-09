@@ -282,7 +282,7 @@ CodexProviderSettings
   manifest: {
     id: 'codex',
     displayName: 'Codex',
-    order: 20,
+    order: 10,
   },
 
   settings: codexSettingsCodec,

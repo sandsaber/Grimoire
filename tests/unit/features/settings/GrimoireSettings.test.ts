@@ -373,8 +373,8 @@ describe('GrimoireSettingTab settings hub', () => {
     ).map((element: any) => element.textContent?.trim() ?? '');
 
     expect(providerNames).toEqual([
-      'Claude Code',
       'Codex',
+      'Claude Code',
       'OpenCode',
       'Grok Build',
       'MiMoCode',
@@ -392,8 +392,8 @@ describe('GrimoireSettingTab settings hub', () => {
     expect(providerHint?.textContent).toBe('Select a provider card to view its settings below.');
     expect(providerGrid).not.toBeNull();
     expect(providerCatalog().ids()).toEqual([
-      'claude',
       'codex',
+      'claude',
       'opencode',
       'grok',
       'mimocode',
@@ -501,8 +501,8 @@ describe('GrimoireSettingTab settings hub', () => {
     const providerIds = providerCatalog().ids();
 
     expect((tab as any).getWorkspaceManagerProviders(providerIds, 'skills')).toEqual([
-      'claude',
       'codex',
+      'claude',
       'opencode',
       'grok',
       'mimocode',
@@ -523,8 +523,8 @@ describe('GrimoireSettingTab settings hub', () => {
       'qwen',
     ]);
     expect((tab as any).getWorkspaceManagerProviders(providerIds, 'agents')).toEqual([
-      'claude',
       'codex',
+      'claude',
       'opencode',
       'grok',
       'mimocode',

@@ -29,7 +29,7 @@
 
 > **안내: 2.0을 개발 중입니다.** 다음 메이저 릴리스에서 Grimoire는 프로바이더 기반 실행 아키텍처로 전환됩니다. 하나의 커널이 각 CLI를 구동하고 턴마다 정확히 하나의 결과를 기록하며, 보관소의 테마와 강조 색상을 따르는 새 디자인이 적용됩니다. 작업은 이미 `main`에 병합되었지만 아직 공개 릴리스에는 포함되지 않았습니다. 현재 공개 릴리스는 여전히 1.3.2입니다. 대화, 설정, 프로바이더 파일은 그대로 유지됩니다.
 
-Grimoire는 에이전트형 CLI 어시스턴트를 Obsidian 안으로 가져옵니다. 하나의 사이드 패널에서 Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin을 사용해 노트를 읽고, 파일을 편집하고, 명령과 도구를 실행하며 실제 볼트의 세션 기록을 유지합니다. Grimoire 서버, 텔레메트리, 호스팅 백엔드, 프록시는 없습니다.
+Grimoire는 에이전트형 CLI 어시스턴트를 Obsidian 안으로 가져옵니다. 하나의 사이드 패널에서 Codex, Claude Code, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin을 사용해 노트를 읽고, 파일을 편집하고, 명령과 도구를 실행하며 실제 볼트의 세션 기록을 유지합니다. Grimoire 서버, 텔레메트리, 호스팅 백엔드, 프록시는 없습니다.
 
 이미 Obsidian에서 작업하며 볼트의 일부처럼 작동하는 AI 도움을 원하는 사람을 위해 만들었습니다. 로컬 컨텍스트와 파일, 신중하게 선택한 제공자, 확인 가능한 사용량을 제공합니다.
 
@@ -38,14 +38,14 @@ Grimoire는 에이전트형 CLI 어시스턴트를 Obsidian 안으로 가져옵�
 ## Grimoire를 선택하는 이유
 
 - 이미 신뢰하는 CLI 에이전트를 노트 안에서 바로 사용하세요.
-- 작성기에서 제공자를 전환하세요. Claude Code, Codex, Antigravity CLI, 레거시 Gemini CLI, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin은 하나의 모델 선택기를 공유합니다.
+- 작성기에서 제공자를 전환하세요. Codex, Claude Code, Antigravity CLI, 레거시 Gemini CLI, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin은 하나의 모델 선택기를 공유합니다.
 - 모든 대화를 볼트에 기반하게 하세요. 경로를 직접 붙여 넣는 대신 노트, 폴더, MCP 도구를 멘션하세요.
 - 어차피 선택하는 자리인 모델 선택기 옆에서 비용과 한도를 확인하세요.
 - 로컬 우선으로 유지하세요. Grimoire는 텔레메트리를 수집하거나 프롬프트를 프록시하지 않으며, 백엔드를 운영하지 않습니다.
 
 ## 제공자별 기능
 
-| 기능 | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
+| 기능 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 로컬 영속 런타임 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
 | 네이티브 기록 복원 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 아니요 | 아니요 |
@@ -53,10 +53,10 @@ Grimoire는 에이전트형 CLI 어시스턴트를 Obsidian 안으로 가져옵�
 | 이미지 첨부 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
 | 지시 모드 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
 | 추론 강도 제어 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 |
-| 되돌리기 | 예 | 아니요 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
+| 되돌리기 | 아니요 | 예 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
 | 포크 | 예 | 예 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
-| 제공자 슬래시 명령 | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
-| Grimoire 관리 MCP UI | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
+| 제공자 슬래시 명령 | 아니요 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
+| Grimoire 관리 MCP UI | 아니요 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
 
 ## 설치
 
@@ -110,9 +110,25 @@ cp dist/grimoire/main.js dist/grimoire/manifest.json dist/grimoire/styles.css \
 
 ### 권장 제공자
 
-최상의 Grimoire 경험을 위해 Claude Code, Codex, OpenCode, MiMoCode, Kimi Code, Grok Build 또는 Qwen Code부터 사용하세요. 이 제공자들은 현재 볼트 네이티브 작업에 가장 강력한 런타임 기능, 즉 영속 세션, 계획 중심 워크플로, 도구 활동, 풍부한 모델 제어를 제공합니다.
+최상의 Grimoire 경험을 위해 Codex, Claude Code, OpenCode, MiMoCode, Kimi Code, Grok Build 또는 Qwen Code부터 사용하세요. 이 제공자들은 현재 볼트 네이티브 작업에 가장 강력한 런타임 기능, 즉 영속 세션, 계획 중심 워크플로, 도구 활동, 풍부한 모델 제어를 제공합니다.
 
 Antigravity CLI와 Gemini CLI (Legacy)는 Google 계정 및 호환성 사례를 위해 계속 제공되지만, 현재 주 Grimoire 제공자로 권장하지는 않습니다. Grimoire는 최선의 노력으로 지원하며 현재 CLI가 가능하게 하는 폴백을 구현했지만, ACP와 런타임 기능에는 기술적 제약이 있습니다. 세션, 승인, 스트리밍, 도구·편집 메타데이터, 모델 검색, 사용량 보고가 권장 제공자와 비교해 불완전하거나 신뢰하기 어렵습니다.
+
+### Codex
+
+Codex는 처음 실행할 때 기본 제공자입니다. ChatGPT 요금제 또는 API 키로 로그인한 로컬 CLI의 OpenAI Codex를 사용하려면 선택하세요.
+
+```bash
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+codex
+```
+
+한 번 실행하여 로그인한 다음 Grimoire에서 활성화하세요. 이제 독립형 설치 관리자가 주 설치 경로입니다. Windows, Homebrew, 대체 패키지 관리자 옵션은 공식 Codex CLI 문서를 참고하세요.
+
+- [Codex CLI setup](https://developers.openai.com/codex/cli)
+- [OpenAI code generation guide](https://developers.openai.com/api/docs/guides/code-generation)
+
+Grimoire에서 Codex는 app-server 프로토콜로 실행되며 네이티브 기록, 포크, 계획 모드, 이미지 입력, 추론 강도 제어를 제공합니다. Codex가 속도 제한 메타데이터를 보고하면 요금제 사용량이 표시됩니다.
 
 ### Claude Code
 
@@ -142,22 +158,6 @@ Grimoire에서 Claude Code는 `.claude/` 파일을 읽고 보존하며 Claude Co
   }
 }
 ```
-
-### Codex
-
-Codex는 처음 실행할 때 기본 제공자입니다. ChatGPT 요금제 또는 API 키로 로그인한 로컬 CLI의 OpenAI Codex를 사용하려면 선택하세요.
-
-```bash
-curl -fsSL https://chatgpt.com/codex/install.sh | sh
-codex
-```
-
-한 번 실행하여 로그인한 다음 Grimoire에서 활성화하세요. 이제 독립형 설치 관리자가 주 설치 경로입니다. Windows, Homebrew, 대체 패키지 관리자 옵션은 공식 Codex CLI 문서를 참고하세요.
-
-- [Codex CLI setup](https://developers.openai.com/codex/cli)
-- [OpenAI code generation guide](https://developers.openai.com/api/docs/guides/code-generation)
-
-Grimoire에서 Codex는 app-server 프로토콜로 실행되며 네이티브 기록, 포크, 계획 모드, 이미지 입력, 추론 강도 제어를 제공합니다. Codex가 속도 제한 메타데이터를 보고하면 요금제 사용량이 표시됩니다.
 
 ### Antigravity CLI
 
@@ -346,8 +346,8 @@ Grimoire에서 Grok Build는 `.grimoire/grok/` 아래의 Grimoire 관리 시작 
 
 | 제공자 | 사용량 출처 |
 | --- | --- |
-| Claude Code | SDK 속도 제한 이벤트, 선택 사항인 `.grimoire/claude/statusline-usage.json`, SDK 결과 비용 메타데이터 |
 | Codex | 계정 속도 제한 알림 및 사용 가능한 경우 `account/rateLimits/read` |
+| Claude Code | SDK 속도 제한 이벤트, 선택 사항인 `.grimoire/claude/statusline-usage.json`, SDK 결과 비용 메타데이터 |
 | Antigravity CLI | 아직 `agy --print`에서 신뢰성 있게 제공되지 않음 |
 | Gemini CLI (Legacy) | Gemini CLI가 보고할 때의 ACP 비용 메타데이터, 레거시 제공자 전용 |
 | Qwen Code | Qwen Code가 보고할 때의 ACP 토큰 및 비용 메타데이터 |
@@ -463,7 +463,7 @@ Obsidian 커뮤니티 플러그인은 권장되는 사용자 설치 경로입니
 
 ## 로드맵
 
-현재 Grimoire는 Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin과 함께 제공됩니다.
+현재 Grimoire는 Codex, Claude Code, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin과 함께 제공됩니다.
 
 다음 후보는 GitHub Copilot CLI, 추가 ACP 호환 제공자, Obsidian에 임베드할 만큼 안정적인 로컬 모델 CLI입니다. 구현 메모는 [제공자 로드맵](../provider-roadmap.md)에 있습니다.
 

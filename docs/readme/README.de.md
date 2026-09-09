@@ -29,7 +29,7 @@
 
 > **Hinweis: 2.0 ist in Arbeit.** Das nächste Hauptrelease stellt Grimoire auf eine providerbasierte Ausführungsarchitektur um, in der ein Kernel jede CLI steuert und pro Zug genau ein Ergebnis festhält, und bringt ein Redesign, das dem Theme und der Akzentfarbe deines Vaults folgt. Die Arbeit ist bereits in `main` gemergt und noch in keinem veröffentlichten Release enthalten. Das aktuelle Release ist weiterhin 1.3.2. Unterhaltungen, Einstellungen und Provider-Dateien bleiben unverändert erhalten.
 
-Grimoire bringt agentic CLI-Assistenten direkt nach Obsidian. Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code und Devin laufen in einer gemeinsamen Seitenleiste: Sie lesen Notizen, bearbeiten Dateien, führen Befehle aus, rufen Tools auf und behalten session history im Kontext deines echten vault. Nichts läuft über einen Grimoire-Server. Es gibt keine telemetry, kein hosted backend und keinen proxy zwischen dir und deinem provider.
+Grimoire bringt agentic CLI-Assistenten direkt nach Obsidian. Codex, Claude Code, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code und Devin laufen in einer gemeinsamen Seitenleiste: Sie lesen Notizen, bearbeiten Dateien, führen Befehle aus, rufen Tools auf und behalten session history im Kontext deines echten vault. Nichts läuft über einen Grimoire-Server. Es gibt keine telemetry, kein hosted backend und keinen proxy zwischen dir und deinem provider.
 
 Grimoire ist für Menschen gebaut, die bereits in Obsidian arbeiten und AI-Hilfe wollen, die sich wie ein Teil des vault anfühlt: lokaler context, lokale files, bewusst gewählte provider und sichtbare usage/cost direkt im UI.
 
@@ -38,14 +38,14 @@ Grimoire ist für Menschen gebaut, die bereits in Obsidian arbeiten und AI-Hilfe
 ## Warum Grimoire
 
 - Nutze die CLI-Agents, denen du bereits vertraust, direkt in deinen Notizen.
-- Wechsle provider im composer. Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code und Devin teilen sich einen model picker.
+- Wechsle provider im composer. Codex, Claude Code, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code und Devin teilen sich einen model picker.
 - Grounde jeden turn in deinem vault. Erwähne Notizen, Ordner und MCP tools, statt paths per Hand zu kopieren.
 - Sieh cost und limits direkt neben der model-Auswahl.
 - Bleib local-first. Grimoire sammelt keine telemetry, proxyed keine prompts und betreibt kein backend.
 
 ## Was die provider können
 
-| Capability | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
+| Capability | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Local persistent runtime | Ja | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja |
 | Native history hydration | Ja | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Nein | Nein |
@@ -53,10 +53,10 @@ Grimoire ist für Menschen gebaut, die bereits in Obsidian arbeiten und AI-Hilfe
 | Image attachments | Ja | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja |
 | Instruction mode | Ja | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja |
 | Reasoning effort controls | Ja | Ja | Ja | Ja | Ja | Ja | Ja | Ja | Ja | Nein |
-| Rewind | Ja | Nein | Nein | Ja | Nein | Nein | Nein | Nein | Nein | Nein |
+| Rewind | Nein | Ja | Nein | Ja | Nein | Nein | Nein | Nein | Nein | Nein |
 | Fork | Ja | Ja | Nein | Ja | Nein | Nein | Nein | Nein | Nein | Nein |
-| Provider slash commands | Ja | Nein | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja |
-| Grimoire-managed MCP UI | Ja | Nein | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja |
+| Provider slash commands | Nein | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja |
+| Grimoire-managed MCP UI | Nein | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja |
 
 ## Installation
 
@@ -110,9 +110,25 @@ Aktiviere die gewünschten providers unter Settings, Grimoire, Providers. Danach
 
 ### Empfohlene Provider
 
-Für die beste Grimoire-Erfahrung beginne mit Claude Code, Codex, OpenCode, MiMoCode, Kimi Code, Grok Build oder Qwen Code. Diese provider bieten aktuell die stärksten runtime surfaces für vault-native Arbeit: persistent sessions, plan-oriented workflows, tool activity und umfangreiche model controls.
+Für die beste Grimoire-Erfahrung beginne mit Codex, Claude Code, OpenCode, MiMoCode, Kimi Code, Grok Build oder Qwen Code. Diese provider bieten aktuell die stärksten runtime surfaces für vault-native Arbeit: persistent sessions, plan-oriented workflows, tool activity und umfangreiche model controls.
 
 Antigravity CLI und Gemini CLI (Legacy) bleiben für Google accounts und compatibility-Fälle verfügbar, werden heute aber nicht als primäre Grimoire-Provider empfohlen. Grimoire unterstützt sie best-effort und wir haben die Fallbacks implementiert, die ihre aktuellen CLIs erlauben, aber ihre ACP und runtime surfaces sind technisch begrenzt: sessions, approvals, streaming, tool/edit metadata, model discovery und usage reporting sind im Vergleich zu den empfohlenen Providern unvollständig oder unzuverlässig.
+
+### Codex
+
+Codex ist beim ersten Start der default provider. Wähle ihn für OpenAI Codex in einem lokalen CLI, angemeldet über deinen ChatGPT plan oder einen API key.
+
+```bash
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+codex
+```
+
+Starte Codex einmal, melde dich an und aktiviere es dann in Grimoire. Der standalone installer ist jetzt der primary install path; Windows, Homebrew und fallback package-manager options stehen in der offiziellen Codex CLI Dokumentation.
+
+- [Codex CLI setup](https://developers.openai.com/codex/cli)
+- [OpenAI code generation guide](https://developers.openai.com/api/docs/guides/code-generation)
+
+In Grimoire läuft Codex über sein app-server protocol mit native history, fork, plan mode, image input und reasoning effort controls. Plan usage erscheint, wenn Codex rate-limit metadata meldet.
 
 ### Claude Code
 
@@ -140,22 +156,6 @@ In Grimoire liest und bewahrt Claude Code deine `.claude/` files, läuft auf dem
   }
 }
 ```
-
-### Codex
-
-Codex ist beim ersten Start der default provider. Wähle ihn für OpenAI Codex in einem lokalen CLI, angemeldet über deinen ChatGPT plan oder einen API key.
-
-```bash
-curl -fsSL https://chatgpt.com/codex/install.sh | sh
-codex
-```
-
-Starte Codex einmal, melde dich an und aktiviere es dann in Grimoire. Der standalone installer ist jetzt der primary install path; Windows, Homebrew und fallback package-manager options stehen in der offiziellen Codex CLI Dokumentation.
-
-- [Codex CLI setup](https://developers.openai.com/codex/cli)
-- [OpenAI code generation guide](https://developers.openai.com/api/docs/guides/code-generation)
-
-In Grimoire läuft Codex über sein app-server protocol mit native history, fork, plan mode, image input und reasoning effort controls. Plan usage erscheint, wenn Codex rate-limit metadata meldet.
 
 ### Antigravity CLI
 
@@ -348,8 +348,8 @@ Ein badge neben dem model selector hält die usage des aktiven provider sichtbar
 
 | Provider | Woher usage kommt |
 | --- | --- |
-| Claude Code | SDK rate-limit events, optional `.grimoire/claude/statusline-usage.json` und SDK result cost metadata |
 | Codex | Account rate-limit notifications und `account/rateLimits/read`, wenn verfügbar |
+| Claude Code | SDK rate-limit events, optional `.grimoire/claude/statusline-usage.json` und SDK result cost metadata |
 | Antigravity CLI | Noch nicht zuverlässig über `agy --print` verfügbar |
 | Gemini CLI (Legacy) | ACP cost metadata, wenn Gemini CLI sie meldet; nur legacy provider |
 | Qwen Code | ACP token- und cost-metadata, wenn Qwen Code sie meldet |
@@ -461,7 +461,7 @@ Obsidian Community plugins sind der empfohlene Installationsweg für Nutzer. Git
 
 ## Roadmap
 
-Aktuell wird Grimoire mit Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code und Devin ausgeliefert.
+Aktuell wird Grimoire mit Codex, Claude Code, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code und Devin ausgeliefert.
 
 Als Nächstes: GitHub Copilot CLI, weitere ACP-compatible providers und local model CLIs, sobald deren runtime stabil genug ist, um in Obsidian eingebettet zu werden. Implementation notes stehen in [docs/provider-roadmap.md](../provider-roadmap.md).
 

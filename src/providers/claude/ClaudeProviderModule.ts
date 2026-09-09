@@ -287,7 +287,7 @@ ClaudeProviderSettings
   manifest: {
     id: 'claude',
     displayName: 'Claude',
-    order: 10,
+    order: 20,
   },
 
   settings: claudeSettingsCodec,

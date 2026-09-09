@@ -12,8 +12,8 @@ Grimoire itself does not require payment and does not sell access to any hosted 
 
 Full functionality requires at least one external CLI provider. Those providers may require an account, subscription, API key, or paid usage:
 
-- Claude Code may require a Claude account, subscription, or API key.
 - Codex may require an OpenAI or ChatGPT account, plan access, or API key.
+- Claude Code may require a Claude account, subscription, or API key.
 - Antigravity CLI may require an eligible Google account and the model access available to that account.
 - Gemini CLI (Legacy) may require a Google account, Gemini API key, or Vertex AI configuration.
 - OpenCode may require provider credentials for the model vendors configured by the user.

@@ -122,7 +122,7 @@ describe('reading a provider\'s contributions through the catalog', () => {
         claude: { enabled: true },
         codex: { enabled: true },
       },
-    })).toEqual(['claude', 'codex']);
+    })).toEqual(['codex', 'claude']);
     expect(providerCatalog().enabledIds({
       providerConfigs: {
         claude: { enabled: true },
@@ -134,8 +134,8 @@ describe('reading a provider\'s contributions through the catalog', () => {
         qwen: { enabled: true },
       },
     })).toEqual([
-      'claude',
       'codex',
+      'claude',
       'opencode',
       'grok',
       'antigravity',

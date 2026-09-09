@@ -30,8 +30,8 @@ describe('built-in provider catalog', () => {
     // reached this commit carrying the order of the provider they were forked
     // from, and the ordering the registrations had is what this pins.
     expect(builtInProviderCatalog.ids()).toEqual([
-      'claude',
       'codex',
+      'claude',
       'opencode',
       'grok',
       'mimocode',
@@ -133,8 +133,8 @@ describe('built-in provider catalog', () => {
 
   it('names each provider as the product names it', () => {
     expect(builtInProviderCatalog.list().map(module => module.manifest.displayName)).toEqual([
-      'Claude',
       'Codex',
+      'Claude',
       'OpenCode',
       'Grok Build',
       'MiMoCode',

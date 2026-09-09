@@ -87,7 +87,7 @@ describe('Claude provider module', () => {
     expect(claudeProviderModule.manifest).toEqual({
       id: 'claude',
       displayName: 'Claude',
-      order: 10,
+      order: 20,
     });
   });
 
