@@ -249,4 +249,16 @@ describe('messages.css', () => {
     expect(getRule(css, '.grimoire-message-content pre')).toContain('max-width: 100%');
     expect(getRule(css, '.grimoire-message-content :not(pre) > code')).toContain('overflow-wrap: anywhere');
   });
+
+  it('sets a fenced block one step below the prose it answers in', () => {
+    // Code in an answer is content the reader reads, not the monospace meta
+    // `--grimoire-text-xs` names. One step down puts a block at 12px against
+    // 13px of prose - the same optical size the 0.92em correction gives a word
+    // of inline code in that prose, rather than below it.
+    const css = readChatMarkdownCss();
+
+    expect(getRule(css, '.grimoire-message-content pre')).toContain('font-size: var(--grimoire-text-s)');
+    expect(getRule(css, '.grimoire-message-content :not(pre) > code'))
+      .toContain('font-size: var(--grimoire-text-inline-code)');
+  });
 });

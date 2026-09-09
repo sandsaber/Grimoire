@@ -342,6 +342,33 @@ describe('Nordic design system', () => {
     expect([...new Set(outranked)].sort()).toEqual([]);
   });
 
+  it('sizes a fenced block once, not twice', () => {
+    // Markdown renders a fence as `<pre><code>`, so a rule that sizes `code`
+    // for a sentence also lands inside a block that has already been stepped
+    // down - and the two reductions multiply. That shipped: a fenced block in
+    // an answer computed at 10.16px against 13px of prose around it, a 22%
+    // drop nobody chose, in message content and in thinking content both.
+    // `--grimoire-text-inline-code` is relative by design, so it is only ever
+    // correct on a `code` that sits in a line of prose. An absolute step is a
+    // different decision and does not compound, so only a relative one is
+    // asked to name its guard.
+    const unguarded: string[] = [];
+
+    for (const file of MODULE_FILES) {
+      for (const rule of read(file).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const size = /(?:^|[;\s])font-size\s*:([^;]+)/.exec(rule[2])?.[1] ?? '';
+        if (!/em\b|%|--grimoire-text-inline-code/.test(size)) continue;
+        for (const part of rule[1].split(',').map(selector => selector.trim())) {
+          if (!/(^|[\s>])code$/.test(part)) continue;
+          if (part.includes(':not(pre)')) continue;
+          unguarded.push(`${file}: ${part}`);
+        }
+      }
+    }
+
+    expect(unguarded.sort()).toEqual([]);
+  });
+
   it('lets a modifier outrank the base it modifies', () => {
     // The other half of the same trap. `button.grimoire-icon-btn` counts an
     // element and a class, so `.grimoire-icon-btn--small` - named by class

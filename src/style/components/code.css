@@ -18,7 +18,7 @@
   background: var(--grimoire-code);
   padding: var(--grimoire-space-8) var(--grimoire-space-10);
   border-radius: var(--grimoire-radius-1);
-  font-size: var(--grimoire-text-xs);
+  font-size: var(--grimoire-text-s);
   line-height: var(--grimoire-leading-code);
   overflow-x: auto;
   margin: 0;
@@ -36,17 +36,19 @@
   margin: var(--grimoire-space-8) 0;
 }
 
+.grimoire-message-content code {
+  font-family: var(--grimoire-mono);
+}
+
 /*
  * Inline code is set relative to the line it sits in, so it stays a word in a
  * sentence rather than a fragment at a fixed size the sentence has to make room
- * for.
+ * for. A fenced block sits in no line, so the correction is scoped away from it:
+ * applied there it would multiply against the step `pre` already takes, and set
+ * a whole block of code smaller than a single word of code in the prose above.
  */
-.grimoire-message-content code {
-  font-family: var(--grimoire-mono);
-  font-size: var(--grimoire-text-inline-code);
-}
-
 .grimoire-message-content :not(pre) > code {
+  font-size: var(--grimoire-text-inline-code);
   padding: 1px var(--grimoire-space-4);
   border-radius: var(--grimoire-radius-1);
   background: var(--grimoire-code);

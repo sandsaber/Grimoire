@@ -33,6 +33,7 @@ The provider runtime is rebuilt on an execution kernel, and the chat surfaces ar
 
 ### Fixed
 
+- Code in an answer is readable again. A fenced block was set two steps below the sentence introducing it, because the correction that keeps inline code the size of the words around it also landed inside the block, on a size the block had already stepped down from. It computed at roughly 10px against 13px of prose, in answers and in reasoning both; it now sits one step below the prose, the same optical size as a word of inline code in it.
 - Grok Build's context meter, Kimi Code's, and Qwen Code's read usage from the turn that produced it, so the meter no longer lags a turn behind or stays empty on a provider that reports usage only after the prompt returns.
 - Resuming an OpenCode session no longer opens a fresh session on every reload. OpenCode answers `session/load` with its config options and no session id, and requiring the echo turned every resume into "the agent returned another session".
 - Stopping the title generation for one tab no longer stops it for every other open tab.

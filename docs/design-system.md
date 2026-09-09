@@ -209,6 +209,15 @@ steps carry the whole plugin.
 | `--grimoire-text-xl` | 20px (`--font-ui-large`) | display, used almost nowhere |
 | `--grimoire-text-inline-code` | 0.92em | the one size relative to its own line — inline code has to match the sentence it is in |
 
+The relative step is scoped to `:not(pre) > code`. Markdown renders a fence as `<pre><code>`, so a
+rule that sizes `code` for a sentence lands inside a block as well, and multiplies against the step
+the block has already taken. That shipped in 2.0: a fenced answer computed at 10.16px against 13px of
+prose around it, in message content and thinking content both. A fenced block is set on
+`--grimoire-text-s`, one step below prose — the same optical size the correction gives a word of
+inline code in that prose, rather than below it. `--grimoire-text-xs` stays what the table says it
+is: monospace meta, and the diff and tool rows that are meta. Screen `1a` of the drawing now carries
+a fenced block in the answer, because the surface it never drew is the surface that drifted.
+
 Faces: `--grimoire-face` for interface text, `--grimoire-mono` for paths, ids, times, token counts,
 commands and keyboard hints. **Monospace means machine-readable**, not "technical-looking": a plan is
 prose about the vault and is set in the interface face.

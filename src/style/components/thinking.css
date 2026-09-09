@@ -153,5 +153,9 @@
 
 .grimoire-thinking-content code {
   font-family: var(--grimoire-mono);
+}
+
+/* Scoped away from `pre > code` for the reason given in code.css. */
+.grimoire-thinking-content :not(pre) > code {
   font-size: var(--grimoire-text-inline-code);
 }
