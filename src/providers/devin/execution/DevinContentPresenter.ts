@@ -23,6 +23,10 @@ import { mapDevinModeToGrimoire } from '@/providers/devin/modes';
 /** What the ACP connection delivered, shared with every managed-ACP provider. */
 export type DevinContentPayload = AcpContentPayload;
 
+const CREDIT_TOTAL_KEY = 'cognition.ai/totalCreditCost';
+/** Devin bills in its own credits; the store prints the unit as it is given. */
+const CREDIT_CURRENCY = 'credits';
+
 /** What a session answered with when it was created or loaded. */
 export interface DevinSessionOpening {
   readonly sessionId: string;
@@ -69,7 +73,10 @@ export interface DevinContentPresenterPorts {
  * transport respectively.
  *
  * The context window comes on the wire: Devin's `usage_update` carries
- * `used` and `size`, so unlike Qwen there is no vendor method to ask.
+ * `used` and `size`, so unlike Qwen there is no vendor method to ask. What it
+ * charged rides beside them as `_meta["cognition.ai/totalCreditCost"]` — a
+ * running total for the session, not the cost of one update — so the spend
+ * store is told the difference since the last one it saw.
  */
 export class DevinContentPresenter {
   private readonly normalizer = new AcpSessionUpdateNormalizer();
@@ -78,6 +85,8 @@ export class DevinContentPresenter {
   private refusal: AcpTurnRefusal | undefined;
   private contextUsage: AcpUsageUpdate | null = null;
   private promptUsage: AcpUsage | null = null;
+  /** The credit total each session last reported, for the difference. */
+  private readonly creditTotals = new Map<string, number>();
 
   constructor(private readonly ports: DevinContentPresenterPorts) {}
 
@@ -104,6 +113,7 @@ export class DevinContentPresenter {
   forgetConversation(): void {
     this.sessionId = undefined;
     this.metadata = {};
+    this.creditTotals.clear();
     this.beginTurn();
   }
 
@@ -179,11 +189,33 @@ export class DevinContentPresenter {
         return normalized.streamChunks;
       case 'usage':
         this.contextUsage = normalized.usage;
-        this.ports.onCost?.(normalized.usage.cost ?? null);
+        this.ports.onCost?.(normalized.usage.cost ?? this.creditsSince(notification));
         return this.usageChunks();
       default:
         return [];
     }
+  }
+
+  /**
+   * What this update added to the session's credit total, or nothing.
+   *
+   * The first total a session reports is a baseline, not a charge: a resumed
+   * session carries everything it spent before this plugin saw it, and a
+   * store that counted that would show last week under this month. A total
+   * that did not grow is nothing either.
+   */
+  private creditsSince(notification: AcpSessionNotification): AcpUsageUpdate['cost'] {
+    const meta = (notification.update as { _meta?: Record<string, unknown> })._meta;
+    const total = meta?.[CREDIT_TOTAL_KEY];
+    const sessionId = notification.sessionId;
+    if (typeof total !== 'number' || !Number.isFinite(total) || !sessionId) {
+      return null;
+    }
+    const previous = this.creditTotals.get(sessionId);
+    this.creditTotals.set(sessionId, total);
+    return previous !== undefined && total > previous
+      ? { amount: total - previous, currency: CREDIT_CURRENCY }
+      : null;
   }
 
   /**

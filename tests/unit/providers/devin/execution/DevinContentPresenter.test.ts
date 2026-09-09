@@ -214,6 +214,25 @@ describe('Devin content presenter', () => {
     }));
   });
 
+  it('tells the spend store what the session credit total grew by', () => {
+    // Recorded: `_meta["cognition.ai/totalCreditCost"]` is a running total.
+    const { presenter, recorded } = createPresenter();
+    const usage = (total: number): DevinContentPayload => sessionUpdate({
+      sessionUpdate: 'usage_update',
+      used: 13_652,
+      size: 200_000,
+      _meta: { 'cognition.ai/totalCreditCost': total, 'cognition.ai/totalAcuCost': 0 },
+    } as unknown as AcpSessionUpdate);
+
+    // The first total is a baseline: a resumed session carries what it spent
+    // before this plugin saw it.
+    presenter.present(usage(2.5));
+    presenter.present(usage(2.5));
+    presenter.present(usage(4));
+
+    expect(recorded.costs).toEqual([null, null, { amount: 1.5, currency: 'credits' }]);
+  });
+
   it('forgets the session a new conversation must not report as its own', () => {
     const { presenter } = createPresenter();
     presenter.present(sessionUpdate({
