@@ -29,7 +29,7 @@
 
 > **안내: 2.0을 개발 중입니다.** 다음 메이저 릴리스에서 Grimoire는 프로바이더 기반 실행 아키텍처로 전환됩니다. 하나의 커널이 각 CLI를 구동하고 턴마다 정확히 하나의 결과를 기록하며, 보관소의 테마와 강조 색상을 따르는 새 디자인이 적용됩니다. 작업은 이미 `main`에 병합되었지만 아직 공개 릴리스에는 포함되지 않았습니다. 현재 공개 릴리스는 여전히 1.3.2입니다. 대화, 설정, 프로바이더 파일은 그대로 유지됩니다.
 
-Grimoire는 에이전트형 CLI 어시스턴트를 Obsidian 안으로 가져옵니다. 하나의 사이드 패널에서 Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code를 사용해 노트를 읽고, 파일을 편집하고, 명령과 도구를 실행하며 실제 볼트의 세션 기록을 유지합니다. Grimoire 서버, 텔레메트리, 호스팅 백엔드, 프록시는 없습니다.
+Grimoire는 에이전트형 CLI 어시스턴트를 Obsidian 안으로 가져옵니다. 하나의 사이드 패널에서 Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin을 사용해 노트를 읽고, 파일을 편집하고, 명령과 도구를 실행하며 실제 볼트의 세션 기록을 유지합니다. Grimoire 서버, 텔레메트리, 호스팅 백엔드, 프록시는 없습니다.
 
 이미 Obsidian에서 작업하며 볼트의 일부처럼 작동하는 AI 도움을 원하는 사람을 위해 만들었습니다. 로컬 컨텍스트와 파일, 신중하게 선택한 제공자, 확인 가능한 사용량을 제공합니다.
 
@@ -38,25 +38,25 @@ Grimoire는 에이전트형 CLI 어시스턴트를 Obsidian 안으로 가져옵�
 ## Grimoire를 선택하는 이유
 
 - 이미 신뢰하는 CLI 에이전트를 노트 안에서 바로 사용하세요.
-- 작성기에서 제공자를 전환하세요. Claude Code, Codex, Antigravity CLI, 레거시 Gemini CLI, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code는 하나의 모델 선택기를 공유합니다.
+- 작성기에서 제공자를 전환하세요. Claude Code, Codex, Antigravity CLI, 레거시 Gemini CLI, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin은 하나의 모델 선택기를 공유합니다.
 - 모든 대화를 볼트에 기반하게 하세요. 경로를 직접 붙여 넣는 대신 노트, 폴더, MCP 도구를 멘션하세요.
 - 어차피 선택하는 자리인 모델 선택기 옆에서 비용과 한도를 확인하세요.
 - 로컬 우선으로 유지하세요. Grimoire는 텔레메트리를 수집하거나 프롬프트를 프록시하지 않으며, 백엔드를 운영하지 않습니다.
 
 ## 제공자별 기능
 
-| 기능 | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 로컬 영속 런타임 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 |
-| 네이티브 기록 복원 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 아니요 |
-| 계획 모드 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 |
-| 이미지 첨부 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 |
-| 지시 모드 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 |
-| 추론 강도 제어 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 예 |
-| 되돌리기 | 예 | 아니요 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
-| 포크 | 예 | 예 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
-| 제공자 슬래시 명령 | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 |
-| Grimoire 관리 MCP UI | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 |
+| 기능 | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 로컬 영속 런타임 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
+| 네이티브 기록 복원 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 아니요 | 아니요 |
+| 계획 모드 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
+| 이미지 첨부 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
+| 지시 모드 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
+| 추론 강도 제어 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 |
+| 되돌리기 | 예 | 아니요 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
+| 포크 | 예 | 예 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
+| 제공자 슬래시 명령 | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
+| Grimoire 관리 MCP UI | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 |
 
 ## 설치
 
@@ -219,6 +219,31 @@ Low, Medium, High, XHigh 또는 Max 추론 강도를 선택하세요(기본값�
 
 Qwen은 자격 증명과 네이티브 구성을 계속 `~/.qwen/settings.json`에서 관리합니다. Grimoire는 `.grimoire/mcp/qwen.json`의 격리된 프로젝트 MCP 목록을 관리하고 Qwen의 네이티브 구성을 덮어쓰지 않은 채 ACP 세션에 주입합니다. Qwen이 ACP 토큰 또는 비용 메타데이터를 내보낼 때만 사용량이 표시됩니다. Qwen은 현재 Grimoire의 포크나 되돌리기 제어를 지원하지 않습니다.
 
+### Devin
+
+Devin CLI(Cognition)는 선택형 ACP 제공자입니다. Grimoire는 `devin acp`를 실행하고, 실행 중인 세션에서 계정이 제공하는 모델과 모드를 찾아내고, 메시지와 추론과 도구 활동을 스트리밍하고, 셸 명령과 파일 쓰기 전에 확인을 요청하며, 세션을 네이티브로 재개합니다. 제공되는 모델 목록은 로그인한 계정에 따라 달라집니다. 이는 Devin의 동작이며 Grimoire의 제한이 아닙니다.
+
+```bash
+# macOS, Linux, WSL
+curl -fsSL https://cli.devin.ai/install.sh | bash
+
+# Homebrew
+brew install --cask devin-cli
+
+devin auth login
+devin --version
+```
+
+`devin auth login`(브라우저 로그인)으로 로그인한 뒤 Grimoire에서 Devin을 활성화하세요. Safe, Auto-approve, Plan은 각각 Devin의 `accept-edits`, `bypass`, `plan`에 대응합니다. Devin의 `smart`와 `ask`는 공용 도구 모음에서 Safe로 표시됩니다.
+
+- [Devin CLI 문서](https://docs.devin.ai/cli)
+- [Devin ACP 문서](https://docs.devin.ai/desktop/acp)
+
+Safe 모드에 대해 알아둘 점이 있습니다. Devin은 어떤 셸 명령이 읽기 전용인지 스스로 판단하고 그런 명령은 묻지 않고 실행하며, `echo`는 파일로 리다이렉트해도 읽기 전용으로 취급됩니다. Grimoire는 Devin이 프로토콜을 통해 수행하는 모든 파일 쓰기를 승인 대상으로 삼지만, 에이전트가 자체 셸로 우회한 쓰기는 그 관문을 지나칠 수 있습니다. 아무것도 쓰지 않아야 하는 세션에는 Plan을 사용하세요.
+
+Devin은 자격 증명을 `~/.local/share/devin/`에서 직접 관리합니다. 볼트 스킬은 `.devin/skills`와 `.agents/skills`에서 읽으며, 스킬이 곧 Devin의 슬래시 명령입니다. Grimoire는 `.grimoire/mcp/devin.json`에 별도의 MCP 목록을 두고 ACP 세션에 주입합니다. 사용량은 Devin이 보고할 때 표시됩니다. 추론 강도 제어는 없습니다. 강도가 모델 id의 일부이기 때문입니다. Grimoire의 포크와 되돌리기는 지원하지 않습니다.
+
+
 ### OpenCode
 
 자체 제공자 구성을 갖춘 모델 불문 에이전트가 필요하면 OpenCode를 선택하세요.
@@ -313,7 +338,7 @@ Grimoire에서 Grok Build는 `.grimoire/grok/` 아래의 Grimoire 관리 시작 
 
 ### 모델 선택기
 
-하나의 선택기에 제공자별로 그룹화하고 레이블 순으로 정렬합니다. Antigravity, Claude Code, Codex, Gemini CLI (Legacy), Grok Build, Kimi Code, MiMoCode, OpenCode, Qwen Code가 포함됩니다. 필터링 중에도 메뉴 크기를 바꾸지 않고 레이블, 설명, 그룹, 모델 ID 전체에서 검색합니다. 카탈로그는 지연 로드되며 접은 그룹을 기억합니다. 설정에서 사용자 지정 별칭과 컨텍스트 창 재정의를 추가하세요. Claude의 1M 변형은 기본 모델을 대체하는 것이 아니라 추가 옵션입니다.
+하나의 선택기에 제공자별로 그룹화하고 레이블 순으로 정렬합니다. Antigravity, Claude Code, Codex, Devin, Gemini CLI (Legacy), Grok Build, Kimi Code, MiMoCode, OpenCode, Qwen Code가 포함됩니다. 필터링 중에도 메뉴 크기를 바꾸지 않고 레이블, 설명, 그룹, 모델 ID 전체에서 검색합니다. 카탈로그는 지연 로드되며 접은 그룹을 기억합니다. 설정에서 사용자 지정 별칭과 컨텍스트 창 재정의를 추가하세요. Claude의 1M 변형은 기본 모델을 대체하는 것이 아니라 추가 옵션입니다.
 
 ### 사용량 및 비용
 
@@ -326,6 +351,7 @@ Grimoire에서 Grok Build는 `.grimoire/grok/` 아래의 Grimoire 관리 시작 
 | Antigravity CLI | 아직 `agy --print`에서 신뢰성 있게 제공되지 않음 |
 | Gemini CLI (Legacy) | Gemini CLI가 보고할 때의 ACP 비용 메타데이터, 레거시 제공자 전용 |
 | Qwen Code | Qwen Code가 보고할 때의 ACP 토큰 및 비용 메타데이터 |
+| Devin | ACP가 보고하는 세션 크레딧 합계를 월간 지출로 |
 | OpenCode | ACP 및 세션 비용 메타데이터에서 집계한 월간 지출 |
 | MiMoCode | ACP 및 세션 비용 메타데이터에서 집계한 월간 지출 |
 | Kimi Code | ACP 및 세션 비용 메타데이터에서 집계한 월간 지출 |
@@ -437,7 +463,7 @@ Obsidian 커뮤니티 플러그인은 권장되는 사용자 설치 경로입니
 
 ## 로드맵
 
-현재 Grimoire는 Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code와 함께 제공됩니다.
+현재 Grimoire는 Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin과 함께 제공됩니다.
 
 다음 후보는 GitHub Copilot CLI, 추가 ACP 호환 제공자, Obsidian에 임베드할 만큼 안정적인 로컬 모델 CLI입니다. 구현 메모는 [제공자 로드맵](../provider-roadmap.md)에 있습니다.
 

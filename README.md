@@ -335,7 +335,7 @@ The **Parallel workers** approval card shows the inherited model and lets you se
 
 ### Model selector
 
-One picker, grouped by provider and sorted by label: Antigravity, Claude Code, Codex, Gemini CLI (Legacy), Grok Build, Kimi Code, MiMoCode, OpenCode, and Qwen Code. Search runs across labels, descriptions, groups, and model IDs without resizing the menu while you filter. Catalogs load lazily and remember which groups you collapsed. Add custom aliases and context-window overrides in settings. Claude's 1M variants are extra options, not replacements for the base models.
+One picker, grouped by provider and sorted by label: Antigravity, Claude Code, Codex, Devin, Gemini CLI (Legacy), Grok Build, Kimi Code, MiMoCode, OpenCode, and Qwen Code. Search runs across labels, descriptions, groups, and model IDs without resizing the menu while you filter. Catalogs load lazily and remember which groups you collapsed. Add custom aliases and context-window overrides in settings. Claude's 1M variants are extra options, not replacements for the base models.
 
 ### Usage and cost
 
@@ -348,6 +348,7 @@ A badge next to the model selector keeps the active provider's usage in view, wi
 | Antigravity CLI | Not reliably available from `agy --print` yet |
 | Gemini CLI (Legacy) | ACP cost metadata when Gemini CLI reports it; legacy provider only |
 | Qwen Code | ACP token and cost metadata when Qwen Code reports it |
+| Devin | Session credit total reported over ACP, as monthly spend |
 | OpenCode | Monthly spend aggregated from ACP and session cost metadata |
 | MiMoCode | Monthly spend aggregated from ACP and session cost metadata |
 | Kimi Code | Monthly spend aggregated from ACP and session cost metadata |
@@ -459,7 +460,7 @@ Obsidian Community plugins are the recommended user install path. GitHub Release
 
 ## Roadmap
 
-Today Grimoire ships with Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, and Qwen Code.
+Today Grimoire ships with Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, and Devin.
 
 Next on the list: GitHub Copilot CLI, other ACP-compatible providers, and local model CLIs once their runtime is stable enough to embed in Obsidian. Implementation notes live in [docs/provider-roadmap.md](docs/provider-roadmap.md).
 

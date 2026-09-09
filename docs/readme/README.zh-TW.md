@@ -29,7 +29,7 @@
 
 > **提示：2.0 正在開發中。** 下一個主要版本會把 Grimoire 遷移到以提供者為基礎的執行架構：由一個核心驅動每個 CLI，並為每一輪精確記錄一個結果；同時帶來跟隨儲存庫主題與強調色的全新設計。相關工作已合併到 `main` 分支，但尚未納入任何已發布版本。目前發布版本仍是 1.3.2。對話、設定與提供者檔案將原樣保留。
 
-Grimoire 將 agentic CLI 助手帶入 Obsidian。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build 和 Qwen Code 都在同一個側邊欄中執行：讀取筆記、編輯檔案、執行命令、呼叫工具，並把 session history 保存在真實的 vault context 中。Grimoire 不經過自家伺服器：沒有 telemetry、沒有 hosted backend，也沒有夾在你和 provider 之間的 proxy。
+Grimoire 將 agentic CLI 助手帶入 Obsidian。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code 和 Devin 都在同一個側邊欄中執行：讀取筆記、編輯檔案、執行命令、呼叫工具，並把 session history 保存在真實的 vault context 中。Grimoire 不經過自家伺服器：沒有 telemetry、沒有 hosted backend，也沒有夾在你和 provider 之間的 proxy。
 
 它面向已經在 Obsidian 中工作的人：你可以使用本地 context、本地檔案、明確選擇的 provider，並在介面中直接看到 usage 和 cost。
 
@@ -38,25 +38,25 @@ Grimoire 將 agentic CLI 助手帶入 Obsidian。Claude Code、Codex、Antigravi
 ## 為什麼選擇 Grimoire
 
 - 在筆記中直接使用你已經信任的 CLI 代理。
-- 從 composer 切換 provider。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build 和 Qwen Code 共用一個 model picker。
+- 從 composer 切換 provider。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code 和 Devin 共用一個 model picker。
 - 讓每一次 turn 都基於 vault context。可以 mention 筆記、資料夾和 MCP tools，不需要手動複製路徑。
 - 在選擇模型的位置直接看到 cost 和 limits。
 - 保持 local-first。Grimoire 不收集 telemetry，不 proxy prompts，也不執行 backend。
 
 ## 各 provider 能做什麼
 
-| 能力 | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 本地 persistent runtime | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 |
-| 原生 history hydration | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 否 |
-| Plan mode | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 |
-| Image attachments | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 |
-| Instruction mode | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 |
-| Reasoning effort controls | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 |
-| Rewind | 是 | 否 | 否 | 是 | 否 | 否 | 否 | 否 | 否 |
-| Fork | 是 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 |
-| Provider slash commands | 是 | 否 | 是 | 是 | 是 | 是 | 否 | 是 | 是 |
-| Grimoire-managed MCP UI | 是 | 否 | 是 | 是 | 是 | 是 | 否 | 是 | 是 |
+| 能力 | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 本地 persistent runtime | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
+| 原生 history hydration | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 否 | 否 |
+| Plan mode | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
+| Image attachments | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
+| Instruction mode | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
+| Reasoning effort controls | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 否 |
+| Rewind | 是 | 否 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 |
+| Fork | 是 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 |
+| Provider slash commands | 是 | 否 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
+| Grimoire-managed MCP UI | 是 | 否 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 |
 
 ## 安裝
 
@@ -214,6 +214,31 @@ Reasoning effort 有 Low、Medium、High、XHigh、Max，預設 High。每個 no
 
 Credentials 和 native config 仍由 Qwen 在 `~/.qwen/settings.json` 中管理。Grimoire 管理 `.grimoire/mcp/qwen.json` 中隔離的 project MCP list，並在不重寫 Qwen native config 的情況下傳入 ACP sessions。只有 Qwen 傳送 ACP token/cost metadata 時才顯示 usage；Qwen 目前不支援 Grimoire fork 或 rewind。
 
+### Devin
+
+Devin CLI（Cognition）是選擇性啟用的 ACP provider。Grimoire 透過 `devin acp` 啟動它，從執行中的 session 取得你的帳號可用的 models 與 modes，串流訊息、思考過程與 tool activity，在 shell command 和寫入檔案前先詢問，並以原生方式恢復 session。可用的 model 清單取決於你登入的帳號，這是 Devin 的行為，而非 Grimoire 的限制。
+
+```bash
+# macOS, Linux, WSL
+curl -fsSL https://cli.devin.ai/install.sh | bash
+
+# Homebrew
+brew install --cask devin-cli
+
+devin auth login
+devin --version
+```
+
+先用 `devin auth login`（瀏覽器登入）登入，再於 Grimoire 中啟用 Devin。Safe、Auto-approve 與 Plan 分別對應 Devin 的 `accept-edits`、`bypass` 與 `plan`；Devin 的 `smart` 與 `ask` 在共用工具列中顯示為 Safe。
+
+- [Devin CLI 文件](https://docs.devin.ai/cli)
+- [Devin ACP 文件](https://docs.devin.ai/desktop/acp)
+
+關於 Safe 模式有一點要知道：Devin 會自行判斷哪些 shell command 屬於唯讀並直接執行，`echo` 即使重新導向寫入檔案也算在內。Grimoire 會為 Devin 透過協定發出的每一次檔案寫入徵求許可，但 agent 改走自己的 shell 完成的寫入可能會繞過這道關卡。如果某個 session 絕對不能寫入，請使用 Plan。
+
+Devin 的憑證由它自己保管在 `~/.local/share/devin/`。Vault skills 從 `.devin/skills` 與 `.agents/skills` 讀取，而 skill 就是 Devin 的 slash command。Grimoire 在 `.grimoire/mcp/devin.json` 維護獨立的 MCP 清單並注入 ACP session。用量會在 Devin 回報時顯示；沒有 reasoning effort 控制，因為 effort 已包含在 model id 中。Grimoire 的 fork 與 rewind 不適用於 Devin。
+
+
 ### OpenCode
 
 如果你想使用自帶 provider configuration 的 model-agnostic agent，可以選擇 OpenCode。
@@ -308,7 +333,7 @@ Grok 4.5 目前是 Grok Build 的預設模型。Grimoire 從已驗證的 Grok CL
 
 ### Model selector
 
-一個 picker，按 provider 分組，並按 label 排序：Antigravity、Claude Code、Codex、Gemini CLI (Legacy)、Grok Build、Kimi Code、MiMoCode、OpenCode 和 Qwen Code。Search 會匹配 labels、descriptions、groups 和 model IDs。Catalogs 會 lazy load，並記住你摺疊過的 groups。你可以在 settings 中新增 custom aliases 和 context-window overrides。Claude 的 1M variants 是額外 options，不會替代 base models。
+一個 picker，按 provider 分組，並按 label 排序：Antigravity、Claude Code、Codex、Devin、Gemini CLI (Legacy)、Grok Build、Kimi Code、MiMoCode、OpenCode 和 Qwen Code。Search 會匹配 labels、descriptions、groups 和 model IDs。Catalogs 會 lazy load，並記住你摺疊過的 groups。你可以在 settings 中新增 custom aliases 和 context-window overrides。Claude 的 1M variants 是額外 options，不會替代 base models。
 
 ### Usage 和 cost
 
@@ -321,6 +346,7 @@ Model selector 旁邊的 badge 會持續顯示目前 provider 的 usage；model 
 | Antigravity CLI | `agy --print` 目前尚無法可靠提供 |
 | Gemini CLI (Legacy) | Gemini CLI 回傳時的 ACP cost metadata；僅 legacy provider |
 | Qwen Code | 僅在 Qwen Code 回傳時的 ACP token 和 cost metadata |
+| Devin | ACP 回報的 session credit 總額，換算為每月支出 |
 | OpenCode | 從 ACP 和 session cost metadata 聚合的 monthly spend |
 | MiMoCode | 從 ACP 和 session cost metadata 聚合的 monthly spend |
 | Kimi Code | 從 ACP 和 session cost metadata 聚合的 monthly spend |
@@ -428,7 +454,7 @@ Obsidian Community plugins 是推薦的使用者安裝方式。GitHub Releases �
 
 ## Roadmap
 
-目前 Grimoire 隨 Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build 和 Qwen Code 一起發布。
+目前 Grimoire 隨 Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code 和 Devin 一起發布。
 
 下一步計畫：GitHub Copilot CLI、其他 ACP-compatible providers，以及當 runtime 足夠穩定可嵌入 Obsidian 時的 local model CLIs。Implementation notes 位於 [docs/provider-roadmap.md](../provider-roadmap.md)。
 

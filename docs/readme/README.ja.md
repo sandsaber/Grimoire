@@ -29,7 +29,7 @@
 
 > **お知らせ: 2.0 を開発中です。** 次のメジャーリリースでは、Grimoire はプロバイダー基盤の実行アーキテクチャに移行します。単一のカーネルが各 CLI を駆動し、ターンごとにちょうど一つの結果を記録します。あわせて、保管庫のテーマとアクセントカラーに従う新しいデザインになります。作業は `main` にマージ済みですが、公開リリースにはまだ含まれていません。現在の公開リリースは 1.3.2 のままです。会話、設定、プロバイダーのファイルはそのまま引き継がれます。
 
-Grimoire は agentic CLI アシスタントを Obsidian に組み込みます。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code がひとつのサイドパネルに入り、ノートを読み、ファイルを編集し、コマンドを実行し、ツールを呼び出し、実際の vault に紐づいた session history を保持します。Grimoire のサーバーは介在しません。Telemetry も hosted backend も、あなたと provider の間に入る proxy もありません。
+Grimoire は agentic CLI アシスタントを Obsidian に組み込みます。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code、Devin がひとつのサイドパネルに入り、ノートを読み、ファイルを編集し、コマンドを実行し、ツールを呼び出し、実際の vault に紐づいた session history を保持します。Grimoire のサーバーは介在しません。Telemetry も hosted backend も、あなたと provider の間に入る proxy もありません。
 
 Grimoire は、すでに Obsidian で作業している人のために作られています。ローカル context、ローカル files、意図して選ぶ provider、そして UI 上で確認できる usage と cost を重視しています。
 
@@ -38,25 +38,25 @@ Grimoire は、すでに Obsidian で作業している人のために作られ�
 ## Grimoire を使う理由
 
 - すでに信頼している CLI エージェントを、ノートの中で直接使えます。
-- Composer から provider を切り替えられます。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code は同じ model picker を共有します。
+- Composer から provider を切り替えられます。Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code、Devin は同じ model picker を共有します。
 - すべての turn を vault context に grounded できます。ノート、フォルダ、MCP tools を mention でき、手で path を貼る必要がありません。
 - Model selector のすぐ横で cost と limits を確認できます。
 - Local-first のまま使えます。Grimoire は telemetry を集めず、prompts を proxy せず、backend を実行しません。
 
 ## 各 provider ができること
 
-| Capability | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Local persistent runtime | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes |
-| Native history hydration | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No |
-| Plan mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes |
-| Image attachments | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes |
-| Instruction mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes |
-| Reasoning effort controls | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Rewind | Yes | No | No | Yes | No | No | No | No | No |
-| Fork | Yes | Yes | No | Yes | No | No | No | No | No |
-| Provider slash commands | Yes | No | Yes | Yes | Yes | Yes | No | Yes | Yes |
-| Grimoire-managed MCP UI | Yes | No | Yes | Yes | Yes | Yes | No | Yes | Yes |
+| Capability | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Local persistent runtime | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
+| Native history hydration | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No | No |
+| Plan mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
+| Image attachments | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
+| Instruction mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
+| Reasoning effort controls | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No |
+| Rewind | Yes | No | No | Yes | No | No | No | No | No | No |
+| Fork | Yes | Yes | No | Yes | No | No | No | No | No | No |
+| Provider slash commands | Yes | No | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
+| Grimoire-managed MCP UI | Yes | No | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes |
 
 ## インストール
 
@@ -215,6 +215,31 @@ Qwen の credentials と native configuration は引き続き `~/.qwen/settings.
 
 Qwen が起動しない、または model が表示されない場合は、Qwen Code 内で `/doctor` を実行し、`/auth` を完了して `qwen --version` を確認し、Grimoire settings の Qwen CLI path を確認してください。
 
+### Devin
+
+Devin CLI (Cognition) はオプトインの ACP provider です。Grimoire は `devin acp` を起動し、稼働中の session から利用可能な models と modes を取得し、メッセージ・思考・tool activity をストリームし、shell command とファイル書き込みの前に確認し、session をネイティブに再開します。提示される model の一覧はサインインしている account によって変わります。これは Devin 側の仕様で、Grimoire の制限ではありません。
+
+```bash
+# macOS, Linux, WSL
+curl -fsSL https://cli.devin.ai/install.sh | bash
+
+# Homebrew
+brew install --cask devin-cli
+
+devin auth login
+devin --version
+```
+
+`devin auth login`（ブラウザ経由）でサインインしてから、Grimoire で Devin を有効にしてください。Safe、Auto-approve、Plan はそれぞれ Devin の `accept-edits`、`bypass`、`plan` に対応します。Devin の `smart` と `ask` は共有ツールバーでは Safe として表示されます。
+
+- [Devin CLI ドキュメント](https://docs.devin.ai/cli)
+- [Devin ACP ドキュメント](https://docs.devin.ai/desktop/acp)
+
+Safe モードについて知っておくべき点があります。Devin はどの shell command が読み取り専用かを自分で判断し、それらは確認なしで実行します。`echo` はファイルへリダイレクトしていても読み取り専用として扱われます。Grimoire はプロトコル経由の書き込みをすべて承認対象にしますが、agent が自分の shell 経由で行う書き込みはそこをすり抜けることがあります。書き込みを一切させたくない session では Plan を使ってください。
+
+Devin の認証情報は `~/.local/share/devin/` にあり、Devin が所有します。Vault skills は `.devin/skills` と `.agents/skills` から読み込まれ、skill がそのまま Devin の slash command になります。Grimoire は `.grimoire/mcp/devin.json` に独自の MCP リストを保持し、ACP session に注入します。Usage は Devin が報告したときに表示されます。reasoning effort のコントロールはありません。effort が model id の一部だからです。Grimoire の fork と rewind には対応していません。
+
+
 ### OpenCode
 
 独自の provider configuration を持つ model-agnostic agent を使いたい場合は OpenCode を選びます。
@@ -317,7 +342,7 @@ Tab を右クリックすると、名前変更、複製、閉じる、他の tab
 
 ### Model selector
 
-ひとつの picker が provider ごとに grouped され、label 順に並びます：Antigravity、Claude Code、Codex、Gemini CLI (Legacy)、Grok Build、Kimi Code、MiMoCode、OpenCode、Qwen Code。Search は labels、descriptions、groups、model IDs を横断します。Catalogs は lazily に load され、collapse した groups を記憶します。Settings で custom aliases と context-window overrides を追加できます。Claude の 1M variants は base models の置き換えではなく、追加 options です。
+ひとつの picker が provider ごとに grouped され、label 順に並びます：Antigravity、Claude Code、Codex、Devin、Gemini CLI (Legacy)、Grok Build、Kimi Code、MiMoCode、OpenCode、Qwen Code。Search は labels、descriptions、groups、model IDs を横断します。Catalogs は lazily に load され、collapse した groups を記憶します。Settings で custom aliases と context-window overrides を追加できます。Claude の 1M variants は base models の置き換えではなく、追加 options です。
 
 ### Usage と cost
 
@@ -330,6 +355,7 @@ Model selector の横の badge が active provider の usage を表示します�
 | Antigravity CLI | `agy --print` からはまだ信頼性高く取得不可 |
 | Gemini CLI (Legacy) | Gemini CLI が返す場合の ACP cost metadata。legacy provider のみ |
 | Qwen Code | Qwen Code が返す場合の ACP token と cost metadata |
+| Devin | ACP が報告する session の credit 合計を月次の spend として |
 | OpenCode | ACP と session cost metadata から集計した monthly spend |
 | MiMoCode | ACP と session cost metadata から集計した monthly spend |
 | Kimi Code | ACP と session cost metadata から集計した monthly spend |
@@ -437,7 +463,7 @@ Obsidian Community plugins が推奨されるユーザー向けインストー�
 
 ## Roadmap
 
-現在 Grimoire は Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code とともに ship されています。
+現在 Grimoire は Claude Code、Codex、Antigravity CLI、Gemini CLI (Legacy)、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code、Devin とともに ship されています。
 
 次の候補は GitHub Copilot CLI、その他の ACP-compatible providers、そして runtime が Obsidian に embed できるほど安定した local model CLIs です。Implementation notes は [docs/provider-roadmap.md](../provider-roadmap.md) にあります。
 

@@ -21,6 +21,7 @@ Full functionality requires at least one external CLI provider. Those providers 
 - Kimi Code may require a Moonshot AI account or the credentials for a configured supported provider.
 - Grok Build may require a Grok/xAI account, subscription, OAuth access, or API key.
 - Qwen Code may require an Alibaba ModelStudio, third-party provider, or custom-provider account and configuration.
+- Devin may require a Cognition account signed in through `devin auth login`; which models it offers is decided by that account.
 
 Provider billing, quotas, rate limits, retention, and account requirements are controlled by the provider, not by Grimoire.
 

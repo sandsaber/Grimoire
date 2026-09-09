@@ -29,7 +29,7 @@
 
 > **Aviso: a 2.0 está em andamento.** A próxima versão principal leva o Grimoire a uma arquitetura de execução baseada em provedores, em que um único núcleo conduz cada CLI e registra exatamente um resultado por turno, e traz um redesign que segue o tema e a cor de destaque do seu cofre. O trabalho já foi mesclado em `main` e ainda não faz parte de nenhuma versão publicada. A versão publicada continua sendo a 1.3.2. Conversas, configurações e arquivos dos provedores são mantidos sem alterações.
 
-O Grimoire traz assistentes de CLI agênticos para o Obsidian. Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build e Qwen Code vivem em um único painel lateral, onde leem suas notas, editam arquivos, executam comandos, chamam ferramentas e mantêm o histórico da sessão no seu vault real. Nada passa por um servidor do Grimoire. Não há telemetria, backend hospedado nem proxy no meio do caminho.
+O Grimoire traz assistentes de CLI agênticos para o Obsidian. Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code e Devin vivem em um único painel lateral, onde leem suas notas, editam arquivos, executam comandos, chamam ferramentas e mantêm o histórico da sessão no seu vault real. Nada passa por um servidor do Grimoire. Não há telemetria, backend hospedado nem proxy no meio do caminho.
 
 Ele foi feito para quem já trabalha no Obsidian e quer uma ajuda de IA que se comporte como parte do vault: contexto local, arquivos locais, um provedor escolhido de propósito e uso que você realmente consegue acompanhar.
 
@@ -38,25 +38,25 @@ Ele foi feito para quem já trabalha no Obsidian e quer uma ajuda de IA que se c
 ## Por que usar o Grimoire
 
 - Use os agentes de CLI nos quais você já confia, dentro das suas notas.
-- Alterne provedores pelo compositor. Claude Code, Codex, Antigravity CLI, Gemini CLI legado, OpenCode, MiMoCode, Kimi Code, Grok Build e Qwen Code compartilham um seletor de modelos.
+- Alterne provedores pelo compositor. Claude Code, Codex, Antigravity CLI, Gemini CLI legado, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code e Devin compartilham um seletor de modelos.
 - Fundamente cada turno no seu vault. Mencione notas, pastas e ferramentas MCP em vez de colar caminhos manualmente.
 - Veja custos e limites ao lado do seletor de modelo, onde você toma essa decisão de qualquer forma.
 - Continue local-first. O Grimoire não coleta telemetria, não faz proxy de prompts nem executa um backend.
 
 ## O que cada provedor pode fazer
 
-| Recurso | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Runtime local persistente | Sim | Sim | Sim | Sim | Sim | Sim | Não | Sim | Sim |
-| Hidratação nativa do histórico | Sim | Sim | Sim | Sim | Sim | Sim | Não | Sim | Não |
-| Modo de plano | Sim | Sim | Sim | Sim | Sim | Sim | Não | Sim | Sim |
-| Anexos de imagem | Sim | Sim | Sim | Sim | Sim | Sim | Não | Sim | Sim |
-| Modo de instrução | Sim | Sim | Sim | Sim | Sim | Sim | Não | Sim | Sim |
-| Controles de esforço de raciocínio | Sim | Sim | Sim | Sim | Sim | Sim | Sim | Sim | Sim |
-| Retroceder | Sim | Não | Não | Sim | Não | Não | Não | Não | Não |
-| Bifurcar | Sim | Sim | Não | Sim | Não | Não | Não | Não | Não |
-| Comandos de barra do provedor | Sim | Não | Sim | Sim | Sim | Sim | Não | Sim | Sim |
-| UI de MCP gerenciada pelo Grimoire | Sim | Não | Sim | Sim | Sim | Sim | Não | Sim | Sim |
+| Recurso | Claude Code | Codex | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Runtime local persistente | Sim | Sim | Sim | Sim | Sim | Sim | Não | Sim | Sim | Sim |
+| Hidratação nativa do histórico | Sim | Sim | Sim | Sim | Sim | Sim | Não | Sim | Não | Não |
+| Modo de plano | Sim | Sim | Sim | Sim | Sim | Sim | Não | Sim | Sim | Sim |
+| Anexos de imagem | Sim | Sim | Sim | Sim | Sim | Sim | Não | Sim | Sim | Sim |
+| Modo de instrução | Sim | Sim | Sim | Sim | Sim | Sim | Não | Sim | Sim | Sim |
+| Controles de esforço de raciocínio | Sim | Sim | Sim | Sim | Sim | Sim | Sim | Sim | Sim | Não |
+| Retroceder | Sim | Não | Não | Sim | Não | Não | Não | Não | Não | Não |
+| Bifurcar | Sim | Sim | Não | Sim | Não | Não | Não | Não | Não | Não |
+| Comandos de barra do provedor | Sim | Não | Sim | Sim | Sim | Sim | Não | Sim | Sim | Sim |
+| UI de MCP gerenciada pelo Grimoire | Sim | Não | Sim | Sim | Sim | Sim | Não | Sim | Sim | Sim |
 
 ## Instalação
 
@@ -219,6 +219,31 @@ Escolha esforço de raciocínio Low, Medium, High, XHigh ou Max (High é o padr�
 
 O Qwen continua responsável pelas próprias credenciais e pela configuração nativa em `~/.qwen/settings.json`. O Grimoire gerencia uma lista MCP de projeto isolada em `.grimoire/mcp/qwen.json` e a injeta nas sessões ACP sem reescrever a configuração nativa do Qwen. O uso aparece somente quando o Qwen emite metadados ACP de token ou custo. Atualmente, o Qwen não oferece controles de bifurcar nem retroceder do Grimoire.
 
+### Devin
+
+A Devin CLI (Cognition) é um provedor ACP opcional. O Grimoire executa `devin acp`, descobre os modelos e modos que sua conta oferece a partir da sessão ativa, transmite mensagens, raciocínio e atividade de ferramentas, pergunta antes de comandos de shell e de gravações de arquivo, e retoma sessões de forma nativa. A lista de modelos depende da conta conectada; isso é da Devin, não do Grimoire.
+
+```bash
+# macOS, Linux, WSL
+curl -fsSL https://cli.devin.ai/install.sh | bash
+
+# Homebrew
+brew install --cask devin-cli
+
+devin auth login
+devin --version
+```
+
+Entre com `devin auth login` (fluxo pelo navegador) e depois ative a Devin no Grimoire. Safe, Auto-approve e Plan correspondem aos modos `accept-edits`, `bypass` e `plan` da Devin; os modos `smart` e `ask` aparecem como Safe na barra compartilhada.
+
+- [Documentação da Devin CLI](https://docs.devin.ai/cli)
+- [Documentação ACP da Devin](https://docs.devin.ai/desktop/acp)
+
+Vale saber uma coisa sobre o modo Safe: a Devin decide sozinha quais comandos de shell são somente leitura e executa esses sem perguntar, e `echo` entra nessa conta mesmo quando redireciona para um arquivo. O Grimoire aprova toda gravação que a Devin faz pelo protocolo, mas uma gravação que o agente encaminha pela própria shell pode escapar disso. Para uma sessão que não deve gravar nada, use Plan.
+
+A Devin cuida das próprias credenciais em `~/.local/share/devin/`. As skills do vault são lidas de `.devin/skills` e `.agents/skills`, e uma skill é o comando de barra da Devin. O Grimoire mantém uma lista MCP própria em `.grimoire/mcp/devin.json` e a injeta na sessão ACP. O uso aparece quando a Devin o informa; não há controle de esforço de raciocínio, porque o esforço faz parte do id do modelo. A Devin não oferece bifurcação nem retrocesso no Grimoire.
+
+
 ### OpenCode
 
 Escolha OpenCode para um agente independente de modelo que traz sua própria configuração de provedor.
@@ -313,7 +338,7 @@ O cartão de aprovação **Trabalhadores paralelos** mostra o modelo herdado e p
 
 ### Seletor de modelo
 
-Um único seletor, agrupado por provedor e ordenado por rótulo: Antigravity, Claude Code, Codex, Gemini CLI (Legacy), Grok Build, Kimi Code, MiMoCode, OpenCode e Qwen Code. A busca percorre rótulos, descrições, grupos e IDs de modelos sem redimensionar o menu enquanto você filtra. Os catálogos carregam de forma preguiçosa e lembram os grupos que você recolheu. Adicione aliases personalizados e substituições de janela de contexto nas configurações. As variantes 1M do Claude são opções extras, não substitutas dos modelos básicos.
+Um único seletor, agrupado por provedor e ordenado por rótulo: Antigravity, Claude Code, Codex, Devin, Gemini CLI (Legacy), Grok Build, Kimi Code, MiMoCode, OpenCode e Qwen Code. A busca percorre rótulos, descrições, grupos e IDs de modelos sem redimensionar o menu enquanto você filtra. Os catálogos carregam de forma preguiçosa e lembram os grupos que você recolheu. Adicione aliases personalizados e substituições de janela de contexto nas configurações. As variantes 1M do Claude são opções extras, não substitutas dos modelos básicos.
 
 ### Uso e custo
 
@@ -326,6 +351,7 @@ Um selo ao lado do seletor de modelo mantém à vista o uso do provedor ativo, c
 | Antigravity CLI | Ainda não disponível de forma confiável em `agy --print` |
 | Gemini CLI (Legacy) | Metadados de custo ACP quando a Gemini CLI os informa; somente provedor legado |
 | Qwen Code | Metadados ACP de token e custo quando Qwen Code os informa |
+| Devin | Total de créditos da sessão informado via ACP, como gasto mensal |
 | OpenCode | Gasto mensal agregado a partir de ACP e metadados de custo da sessão |
 | MiMoCode | Gasto mensal agregado a partir de ACP e metadados de custo da sessão |
 | Kimi Code | Gasto mensal agregado a partir de ACP e metadados de custo da sessão |
@@ -435,7 +461,7 @@ Os plugins da comunidade do Obsidian são o caminho recomendado de instalação 
 
 ## Roteiro
 
-Hoje, o Grimoire inclui Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build e Qwen Code.
+Hoje, o Grimoire inclui Claude Code, Codex, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code e Devin.
 
 Os próximos da lista são GitHub Copilot CLI, outros provedores compatíveis com ACP e CLIs de modelos locais assim que seus runtimes estiverem estáveis o suficiente para serem incorporados ao Obsidian. As notas de implementação estão em [docs/provider-roadmap.md](../provider-roadmap.md).
 
