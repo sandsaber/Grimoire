@@ -1,3 +1,6 @@
+import * as os from 'node:os';
+import * as path from 'node:path';
+
 import * as fs from 'fs';
 
 import { CodexCliResolver } from '@/providers/codex/runtime/CodexCliResolver';
@@ -54,9 +57,10 @@ describe('CodexCliResolver', () => {
   });
 
   it('auto-detects from the runtime PATH when no configured path is valid', () => {
-    mockedExists.mockImplementation((filePath: string) => filePath === '/custom/bin/codex');
+    const runtimeExecutable = path.join('/custom/bin', 'codex');
+    mockedExists.mockImplementation((filePath: string) => filePath === runtimeExecutable);
     mockedStat.mockImplementation((filePath: string) => ({
-      isFile: () => filePath === '/custom/bin/codex',
+      isFile: () => filePath === runtimeExecutable,
     }));
 
     const resolver = new CodexCliResolver();
@@ -64,9 +68,24 @@ describe('CodexCliResolver', () => {
       { 'other-host': '/other/codex' },
       '',
       'PATH=/custom/bin',
+      { hostPlatform: 'linux' },
     );
 
-    expect(resolved).toBe('/custom/bin/codex');
+    expect(resolved).toBe(runtimeExecutable);
+  });
+
+  it('detects the default Windows desktop-app codex.exe installation', () => {
+    const localAppData = process.env.LOCALAPPDATA
+      || path.join(os.homedir(), 'AppData', 'Local');
+    const defaultExecutable = path.join(localAppData, 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe');
+    mockedExists.mockImplementation((filePath: string) => filePath === defaultExecutable);
+    mockedStat.mockImplementation((filePath: string) => ({
+      isFile: () => filePath === defaultExecutable,
+    }));
+
+    const resolver = new CodexCliResolver();
+
+    expect(resolver.resolve({}, '', '', { hostPlatform: 'win32' })).toBe(defaultExecutable);
   });
 
   it('returns a Linux-side command in WSL mode without host filesystem validation', () => {

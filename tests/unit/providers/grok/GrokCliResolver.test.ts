@@ -1,3 +1,6 @@
+import * as os from 'node:os';
+import * as path from 'node:path';
+
 import * as fs from 'fs';
 
 import { GrokCliResolver } from '@/providers/grok/runtime/GrokCliResolver';
@@ -62,5 +65,15 @@ describe('GrokCliResolver', () => {
     );
 
     expect(resolved).toBeNull();
+  });
+
+  it('detects the default Windows grok.exe installation', () => {
+    const defaultExecutable = path.join(os.homedir(), '.grok', 'bin', 'grok.exe');
+    mockedExists.mockImplementation((filePath: string) => filePath === defaultExecutable);
+    mockedStat.mockReturnValue({ isFile: () => true });
+
+    const resolver = new GrokCliResolver();
+
+    expect(resolver.resolve({}, '', '')).toBe(defaultExecutable);
   });
 });

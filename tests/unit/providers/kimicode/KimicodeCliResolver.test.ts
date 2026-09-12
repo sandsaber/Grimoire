@@ -1,3 +1,6 @@
+import * as os from 'node:os';
+import * as path from 'node:path';
+
 import * as fs from 'fs';
 
 import { KimicodeCliResolver } from '@/providers/kimicode/runtime/KimicodeCliResolver';
@@ -62,5 +65,16 @@ describe('KimicodeCliResolver', () => {
     );
 
     expect(resolved).toBeNull();
+  });
+
+  it('detects the default Windows kimi.exe installation', () => {
+    const defaultExecutable = path.join(os.homedir(), '.kimi-code', 'bin', 'kimi.exe');
+    mockedExists.mockImplementation((filePath: string) => filePath === defaultExecutable);
+    mockedStat.mockReturnValue({ isFile: () => true });
+
+    const resolver = new KimicodeCliResolver();
+    const resolved = resolver.resolve({}, '', '');
+
+    expect(resolved).toBe(defaultExecutable);
   });
 });

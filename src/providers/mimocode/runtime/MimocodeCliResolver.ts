@@ -7,6 +7,7 @@ import { resolveCliExecutable } from '../../../utils/resolveCliExecutable';
 import { getMimocodeProviderSettings } from '../settings';
 
 const MIMOCODE_DEFAULT_BIN = path.join(os.homedir(), '.mimocode', 'bin', 'mimo');
+const MIMOCODE_DEFAULT_WINDOWS_BIN = `${MIMOCODE_DEFAULT_BIN}.exe`;
 
 export class MimocodeCliResolver {
   private readonly cachedHostname = getHostnameKey();
@@ -48,7 +49,7 @@ export class MimocodeCliResolver {
   ): string | null {
     const hostnamePath = (hostnamePaths?.[this.cachedHostname] ?? '').trim();
     return resolveCliExecutable('mimo', [hostnamePath, legacyPath], envText, {
-      fallbackPaths: [MIMOCODE_DEFAULT_BIN],
+      fallbackPaths: [MIMOCODE_DEFAULT_WINDOWS_BIN, MIMOCODE_DEFAULT_BIN],
     });
   }
 

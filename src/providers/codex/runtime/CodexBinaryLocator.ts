@@ -1,3 +1,5 @@
+import * as os from 'node:os';
+
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -86,5 +88,24 @@ export function resolveCodexCliPath(
   }
 
   const customEnv = parseEnvironmentVariables(envText || '');
-  return findCodexBinaryPath(customEnv.PATH, hostPlatform);
+  const detectedPath = findCodexBinaryPath(customEnv.PATH, hostPlatform);
+  if (detectedPath) {
+    return detectedPath;
+  }
+
+  if (hostPlatform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA
+      || path.join(os.homedir(), 'AppData', 'Local');
+    const desktopAppBinary = path.join(
+      localAppData,
+      'Programs',
+      'OpenAI',
+      'Codex',
+      'bin',
+      'codex.exe',
+    );
+    return isExistingFile(desktopAppBinary) ? desktopAppBinary : null;
+  }
+
+  return null;
 }

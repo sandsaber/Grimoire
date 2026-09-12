@@ -1,7 +1,12 @@
+import * as os from 'node:os';
+import * as path from 'node:path';
+
 import { getRuntimeEnvironmentText } from '../../../core/providers/providerEnvironment';
 import { getHostnameKey } from '../../../utils/env';
 import { resolveCliExecutable } from '../../../utils/resolveCliExecutable';
 import { getGrokProviderSettings } from '../settings';
+
+const GROK_DEFAULT_WINDOWS_BIN = path.join(os.homedir(), '.grok', 'bin', 'grok.exe');
 
 export class GrokCliResolver {
   private readonly cachedHostname = getHostnameKey();
@@ -42,7 +47,9 @@ export class GrokCliResolver {
     envText: string,
   ): string | null {
     const hostnamePath = (hostnamePaths?.[this.cachedHostname] ?? '').trim();
-    return resolveCliExecutable('grok', [hostnamePath, legacyPath], envText);
+    return resolveCliExecutable('grok', [hostnamePath, legacyPath], envText, {
+      fallbackPaths: [GROK_DEFAULT_WINDOWS_BIN],
+    });
   }
 
   reset(): void {

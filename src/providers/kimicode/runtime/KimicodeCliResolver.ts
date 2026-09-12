@@ -7,6 +7,7 @@ import { resolveCliExecutable } from '../../../utils/resolveCliExecutable';
 import { getKimicodeProviderSettings } from '../settings';
 
 const KIMI_CODE_DEFAULT_BIN = path.join(os.homedir(), '.kimi-code', 'bin', 'kimi');
+const KIMI_CODE_DEFAULT_WINDOWS_BIN = `${KIMI_CODE_DEFAULT_BIN}.exe`;
 
 export class KimicodeCliResolver {
   private readonly cachedHostname = getHostnameKey();
@@ -48,7 +49,7 @@ export class KimicodeCliResolver {
   ): string | null {
     const hostnamePath = (hostnamePaths?.[this.cachedHostname] ?? '').trim();
     return resolveCliExecutable('kimi', [hostnamePath, legacyPath], envText, {
-      fallbackPaths: [KIMI_CODE_DEFAULT_BIN],
+      fallbackPaths: [KIMI_CODE_DEFAULT_WINDOWS_BIN, KIMI_CODE_DEFAULT_BIN],
     });
   }
 

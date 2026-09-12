@@ -13,7 +13,7 @@
 - Preserve Grok Build-native behavior and file formats where possible.
 - Launch Grok with `grok agent stdio`, not the `acp` subcommand used by other providers.
 - Use `GROK_HOME` for Grimoire-managed launch artifacts under `.grimoire/grok/`.
-- Resolve CLI paths from per-host settings only; fall back to the `grok` command on `PATH` when no configured binary exists.
+- Resolve CLI paths from per-host settings first, then the `grok` command on `PATH`, then the native Windows fallback `~/.grok/bin/grok.exe`.
 - Keep auth and session discovery env-driven (`GROK_AUTH_PATH`, `GROK_HOME` in provider env vars). When Grimoire redirects `GROK_HOME` to `.grimoire/grok/`, bridge auth with `GROK_AUTH_PATH` resolved from provider env plus process env, not from the managed home path.
 - Grok sessions persist as JSONL under `<GROK data dir>/sessions/`; history hydration still needs runtime discovery before it can replace the scaffold store.
 - Do not project Grok provider state into generic chat UI code. Use provider helpers and shared contracts.
