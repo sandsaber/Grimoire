@@ -1064,6 +1064,9 @@
       },
       "reasonix": {
         "desc": "通过原生 Agent Client Protocol 运行的开源编程智能体 Reasonix。"
+      },
+      "commandcode": {
+        "desc": "使用已安装的 Command Code CLI，支持原生会话和实时工具活动。"
       }
     },
     "hub": {

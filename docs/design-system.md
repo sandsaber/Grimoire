@@ -533,6 +533,16 @@ and what does it cost" was a question the composer could not answer.
 
 ### 11.8 Settings
 
+Command Code follows the provider card and native settings rows shown on screen `2f`; its mark is
+also included in `2g`. The provider page adds setup instructions, headless permission limits, a
+host-specific CLI path and the shared environment editor. It introduces no new styling. Its
+composer toggle offers **Safe** and **Auto**. Safe uses the shared permission decision card shown
+in the drawing, with **Allow once** and **Deny**; reads do not prompt. The command or file edit
+waits for the answer, and cancellation dismisses the card. There is no persistent allowance.
+Native deny and ask rules still apply in both modes. Plan controls are hidden. The existing effort picker shows CLI default plus the selected
+model's discovered levels; it is hidden when the CLI reports no adjustable effort or metadata is
+unavailable. These are capability differences from the Claude example in the drawing.
+
 Obsidian's declarative settings API, rendering native `.setting-item` rows. Grimoire styles the
 content it puts *inside* a row — never `.setting-item`, `.setting-item-info`, `.setting-item-name`,
 `.setting-item-control` or their spacing. A settings tab that looks native is the goal, not a

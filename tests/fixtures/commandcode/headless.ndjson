@@ -1,0 +1,6 @@
+{"type": "event", "event": {"type": "run_start", "sessionId": "00000000-0000-4000-8000-000000000001"}}
+{"type": "event", "event": {"type": "model_request_end", "model": "poolside/laguna-s-2.1-free", "usage": {"inputTokens": 14711, "outputTokens": 44, "cacheReadTokens": 7072, "cacheWriteTokens": 0}, "stopReason": "tool_calls"}}
+{"type": "event", "event": {"type": "tool_queued", "toolCallId": "chatcmpl-tool-f7abb818668947ffa2ce85cde4707605", "toolName": "read_file", "input": {"file_path": "<vault>/probe.txt"}}}
+{"type": "event", "event": {"type": "tool_running", "toolCallId": "chatcmpl-tool-f7abb818668947ffa2ce85cde4707605", "toolName": "read_file", "description": null}}
+{"type": "event", "event": {"type": "tool_completed", "toolCallId": "chatcmpl-tool-f7abb818668947ffa2ce85cde4707605", "toolName": "read_file", "result": [{"type": "text", "text": "Read 1/1 file, 1 line\n1: COMMANDCODE_FILE_OK"}], "deferred": false}}
+{"type": "result", "subtype": "max_turns", "sessionId": "00000000-0000-4000-8000-000000000001", "stopReason": "max_turns", "usage": {"inputTokens": 14711, "outputTokens": 44, "cacheReadTokens": 7072, "cacheWriteTokens": 0}, "durationMs": 7798, "finalText": "I'll read the probe.txt file for you."}

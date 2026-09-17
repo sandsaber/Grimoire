@@ -1064,6 +1064,9 @@
       },
       "reasonix": {
         "desc": "Der quelloffene Reasonix-Coding-Agent über seine native Agent-Client-Protocol-Laufzeit."
+      },
+      "commandcode": {
+        "desc": "Nutze die installierte Command Code CLI mit nativen Sitzungen und laufenden Werkzeugereignissen."
       }
     },
     "hub": {

@@ -45,18 +45,18 @@ Está diseñado para quienes ya trabajan en Obsidian y quieren ayuda de IA que s
 
 ## Qué puede hacer cada provider
 
-| Capability | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Local persistent runtime | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | Sí |
-| Native history hydration | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | No | No | No |
-| Plan mode | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | Sí |
-| Image attachments | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | No |
-| Instruction mode | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | Sí |
-| Reasoning effort controls | Sí | Sí | Sí | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí |
-| Rewind | No | Sí | No | Sí | No | No | No | No | No | No | No |
-| Fork | Sí | Sí | No | Sí | No | No | No | No | No | No | No |
-| Provider slash commands | No | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | Sí |
-| Grimoire-managed MCP UI | No | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | Sí |
+| Capability | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix | Command Code |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Local persistent runtime | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | Sí | No |
+| Native history hydration | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | No | No | No | No |
+| Plan mode | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | Sí | No |
+| Image attachments | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | No | No |
+| Instruction mode | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | Sí | No |
+| Reasoning effort controls | Sí | Sí | Sí | Sí | Sí | Sí | Sí | Sí | Sí | No | Sí | Yes (model-specific) |
+| Rewind | No | Sí | No | Sí | No | No | No | No | No | No | No | No |
+| Fork | Sí | Sí | No | Sí | No | No | No | No | No | No | No | No |
+| Provider slash commands | No | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | Sí | No |
+| Grimoire-managed MCP UI | No | Sí | Sí | Sí | Sí | Sí | No | Sí | Sí | Sí | Sí | No |
 
 ## Instalación
 
@@ -265,6 +265,23 @@ El esfuerzo de razonamiento es un selector alimentado por la sesión, no una lis
 Algo que conviene saber sobre Safe: `ask` protege las herramientas que Reasonix clasifica como sujetas a permiso, no todas, así que un comando de shell que juzga de solo lectura puede ejecutarse sin preguntar. Grimoire aprueba cada escritura de archivo que Reasonix hace por el protocolo, y eso es lo que mantiene el vault detrás de una pregunta. Para una sesión que no debe escribir, usa Plan.
 
 Reasonix mantiene su configuración en `~/.reasonix/config.toml` y lee las claves de API del entorno con los nombres que ese archivo indica. Las habilidades del vault se leen de `.reasonix/skills` y `.agents/skills`. Grimoire gestiona una lista MCP de proyecto aislada en `.grimoire/mcp/reasonix.json` y la inyecta en las sesiones ACP. El uso viene de las notificaciones de estado de Reasonix, y el coste aparece solo si tu proveedor de modelos tiene precio. No se admiten imágenes adjuntas, control de esfuerzo de razonamiento, fork ni rewind.
+
+### Command Code
+
+Command Code is opt-in in the unreleased 2.0 build. Install and authenticate in a terminal, then enable it under Settings → Grimoire → Providers:
+
+```bash
+npm i -g command-code
+command-code login
+```
+
+Reasoning effort is discovered for the selected model from the installed CLI. The picker offers only that model's supported levels and a CLI default option; models without adjustable effort have no picker. Explicit selections apply to the current run through the native session mod API without changing global CLI settings. CLI default preserves native behavior, including an effort already stored in a resumed session.
+
+Grimoire streams answers and tool activity from the CLI's headless JSON output, discovers models with `--list-models`, and saves the native session ID for explicit resume after reload. Authentication, native configuration, skills, MCP and transcripts stay with Command Code. Context usage uses reported input tokens against an estimated or user-supplied context limit; account quotas and prices are not inferred.
+
+**Safe** pauses edits, commands and other non-read tools for a one-time approval in Grimoire. Denying, cancelling or losing the approval connection prevents execution. Safe currently requires the verified Command Code 1.53.0 npm installation and disables native subagents, whose separate loops cannot use this approval bridge. **Auto-approve** runs without Grimoire prompts; native deny and ask rules still apply in both modes. This integration does not expose interactive questions, image attachments, plan controls, slash commands, managed MCP/skills/agents, auxiliary tasks, fork, rewind, or native history import.
+
+- [Command Code headless documentation](https://commandcode.ai/docs/headless)
 
 ### OpenCode
 

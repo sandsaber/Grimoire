@@ -45,18 +45,18 @@ Grimoire는 에이전트형 CLI 어시스턴트를 Obsidian 안으로 가져옵�
 
 ## 제공자별 기능
 
-| 기능 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 로컬 영속 런타임 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 예 |
-| 네이티브 기록 복원 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 아니요 | 아니요 | 아니요 |
-| 계획 모드 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 예 |
-| 이미지 첨부 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 아니요 |
-| 지시 모드 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 예 |
-| 추론 강도 제어 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 |
-| 되돌리기 | 아니요 | 예 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
-| 포크 | 예 | 예 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
-| 제공자 슬래시 명령 | 아니요 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 예 |
-| Grimoire 관리 MCP UI | 아니요 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 예 |
+| 기능 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix | Command Code |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 로컬 영속 런타임 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 |
+| 네이티브 기록 복원 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 |
+| 계획 모드 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 |
+| 이미지 첨부 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 아니요 | 아니요 |
+| 지시 모드 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 |
+| 추론 강도 제어 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 아니요 |
+| 되돌리기 | 아니요 | 예 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
+| 포크 | 예 | 예 | 아니요 | 예 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 | 아니요 |
+| 제공자 슬래시 명령 | 아니요 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 |
+| Grimoire 관리 MCP UI | 아니요 | 예 | 예 | 예 | 예 | 예 | 아니요 | 예 | 예 | 예 | 예 | 아니요 |
 
 ## 설치
 
@@ -271,6 +271,23 @@ Reasonix는 권한만이 아니라 질문도 합니다. `ask` 도구는 같은 �
 Safe 모드에 대해 알아둘 점이 하나 있습니다. `ask`는 Reasonix가 권한 대상으로 분류한 도구만 막고 모든 도구를 막지는 않으므로, 읽기 전용으로 판단한 셸 명령은 묻지 않고 실행됩니다. Grimoire는 Reasonix가 프로토콜로 수행하는 모든 파일 쓰기를 승인 대상으로 두며, 그것이 볼트를 질문 뒤에 두는 장치입니다. 아무것도 쓰면 안 되는 세션에는 Plan을 사용하세요.
 
 Reasonix는 설정을 `~/.reasonix/config.toml`에 두고, API 키는 그 파일이 지정한 이름으로 환경에서 읽습니다. 볼트 스킬은 `.reasonix/skills`와 `.agents/skills`에서 읽습니다. Grimoire는 `.grimoire/mcp/reasonix.json`에 별도의 프로젝트 MCP 목록을 관리하고 ACP 세션에 주입합니다. 사용량은 Reasonix 자체 상태 알림에서 오며, 비용은 모델 공급자에 가격이 있을 때만 표시됩니다. 이미지 첨부, 추론 강도 제어, 포크, 되감기는 지원하지 않습니다.
+
+### Command Code
+
+Command Code is opt-in in the unreleased 2.0 build. Install and authenticate in a terminal, then enable it under Settings → Grimoire → Providers:
+
+```bash
+npm i -g command-code
+command-code login
+```
+
+Reasoning effort is discovered for the selected model from the installed CLI. The picker offers only that model's supported levels and a CLI default option; models without adjustable effort have no picker. Explicit selections apply to the current run through the native session mod API without changing global CLI settings. CLI default preserves native behavior, including an effort already stored in a resumed session.
+
+Grimoire streams answers and tool activity from the CLI's headless JSON output, discovers models with `--list-models`, and saves the native session ID for explicit resume after reload. Authentication, native configuration, skills, MCP and transcripts stay with Command Code. Context usage uses reported input tokens against an estimated or user-supplied context limit; account quotas and prices are not inferred.
+
+**Safe** pauses edits, commands and other non-read tools for a one-time approval in Grimoire. Denying, cancelling or losing the approval connection prevents execution. Safe currently requires the verified Command Code 1.53.0 npm installation and disables native subagents, whose separate loops cannot use this approval bridge. **Auto-approve** runs without Grimoire prompts; native deny and ask rules still apply in both modes. This integration does not expose interactive questions, image attachments, plan controls, slash commands, managed MCP/skills/agents, auxiliary tasks, fork, rewind, or native history import.
+
+- [Command Code headless documentation](https://commandcode.ai/docs/headless)
 
 ### OpenCode
 

@@ -24,6 +24,7 @@ Repository documentation and user-facing product copy should be in English unles
 - `src/providers/qwen/` - Qwen Code ACP adapter and Qwen-owned runtime, history, settings, and UI behavior.
 - `src/providers/devin/` - Devin CLI (Cognition) ACP adapter and Devin-owned runtime, settings, and UI behavior.
 - `src/providers/reasonix/` - Reasonix ACP adapter and Reasonix-owned runtime, settings, and UI behavior.
+- `src/providers/commandcode/` - Command Code headless NDJSON adapter and CLI-owned sessions, model discovery, settings, and UI behavior.
 - `src/providers/acp/` - Shared ACP transport and normalization helpers.
 - `src/providers/shared/` - Provider-neutral helpers that need the plugin type, and so cannot live in `src/core/`. A helper belongs here only when at least two providers use it and its implementation is genuinely the same question asked twice.
 

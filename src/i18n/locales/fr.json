@@ -1064,6 +1064,9 @@
       },
       "reasonix": {
         "desc": "L’agent de codage open source Reasonix via son environnement d’exécution Agent Client Protocol natif."
+      },
+      "commandcode": {
+        "desc": "Utilisez la CLI Command Code installée avec des sessions natives et les événements des outils en direct."
       }
     },
     "hub": {

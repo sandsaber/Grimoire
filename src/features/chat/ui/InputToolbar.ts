@@ -1514,19 +1514,21 @@ export class PermissionToggle {
     const canShowPlan = Boolean(planValue) && capabilities.supportsPlanMode;
     const options = [
       {
-        detail: t('chat.ui.toolbar.permissionSafeDetail'),
-        label: t('chat.ui.toolbar.permissionSafe'),
+        detail: toggleConfig.inactiveDescription ?? t('chat.ui.toolbar.permissionSafeDetail'),
+        label: toggleConfig.inactiveLabel === 'Safe' ? t('chat.ui.toolbar.permissionSafe')
+          : toggleConfig.inactiveLabel === 'Blocked' ? t('chat.ui.status.blocked') : toggleConfig.inactiveLabel,
         value: toggleConfig.inactiveValue,
       },
       {
-        detail: t('chat.ui.toolbar.permissionAutoDetail'),
-        label: t('chat.ui.toolbar.permissionAuto'),
+        detail: toggleConfig.activeDescription ?? t('chat.ui.toolbar.permissionAutoDetail'),
+        label: toggleConfig.activeLabel === 'Auto-approve' ? t('chat.ui.toolbar.permissionAuto') : toggleConfig.activeLabel,
         value: toggleConfig.activeValue,
       },
       ...(canShowPlan && planValue
         ? [{
-          detail: t('chat.ui.toolbar.permissionPlanDetail'),
-          label: t('chat.ui.toolbar.permissionPlan'),
+          detail: toggleConfig.planDescription ?? t('chat.ui.toolbar.permissionPlanDetail'),
+          label: !toggleConfig.planLabel || toggleConfig.planLabel === 'Plan'
+            ? t('chat.ui.toolbar.permissionPlan') : toggleConfig.planLabel,
           value: planValue,
         }]
         : []),

@@ -1064,6 +1064,9 @@
       },
       "reasonix": {
         "desc": "ネイティブのAgent Client Protocolランタイムを通じたオープンソースのコーディングエージェントReasonix。"
+      },
+      "commandcode": {
+        "desc": "インストール済みの Command Code CLI をネイティブセッションとツールのリアルタイム表示で使用します。"
       }
     },
     "hub": {

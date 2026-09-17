@@ -8,6 +8,7 @@ import { antigravityWorkspaceRegistration } from './antigravity/app/AntigravityW
 import { builtInProviderCatalog } from './BuiltInProviderCatalog';
 import { claudeWorkspaceRegistration } from './claude/app/ClaudeWorkspaceServices';
 import { codexWorkspaceRegistration } from './codex/app/CodexWorkspaceServices';
+import { commandcodeWorkspaceRegistration } from './commandcode/app/CommandcodeWorkspaceServices';
 import { devinWorkspaceRegistration } from './devin/app/DevinWorkspaceServices';
 import { geminiWorkspaceRegistration } from './gemini/app/GeminiWorkspaceServices';
 import { grokWorkspaceRegistration } from './grok/app/GrokWorkspaceServices';
@@ -34,6 +35,7 @@ export const builtInWorkspaceInitializers: Readonly<Record<
   antigravity: context => antigravityWorkspaceRegistration.initialize(context),
   claude: context => claudeWorkspaceRegistration.initialize(context),
   codex: context => codexWorkspaceRegistration.initialize(context),
+  commandcode: context => commandcodeWorkspaceRegistration.initialize(context),
   devin: context => devinWorkspaceRegistration.initialize(context),
   gemini: context => geminiWorkspaceRegistration.initialize(context),
   grok: context => grokWorkspaceRegistration.initialize(context),

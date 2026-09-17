@@ -1064,6 +1064,9 @@
       },
       "reasonix": {
         "desc": "기본 Agent Client Protocol 런타임을 통한 오픈 소스 코딩 에이전트 Reasonix입니다."
+      },
+      "commandcode": {
+        "desc": "설치된 Command Code CLI를 기본 세션 및 실시간 도구 활동과 함께 사용합니다."
       }
     },
     "hub": {

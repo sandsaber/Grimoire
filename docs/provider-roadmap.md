@@ -50,9 +50,27 @@ This file tracks future provider integrations and the implementation sequence fo
 
 ## Current Integration Notes
 
+- Command Code is an opt-in headless integration. It uses NDJSON over a process per turn, with explicit native session resume, rather than ACP.
+
 - Claude Code, Codex, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin, and Reasonix are current integrations. Their runtime capabilities differ, but each has a registered provider adapter; OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin, and Reasonix use ACP-based runtime paths where their CLI supports them.
 - Antigravity CLI and Gemini CLI (Legacy) are current Google integrations with more limited runtime surfaces. Keep Antigravity as the recommended Google path and Gemini only for legacy-compatible accounts; treat provider-specific enhancements as runtime-limited until their CLIs expose richer event streams, safer approval flows, and stronger session/tool metadata.
 - Context visibility should stay provider-neutral. The Context tab should show both user-pinned files and provider runtime file loads when Grimoire can infer them from tool events, while avoiding provider-specific assumptions in shared feature code.
+
+## Integrated Provider: Command Code
+
+Verified against installed `command-code 1.53.0` on 2026-09-13:
+
+- Launch: `command-code --print --output-format json --skip-onboarding --no-auto-update`, with the prompt on stdin and the local vault as cwd. A selected model adds `--model`; a conversation resumes only its saved ID through `--resume`, never the global latest session.
+- `event` envelopes carry text deltas, tool lifecycle updates and model usage. Only a final `result` with `subtype: success`, a required answer, and confirmed process exit completes a chat turn. A `max_turns` result is a failure even when text was streamed. The transcript in `run_end.nextState` is never forwarded or persisted in lifecycle control records.
+- The execution kernel owns chat runs and process-tree cancellation. Grimoire stores the rendered conversation and native session ID; Command Code owns authentication, configuration, transcripts, skills and MCP. Deleting a Grimoire conversation does not delete the CLI transcript.
+- Effort metadata is read per selected model through an invalid `--effort grimoire-probe` validation with empty stdin; it exits before inference and config writes. A temporary `--mod` calls the native session-scoped `cmd.setEffort`, because a valid `--effort` writes global user config in CLI 1.53.0. Grimoire checks the effective effort reported by `model_request_end`. CLI default leaves native resume semantics intact. In the 1.53.0 catalog, validation succeeded for all 70 models: 44 offered adjustable levels, while all three free models reported none.
+- Models come from `--list-models`; IDs stay opaque. Reported input tokens include cache reads. Context windows are estimates unless the user supplies a custom limit; account quotas and prices are not inferred.
+- **Safe** uses a Grimoire-owned, per-run approval bridge over private local IPC and a native mod. A Node launcher installs a synchronous execution guard before importing the verified 1.53.0 CLI. The print gate is lifted with `--yolo`, but each non-read tool must receive a one-time UI approval; missing or skipped hooks stop the process before tool execution. Native deny and ask rules still apply. Native subagents are blocked in Safe because their loops do not inherit the guard hooks. **Auto-approve** uses native `--yolo` without Grimoire prompts. Interactive questions remain unsupported.
+- Images, plan controls, slash commands, managed MCP/skills/agents, auxiliary execution, fork, rewind, steering, and transcript hydration are outside this initial adapter.
+
+Evidence: `tests/fixtures/commandcode/headless.ndjson` retains sanitized observed tool/usage/result frames. Unit tests run the shared execution conformance contract. The opt-in `CommandcodeChatProjectionLiveSmoke.integration.test.ts` drives the actual chat projection, reads a synthetic vault file, persists the conversation, reloads the kernel, and verifies native recall in the same session. Run it with `GRIMOIRE_COMMANDCODE_LIVE=1`; it requires an authenticated CLI and explicitly selects the free `poolside/laguna-s-2.1-free` model. Add `GRIMOIRE_COMMANDCODE_PAID_EFFORT_LIVE=1` to explicitly opt into DeepSeek V4 Flash and verify high-to-max effort changes across reload; this makes paid requests.
+
+References: [headless mode](https://commandcode.ai/docs/headless), [CLI reference](https://commandcode.ai/docs/reference/cli).
 
 ## Integrated Provider: Qwen Code
 

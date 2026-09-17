@@ -47,6 +47,9 @@
     },
     "reasonix": {
       "enabled": false
+    },
+    "commandcode": {
+      "enabled": false
     }
   },
   "sharedEnvironmentVariables": {

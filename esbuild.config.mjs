@@ -2,6 +2,7 @@ import esbuild from 'esbuild';
 import { builtinModules } from 'node:module';
 import path from 'path';
 import process from 'process';
+import { gzipSync } from 'node:zlib';
 import {
   copyFileSync,
   existsSync,
@@ -189,7 +190,7 @@ const context = await esbuild.context({
   treeShaking: true,
   minify: prod,
   define: {
-    GRIMOIRE_CHANGELOG_MARKDOWN: JSON.stringify(changelogMarkdown),
+    GRIMOIRE_CHANGELOG_GZIP: JSON.stringify(gzipSync(changelogMarkdown, { level: 9 }).toString('base64')),
   },
   legalComments: 'eof',
   banner: {

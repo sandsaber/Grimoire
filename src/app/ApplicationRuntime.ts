@@ -18,6 +18,7 @@ import type GrimoirePlugin from '@/main';
 import { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
 import { ClaudeExecution } from '@/providers/claude/execution/ClaudeExecutionComposition';
 import { CodexExecution } from '@/providers/codex/execution/CodexExecutionComposition';
+import { CommandcodeExecution } from '@/providers/commandcode/execution/CommandcodeExecutionComposition';
 import { DevinExecution } from '@/providers/devin/execution/DevinExecutionComposition';
 import { GeminiExecution } from '@/providers/gemini/execution/GeminiExecutionComposition';
 import { GrokExecution } from '@/providers/grok/execution/GrokExecutionComposition';
@@ -133,6 +134,7 @@ export class ApplicationRuntime {
   /** Titles, instruction refinement and inline edits, for every provider. */
   readonly auxiliary: AuxiliaryExecutionOwner;
   readonly antigravity: AntigravityExecution;
+  readonly commandcode: CommandcodeExecution;
   readonly codex: CodexExecution;
   readonly claude: ClaudeExecution;
   readonly opencode: OpencodeExecution;
@@ -167,6 +169,9 @@ export class ApplicationRuntime {
     // is refused before a process exists, so it registers as a bare backend.
     this.antigravity = new AntigravityExecution(plugin, registry);
     this.kernel.registerBackend({ backend: this.antigravity.createBackend() });
+    this.commandcode = new CommandcodeExecution(plugin, registry);
+    const commandcodeBackend = this.commandcode.createBackend();
+    this.kernel.registerBackend({ backend: commandcodeBackend, interactions: commandcodeBackend.interactions });
 
     // **Every other provider registers with its interaction and recovery
     // ports**, and the reason is the same for all of them: a backend registered
@@ -366,6 +371,7 @@ export class ApplicationRuntime {
   } | null {
     switch (providerId) {
       case 'antigravity': return this.antigravity;
+      case 'commandcode': return this.commandcode;
       case 'claude': return this.claude;
       case 'codex': return this.codex;
       case 'devin': return this.devin;
@@ -596,6 +602,7 @@ export class ApplicationRuntime {
     // and no daemon, so this composition had no `dispose` and the application
     // never called one.
     void this.antigravity.dispose();
+    void this.commandcode.dispose();
     this.codex.dispose();
     this.claude.dispose();
     this.opencode.dispose();

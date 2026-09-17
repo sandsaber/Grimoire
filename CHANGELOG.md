@@ -6,6 +6,8 @@ The provider runtime is rebuilt on an execution kernel, and the chat surfaces ar
 
 ### Changed
 
+- Compress the embedded changelog with gzip to keep the complete release history inside Obsidian Sync Standard’s 5 MB asset limit as providers are added.
+
 - A permission card that offers several answers no longer commits one of them on `Enter` or `a`. Those shortcuts exist for the ordinary card, where one option allows and one rejects; a provider that asks a question on the permission channel offers three or four distinct answers, and the shortcut took whichever came first. Each answer is still reachable by its own number, which the card draws.
 - Every turn now ends in exactly one recorded outcome - succeeded, failed, cancelled, interrupted, rejected before dispatch, or unknown. A connection that drops mid-answer no longer renders as a finished reply, and a turn whose fate the provider never confirmed is shown as a warning instead of being drawn as success.
 - A turn that never reached the provider - a permission check that refuses on the default mode, a session the CLI would not open - now says so in the conversation, where before it left an empty assistant message.
@@ -22,6 +24,9 @@ The provider runtime is rebuilt on an execution kernel, and the chat surfaces ar
 - Session metadata in `.grimoire/sessions/` is written as a versioned record. A file written before the envelope existed is read as revision 1 and rewritten in place at its next write, never renamed. A writer applies only the fields it changed, so two views of one conversation no longer overwrite each other's edits.
 
 ### Added
+
+- Fixed blocked Command Code tool calls remaining in the running state after completion, and work-mode menus overriding provider-specific permission labels and descriptions.
+- Added Command Code as an opt-in provider: streamed answers and tool activity, CLI model discovery, model-specific reasoning effort without global CLI configuration writes, native session resume after reload, context token estimates, host-specific CLI paths, and scoped environment settings. Authentication and native configuration remain CLI-owned. Safe mode now pauses edits, commands and other non-read tools for a one-time Grimoire approval. Cancellation, a lost connection or a missing approval hook prevents execution. Safe requires the verified Command Code 1.53.0 npm installation and disables native subagents. Auto-approve runs without Grimoire prompts; native deny and ask rules still apply. Image attachments, plan mode, slash commands, auxiliary tasks, fork, and rewind are not exposed in this integration.
 
 - Devin CLI (Cognition) as an opt-in provider over `devin acp`: models and modes from the live session, permission requests for shell commands, file writes approved by Grimoire, native resume, and Grimoire-managed MCP servers in `.grimoire/mcp/devin.json`. (#108)
 - Reasonix as an opt-in provider over `reasonix acp`: models and modes from the live session, permission requests that carry their own subject, file writes approved by Grimoire, native resume, per-turn tokens read from Reasonix's own status notifications, and Grimoire-managed MCP servers in `.grimoire/mcp/reasonix.json`. Safe, Plan, and Auto-approve drive both of Reasonix's axes, because it keeps the session mode and the tool-approval posture apart — and a turn that cannot set the posture is refused rather than run, since that posture is the only thing separating Safe from Auto-approve. Reasoning effort is a picker filled from the session rather than a fixed list, because which levels a model takes is decided by the provider block serving it; Auto heads the list and leaves the choice to Reasonix.

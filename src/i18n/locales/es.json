@@ -1064,6 +1064,9 @@
       },
       "reasonix": {
         "desc": "El agente de programación de código abierto Reasonix mediante su entorno nativo Agent Client Protocol."
+      },
+      "commandcode": {
+        "desc": "Usa la CLI de Command Code instalada con sesiones nativas y eventos de herramientas en tiempo real."
       }
     },
     "hub": {

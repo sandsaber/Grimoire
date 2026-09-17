@@ -74,7 +74,7 @@ describe('application runtime', () => {
     expect(missing).toEqual([]);
     // Guards the reader: a catalog that answered nothing would report no
     // missing providers for the same reason a complete composition does.
-    expect(providerCatalog().ids()).toHaveLength(11);
+    expect(providerCatalog().ids()).toHaveLength(12);
     runtime.dispose();
   });
 

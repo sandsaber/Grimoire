@@ -1,3 +1,5 @@
+import { gunzipSync } from 'node:zlib';
+
 type ReadableAdapter = {
   read: (path: string) => Promise<string>;
 };
@@ -7,14 +9,15 @@ type ManifestLike = {
   dir?: string;
 };
 
-declare const GRIMOIRE_CHANGELOG_MARKDOWN: string | undefined;
+declare const GRIMOIRE_CHANGELOG_GZIP: string | undefined;
 
 export const GRIMOIRE_CHANGELOG_URL = 'https://github.com/sandsaber/Grimoire/blob/main/CHANGELOG.md';
 
 export function getEmbeddedChangelogMarkdown(): string | null {
   try {
-    if (typeof GRIMOIRE_CHANGELOG_MARKDOWN === 'string' && GRIMOIRE_CHANGELOG_MARKDOWN.trim()) {
-      return GRIMOIRE_CHANGELOG_MARKDOWN;
+    if (typeof GRIMOIRE_CHANGELOG_GZIP === 'string' && GRIMOIRE_CHANGELOG_GZIP) {
+      // Keep the complete changelog without consuming the Sync release size budget.
+      return gunzipSync(Buffer.from(GRIMOIRE_CHANGELOG_GZIP, 'base64')).toString('utf8');
     }
   } catch {
     return null;

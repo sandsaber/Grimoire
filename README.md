@@ -29,32 +29,32 @@
 
 > **Heads-up: 2.0 is in progress.** The next major release moves Grimoire onto a provider-based execution architecture, where one kernel drives every CLI and records exactly one outcome per turn, and brings a redesign that follows your vault's theme and accent. It is merged into `main` and is not in a published release yet. The current release is still 1.3.2. Conversations, settings, and provider files carry over unchanged.
 
-Grimoire brings agentic CLI assistants into Obsidian. Codex, Claude Code, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin, and Reasonix all live in one side panel, where they read your notes, edit files, run commands, call tools, and keep session history against your real vault. Nothing routes through a Grimoire server. There's no telemetry, no hosted backend, and no proxy sitting in the middle.
+Grimoire brings agentic CLI assistants into Obsidian. Codex, Claude Code, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin, Reasonix, and Command Code all live in one side panel, where they read your notes, edit files, run commands, call tools, and keep session history against your real vault. Nothing routes through a Grimoire server. There's no telemetry, no hosted backend, and no proxy sitting in the middle.
 
 It's built for people who already work in Obsidian and want AI help that behaves like part of the vault: local context, local files, a provider you pick on purpose, and usage you can actually see.
 
 ## Why Grimoire
 
 - Use the CLI agents you already trust, right inside your notes.
-- Switch providers from the composer. Codex, Claude Code, Antigravity CLI, legacy Gemini CLI, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin, and Reasonix share one model picker.
+- Switch providers from the composer. Codex, Claude Code, Antigravity CLI, legacy Gemini CLI, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin, Reasonix, and Command Code share one model picker.
 - Ground every turn in your vault. Mention notes, folders, and MCP tools instead of pasting paths by hand.
 - See cost and limits next to the model selector, where you're making the decision anyway.
 - Stay local-first. Grimoire doesn't collect telemetry, proxy prompts, or run a backend.
 
 ## What each provider can do
 
-| Capability | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Local persistent runtime | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes |
-| Native history hydration | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No | No | No |
-| Plan mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes |
-| Image attachments | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | No |
-| Instruction mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes |
-| Reasoning effort controls | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes |
-| Rewind | No | Yes | No | Yes | No | No | No | No | No | No | No |
-| Fork | Yes | Yes | No | Yes | No | No | No | No | No | No | No |
-| Provider slash commands | No | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes |
-| Grimoire-managed MCP UI | No | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes |
+| Capability | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix | Command Code |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Local persistent runtime | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No |
+| Native history hydration | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No | No | No | No |
+| Plan mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No |
+| Image attachments | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | No | No |
+| Instruction mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No |
+| Reasoning effort controls | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes (model-specific) |
+| Rewind | No | Yes | No | Yes | No | No | No | No | No | No | No | No |
+| Fork | Yes | Yes | No | Yes | No | No | No | No | No | No | No | No |
+| Provider slash commands | No | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No |
+| Grimoire-managed MCP UI | No | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No |
 
 ## Installation
 
@@ -268,6 +268,23 @@ Reasoning effort is a picker fed by the session, not a fixed list. Which levels 
 One thing to know about Safe mode: `ask` gates the tools Reasonix classifies as permission-gated, not every tool, so a shell command it judges read-only can run without a prompt. Grimoire approves every file write Reasonix makes through the protocol, which is what keeps the vault behind a question. For a session that must not write, use Plan.
 
 Reasonix owns its configuration in `~/.reasonix/config.toml` and reads API keys from the environment under the names that file gives. Vault skills are read from `.reasonix/skills` and `.agents/skills`. Grimoire manages an isolated project MCP list in `.grimoire/mcp/reasonix.json` and injects it into ACP sessions. Usage comes from Reasonix's own status notifications, and a cost appears only when your model provider has a price. Image attachments, reasoning effort control, fork, and rewind are not supported.
+
+### Command Code
+
+Command Code is opt-in in the unreleased 2.0 build. Install and authenticate in a terminal, then enable it under Settings → Grimoire → Providers:
+
+```bash
+npm i -g command-code
+command-code login
+```
+
+Reasoning effort is discovered for the selected model from the installed CLI. The picker offers only that model's supported levels and a CLI default option; models without adjustable effort have no picker. Explicit selections apply to the current run through the native session mod API without changing global CLI settings. CLI default preserves native behavior, including an effort already stored in a resumed session.
+
+Grimoire streams answers and tool activity from the CLI's headless JSON output, discovers models with `--list-models`, and saves the native session ID for explicit resume after reload. Authentication, native configuration, skills, MCP and transcripts stay with Command Code. Context usage uses reported input tokens against an estimated or user-supplied context limit; account quotas and prices are not inferred.
+
+**Safe** pauses edits, commands and other non-read tools for a one-time approval in Grimoire. Denying, cancelling or losing the approval connection prevents execution. Safe currently requires the verified Command Code 1.53.0 npm installation and disables native subagents, whose separate loops cannot use this approval bridge. **Auto-approve** runs without Grimoire prompts; native deny and ask rules still apply in both modes. This integration does not expose interactive questions, image attachments, plan controls, slash commands, managed MCP/skills/agents, auxiliary tasks, fork, rewind, or native history import.
+
+- [Command Code headless documentation](https://commandcode.ai/docs/headless)
 
 ### OpenCode
 
@@ -489,7 +506,7 @@ Obsidian Community plugins are the recommended user install path. GitHub Release
 
 ## Roadmap
 
-Today Grimoire ships with Codex, Claude Code, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin, and Reasonix.
+The current source integrates Codex, Claude Code, Antigravity CLI, Gemini CLI (Legacy), OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin, Reasonix, and Command Code.
 
 Next on the list: GitHub Copilot CLI, other ACP-compatible providers, and local model CLIs once their runtime is stable enough to embed in Obsidian. Implementation notes live in [docs/provider-roadmap.md](docs/provider-roadmap.md).
 

@@ -13,6 +13,7 @@ describe('built-in provider catalog', () => {
       'antigravity',
       'claude',
       'codex',
+      'commandcode',
       'devin',
       'gemini',
       'grok',
@@ -42,6 +43,7 @@ describe('built-in provider catalog', () => {
       'qwen',
       'devin',
       'reasonix',
+      'commandcode',
     ]);
   });
 
@@ -146,6 +148,7 @@ describe('built-in provider catalog', () => {
       'Qwen Code',
       'Devin',
       'Reasonix',
+      'Command Code',
     ]);
   });
 });

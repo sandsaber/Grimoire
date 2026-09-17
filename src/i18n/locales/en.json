@@ -1064,6 +1064,9 @@
       },
       "reasonix": {
         "desc": "The open-source Reasonix coding agent over its native Agent Client Protocol runtime."
+      },
+      "commandcode": {
+        "desc": "Use the installed Command Code CLI with native sessions and streaming tool activity."
       }
     },
     "hub": {

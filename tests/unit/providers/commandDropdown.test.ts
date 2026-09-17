@@ -47,6 +47,6 @@ describe('provider command dropdown declarations', () => {
     const withoutDropdown = catalog.ids()
       .filter(providerId => !catalog.declarations(providerId).commandDropdown);
 
-    expect(withoutDropdown).toEqual(['antigravity']);
+    expect(withoutDropdown).toEqual(['antigravity', 'commandcode']);
   });
 });

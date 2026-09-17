@@ -1064,6 +1064,9 @@
       },
       "reasonix": {
         "desc": "透過原生 Agent Client Protocol 執行的開源程式設計智慧代理 Reasonix。"
+      },
+      "commandcode": {
+        "desc": "使用已安裝的 Command Code CLI，支援原生工作階段和即時工具活動。"
       }
     },
     "hub": {

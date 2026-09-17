@@ -2,6 +2,7 @@ import { ProviderCatalog } from '../core/providers/ProviderCatalog';
 import { antigravityProviderModule } from './antigravity/AntigravityProviderModule';
 import { claudeProviderModule } from './claude/ClaudeProviderModule';
 import { codexProviderModule } from './codex/CodexProviderModule';
+import { commandcodeProviderModule } from './commandcode/CommandcodeProviderModule';
 import { devinProviderModule } from './devin/DevinProviderModule';
 import { geminiProviderModule } from './gemini/GeminiProviderModule';
 import { grokProviderModule } from './grok/GrokProviderModule';
@@ -22,6 +23,7 @@ const BUILT_IN_PROVIDER_MODULES = [
   antigravityProviderModule,
   claudeProviderModule,
   codexProviderModule,
+  commandcodeProviderModule,
   devinProviderModule,
   geminiProviderModule,
   grokProviderModule,

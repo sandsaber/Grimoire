@@ -374,6 +374,11 @@ const PROVIDER_SETTING_COPY: Record<ProviderId, {
     name: 'Reasonix',
     tabName: 'Reasonix',
   },
+  commandcode: {
+    descKey: 'settings.providers.commandcode.desc',
+    name: 'Command Code',
+    tabName: 'Command Code',
+  },
 };
 
 const GENERAL_SETTINGS_SEARCH_KEYS: TranslationKey[] = [

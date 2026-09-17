@@ -1660,6 +1660,23 @@ describe('PermissionToggle', () => {
     expect(parentEl.querySelector('.grimoire-permission-toggle')).not.toBeNull();
   });
 
+  it('preserves provider permission semantics instead of promising unavailable confirmations', () => {
+    const chatUI = callbacks.getChatUI();
+    callbacks.getChatUI.mockReturnValue({ ...chatUI, permissionMode: { toggle: () => ({
+      inactiveValue: 'normal', inactiveLabel: 'CLI rules',
+      inactiveDescription: 'Allowed actions run without asking; confirmation requests are denied.',
+      activeValue: 'full_access', activeLabel: 'Auto-approve',
+      activeDescription: 'Runs without asking; explicit CLI deny rules still apply.',
+    }) } });
+    const root = createMockEl();
+    new PermissionToggle(root, callbacks);
+    expect(root.querySelector('.grimoire-permission-label')?.getAttribute('aria-label')).toBe('Work mode · CLI rules');
+    expect(permissionOptions(root).map(option => option.getAttribute('aria-label'))).toEqual([
+      'CLI rules · Allowed actions run without asking; confirmation requests are denied.',
+      'Auto · Runs without asking; explicit CLI deny rules still apply.',
+    ]);
+  });
+
   it('gives each mode its own glyph, and names it', () => {
     // The mode was a word in the toolbar at the same weight as the model's
     // name, which gave three rarely-changed words equal billing with the one

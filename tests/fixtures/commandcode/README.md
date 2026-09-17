@@ -1,0 +1,9 @@
+# Command Code wire evidence
+
+Captured from `command-code 1.53.0` on 2026-09-13 with a synthetic vault containing `probe.txt` (`COMMANDCODE_FILE_OK`). The probe used `--print --output-format json --max-turns 1 --permission-mode standard` and successfully read the file, then returned `max_turns` (exit 8). UUIDs and the temporary vault path are replaced. Full `run_end.nextState` transcripts and unrelated diagnostic events are omitted; the retained event shapes and usage numbers are unchanged.
+
+Separate real-CLI smoke coverage verifies successful text, file reading and native resume through the actual Grimoire chat projection. No credentials or real vault content are recorded here.
+
+A disposable-file probe on 2026-09-14 with DeepSeek V4 Flash confirmed that both `--permission-mode standard` and `default` leave the file unchanged and emit `tool_hook_blocked` with `toolCallId`, `toolName` and `hookOutput`. The same edit with `--yolo` updates the file and emits `tool_completed`. The stream/presenter regression test retains the blocked event shape and verifies that its tool card settles as an error.
+
+The opt-in `GRIMOIRE_COMMANDCODE_APPROVAL_LIVE=1` projection test uses DeepSeek V4 Flash and a disposable `Note.md` to verify allow, deny and Stop while waiting. It holds each approval open, checks that the file is unchanged, and checks the final bytes. Process tests additionally omit or skip the mod and require the launcher to stop before any write. Safe is tested against CLI 1.53.0 only; it is not a filesystem sandbox for arbitrary user-installed mods.

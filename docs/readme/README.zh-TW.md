@@ -45,18 +45,18 @@ Grimoire 將 agentic CLI 助手帶入 Obsidian。Codex、Claude Code、Antigravi
 
 ## 各 provider 能做什麼
 
-| 能力 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 本地 persistent runtime | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 |
-| 原生 history hydration | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 否 | 否 | 否 |
-| Plan mode | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 |
-| Image attachments | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 否 |
-| Instruction mode | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 |
-| Reasoning effort controls | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 |
-| Rewind | 否 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 | 否 |
-| Fork | 是 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 | 否 |
-| Provider slash commands | 否 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 |
-| Grimoire-managed MCP UI | 否 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 |
+| 能力 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix | Command Code |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 本地 persistent runtime | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 | 否 |
+| 原生 history hydration | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 否 | 否 | 否 | 否 |
+| Plan mode | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 | 否 |
+| Image attachments | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 否 | 否 |
+| Instruction mode | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 | 否 |
+| Reasoning effort controls | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | Yes (model-specific) |
+| Rewind | 否 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 | 否 | 否 |
+| Fork | 是 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 | 否 | 否 |
+| Provider slash commands | 否 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 | 否 |
+| Grimoire-managed MCP UI | 否 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 | 否 |
 
 ## 安裝
 
@@ -266,6 +266,23 @@ Reasonix 不只請求權限，也會提問：它的 `ask` tool 經由同一通�
 關於 Safe 模式有一點要知道：`ask` 只擋下 Reasonix 判定為需要授權的 tool，而不是全部 tool，因此它認為 read-only 的 shell command 會直接執行而不詢問。Grimoire 會對 Reasonix 透過協定進行的每一次檔案寫入進行確認，這正是讓 vault 待在一個問題之後的機制。如果某個 session 完全不該寫入，請使用 Plan。
 
 Reasonix 的設定放在 `~/.reasonix/config.toml`，API keys 依該檔案給出的名稱從環境變數讀取。Vault skills 從 `.reasonix/skills` 與 `.agents/skills` 讀取。Grimoire 在 `.grimoire/mcp/reasonix.json` 維護獨立的專案 MCP 清單，並注入 ACP session。用量來自 Reasonix 自身的 status notification；只有當你的 model provider 有價格時才會顯示 cost。圖片附件、reasoning effort 控制、fork 與 rewind 都不支援。
+
+### Command Code
+
+Command Code is opt-in in the unreleased 2.0 build. Install and authenticate in a terminal, then enable it under Settings → Grimoire → Providers:
+
+```bash
+npm i -g command-code
+command-code login
+```
+
+Reasoning effort is discovered for the selected model from the installed CLI. The picker offers only that model's supported levels and a CLI default option; models without adjustable effort have no picker. Explicit selections apply to the current run through the native session mod API without changing global CLI settings. CLI default preserves native behavior, including an effort already stored in a resumed session.
+
+Grimoire streams answers and tool activity from the CLI's headless JSON output, discovers models with `--list-models`, and saves the native session ID for explicit resume after reload. Authentication, native configuration, skills, MCP and transcripts stay with Command Code. Context usage uses reported input tokens against an estimated or user-supplied context limit; account quotas and prices are not inferred.
+
+**Safe** pauses edits, commands and other non-read tools for a one-time approval in Grimoire. Denying, cancelling or losing the approval connection prevents execution. Safe currently requires the verified Command Code 1.53.0 npm installation and disables native subagents, whose separate loops cannot use this approval bridge. **Auto-approve** runs without Grimoire prompts; native deny and ask rules still apply in both modes. This integration does not expose interactive questions, image attachments, plan controls, slash commands, managed MCP/skills/agents, auxiliary tasks, fork, rewind, or native history import.
+
+- [Command Code headless documentation](https://commandcode.ai/docs/headless)
 
 ### OpenCode
 

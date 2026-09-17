@@ -203,15 +203,13 @@ export function getPermissionSummary(providerId: ProviderId, permissionMode: str
     .chatUI.permissionMode?.toggle() ?? null;
   if (toggle) {
     if (permissionMode === toggle.activeValue) {
-      return t('chat.ui.context.autoApprove');
+      return toggle.activeDescription ?? t('chat.ui.context.autoApprove');
     }
     if (permissionMode === toggle.inactiveValue) {
-      return toggle.inactiveLabel === 'Blocked'
-        ? toggle.inactiveDescription ?? t('chat.ui.context.permissionSafeDescription')
-        : t('chat.ui.context.permissionSafeDescription');
+      return toggle.inactiveDescription ?? t('chat.ui.context.permissionSafeDescription');
     }
     if (permissionMode === toggle.planValue) {
-      return t('chat.ui.context.permissionPlanDescription');
+      return toggle.planDescription ?? t('chat.ui.context.permissionPlanDescription');
     }
   }
   if (permissionMode === 'plan') {
@@ -228,12 +226,11 @@ export function getPermissionTitle(providerId: ProviderId, permissionMode: strin
     .chatUI.permissionMode?.toggle() ?? null;
   if (toggle) {
     if (permissionMode === toggle.activeValue) {
-      return t('chat.ui.toolbar.permissionAuto');
+      return toggle.activeLabel === 'Auto-approve' ? t('chat.ui.toolbar.permissionAuto') : toggle.activeLabel;
     }
     if (permissionMode === toggle.inactiveValue) {
-      return toggle.inactiveLabel === 'Blocked'
-        ? t('chat.ui.status.blocked')
-        : t('chat.ui.toolbar.permissionSafe');
+      return toggle.inactiveLabel === 'Safe' ? t('chat.ui.toolbar.permissionSafe')
+        : toggle.inactiveLabel === 'Blocked' ? t('chat.ui.status.blocked') : toggle.inactiveLabel;
     }
     if (permissionMode === toggle.planValue) {
       return t('chat.ui.toolbar.permissionPlan');

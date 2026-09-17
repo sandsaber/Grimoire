@@ -43,18 +43,18 @@ Grimoire 面向已经使用 Obsidian 工作，并希望 AI 助手像仓库的一
 
 ## 各供应商支持的功能
 
-| 能力 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI（旧版） | Qwen Code | Devin | Reasonix |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 本地持久运行时 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 |
-| 原生历史记录恢复 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 否 | 否 | 否 |
-| 规划模式 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 |
-| 图片附件 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 否 |
-| 指令模式 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 |
-| 推理强度控制 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 |
-| 回退 | 否 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 | 否 |
-| 分叉 | 是 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 | 否 |
-| 供应商斜杠命令 | 否 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 |
-| Grimoire 管理的 MCP 界面 | 否 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 |
+| 能力 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI（旧版） | Qwen Code | Devin | Reasonix | Command Code |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 本地持久运行时 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 | 否 |
+| 原生历史记录恢复 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 否 | 否 | 否 | 否 |
+| 规划模式 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 | 否 |
+| 图片附件 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 否 | 否 |
+| 指令模式 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 | 否 |
+| 推理强度控制 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 否 |
+| 回退 | 否 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 | 否 | 否 |
+| 分叉 | 是 | 是 | 否 | 是 | 否 | 否 | 否 | 否 | 否 | 否 | 否 | 否 |
+| 供应商斜杠命令 | 否 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 | 否 |
+| Grimoire 管理的 MCP 界面 | 否 | 是 | 是 | 是 | 是 | 是 | 否 | 是 | 是 | 是 | 是 | 否 |
 
 ## 安装
 
@@ -269,6 +269,23 @@ Reasonix 不只请求权限，也会提问：它的 `ask` 工具经由同一通�
 关于 Safe 模式有一点需要知道：`ask` 只拦截 Reasonix 判定为需要授权的工具，而不是全部工具，因此它认为只读的 shell 命令会直接执行而不询问。Grimoire 会对 Reasonix 通过协议进行的每一次文件写入进行确认，这正是让仓库处在一个问题之后的机制。如果某个会话完全不应写入，请使用 Plan。
 
 Reasonix 的配置保存在 `~/.reasonix/config.toml`，API 密钥按该文件给出的名称从环境变量读取。仓库技能从 `.reasonix/skills` 和 `.agents/skills` 读取。Grimoire 在 `.grimoire/mcp/reasonix.json` 中维护独立的项目 MCP 列表，并注入到 ACP 会话。用量来自 Reasonix 自身的状态通知；只有当你的模型供应商有价格时才会显示费用。图片附件、推理强度控制、分叉与回退均不支持。
+
+### Command Code
+
+Command Code is opt-in in the unreleased 2.0 build. Install and authenticate in a terminal, then enable it under Settings → Grimoire → Providers:
+
+```bash
+npm i -g command-code
+command-code login
+```
+
+Reasoning effort is discovered for the selected model from the installed CLI. The picker offers only that model's supported levels and a CLI default option; models without adjustable effort have no picker. Explicit selections apply to the current run through the native session mod API without changing global CLI settings. CLI default preserves native behavior, including an effort already stored in a resumed session.
+
+Grimoire streams answers and tool activity from the CLI's headless JSON output, discovers models with `--list-models`, and saves the native session ID for explicit resume after reload. Authentication, native configuration, skills, MCP and transcripts stay with Command Code. Context usage uses reported input tokens against an estimated or user-supplied context limit; account quotas and prices are not inferred.
+
+**Safe** pauses edits, commands and other non-read tools for a one-time approval in Grimoire. Denying, cancelling or losing the approval connection prevents execution. Safe currently requires the verified Command Code 1.53.0 npm installation and disables native subagents, whose separate loops cannot use this approval bridge. **Auto-approve** runs without Grimoire prompts; native deny and ask rules still apply in both modes. This integration does not expose interactive questions, image attachments, plan controls, slash commands, managed MCP/skills/agents, auxiliary tasks, fork, rewind, or native history import.
+
+- [Command Code headless documentation](https://commandcode.ai/docs/headless)
 
 ### OpenCode
 
