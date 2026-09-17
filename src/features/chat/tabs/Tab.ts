@@ -384,7 +384,7 @@ export async function initializeTabService(
     await applyBlankDraftSettings(tab, plugin, providerId);
     // From the composition that builds it, not through a registration whose
     // factory reached the same composition by way of a plugin.
-    const runtime = plugin.getApplicationRuntimeOrNull()?.createRuntimeFor(providerId);
+    const runtime = await plugin.getApplicationRuntimeOrNull()?.createRuntimeFor(providerId);
     if (!runtime) {
       throw new Error(`${providerCatalog().displayNameOrId(providerId)} has no execution to run on.`);
     }

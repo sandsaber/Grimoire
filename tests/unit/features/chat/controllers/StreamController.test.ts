@@ -305,6 +305,52 @@ describe('StreamController - Text Content', () => {
       );
     });
 
+    it('batches long text across frames and flushes the last delta at a block boundary', async () => {
+      const msg = createTestMessage();
+      const longText = 'x'.repeat(8_000);
+      await controller.appendText(longText);
+      jest.advanceTimersByTime(16);
+      await Promise.resolve();
+      expect(deps.renderer.renderContent).toHaveBeenCalledTimes(1);
+
+      await controller.appendText(' first');
+      jest.advanceTimersByTime(16);
+      await Promise.resolve();
+      await controller.appendText(' last');
+      jest.advanceTimersByTime(16);
+      await Promise.resolve();
+      expect(deps.renderer.renderContent).toHaveBeenCalledTimes(1);
+
+      await controller.finalizeCurrentTextBlock(msg);
+      expect(deps.renderer.renderContent).toHaveBeenLastCalledWith(
+        expect.anything(), `${longText} first last`,
+      );
+      expect(msg.contentBlocks).toContainEqual({ type: 'text', content: `${longText} first last` });
+    });
+
+    it('keeps showing live text while a long block is still streaming', async () => {
+      const longText = 'x'.repeat(8_000);
+      await controller.appendText(longText);
+      jest.advanceTimersByTime(16);
+      await Promise.resolve();
+      await controller.appendText(' live');
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+      expect(deps.renderer.renderContent).toHaveBeenCalledTimes(2);
+      expect(deps.renderer.renderContent).toHaveBeenLastCalledWith(expect.anything(), `${longText} live`);
+    });
+
+    it('cancels a throttled render when the stream is reset', async () => {
+      await controller.appendText('x'.repeat(8_000));
+      jest.advanceTimersByTime(16);
+      await Promise.resolve();
+      await controller.appendText(' abandoned');
+      controller.resetStreamingState();
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      expect(deps.renderer.renderContent).toHaveBeenCalledTimes(1);
+    });
+
     it('should defer math rendering during live text renders', async () => {
       deps.state.currentTextEl = createMockEl();
 

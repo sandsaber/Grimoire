@@ -119,6 +119,7 @@ export class StreamController {
 
   private deps: StreamControllerDeps;
   private pendingTextRenderFrame: ScheduledAnimationFrame | null = null;
+  private lastTextRenderAt = -Infinity;
   private pendingTextRenderPromise: Promise<void> | null = null;
   private resolvePendingTextRender: (() => void) | null = null;
   private isTextRenderRunning = false;
@@ -955,6 +956,7 @@ export class StreamController {
       state.currentTextEl = state.currentContentEl.createDiv({ cls: classes.join(' ') });
       state.currentTextContent = '';
       this.currentTextPhase = phase;
+      this.lastTextRenderAt = -Infinity;
     }
 
     state.currentTextContent += text;
@@ -1147,13 +1149,25 @@ export class StreamController {
     }
 
     if (this.pendingTextRenderFrame === null && !this.isTextRenderRunning) {
-      this.pendingTextRenderFrame = scheduleAnimationFrame(() => {
-        this.pendingTextRenderFrame = null;
-        void this.renderPendingText();
-      }, this.getStreamingRenderWindow());
+      this.scheduleTextRenderFrame();
     }
 
     return this.pendingTextRenderPromise;
+  }
+
+  private scheduleTextRenderFrame(): void {
+    const ownerWindow = this.getStreamingRenderWindow();
+    // Markdown reparses the whole block. Longer blocks need fewer passes, but
+    // the first paint stays immediate and finalization bypasses this delay.
+    const interval = Math.min(100, Math.floor(this.deps.state.currentTextContent.length / 4_000) * 50);
+    const delay = interval - (performance.now() - this.lastTextRenderAt);
+    const render = (): void => {
+      this.pendingTextRenderFrame = null;
+      void this.renderPendingText();
+    };
+    this.pendingTextRenderFrame = delay > 16 && ownerWindow
+      ? { kind: 'timeout', id: ownerWindow.setTimeout(render, delay), ownerWindow }
+      : scheduleAnimationFrame(render, ownerWindow);
   }
 
   private async flushPendingTextRender(): Promise<void> {
@@ -1172,6 +1186,7 @@ export class StreamController {
   private async renderPendingText(): Promise<void> {
     if (this.isTextRenderRunning) return;
     this.isTextRenderRunning = true;
+    this.lastTextRenderAt = performance.now();
 
     const { state, renderer } = this.deps;
     const textEl = state.currentTextEl;
@@ -1194,10 +1209,7 @@ export class StreamController {
     }
 
     if (state.currentTextEl === textEl && state.currentTextContent !== content) {
-      this.pendingTextRenderFrame = scheduleAnimationFrame(() => {
-        this.pendingTextRenderFrame = null;
-        void this.renderPendingText();
-      }, this.getStreamingRenderWindow());
+      this.scheduleTextRenderFrame();
       return;
     }
 
@@ -1208,6 +1220,7 @@ export class StreamController {
   }
 
   private cancelPendingTextRender(): void {
+    this.lastTextRenderAt = -Infinity;
     if (this.pendingTextRenderFrame !== null) {
       cancelScheduledAnimationFrame(this.pendingTextRenderFrame);
       this.pendingTextRenderFrame = null;

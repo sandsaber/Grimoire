@@ -60,6 +60,7 @@ function createMockDeps(overrides: Partial<ConversationControllerDeps> = {}): Co
       getConversationById: jest.fn().mockResolvedValue(null),
       getHistoryHydration: jest.fn().mockReturnValue(undefined),
       getConversationSync: jest.fn().mockReturnValue(null),
+      hasConversationUserMessage: jest.fn().mockReturnValue(false),
       getConversationList: jest.fn().mockReturnValue([]),
       getConversationTitles: jest.fn().mockReturnValue([]),
       findEmptyConversation: jest.fn().mockResolvedValue(null),

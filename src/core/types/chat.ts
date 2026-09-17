@@ -183,6 +183,8 @@ export interface ConversationMeta {
   /** Timestamp when the last agent response completed. */
   lastResponseAt?: number;
   messageCount: number;
+  /** Whether a title can be generated without loading the transcript to check. */
+  hasUserMessage?: boolean;
   preview: string;
   /** Display label for the model used in the session history row. */
   modelLabel?: string;

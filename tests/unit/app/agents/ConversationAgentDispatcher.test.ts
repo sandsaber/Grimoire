@@ -64,7 +64,7 @@ describe('conversation agent dispatcher', () => {
     return new ConversationAgentDispatcher({
       chat: { submitTurn: command => harness.composition.submitTurn(command) },
       conversations: conversationPort(harness.conversations),
-      createRuntime: () => runtime(),
+      createRuntime: async () => runtime(),
       nextCommandId: () => 'cmd-worker-1',
       backendIdFor: () => FAKE_BACKEND_ID,
       ...overrides,
@@ -149,7 +149,7 @@ describe('conversation agent dispatcher', () => {
     const harness = await createHarness();
 
     const outcome = await toldDispatcher(harness, {
-      createRuntime: () => runtime(text => `<task>${text}</task>`),
+      createRuntime: async () => runtime(text => `<task>${text}</task>`),
     }).dispatch(REQUEST);
 
     expect(outcome.kind).toBe('accepted');
@@ -213,7 +213,7 @@ describe('conversation agent dispatcher', () => {
   it('refuses a provider this build does not compose', async () => {
     const harness = await createHarness();
 
-    const outcome = await toldDispatcher(harness, { createRuntime: () => null })
+    const outcome = await toldDispatcher(harness, { createRuntime: async () => null })
       .dispatch(REQUEST);
 
     expect(outcome).toEqual({
@@ -234,10 +234,25 @@ describe('conversation agent dispatcher', () => {
     const harness = await createHarness();
     const adapter = runtime();
 
-    await toldDispatcher(harness, { createRuntime: () => adapter }).dispatch(REQUEST);
+    await toldDispatcher(harness, { createRuntime: async () => adapter }).dispatch(REQUEST);
 
     expect(adapter.syncConversationState).toHaveBeenCalledWith(
       expect.objectContaining({ id: CONVERSATION_ID }),
     );
+  });
+
+  it('refuses an initialization failure before submitting or persisting a turn', async () => {
+    const harness = await createHarness();
+    const submitTurn = jest.fn();
+    const outcome = await toldDispatcher(harness, {
+      chat: { submitTurn },
+      createRuntime: async () => { throw new Error('Workspace unavailable'); },
+    }).dispatch(REQUEST);
+
+    expect(outcome).toEqual({
+      kind: 'rejected', code: 'dispatch.provider-unavailable', sideEffectFree: true,
+    });
+    expect(submitTurn).not.toHaveBeenCalled();
+    await expect(storedMessages(harness)).resolves.toEqual([]);
   });
 });

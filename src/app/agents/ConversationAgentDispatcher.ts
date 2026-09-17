@@ -49,7 +49,7 @@ export interface ConversationAgentDispatcherOptions {
   readonly chat: Pick<ChatExecutionComposition, 'submitTurn'>;
   readonly conversations: Pick<ChatConversationPort, 'read'>;
   /** A provider adapter with no tab behind it. `ApplicationRuntime` builds these. */
-  createRuntime(providerId: ProviderId): ExecutionChatRuntimeAdapter | null;
+  createRuntime(providerId: ProviderId): Promise<ExecutionChatRuntimeAdapter | null>;
   nextCommandId(): string;
   /** The backend a dispatched turn runs on, per provider. */
   backendIdFor(providerId: ProviderId): ExecutionBackendId | null;
@@ -113,7 +113,13 @@ export class ConversationAgentDispatcher implements AgentDispatchPort {
     if (!backendId) {
       return rejected('dispatch.provider-not-composed');
     }
-    const runtime = this.options.createRuntime(request.providerId);
+    let runtime: ExecutionChatRuntimeAdapter | null;
+    try {
+      runtime = await this.options.createRuntime(request.providerId);
+    } catch {
+      // No turn has been submitted, so initialization failure has a known outcome.
+      return rejected('dispatch.provider-unavailable');
+    }
     if (!runtime) {
       return rejected('dispatch.provider-not-composed');
     }

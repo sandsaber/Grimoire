@@ -69,7 +69,7 @@ export interface AppTabManagerState {
 export interface AppSessionStorage {
   listMetadata(): Promise<SessionMetadata[]>;
   /** The same listing, plus the conversations this build cannot read. */
-  listConversations(): Promise<ConversationListing>;
+  listConversations(loadMessagesFor?: ReadonlySet<string>): Promise<ConversationListing>;
   /** Writes a conversation the vault does not have yet. */
   createMetadata(meta: SessionMetadata): Promise<void>;
   /**

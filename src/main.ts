@@ -128,6 +128,8 @@ export default class GrimoirePlugin extends Plugin {
   settings!: GrimoireSettings;
   storage!: SharedAppStorage;
   private conversations: Conversation[] = [];
+  private unloadedConversations = new Map<string, ConversationMeta>();
+  private readonly conversationLoads = new Map<string, Promise<Conversation | null>>();
   /**
    * What the last hydration of each conversation reported.
    *
@@ -166,7 +168,7 @@ export default class GrimoirePlugin extends Plugin {
     try {
       await this.loadSettings();
       await this.startExecutionKernel();
-      await this.startProviderWorkspaces();
+      this.startProviderWorkspaces();
       await this.writeDebugLog({
         data: {
           providerCount: providerCatalog().ids().length,
@@ -568,25 +570,11 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   /**
-   * Brings the kernel up before anything can ask it for work.
-   *
-   * A kernel that cannot start must not take the plugin down with it: the
-   * providers running through it are Antigravity and Codex, and every other
-   * surface is unaffected. The registry refuses work it never accepted, so a
-   * failed start surfaces as refused turns for those two rather than a vault
-   * without Grimoire in it.
+   * Owns provider initialization without doing provider I/O at startup.
+   * A first workspace request initializes just that provider; failures remain
+   * isolated and retryable through the same manager.
    */
-  /**
-   * Brings every provider's workspace services up, isolated from each other.
-   *
-   * Startup awaits this and cannot be taken down by it: a provider whose
-   * initializer throws is recorded and left retryable, and the others are
-   * unaffected. The loop this replaces awaited each provider in turn with no
-   * `try`, so one failure silently cost every provider after it in the
-   * iteration order its command catalog, model list, CLI resolution and
-   * settings tab.
-   */
-  private async startProviderWorkspaces(): Promise<void> {
+  private startProviderWorkspaces(): void {
     if (this.unloading) {
       return;
     }
@@ -625,7 +613,13 @@ export default class GrimoirePlugin extends Plugin {
       },
     });
     this.providerWorkspaces = manager;
-    await manager.initializeAll(providerCatalog().ids());
+  }
+
+  /** Shared by settings, history and chat; concurrent first uses join one build. */
+  async ensureProviderWorkspace(providerId: ProviderId): Promise<void> {
+    if (this.unloading || !await this.providerWorkspaces?.initialize(providerId)) {
+      throw new Error(`Provider workspace "${providerId}" is not available.`);
+    }
   }
 
   private async startExecutionKernel(): Promise<void> {
@@ -843,7 +837,11 @@ export default class GrimoirePlugin extends Plugin {
     );
     const didNormalizeModelVariants = this.normalizeModelVariantSettings();
 
-    const listing = await this.storage.sessions.listConversations();
+    const openConversationIds = new Set(
+      this.lastKnownTabManagerState?.openTabs.flatMap(tab => tab.conversationId ? [tab.conversationId] : []) ?? [],
+    );
+    const listing = await this.storage.sessions.listConversations(openConversationIds);
+    this.unloadedConversations = listing.unloaded ?? new Map<string, ConversationMeta>();
     this.unreadableConversations = listing.unreadable;
     // The same projection the execution path applies to the one conversation a
     // turn is running on. Two copies of it means a conversation means one thing
@@ -851,7 +849,8 @@ export default class GrimoirePlugin extends Plugin {
     this.conversations = listing.metadata.map(meta => (
       this.storage.sessions.toConversation(meta, DEFAULT_CHAT_PROVIDER_ID)
     )).sort(
-      (a, b) => (b.lastResponseAt ?? b.updatedAt) - (a.lastResponseAt ?? a.updatedAt)
+      (a, b) => (b.lastResponseAt ?? this.unloadedConversations.get(b.id)?.lastResponseAt ?? b.updatedAt)
+        - (a.lastResponseAt ?? this.unloadedConversations.get(a.id)?.lastResponseAt ?? a.updatedAt)
     );
     setLocale(this.settings.locale as Locale);
 
@@ -904,9 +903,9 @@ export default class GrimoirePlugin extends Plugin {
     }
   }
 
-  private backfillConversationResponseTimestamps(): Conversation[] {
+  private backfillConversationResponseTimestamps(conversations: readonly Conversation[] = this.conversations): Conversation[] {
     const updated: Conversation[] = [];
-    for (const conv of this.conversations) {
+    for (const conv of conversations) {
       if (conv.lastResponseAt != null) continue;
       if (!conv.messages || conv.messages.length === 0) continue;
 
@@ -1260,20 +1259,17 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   async switchConversation(id: string): Promise<Conversation | null> {
-    const conversation = this.conversations.find(c => c.id === id);
-    if (!conversation) return null;
-
-    await this.loadSdkMessagesForConversation(conversation);
-
-    return conversation;
+    return this.getConversationById(id);
   }
 
   async deleteConversation(id: string): Promise<void> {
+    await this.loadStoredConversation(id);
     const index = this.conversations.findIndex(c => c.id === id);
     if (index === -1) return;
 
     const conversation = this.conversations[index];
     this.conversations.splice(index, 1);
+    this.unloadedConversations.delete(id);
 
     const transcripts = (
       await this.getApplicationRuntimeOrNull()?.workspaceFor(conversation.providerId)
@@ -1357,7 +1353,7 @@ export default class GrimoirePlugin extends Plugin {
    * a fork, a duplicate, a restore.
    */
   async renameConversation(id: string, title: string, titleSource?: TitleSource): Promise<void> {
-    const conversation = this.conversations.find(c => c.id === id);
+    const conversation = await this.loadStoredConversation(id);
     if (!conversation) return;
 
     conversation.title = title.trim() || this.generateDefaultTitle();
@@ -1378,7 +1374,7 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   async updateConversation(id: string, updates: Partial<Conversation>): Promise<void> {
-    const conversation = this.conversations.find(c => c.id === id);
+    const conversation = await this.loadStoredConversation(id);
     if (!conversation) return;
 
     // providerId is immutable — strip it from updates to prevent accidental mutation
@@ -1408,7 +1404,7 @@ export default class GrimoirePlugin extends Plugin {
   }
 
   async getConversationById(id: string): Promise<Conversation | null> {
-    const conversation = this.conversations.find(c => c.id === id) || null;
+    const conversation = await this.loadStoredConversation(id);
 
     if (conversation) {
       await this.loadSdkMessagesForConversation(conversation);
@@ -1417,12 +1413,41 @@ export default class GrimoirePlugin extends Plugin {
     return conversation;
   }
 
+  private async loadStoredConversation(id: string): Promise<Conversation | null> {
+    const conversation = this.conversations.find(c => c.id === id) ?? null;
+    if (!conversation || !this.unloadedConversations.has(id)) return conversation;
+    const existing = this.conversationLoads.get(id);
+    if (existing) return existing;
+    const pending = (async () => {
+      const record = await this.storage.sessions.records.read(id);
+      if (record.kind !== 'present') return null;
+      const loaded = this.storage.sessions.toConversation(record.metadata, DEFAULT_CHAT_PROVIDER_ID);
+      this.backfillConversationResponseTimestamps([loaded]);
+      Object.assign(conversation, loaded);
+      this.unloadedConversations.delete(id);
+      return conversation;
+    })();
+    this.conversationLoads.set(id, pending);
+    try {
+      return await pending;
+    } finally {
+      this.conversationLoads.delete(id);
+    }
+  }
+
   getConversationSync(id: string): Conversation | null {
+    if (this.unloadedConversations.has(id)) return null;
     return this.conversations.find(c => c.id === id) || null;
   }
 
+  hasConversationUserMessage(id: string): boolean {
+    return this.unloadedConversations.get(id)?.hasUserMessage
+      ?? this.getConversationSync(id)?.messages.some(message => message.role === 'user')
+      ?? false;
+  }
+
   findEmptyConversation(): Conversation | null {
-    return this.conversations.find(c => c.messages.length === 0) || null;
+    return this.conversations.find(c => !this.unloadedConversations.has(c.id) && c.messages.length === 0) || null;
   }
 
   /**
@@ -1444,11 +1469,12 @@ export default class GrimoirePlugin extends Plugin {
       title: c.title,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
-      lastResponseAt: c.lastResponseAt,
-      messageCount: c.messages.length,
-      preview: this.getConversationPreview(c),
+      lastResponseAt: c.lastResponseAt ?? this.unloadedConversations.get(c.id)?.lastResponseAt,
+      messageCount: this.unloadedConversations.get(c.id)?.messageCount ?? c.messages.length,
+      hasUserMessage: this.unloadedConversations.get(c.id)?.hasUserMessage ?? c.messages.some(message => message.role === 'user'),
+      preview: this.unloadedConversations.get(c.id)?.preview ?? this.getConversationPreview(c),
       modelLabel: this.getConversationModelLabel(c),
-      sourceCount: this.getConversationSourceCount(c),
+      sourceCount: this.unloadedConversations.get(c.id)?.sourceCount ?? this.getConversationSourceCount(c),
       usagePercentage: c.usage?.percentage,
       titleGenerationStatus: c.titleGenerationStatus,
       titleSource: c.titleSource,

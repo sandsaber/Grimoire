@@ -13,6 +13,7 @@ import type {
   SessionMetadata,
 } from '../types';
 import type { ProviderId } from '../types/provider';
+import { ConversationHeaderCache } from './ConversationHeaderCache';
 import { LEGACY_SESSIONS_PATH, SESSIONS_PATH } from './StoragePaths';
 
 export {
@@ -126,6 +127,8 @@ export interface UnreadableConversation {
 export interface ConversationListing {
   readonly metadata: SessionMetadata[];
   readonly unreadable: UnreadableConversation[];
+  /** Headers whose messages have deliberately not been loaded. */
+  readonly unloaded?: Map<string, ConversationMeta>;
 }
 
 function isSupportedSessionMetadata(value: unknown): value is SessionMetadata {
@@ -522,16 +525,42 @@ export class SessionStorage {
    * file is still there, and a conversation that simply disappears from the
    * list is indistinguishable from one the user deleted.
    */
-  async listConversations(): Promise<ConversationListing> {
+  async listConversations(loadMessagesFor?: ReadonlySet<string>): Promise<ConversationListing> {
     const metas: SessionMetadata[] = [];
     const unreadable: UnreadableConversation[] = [];
     const seen = new Set<string>();
+    const cache = loadMessagesFor ? new ConversationHeaderCache(this.adapter, this.durable) : undefined;
+    const unloaded = new Map<string, ConversationMeta>();
+    await cache?.load();
+
+    const add = async (metadata: SessionMetadata, path: string, before?: { mtime: number; size: number } | null): Promise<void> => {
+      if (!cache) {
+        metas.push(metadata);
+        return;
+      }
+      const summary = this.summarize(metadata);
+      const header = await cache.remember(metadata, summary, path, before);
+      if (loadMessagesFor?.has(metadata.id)) {
+        metas.push(metadata);
+      } else {
+        metas.push(header);
+        unloaded.set(metadata.id, summary);
+      }
+    };
 
     for (const conversationId of await this.conversations.listIds()) {
-      const record = await this.conversations.read(conversationId);
+      const path = this.getMetadataPath(conversationId);
+      const cached = loadMessagesFor?.has(conversationId) ? undefined : await cache?.get(conversationId, path);
       seen.add(`${conversationId}.meta.json`);
+      if (cached && isSupportedSessionMetadata(cached.metadata)) {
+        metas.push(cached.metadata);
+        unloaded.set(conversationId, cached.summary);
+        continue;
+      }
+      const before = cache ? await this.adapter.stat?.(path) : undefined;
+      const record = await this.conversations.read(conversationId);
       if (record.kind === 'present' && isSupportedSessionMetadata(record.metadata)) {
-        metas.push(record.metadata);
+        await add(record.metadata, path, before);
       } else if (record.kind === 'unreadable') {
         unreadable.push({ id: conversationId, reason: record.reason });
       }
@@ -550,14 +579,33 @@ export class SessionStorage {
         if (!isSupportedSessionMetadata(raw)) {
           continue;
         }
-        metas.push(raw);
+        const path = this.getMetadataPath(raw.id);
+        await add(raw, path);
         await this.saveMetadata(raw);
       } catch {
         // Skip files that fail to load.
       }
     }
 
-    return { metadata: metas, unreadable };
+    await cache?.save();
+    return { metadata: metas, unreadable, ...(cache ? { unloaded } : {}) };
+  }
+
+  private summarize(meta: SessionMetadata): ConversationMeta {
+    const messages = meta.messages ?? [];
+    const lastResponseAt = meta.lastResponseAt ?? [...messages].reverse().find(message => message.role === 'assistant')?.timestamp;
+    const sourceCount = countSessionSources({ ...meta, vaultSearchContexts: [
+      ...(meta.vaultSearchContexts ?? []), ...(collectVaultSearchContexts(messages) ?? []),
+    ] });
+    return {
+      id: meta.id, providerId: meta.providerId ?? DEFAULT_CHAT_PROVIDER_ID,
+      title: meta.title, createdAt: meta.createdAt, updatedAt: meta.updatedAt,
+      lastResponseAt, messageCount: messages.length, preview: getMessagePreview(messages) || 'New conversation',
+      hasUserMessage: messages.some(message => message.role === 'user'),
+      modelLabel: meta.usage?.model, sourceCount, usagePercentage: meta.usage?.percentage,
+      titleGenerationStatus: meta.titleGenerationStatus === 'pending' ? undefined : meta.titleGenerationStatus,
+      titleSource: meta.titleSource,
+    };
   }
 
   async listAllConversations(): Promise<ConversationMeta[]> {

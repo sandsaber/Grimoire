@@ -324,14 +324,17 @@ export class ApplicationRuntime {
   /** Set by `dispose`, so a stage that has not started does not start. */
   private disposed = false;
 
-  workspaceFor(providerId: ProviderId): Promise<ProviderWorkspaceSlots> {
+  async workspaceFor(providerId: ProviderId): Promise<ProviderWorkspaceSlots> {
     const composition = this.compositionFor(providerId);
     if (!composition) {
       // Not an error: the catalog validates provider ids, so an id with no
       // composition is an id this build does not compose — which reads the same
       // as a provider with nothing to offer.
-      return Promise.resolve({});
+      return {};
     }
+    if (this.disposed) throw new Error('Application runtime has been disposed.');
+    await this.options.plugin.ensureProviderWorkspace?.(providerId);
+    if (this.disposed) throw new Error('Application runtime has been disposed.');
     return composition.workspace();
   }
 
@@ -358,8 +361,12 @@ export class ApplicationRuntime {
    * without its identifier: the deletion gate counts files that mention it, and
    * a comment about it is not a consumer.)
    */
-  createRuntimeFor(providerId: ProviderId): ExecutionChatRuntimeAdapter | null {
-    return this.compositionFor(providerId)?.createRuntime() ?? null;
+  async createRuntimeFor(providerId: ProviderId): Promise<ExecutionChatRuntimeAdapter | null> {
+    const composition = this.compositionFor(providerId);
+    if (!composition) return null;
+    // Background workers need the same provider settings and MCP catalog as tabs.
+    await this.workspaceFor(providerId);
+    return composition.createRuntime();
   }
 
   private compositionFor(
@@ -561,16 +568,6 @@ export class ApplicationRuntime {
     if (!kernelStarted) {
       return;
     }
-    // After the gate is open, because it reaches provider services that expect
-    // a started plugin, and nothing renders a Codex tab before it resolves.
-    void this.codex.initializeWorkspace().catch(error => {
-      this.options.report({
-        error,
-        event: 'execution.workspace.failed',
-        level: 'warn',
-        scope: 'codex',
-      });
-    });
     const migration = this.kernel.migrationRequirement();
     if (migration) {
       // Persistence decision D5: a control record this build cannot read opens

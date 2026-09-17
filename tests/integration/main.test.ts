@@ -3,6 +3,7 @@ import { addIcon, setTooltip } from 'obsidian';
 import { providerCatalog } from '@/core/providers/ProviderCatalog';
 import { TOOL_SUBAGENT } from '@/core/tools/toolNames';
 import { VIEW_TYPE_GRIMOIRE } from '@/core/types';
+import { ConversationController } from '@/features/chat/controllers/ConversationController';
 import { setLocale } from '@/i18n/i18n';
 import * as sdkSession from '@/providers/claude/history/ClaudeHistoryStore';
 import { DEFAULT_SETTINGS } from '@/providers/claude/types/settings';
@@ -51,6 +52,49 @@ describe('GrimoirePlugin', () => {
       ]))
     ));
   }
+
+  /**
+   * A vault that remembers what was written to it.
+   *
+   * The shared mock adapter answers `exists: false` and `read: ''`, which is
+   * fine for tests that only watch calls but makes every stored conversation
+   * invisible — and a collision with a conversation the vault holds is
+   * exactly what this group is about.
+   */
+  function useRememberingVault(): Map<string, string> {
+    const files = new Map<string, string>();
+    // Folders exist when something is stored under them, which is what the
+    // recursive listing checks before it descends.
+    mockApp.vault.adapter.exists.mockImplementation(async (path: string) => (
+      files.has(path) || [...files.keys()].some(stored => stored.startsWith(`${path}/`))
+    ));
+    mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
+      const stored = files.get(path);
+      if (stored === undefined) {
+        throw new Error(`File not found: ${path}`);
+      }
+      return stored;
+    });
+    mockApp.vault.adapter.write.mockImplementation(async (path: string, content: string) => {
+      files.set(path, content);
+    });
+    mockApp.vault.adapter.remove.mockImplementation(async (path: string) => {
+      files.delete(path);
+    });
+    mockApp.vault.adapter.list.mockImplementation(async (folder: string) => ({
+      files: [...files.keys()].filter(path => path.startsWith(`${folder}/`)),
+      folders: [],
+    }));
+    mockApp.vault.adapter.rename.mockImplementation(async (from: string, to: string) => {
+      const stored = files.get(from);
+      if (stored !== undefined) {
+        files.set(to, stored);
+        files.delete(from);
+      }
+    });
+    return files;
+  }
+
 
   beforeEach(() => {
     // Reset mocks
@@ -255,49 +299,116 @@ describe('GrimoirePlugin', () => {
 
   });
 
-  describe('creating a conversation', () => {
-    /**
-     * A vault that remembers what was written to it.
-     *
-     * The shared mock adapter answers `exists: false` and `read: ''`, which is
-     * fine for tests that only watch calls but makes every stored conversation
-     * invisible — and a collision with a conversation the vault holds is
-     * exactly what this group is about.
-     */
-    function useRememberingVault(): Map<string, string> {
-      const files = new Map<string, string>();
-      // Folders exist when something is stored under them, which is what the
-      // recursive listing checks before it descends.
-      mockApp.vault.adapter.exists.mockImplementation(async (path: string) => (
-        files.has(path) || [...files.keys()].some(stored => stored.startsWith(`${path}/`))
+  describe('lazy startup regressions', () => {
+    it.each([
+      { role: 'user', canSuggest: true },
+      { role: 'assistant', canSuggest: false },
+      { role: null, canSuggest: false },
+    ])('checks title availability for a cold chat with role $role without reading its transcript', async ({ role, canSuggest }) => {
+      const files = useRememberingVault();
+      mockApp.vault.adapter.stat.mockImplementation(async (path: string) => (
+        files.has(path) ? { mtime: 1, size: files.get(path)!.length } : null
       ));
-      mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
-        const stored = files.get(path);
-        if (stored === undefined) {
-          throw new Error(`File not found: ${path}`);
-        }
-        return stored;
-      });
-      mockApp.vault.adapter.write.mockImplementation(async (path: string, content: string) => {
-        files.set(path, content);
-      });
-      mockApp.vault.adapter.remove.mockImplementation(async (path: string) => {
-        files.delete(path);
-      });
-      mockApp.vault.adapter.list.mockImplementation(async (folder: string) => ({
-        files: [...files.keys()].filter(path => path.startsWith(`${folder}/`)),
-        folders: [],
+      files.set('.grimoire/sessions/cold-title.meta.json', JSON.stringify({
+        id: 'cold-title', providerId: 'codex', title: 'Saved chat', createdAt: 1, updatedAt: 3,
+        messages: role ? [{ id: 'message', role, content: 'A saved message', timestamp: 1 }] : [],
       }));
-      mockApp.vault.adapter.rename.mockImplementation(async (from: string, to: string) => {
-        const stored = files.get(from);
-        if (stored !== undefined) {
-          files.set(to, stored);
-          files.delete(from);
-        }
+      await plugin.loadSettings();
+      plugin.settings.enableAutoTitleGeneration = true;
+      const controller = new ConversationController({
+        plugin,
+        state: { currentConversationId: null, messages: [] },
+        getTitleGenerationService: () => ({ generateTitle: jest.fn(), cancel: jest.fn() }),
+      } as any);
+      const beforeOpen = controller.canSuggestTitle('cold-title');
+      mockApp.vault.adapter.read.mockClear();
+      await plugin.loadSettings();
+      plugin.settings.enableAutoTitleGeneration = true;
+      const afterReload = controller.canSuggestTitle('cold-title');
+      expect(mockApp.vault.adapter.read.mock.calls.map(([path]: [string]) => path))
+        .not.toContain('.grimoire/sessions/cold-title.meta.json');
+      expect(plugin.getConversationSync('cold-title')).toBeNull();
+      await plugin.getConversationById('cold-title');
+      const afterOpen = controller.canSuggestTitle('cold-title');
+      expect({ beforeOpen, afterReload, afterOpen }).toEqual({
+        beforeOpen: canSuggest, afterReload: canSuggest, afterOpen: canSuggest,
       });
-      return files;
-    }
+    });
 
+    it('initializes the provider before a background worker is submitted', async () => {
+      const files = useRememberingVault();
+      files.set('.grimoire/mcp/opencode.json', JSON.stringify({
+        mcpServers: { 'review-mcp': { command: 'review-do-not-run', args: [] } },
+      }));
+      await plugin.onload();
+      const runtime = plugin.getApplicationRuntimeOrNull()!;
+      expect(runtime.workspaceServicesFor('opencode')).toBeNull();
+      const conversation = await plugin.createConversation({ providerId: 'opencode' });
+      let serversAtSubmit: string[] = [];
+      const submit = jest.spyOn(runtime.chat, 'submitTurn').mockImplementation(async () => {
+        serversAtSubmit = runtime.workspaceServicesFor('opencode')?.mcpServerManager?.getServers().map(s => s.name) ?? [];
+        return { ticket: { started: Promise.resolve({ executionSessionId: 'review-session', runId: 'review-run' }) } } as any;
+      });
+      try {
+        runtime.agentDispatcher.rememberGoal('review-agent-run', 'Review-only test goal');
+        const outcome = await runtime.agentDispatcher.dispatch({
+          agentInstanceId: 'review-agent', agentRunId: 'review-agent-run', dispatchToken: 'review-token',
+          providerId: 'opencode', executionMode: 'worker-tab',
+          rootOwner: { kind: 'conversation', ownerId: conversation.id },
+          conversationId: conversation.id, goalRef: 'review-goal', policy: {}, idempotency: 'none',
+        } as any);
+        expect(outcome.kind).toBe('accepted');
+        expect(submit).toHaveBeenCalledTimes(1);
+        await runtime.workspaceFor('opencode');
+        const afterWorkspaceRequest = runtime.workspaceServicesFor('opencode')?.mcpServerManager?.getServers().map(s => s.name);
+        expect({ serversAtSubmit, afterWorkspaceRequest }).toEqual({
+          serversAtSubmit: ['review-mcp'], afterWorkspaceRequest: ['review-mcp'],
+        });
+      } finally {
+        submit.mockRestore();
+        plugin.onunload();
+      }
+    });
+
+    it.each([undefined, 42])('preserves the last-response timestamp %s when opening and renaming a cold conversation', async lastResponseAt => {
+      const files = useRememberingVault();
+      files.set('.grimoire/sessions/cold-time.meta.json', JSON.stringify({
+        id: 'cold-time', providerId: 'codex', title: 'Saved chat', createdAt: 1, updatedAt: 99,
+        lastResponseAt,
+        messages: [
+          { id: 'user', role: 'user', content: 'Question', timestamp: 1 },
+          { id: 'assistant', role: 'assistant', content: 'Answer', timestamp: 2 },
+        ],
+      }));
+      await plugin.loadSettings();
+      const beforeOpen = plugin.getConversationList().find(c => c.id === 'cold-time')?.lastResponseAt;
+      await plugin.getConversationById('cold-time');
+      const afterOpen = plugin.getConversationList().find(c => c.id === 'cold-time')?.lastResponseAt;
+      await plugin.renameConversation('cold-time', 'Renamed');
+      const afterRename = plugin.getConversationList().find(c => c.id === 'cold-time')?.lastResponseAt;
+      const expected = lastResponseAt ?? 2;
+      expect({ beforeOpen, afterOpen, afterRename }).toEqual({
+        beforeOpen: expected, afterOpen: expected, afterRename: expected,
+      });
+    });
+
+    it('infers the response date from the current record when a cold transcript changes externally', async () => {
+      const files = useRememberingVault();
+      const metadata = {
+        id: 'cold-time', providerId: 'codex', title: 'Saved chat', createdAt: 1, updatedAt: 99,
+        messages: [{ id: 'assistant', role: 'assistant', content: 'Answer', timestamp: 2 }],
+      };
+      files.set('.grimoire/sessions/cold-time.meta.json', JSON.stringify(metadata));
+      await plugin.loadSettings();
+      expect(plugin.getConversationList()[0].lastResponseAt).toBe(2);
+      metadata.messages.push({ id: 'new-answer', role: 'assistant', content: 'New answer', timestamp: 7 });
+      files.set('.grimoire/sessions/cold-time.meta.json', JSON.stringify(metadata));
+      await plugin.getConversationById('cold-time');
+      expect(plugin.getConversationList()[0].lastResponseAt).toBe(7);
+    });
+  });
+
+  describe('creating a conversation', () => {
     it('comes back from the vault after a reload, with what was written to it', async () => {
       // The assertion nothing had: a conversation read back through the file
       // listing. Since M4 the file holds a versioned envelope, and a reader
@@ -370,6 +481,22 @@ describe('GrimoirePlugin', () => {
   });
 
   describe('provider workspaces', () => {
+    it('keeps unused provider services cold and initializes the requested provider once', async () => {
+      const initialize = jest.spyOn(builtInWorkspaceInitializers, 'codex');
+      try {
+        await plugin.onload();
+        const runtime = plugin.getApplicationRuntimeOrNull()!;
+        expect(providerCatalog().ids().every(id => runtime.workspaceServicesFor(id) === null)).toBe(true);
+        await Promise.all([runtime.workspaceFor('codex'), runtime.workspaceFor('codex')]);
+        expect(initialize).toHaveBeenCalledTimes(1);
+        expect(runtime.workspaceServicesFor('codex')).not.toBeNull();
+        expect(runtime.workspaceServicesFor('claude')).toBeNull();
+      } finally {
+        initialize.mockRestore();
+        plugin.onunload();
+      }
+    });
+
     it('loads every other provider when one workspace initializer throws', async () => {
       // Startup used to await each provider's initializer in one loop with no
       // `try`, so a single throw cost every provider after it in the iteration
@@ -388,6 +515,9 @@ describe('GrimoirePlugin', () => {
       try {
 
         await plugin.onload();
+        await Promise.allSettled(providerCatalog().ids().map(id => (
+          plugin.getApplicationRuntimeOrNull()!.workspaceFor(id)
+        )));
       } finally {
         restore();
       }
@@ -405,6 +535,7 @@ describe('GrimoirePlugin', () => {
       // filled it, so the next load read the previous load's services until its
       // own initializer overwrote them.
       await plugin.onload();
+      await plugin.getApplicationRuntimeOrNull()!.workspaceFor('codex');
       expect(plugin.getApplicationRuntimeOrNull()?.workspaceServicesFor('codex') ?? null).not.toBeNull();
 
       plugin.onunload();
@@ -1354,6 +1485,44 @@ describe('GrimoirePlugin', () => {
   });
 
   describe('loadSettings with conversations', () => {
+    it('restores only open transcripts and safely opens, renames and deletes cold chats', async () => {
+      const files = useRememberingVault();
+      mockApp.vault.adapter.stat.mockImplementation(async (path: string) => (
+        files.has(path) ? { mtime: 1, size: files.get(path)!.length } : null
+      ));
+      for (const id of ['open-chat', 'cold-chat', 'deleted-chat']) {
+        files.set(`.grimoire/sessions/${id}.meta.json`, JSON.stringify({
+          id, providerId: 'codex', title: id, createdAt: 1, updatedAt: 2,
+          messages: [{ id: 'user', role: 'user', content: `Saved ${id}`, timestamp: 1 }],
+        }));
+      }
+      (plugin.loadData as jest.Mock).mockResolvedValue({
+        tabManagerState: {
+          openTabs: [{ tabId: 'tab-one', conversationId: 'open-chat' }], activeTabId: 'tab-one',
+        },
+      });
+      await plugin.loadSettings();
+      mockApp.vault.adapter.read.mockClear();
+      await plugin.loadSettings();
+      const readPaths = mockApp.vault.adapter.read.mock.calls.map(([path]: [string]) => path);
+      expect(readPaths).not.toContain('.grimoire/sessions/cold-chat.meta.json');
+      expect(plugin.getConversationSync('open-chat')?.messages).toHaveLength(1);
+      expect(plugin.getConversationSync('cold-chat')).toBeNull();
+      expect(plugin.findEmptyConversation()).toBeNull();
+      expect(plugin.getConversationList().find(meta => meta.id === 'cold-chat')).toMatchObject({
+        messageCount: 1, preview: 'Saved cold-chat',
+      });
+      await plugin.renameConversation('cold-chat', 'Renamed');
+      const renamed = await plugin.getConversationById('cold-chat');
+      expect(renamed?.messages[0].content).toBe('Saved cold-chat');
+      expect(renamed?.title).toBe('Renamed');
+      const stored = await plugin.storage.sessions.records.read('cold-chat');
+      expect(stored.kind === 'present' && stored.metadata.messages?.[0].content).toBe('Saved cold-chat');
+      await plugin.deleteConversation('deleted-chat');
+      expect(plugin.getConversationList().map(meta => meta.id)).not.toContain('deleted-chat');
+      expect(files.has('.grimoire/sessions/deleted-chat.meta.json')).toBe(false);
+    });
+
     it('should load saved conversations from metadata files', async () => {
       const timestamp = Date.now();
       const sessionMeta = JSON.stringify({
@@ -1460,30 +1629,12 @@ describe('GrimoirePlugin', () => {
         sessionId: 'saved-session',
       });
 
-      mockApp.vault.adapter.exists.mockImplementation(async (path: string) => {
-        return path === '.grimoire/grimoire-settings.json' ||
-          path === '.grimoire/sessions' ||
-          path === '.grimoire/sessions/conv-saved-1.meta.json';
-      });
-      mockApp.vault.adapter.list.mockImplementation(async (path: string) => {
-        if (path === '.grimoire/sessions') {
-          return { files: ['.grimoire/sessions/conv-saved-1.meta.json'], folders: [] };
-        }
-        return { files: [], folders: [] };
-      });
-      mockApp.vault.adapter.read.mockImplementation(async (path: string) => {
-        if (path === '.grimoire/grimoire-settings.json') {
-          // All these fields are now in grimoire-settings.json
-          return JSON.stringify({
-            lastEnvHash: 'old-hash',
-            environmentVariables: 'ANTHROPIC_BASE_URL=https://api.example.com',
-          });
-        }
-        if (path === '.grimoire/sessions/conv-saved-1.meta.json') {
-          return sessionMeta;
-        }
-        return '';
-      });
+      const files = useRememberingVault();
+      files.set('.grimoire/sessions/conv-saved-1.meta.json', sessionMeta);
+      files.set('.grimoire/grimoire-settings.json', JSON.stringify({
+        lastEnvHash: 'old-hash',
+        environmentVariables: 'ANTHROPIC_BASE_URL=https://api.example.com',
+      }));
 
       // data.json is minimal (already migrated)
       (plugin.loadData as jest.Mock).mockResolvedValue({});

@@ -1447,12 +1447,15 @@ export class ConversationController {
   }
 
   /**
-   * Synchronous gate for auto-rename controls. Reads the in-memory conversation, because
-   * context menus are built synchronously and cannot await.
+   * Context menus cannot await transcript loading; cold chats use their cached summary.
    */
   canSuggestTitle(conversationId: string | null): boolean {
     if (!conversationId) return false;
-    return this.resolveTitleSource(this.deps.plugin.getConversationSync(conversationId), conversationId).ok;
+    const conversation = this.deps.plugin.getConversationSync(conversationId);
+    if (conversation) return this.resolveTitleSource(conversation, conversationId).ok;
+    return this.isAutoTitleEnabled()
+      && this.deps.plugin.hasConversationUserMessage(conversationId)
+      && !!this.deps.getTitleGenerationService();
   }
 
   /**

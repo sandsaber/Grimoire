@@ -292,7 +292,7 @@ describe('diagnostic redaction (D7)', () => {
     // Printed by being asserted. A new event shows up as a diff here, which is
     // the moment to ask what it carries — not after it has been carrying it.
     expect([...new Set(sites.map(site => site.event))].sort()).toEqual([
-      // The composition root's eight, which this gate did not read until it
+      // The composition root's events, which this gate did not read until it
       // learned the `report` port the root logs through: startup and shutdown
       // failures, both stores' migration requirements, and what agent recovery
       // could not finish.
@@ -309,7 +309,6 @@ describe('diagnostic redaction (D7)', () => {
       'execution.setMode.refused',
       'execution.shutdown.failed',
       'execution.start.failed',
-      'execution.workspace.failed',
     ]);
   });
 
