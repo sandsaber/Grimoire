@@ -160,6 +160,7 @@ describe('Reasonix execution composition', () => {
     refusesSession?: string;
     rejectsPrompt?: string;
     sessionLoadFails?: boolean;
+    emptySessionReplay?: boolean;
     sessionLoadRefusal?: string;
     switchesMode?: string;
     windowOnFirstTurnOnly?: boolean;
@@ -236,6 +237,11 @@ describe('Reasonix execution composition', () => {
                 'Internal error: Reasonix service failure',
                 { service: 'session' },
               );
+            }
+            if (!options.emptySessionReplay) {
+              notify({ sessionId: request.sessionId, update: {
+                sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Earlier message' },
+              } });
             }
             return recordedSession(request.sessionId);
           },
@@ -812,6 +818,19 @@ describe('Reasonix execution composition', () => {
       resolvedPath: '/vault/note.md',
     })).resolves.toBe(true);
     expect(approval).toHaveBeenCalledTimes(1);
+    execution.dispose();
+    await host.dispose();
+  });
+
+  it('restores saved history once when a successful native load replays no conversation', async () => {
+    const { execution, host, prompts } = await createHarness({ emptySessionReplay: true });
+    const runtime = execution.createRuntime();
+    runtime.syncConversationState({ sessionId: 'acp-session-saved' });
+    const history = [{ id: 'previous', role: 'user' as const, content: 'The code word is birch7319.', timestamp: 1 }];
+    await drain(runtime.query(runtime.prepareTurn({ text: 'What was the code word?' }), history));
+    expect(JSON.stringify(prompts[0])).toContain('birch7319');
+    await drain(runtime.query(runtime.prepareTurn({ text: 'Continue.' }), history));
+    expect(JSON.stringify(prompts[1])).not.toContain('birch7319');
     execution.dispose();
     await host.dispose();
   });

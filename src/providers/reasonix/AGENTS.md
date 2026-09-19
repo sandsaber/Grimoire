@@ -41,5 +41,6 @@ Nothing is forced into the environment. Devin's launcher sets `RUST_LOG=warn` be
 
 ## Session resume
 
+- `ReasonixSessionRecovery` checks replay during `session/load`. On v1.38.10, changing thinking/model can leave the saved ACP id pointing at an empty controller after restart. If a successful load replays no user or assistant messages, the first prompt uses Grimoire's saved conversation through the existing history builder. Native replay and warm turns do not receive duplicate history. Recovery is request-scoped, remains available after a rejected prompt, and does not mask load errors. It restores visible messages and tool summaries, not private thinking or complete successful tool outputs.
 - `session/load` replays the transcript as `user_message_chunk` and the rest before answering with the same models, modes and config options `session/new` gives. Grimoire keeps its own projection and does not read the replay back.
 - A missing session answers `-32602 "session/load: unknown session <id>"`, and `session/list` is answered too, so both halves of `isAcpSessionGone` are available. A dropped session is recorded in `providerState.sessionDropped` and read back on load.

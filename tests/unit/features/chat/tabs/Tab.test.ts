@@ -4122,7 +4122,7 @@ function stubOwnsModel(providerId: string, model: string): boolean {
 
 describe('Tab - Cross-Provider Model Rejection', () => {
   it('offers all enabled provider model groups on a bound tab', () => {
-    jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['codex', 'claude']);
+    const enabledIds = jest.spyOn(ProviderCatalog.prototype, 'enabledIds').mockReturnValue(['codex', 'claude']);
     jest.spyOn(ProviderCatalog.prototype, 'displayName').mockImplementation((providerId) => (
       providerId === 'codex' ? 'Codex' : 'Claude'
     ));
@@ -4164,6 +4164,17 @@ describe('Tab - Cross-Provider Model Rejection', () => {
       { value: DEFAULT_CODEX_PRIMARY_MODEL, label: DEFAULT_CODEX_PRIMARY_MODEL_LABEL, group: 'Codex', providerId: 'codex' },
       { value: 'opus', label: 'Opus 4.8', group: 'Claude', providerId: 'claude' },
     ]);
+
+    enabledIds.mockReturnValue(['claude']);
+    expect(toolbarCallbacks.getChatUI().models.options(plugin.settings)).toEqual([
+      { value: 'opus', label: 'Opus 4.8', group: 'Claude', providerId: 'claude' },
+    ]);
+    expect(toolbarCallbacks.resolveModelOption(DEFAULT_CODEX_PRIMARY_MODEL)).toEqual({
+      value: DEFAULT_CODEX_PRIMARY_MODEL,
+      label: DEFAULT_CODEX_PRIMARY_MODEL_LABEL,
+      providerId: 'codex',
+    });
+    enabledIds.mockReturnValue(['codex', 'claude']);
   });
 
   it('rejects cross-provider model change on bound tab via toolbar onModelChange', async () => {

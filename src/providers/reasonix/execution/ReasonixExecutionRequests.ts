@@ -14,6 +14,8 @@ export const REASONIX_ACP_ARGUMENTS: readonly string[] = Object.freeze(['acp']);
 /** What one Reasonix turn decides, before it becomes an opaque reference. */
 export interface ReasonixExecutionRequest {
   readonly prompt: readonly AcpContentBlock[];
+  /** Built only if native resume returned no conversation to continue. */
+  readonly recoveryPrompt?: () => readonly AcpContentBlock[];
   /** The mode and model this turn runs under, applied to the session. */
   readonly dynamic?: ReasonixAcpDynamicConfig;
   readonly messageId?: string;
@@ -50,6 +52,7 @@ export class ReasonixExecutionRequests {
   private readonly pending = new Map<string, ReasonixExecutionRequest>();
   private readonly startups = new Map<string, ManagedAcpLaunchInvocation>();
   private readonly dynamics = new Map<string, ReasonixAcpDynamicConfig>();
+  private readonly recoveryPrompts = new Map<string, () => readonly AcpContentBlock[]>();
 
   constructor(
     private readonly nextReference: () => string,
@@ -68,6 +71,11 @@ export class ReasonixExecutionRequests {
   async resolve(requestRef: string): Promise<ReasonixExecutionInvocation> {
     const request = this.take(requestRef);
     const environment = await this.environment();
+    const messageId = request.messageId ?? requestRef;
+    if (request.recoveryPrompt) {
+      evict(this.recoveryPrompts, this.limit);
+      this.recoveryPrompts.set(messageId, request.recoveryPrompt);
+    }
     evict(this.startups, this.limit);
     const startupRef = this.nextReference();
     this.startups.set(startupRef, {
@@ -88,7 +96,7 @@ export class ReasonixExecutionRequests {
       cwd: environment.cwd,
       prompt: [...request.prompt],
       mcpServers: toAcpMcpServers([...environment.mcpServers]),
-      ...(request.messageId ? { messageId: request.messageId } : {}),
+      ...(request.messageId || request.recoveryPrompt ? { messageId } : {}),
       ...(dynamicRef ? { dynamicRef } : {}),
     };
   }
@@ -122,11 +130,20 @@ export class ReasonixExecutionRequests {
     return dynamic;
   }
 
+  recoveryPrompt(messageId: string): readonly AcpContentBlock[] | undefined {
+    return this.recoveryPrompts.get(messageId)?.();
+  }
+
+  releaseRecoveryPrompt(messageId: string): void {
+    this.recoveryPrompts.delete(messageId);
+  }
+
   /** Drops everything held for turns that will never dispatch. */
   dispose(): void {
     this.pending.clear();
     this.startups.clear();
     this.dynamics.clear();
+    this.recoveryPrompts.clear();
   }
 
   private take(requestRef: string): ReasonixExecutionRequest {

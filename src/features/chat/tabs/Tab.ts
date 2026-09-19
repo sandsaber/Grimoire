@@ -601,6 +601,14 @@ function initializeInputToolbar(
     getEnvironmentVariables: () => plugin.getActiveEnvironmentVariables(),
     refreshModelOptions: () => refreshTabModelOptions(tab, plugin),
     getProviderId: () => getTabProviderId(tab, plugin),
+    resolveModelOption: (model) => {
+      const chatUI = getTabChatUIConfig(tab, plugin);
+      const option = chatUI.models.options({
+        ...getTabSettingsSnapshot(tab, plugin),
+        environmentVariables: plugin.getActiveEnvironmentVariables(),
+      }).find(candidate => candidate.value === model);
+      return option ? { ...option, providerId: getTabProviderId(tab, plugin) } : undefined;
+    },
     getProviderUsage: (providerId: ProviderId) => getProviderUsageSnapshot(plugin, providerId),
     refreshProviderUsage: (providerId: ProviderId) => refreshProviderUsageSnapshot(plugin, providerId),
     onProviderUsageRefresh: (providerId: ProviderId) => {

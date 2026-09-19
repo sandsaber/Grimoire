@@ -290,6 +290,26 @@ describe('ModelSelector', () => {
     expect(label?.textContent).toBe('Sonnet 4.6');
   });
 
+  it('keeps the saved model label when its provider is absent from the selectable catalog', () => {
+    const model = 'reasonix:custom-api-z-ai/glm-5.3-flash';
+    const settings = { ...callbacks.getSettings(), model };
+    callbacks.getSettings.mockReturnValue(settings);
+    const resolveModelOption = jest.fn().mockReturnValue({
+      value: model,
+      label: 'custom-api-z-ai/glm-5.3-flash',
+      providerId: 'reasonix',
+    });
+    const restoredParent = createMockEl();
+    new ModelSelector(restoredParent, { ...callbacks, resolveModelOption });
+
+    expect(restoredParent.querySelector('.grimoire-model-label')?.textContent).toBe('glm-5.3-flash');
+    expect(restoredParent.querySelector('.grimoire-model-btn')?.getAttribute('aria-label'))
+      .toBe('Select model: custom-api-z-ai/glm-5.3-flash');
+    expect(resolveModelOption).toHaveBeenCalledWith(model);
+    expect(restoredParent.querySelectorAll('.grimoire-model-option')
+      .some((option: any) => getModelOptionLabel(option) === 'glm-5.3-flash')).toBe(false);
+  });
+
   it('should mark the selected model icon with its provider for brand coloring', () => {
     const uiConfig = {
       ...createMockUIConfig(),

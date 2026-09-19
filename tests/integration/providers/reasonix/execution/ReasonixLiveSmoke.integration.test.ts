@@ -32,7 +32,7 @@ live('Reasonix live smoke', () => {
   const running: Array<() => Promise<void>> = [];
 
   afterEach(async () => {
-    for (const release of running.splice(0)) {
+    for (const release of running.splice(0).reverse()) {
       await release().catch(() => undefined);
     }
   });
@@ -252,44 +252,46 @@ live('Reasonix live smoke', () => {
     await shutdown();
   });
 
-  it('row 8: resumes the conversation a fresh load was told about', async () => {
-    const first = await createHarness();
+  it.each(['auto', 'enabled'])('row 8: restores history after a process restart (effort %s)', async effortLevel => {
+    const vault = mkdtempSync(join(tmpdir(), 'grimoire-reasonix-resume-'));
+    running.push(async () => { rmSync(vault, { force: true, recursive: true }); });
+    const settings = { permissionMode: 'normal' };
+    const first = await createHarness(settings, vault);
+    updateReasonixProviderSettings(first.plugin.settings, {
+      effortLevel,
+      availableEfforts: [{ id: 'enabled', name: 'Enabled' }],
+    });
     const word = mintedWord();
-    const conversation: any = { id: 'conv-live', messages: [], providerState: {}, sessionId: null };
+    const text = `For this conversation only, the code word is ${word}. `
+      + 'Do not use tools or save it to persistent memory. Reply with exactly: OK';
+    const conversation: any = { id: 'conv-live', providerState: {}, sessionId: null };
     first.runtime.syncConversationState(conversation);
-    await drain(first.runtime.query(first.runtime.prepareTurn({
-      text: `Remember the word ${word}. Reply with exactly: OK`,
-    })));
-    const updates = first.runtime.sessionBinding({
-      conversation,
-      sessionInvalidated: false,
-    }) ?? {};
+    const initial = await drain(first.runtime.query(first.runtime.prepareTurn({ text })));
+    expect(errorsOf(initial)).toEqual([]);
+    expect(answerOf(initial)).toContain('OK');
+    expect(initial.some(chunk => chunk.type === 'tool_use')).toBe(false);
+    const updates = first.runtime.sessionBinding({ conversation, sessionInvalidated: false }) ?? {};
+    const history = [
+      { id: 'user-1', role: 'user' as const, content: text, timestamp: 1 },
+      { id: 'assistant-1', role: 'assistant' as const, content: answerOf(initial), timestamp: 2 },
+    ];
     await first.shutdown();
 
-    // A different composition, a different process. The binding is an id and a
-    // marker that is usually empty — until 2026-08-30 it was the id alone, which
-    // is why this provider had nowhere to remember that a session had been
-    // replaced.
-    const second = await createHarness({}, first.vault);
-    second.runtime.syncConversationState({
-      ...conversation,
-      sessionId: updates.sessionId,
+    const second = await createHarness(settings, vault);
+    updateReasonixProviderSettings(second.plugin.settings, {
+      effortLevel,
+      availableEfforts: [{ id: 'enabled', name: 'Enabled' }],
     });
+    second.runtime.syncConversationState({ ...conversation, sessionId: updates.sessionId });
     const chunks = await drain(second.runtime.query(second.runtime.prepareTurn({
-      text: 'What word did I ask you to remember? Reply with the word only.',
-    })));
-
-    report('ROW 8', JSON.stringify(updates),
-      'resumed-as:', String(second.runtime.getSessionId()),
-      JSON.stringify(summarize(chunks)));
+      text: 'What is the code word from my previous message? Do not use tools. Reply with the word only.',
+    }), history));
+    report('ROW 8', effortLevel, JSON.stringify(updates),
+      'resumed-as:', String(second.runtime.getSessionId()), JSON.stringify(summarize(chunks)));
     expect(updates.sessionId).toBeTruthy();
-    // **One field, and empty is the point.** This provider used to write no
-    // state at all — its binding was an id and nothing else, which this row
-    // asserted. It carries a session-drop marker now, and a conversation whose
-    // session resumed is written back as `{}` rather than left alone: the
-    // surface replaces `providerState` whole, so an omitted opinion would leave
-    // a stale marker standing with no way to take it down.
-    expect(updates.providerState).toEqual({});
+    expect(second.runtime.getSessionId()).toBe(updates.sessionId);
+    expect(errorsOf(chunks)).toEqual([]);
+    expect(chunks.some(chunk => chunk.type === 'tool_use')).toBe(false);
     expect(answerOf(chunks).toLowerCase()).toContain(word);
     await second.shutdown();
   });

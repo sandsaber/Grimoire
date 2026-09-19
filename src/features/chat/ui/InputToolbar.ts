@@ -376,6 +376,7 @@ export interface ToolbarCallbacks {
   refreshProviderUsage?: (providerId: ProviderId) => Promise<ProviderUsageSnapshot | null>;
   onProviderUsageRefresh?: (providerId: ProviderId) => void;
   resolveProviderForModel?: (model: string) => ProviderId;
+  resolveModelOption?: (model: string) => ProviderModelOption | undefined;
   getOrchestratorMode?: () => boolean;
   getProjectWorkspaces?: () => ProjectWorkspace[];
   getActiveProjectWorkspaceId?: () => string;
@@ -512,7 +513,8 @@ export class ModelSelector {
     if (!this.buttonEl) return;
     const currentModel = this.getCurrentModel();
     const models = this.getAvailableModels();
-    const modelInfo = models.find(m => m.value === currentModel);
+    const modelInfo = models.find(m => m.value === currentModel)
+      ?? this.callbacks.resolveModelOption?.(currentModel);
 
     this.buttonEl.empty();
 

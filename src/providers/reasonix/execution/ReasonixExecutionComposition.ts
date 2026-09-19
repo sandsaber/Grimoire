@@ -65,6 +65,7 @@ import {
 } from '@/providers/reasonix/execution/ReasonixMetadataSession';
 import { ReasonixProjectionResultSink } from '@/providers/reasonix/execution/ReasonixProjectionResultSink';
 import { ReasonixSessionConfigState } from '@/providers/reasonix/execution/ReasonixSessionConfigState';
+import { withReasonixSessionRecovery } from '@/providers/reasonix/execution/ReasonixSessionRecovery';
 import { resolveReasonixModelCatalogFingerprint } from '@/providers/reasonix/modelCatalogFingerprint';
 import { reasonixProviderModule } from '@/providers/reasonix/ReasonixProviderModule';
 import {
@@ -158,7 +159,7 @@ export class ReasonixExecution {
   ): ReasonixExecutionBackend {
     this.clientFactory = clientFactory;
     const context: ReasonixExecutionBackendContext = {
-      clientFactory,
+      clientFactory: withReasonixSessionRecovery(clientFactory, this.requests),
       requestResolver: this.requests,
       dynamicApplier: new ReasonixAcpDynamicConfigApplier(
         { resolve: dynamicRef => this.requests.resolveDynamic(dynamicRef) },
@@ -324,6 +325,11 @@ export class ReasonixExecution {
           prompt: buildReasonixPromptBlocks(turn.request, [...bootstrap], {
             ...(options?.orchestratorMode ? { orchestratorMode: true } : {}),
           }),
+          ...(ports.currentSessionId() && history?.length ? {
+            recoveryPrompt: () => buildReasonixPromptBlocks(turn.request, history, {
+              ...(options?.orchestratorMode ? { orchestratorMode: true } : {}),
+            }),
+          } : {}),
           ...(dynamic ? { dynamic } : {}),
         });
       },
