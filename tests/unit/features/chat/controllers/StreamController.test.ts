@@ -612,7 +612,10 @@ describe('StreamController - Text Content', () => {
 
       await controller.handleStreamChunk({ type: 'usage', usage, sessionId: 'session-1' }, msg);
 
-      expect(deps.state.usage).toEqual({ ...usage, model: DEFAULT_CODEX_PRIMARY_MODEL });
+      expect(deps.state.usage).toEqual({
+        ...usage, model: DEFAULT_CODEX_PRIMARY_MODEL,
+        contextWindow: 200_000, contextWindowIsAuthoritative: false, percentage: 0,
+      });
 
       providerSettingsSpy.mockRestore();
     });

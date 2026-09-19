@@ -3,6 +3,7 @@ import '@/providers';
 import { createMockEl } from '@test/helpers/mockElement';
 import { Menu, Notice, Scope, setIcon } from 'obsidian';
 
+import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import { GrimoireView } from '@/features/chat/GrimoireView';
 
 const MockScope = Scope as typeof Scope & { instances: Scope[] };
@@ -37,6 +38,33 @@ function createViewHarness(options: {
 }
 
 describe('GrimoireView tab controls', () => {
+  it('refreshes and persists context limits for every open tab without replacing authoritative windows', async () => {
+    const view = Object.create(GrimoireView.prototype);
+    const usage = {
+      model: 'custom-model', inputTokens: 69422, contextTokens: 69422,
+      contextWindow: 200000, contextWindowIsAuthoritative: false, percentage: 35,
+    };
+    const tabs = [false, true].map((authoritative, index) => ({
+      providerId: 'opencode', lifecycleState: 'bound_cold', conversationId: `chat-${index}`,
+      state: { currentConversationId: `chat-${index}`, usage: { ...usage, contextWindowIsAuthoritative: authoritative } },
+    }));
+    const settings = { model: usage.model, customContextLimits: { [usage.model]: 1_000_000 } };
+    const spy = jest.spyOn(ProviderSettingsCoordinator, 'getProviderSettingsSnapshot').mockReturnValue(settings);
+    view.plugin = {
+      settings, updateConversation: jest.fn().mockResolvedValue(undefined),
+      getConversationSync: () => ({ providerId: 'opencode', model: usage.model }),
+    };
+    view.tabManager = { getAllTabs: () => tabs };
+    await view.refreshContextUsage();
+    expect(tabs[0].state.usage).toMatchObject({ contextWindow: 1_000_000, percentage: 7 });
+    expect(tabs[1].state.usage).toMatchObject({ contextWindow: 200000, percentage: 35 });
+    expect(view.plugin.updateConversation).toHaveBeenCalledTimes(1);
+    expect(view.plugin.updateConversation).toHaveBeenCalledWith('chat-0', { usage: tabs[0].state.usage });
+    await view.refreshContextUsage();
+    expect(view.plugin.updateConversation).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
   it('uses the Grimoire display text', () => {
     const view = Object.create(GrimoireView.prototype) as GrimoireView;
 

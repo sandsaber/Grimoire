@@ -61,7 +61,7 @@ import { RelevantNotesView } from '../ui/RelevantNotesView';
 import { StatusPanel } from '../ui/StatusPanel';
 import { autoResizeTextarea } from '../ui/textareaResize';
 import { buildAssistantResponseMetadata } from '../utils/assistantResponseMetadata';
-import { recalculateUsageForModel } from '../utils/usageInfo';
+import { resolveContextUsage } from '../utils/usageInfo';
 import { getTabProviderId } from './providerResolution';
 import { applyPanelLabels, attachInputResizeHandle, buildTabDOM } from './tabDOM';
 import {
@@ -765,12 +765,7 @@ function initializeInputToolbar(
       // Recalculate context usage percentage for the new model's context window
       const currentUsage = tab.state.usage;
       if (currentUsage) {
-        const newContextWindow = chatUI.models.contextWindow(
-          model,
-          providerSettings,
-          providerSettings.customContextLimits,
-        );
-        tab.state.usage = recalculateUsageForModel(currentUsage, model, newContextWindow);
+        tab.state.usage = resolveContextUsage(currentUsage, chatUI, model, providerSettings);
       }
       syncContextSummary(tab, plugin);
     },

@@ -17,7 +17,6 @@ import type {
   AcpUsageUpdate,
 } from '@/providers/acp/types';
 import { REASONIX_TURN_USAGE_META_KEY } from '@/providers/reasonix/runtime/ReasonixSessionNotifications';
-import { REASONIX_DEFAULT_CONTEXT_WINDOW } from '@/providers/reasonix/ui/ReasonixChatUIConfig';
 
 /** What the ACP connection delivered, shared with every managed-ACP provider. */
 export type ReasonixContentPayload = AcpContentPayload;
@@ -249,19 +248,9 @@ export class ReasonixContentPresenter {
     return this.usageChunks();
   }
 
-  /**
-   * The turn's usage, with a window the agent never states.
-   *
-   * `buildAcpUsageInfo` reports whatever window it was given and marks it
-   * authoritative only when there was one, so a Reasonix chunk leaves it at
-   * zero — and a zero window is a meter stuck at 0% for the length of every
-   * turn. `recalculateUsageForModel` does apply the provider default, but only
-   * when the model selector changes, which is before the turn rather than
-   * during it. So the default is filled in here, and left *not* authoritative,
-   * which is exactly what it is: a stand-in until the model's real window is
-   * known, replaceable by a custom context limit.
-   */
+  /** Turn totals are billing data; only an explicit context update is occupancy. */
   private usageChunks(): readonly StreamChunk[] {
+    if (!this.contextUsage) return [];
     const model = this.ports.displayModel();
     const usage = buildAcpUsageInfo({
       contextWindow: this.contextUsage,
@@ -271,17 +260,9 @@ export class ReasonixContentPresenter {
     if (!usage) {
       return [];
     }
-    const windowed = usage.contextWindow > 0 ? usage : {
-      ...usage,
-      contextWindow: REASONIX_DEFAULT_CONTEXT_WINDOW,
-      percentage: Math.min(
-        100,
-        Math.max(0, Math.round((usage.contextTokens / REASONIX_DEFAULT_CONTEXT_WINDOW) * 100)),
-      ),
-    };
     return [{
       type: 'usage',
-      usage: windowed,
+      usage,
       ...(this.sessionId ? { sessionId: this.sessionId } : {}),
     }];
   }

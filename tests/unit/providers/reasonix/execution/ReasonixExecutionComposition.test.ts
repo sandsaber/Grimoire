@@ -922,15 +922,12 @@ describe('Reasonix execution composition', () => {
     const second = await drain(runtime.query(runtime.prepareTurn({ text: 'second' })));
 
     // A window the wire stated is the thing that must not outlive its turn.
-    // Both turns draw a window now, because the provider default stands in
-    // whenever the agent states none — so what tells them apart is whether the
-    // badge still claims the number came from the agent.
+    // A turn without an occupancy report must not fabricate a percentage.
     expect(first.some(chunk => chunk.type === 'usage'
       && chunk.usage?.contextWindowIsAuthoritative === true)).toBe(true);
     expect(second.some(chunk => chunk.type === 'usage'
       && chunk.usage?.contextWindowIsAuthoritative === true)).toBe(false);
-    expect(second.some(chunk => chunk.type === 'usage'
-      && chunk.usage?.contextWindow === 200_000)).toBe(true);
+    expect(second.some(chunk => chunk.type === 'usage')).toBe(false);
     execution.dispose();
     await host.dispose();
   });

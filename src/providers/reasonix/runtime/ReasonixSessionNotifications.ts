@@ -12,10 +12,10 @@ import type { AcpSessionNotification, AcpUsage } from '../../acp';
  * session's tokens on it. Without this the usage badge would have nothing, and
  * with a guessed shape it would have the wrong thing.
  *
- * The status carries no context-window size, so the notification produced here
- * reports none. `size: 0` is read by `ReasonixContentPresenter` as "no window
- * was stated" rather than as a window of nothing, which keeps
- * `contextWindowIsAuthoritative` false and the badge honest about what it knows.
+ * The status carries neither context occupancy nor a window. Its turn totals
+ * sum every model request, including repeated prompts after tools. The
+ * synthesized update therefore uses zero placeholders and keeps billing
+ * counts only in metadata; the presenter does not draw a context meter from it.
  *
  * **The cost rides on the completion status and no other.** `usage.turn` is a
  * running figure for the turn in progress, re-sent whole on every status —
@@ -61,7 +61,8 @@ export function parseReasonixSessionNotification(
       sessionUpdate: 'usage_update',
       // No window is stated anywhere in the status, so none is claimed here.
       size: 0,
-      used: turn.totalTokens,
+      // Turn totals sum repeated model requests; they are not occupancy.
+      used: 0,
       cost: params.event === REASONIX_COMPLETION_EVENT ? readCost(usage?.turn) : null,
       _meta: { [REASONIX_TURN_USAGE_META_KEY]: turn },
     } as AcpSessionNotification['update'],

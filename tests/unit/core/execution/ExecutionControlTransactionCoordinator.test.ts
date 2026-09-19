@@ -80,6 +80,59 @@ function writes(): ExecutionControlWrite[] {
 }
 
 describe('ExecutionControlTransactionCoordinator', () => {
+  it('does not adopt an interaction id belonging to a different request', async () => {
+    const storage = new TestDurableStorage();
+    const repositories = new ExecutionControlRepositories(storage, () => 10);
+    const id = `ix-${'5'.repeat(32)}`;
+    const interaction = {
+      interactionId: id, runId: RUN_ID, kind: 'approval' as const,
+      presentationRef: 'original-request', responseIds: ['yes', 'no'],
+      status: 'resolved' as const, selectedResponseId: 'no', createdAt: 1, updatedAt: 2,
+    };
+    await repositories.interactions.create(id, interaction);
+    const coordinator = new ExecutionControlTransactionCoordinator(storage, repositories);
+    await expect(coordinator.execute(TRANSACTION_ID, [{
+      repository: 'interactions', recordId: id, expectedRevision: null,
+      record: {
+        interactionId: id, runId: RUN_ID, kind: 'approval',
+        presentationRef: 'different-request', responseIds: ['yes', 'no'],
+        status: 'open', createdAt: 3, updatedAt: 3,
+      },
+    }])).rejects.toThrow('revision conflict');
+    await expect(repositories.interactions.read(id)).resolves.toMatchObject({
+      kind: 'current', record: { revision: 1, payload: interaction },
+    });
+  });
+
+  it('adopts a resolved interaction when recovering a stale create intent', async () => {
+    const storage = new TestDurableStorage();
+    const repositories = new ExecutionControlRepositories(storage, () => 10);
+    const id = `ix-${'5'.repeat(32)}`;
+    const interaction = {
+      interactionId: id, runId: RUN_ID, kind: 'approval' as const,
+      presentationRef: 'approval-repeat', responseIds: ['yes', 'no'],
+      status: 'open' as const, createdAt: 1, updatedAt: 1,
+    };
+    await repositories.interactions.create(id, interaction);
+    await repositories.interactions.update(id, 1, record => ({
+      ...record, status: 'resolving', selectedResponseId: 'yes',
+    }));
+    await repositories.interactions.update(id, 2, record => ({ ...record, status: 'resolved' }));
+    const coordinator = new ExecutionControlTransactionCoordinator(storage, repositories, {
+      crashInjector: crashOnceAt('after-intent'),
+    });
+    await expect(coordinator.execute(TRANSACTION_ID, [{
+      repository: 'interactions', recordId: id, expectedRevision: null,
+      record: { ...interaction, createdAt: 20, updatedAt: 20 },
+    }])).rejects.toThrow('crash:after-intent');
+    const restored = new ExecutionControlTransactionCoordinator(storage, repositories);
+    await restored.recoverPending();
+    await restored.recoverPending();
+    await expect(repositories.interactions.read(id)).resolves.toMatchObject({
+      kind: 'current', record: { revision: 3, payload: { status: 'resolved', selectedResponseId: 'yes' } },
+    });
+  });
+
   it('recovers a multi-record control write without duplicating the committed first step', async () => {
     const storage = new TestDurableStorage();
     const repositories = new ExecutionControlRepositories(storage, () => 10);

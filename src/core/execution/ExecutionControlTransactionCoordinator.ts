@@ -225,12 +225,30 @@ async function applyWrite(
         write,
         executionRunRecordSchema.decode(write.record),
       );
-    case 'interactions':
+    case 'interactions': {
+      const desired = executionInteractionRecordSchema.decode(write.record);
+      if (write.expectedRevision === null) {
+        const current = await repositories.interactions.read(write.recordId);
+        // A repeated open event could leave a pending create after this very
+        // interaction had already been answered. Preserve that answer; never
+        // rewind it to open. A reused id with different identity still conflicts.
+        if ((current.kind === 'current' || current.kind === 'migrated')
+          && desired.status === 'open'
+          && current.record.payload.interactionId === desired.interactionId
+          && current.record.payload.runId === desired.runId
+          && current.record.payload.kind === desired.kind
+          && current.record.payload.presentationRef === desired.presentationRef
+          && current.record.payload.expiresAt === desired.expiresAt
+          && stableSerialize(current.record.payload.responseIds) === stableSerialize(desired.responseIds)) {
+          return;
+        }
+      }
       return applyMutableWrite(
         repositories.interactions,
         write,
-        executionInteractionRecordSchema.decode(write.record),
+        desired,
       );
+    }
     case 'reconciliations':
       return applyAppendOnlyWrite(
         repositories.reconciliations,

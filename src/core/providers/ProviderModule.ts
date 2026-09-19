@@ -1,5 +1,5 @@
 import type { ExecutionBackendFactory } from '../execution/ExecutionBackendDescriptor';
-import type { Conversation, SlashCommand } from '../types';
+import type { Conversation, SlashCommand, UsageInfo } from '../types';
 import type { ManagedMcpServer } from '../types/mcp';
 import type { ProviderId } from '../types/provider';
 import type { ProviderCommandEntry } from './commands/ProviderCommandEntry';
@@ -753,6 +753,8 @@ export type ProviderScopedSettings = Record<string, unknown>;
 
 export interface ProviderChatUiContribution {
   readonly models: ProviderModelPresentation;
+  /** Rejects saved or live usage that does not represent context occupancy. */
+  normalizeContextUsage?(usage: UsageInfo): UsageInfo | null;
   /**
    * The reasoning control, where the provider has one.
    *

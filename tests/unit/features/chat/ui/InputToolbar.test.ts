@@ -2130,7 +2130,7 @@ describe('ContextUsageMeter', () => {
     expect(container?.style.display).toBe('none');
   });
 
-  it('should support a header mode that stays visible at 0%', () => {
+  it('keeps the header control visible without inventing a percentage for unknown usage', () => {
     const headerParentEl = createMockEl();
     const headerMeter = new ContextUsageMeter(headerParentEl, { showWhenEmpty: true });
 
@@ -2138,8 +2138,16 @@ describe('ContextUsageMeter', () => {
 
     const container = headerParentEl.querySelector('.grimoire-context-meter');
     expect(container?.style.display).toBe('flex');
+    expect(headerParentEl.querySelector('.grimoire-context-meter-percent')?.textContent).toBe('—');
+    expect(setTooltip).toHaveBeenCalledWith(container, 'Usage appears as the active tab builds context.', { placement: 'bottom' });
+
+    headerMeter.update(makeUsage({ contextTokens: 0, contextWindow: 200000, percentage: 0 }));
     expect(headerParentEl.querySelector('.grimoire-context-meter-percent')?.textContent).toBe('0%');
-    expect(setTooltip).toHaveBeenCalledWith(container, 'No context used yet', { placement: 'bottom' });
+
+    headerMeter.update(makeUsage({ percentage: 90 }));
+    headerMeter.update(null);
+    expect(container?.getAttribute('aria-label')).not.toContain('90%');
+    expect(headerParentEl.querySelector('.grimoire-context-meter-percent')?.textContent).toBe('—');
   });
 
   it('should become visible when contextTokens > 0', () => {

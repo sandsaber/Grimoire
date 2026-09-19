@@ -195,10 +195,12 @@ const reasonixCapabilities: ProviderCapabilityDescriptor = {
   },
 };
 
-const reasonixChatUi: ProviderChatUiContribution = chatUiContributionFor(
-  reasonixChatUIConfig,
-  reasonixCapabilities.reasoningControl,
-);
+const reasonixChatUi: ProviderChatUiContribution = {
+  ...chatUiContributionFor(reasonixChatUIConfig, reasonixCapabilities.reasoningControl),
+  // Older records stored turn aggregates as occupancy. Only a real ACP context
+  // update can make a Reasonix context reading trustworthy.
+  normalizeContextUsage: usage => usage.contextWindowIsAuthoritative === true ? usage : null,
+};
 
 const reasonixHistory = new ReasonixConversationHistoryService();
 

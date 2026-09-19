@@ -149,6 +149,38 @@ describe('ConversationController', () => {
   });
 
   describe('Queue Management', () => {
+    it('clears and persists legacy Reasonix turn totals when restoring a conversation', async () => {
+      const usage = {
+        model: 'reasonix:test', inputTokens: 845041, contextTokens: 889101,
+        contextWindow: 200000, contextWindowIsAuthoritative: false, percentage: 100,
+      };
+      (deps.plugin.switchConversation as jest.Mock).mockResolvedValue({
+        id: 'reasonix-conversation', providerId: 'reasonix', messages: [], usage,
+      });
+      deps.getActiveProviderSettings = () => ({ model: usage.model });
+      await controller.switchTo('reasonix-conversation');
+      expect(deps.state.usage).toBeNull();
+      expect(deps.plugin.updateConversation).toHaveBeenCalledWith('reasonix-conversation', { usage: undefined });
+    });
+
+    it('recalculates and persists a saved non-authoritative window on restore', async () => {
+      const usage = {
+        model: 'custom-model', inputTokens: 69422, contextTokens: 69422,
+        contextWindow: 200000, contextWindowIsAuthoritative: false, percentage: 35,
+      };
+      (deps.plugin.switchConversation as jest.Mock).mockResolvedValue({
+        id: 'updated-window', providerId: 'opencode', messages: [], usage,
+      });
+      deps.getActiveProviderSettings = () => ({
+        model: usage.model, customContextLimits: { [usage.model]: 1_000_000 },
+      });
+      await controller.switchTo('updated-window');
+      expect(deps.state.usage).toMatchObject({ contextWindow: 1_000_000, percentage: 7 });
+      expect(deps.plugin.updateConversation).toHaveBeenCalledWith('updated-window', {
+        usage: expect.objectContaining({ contextWindow: 1_000_000, percentage: 7 }),
+      });
+    });
+
     describe('Creating new conversation', () => {
       it('should clear queued message on new conversation', async () => {
         deps.state.queue.enqueue({ content: 'test', images: undefined, editorContext: null, canvasContext: null });

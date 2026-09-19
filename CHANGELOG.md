@@ -2,6 +2,14 @@
 
 User-facing changes by release.
 
+## 2.0.2 - Unreleased
+
+### Fixed
+
+- Reasonix no longer displays per-turn token totals as context occupancy. The header shows an unknown reading instead of a percentage when the CLI reports no occupancy, including for saved readings from older builds (#201, #203).
+- Custom context limits refresh and persist remembered non-authoritative usage in open and restored chats (#203).
+- Repeated approval events no longer reopen resolved interactions. Startup recovers stale interaction-create transactions without overwriting answers, and unexpected startup failures show their cause (#202).
+
 ## 2.0.1 - 2026-09-18
 
 ### Added

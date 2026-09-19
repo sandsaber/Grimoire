@@ -26,18 +26,7 @@ const REASONIX_MODELS: ProviderUIOption[] = [
     value: REASONIX_SYNTHETIC_MODEL_ID,
   },
 ];
-/**
- * The window every Reasonix session is measured against, because the wire never
- * states one.
- *
- * Devin's comment here said the wire overrides it per turn; that is not true of
- * this provider. Reasonix sends no `usage_update`, and the status notification
- * it sends instead carries no window size, so `contextWindowIsAuthoritative`
- * stays false and this figure is what the percentage is drawn from. It is a
- * default rather than a fact: the window really belongs to whichever model the
- * configured provider block serves, and a person whose model differs sets it in
- * the settings tab's custom context limits.
- */
+/** Local model-window fallback; it does not imply known context occupancy. */
 export const REASONIX_DEFAULT_CONTEXT_WINDOW = 200_000;
 /**
  * The picker is built from the session, because the levels are the session's.

@@ -63,6 +63,7 @@ import {
 
 type RegistryState =
   | 'initializing'
+  | 'failed'
   | 'accepting'
   | 'quiescing'
   | 'closed'
@@ -244,6 +245,7 @@ export class ExecutionLifecycleRegistry {
   private readonly admissionWaiters = new Set<() => void>();
   private readonly ownerQueues = new Map<string, Promise<void>>();
   private state: RegistryState = 'initializing';
+  private startupFailure: Error | null = null;
   private migrationRequired: UnreadableControlRecordError | null = null;
   private activeAdmissions = 0;
 
@@ -301,6 +303,11 @@ export class ExecutionLifecycleRegistry {
       // Only unreadable records take this path. Anything else is a real defect
       // and must keep propagating rather than being disguised as a migration.
       if (!(error instanceof UnreadableControlRecordError)) {
+        this.startupFailure = new Error(
+          `Execution startup failed: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        );
+        this.state = 'failed';
         throw error;
       }
       this.migrationRequired = error;
@@ -336,6 +343,10 @@ export class ExecutionLifecycleRegistry {
 
   getMigrationRequirement(): UnreadableControlRecordError | null {
     return this.migrationRequired;
+  }
+
+  getStartupFailure(): Error | null {
+    return this.startupFailure;
   }
 
   async createSession(command: CreateExecutionSessionCommand): Promise<ExecutionSessionId> {
@@ -576,6 +587,15 @@ export class ExecutionLifecycleRegistry {
       let currentCheckpoint = checkpoint;
       let envelope: ExecutionEventEnvelope | undefined = result.envelopes[0];
       while (envelope) {
+        // Interaction ids are single-use. Consume a repeated open without
+        // publishing it or rolling back the causal cursor: the next event
+        // must still be able to finish the run after an approval was answered.
+        if (envelope.event.kind === 'interaction-opened'
+          && this.interactions.has(envelope.event.interaction.interactionId)) {
+          currentCheckpoint = session.ingestor.createCheckpoint();
+          envelope = session.ingestor.drainReady() ?? undefined;
+          continue;
+        }
         // Transient content goes straight to observers. It writes no control
         // record, advances no state machine, and runs no post-commit hook —
         // there is nothing about it to commit, and a transaction per token
@@ -2522,6 +2542,9 @@ export class ExecutionLifecycleRegistry {
   }
 
   private requireAccepting(): void {
+    if (this.startupFailure) {
+      throw this.startupFailure;
+    }
     if (this.state === 'migration-required') {
       throw new Error(
         'Execution control store requires migration; the registry is read-only.',

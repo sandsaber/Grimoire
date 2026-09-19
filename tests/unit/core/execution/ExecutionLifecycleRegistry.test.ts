@@ -30,6 +30,78 @@ const OWNER = { kind: 'conversation' as const, ownerId: 'conversation-1' };
 const RESULT: ResultRef = { resultId: 'result-1', storage: 'projection' };
 
 describe('ExecutionLifecycleRegistry', () => {
+  it('retains the startup failure for later admissions', async () => {
+    const fixture = createFixture();
+    jest.spyOn(fixture.controlTransactions, 'recoverPending')
+      .mockRejectedValue(new Error('broken control transaction'));
+    await expect(fixture.registry.start()).rejects.toThrow('broken control transaction');
+    await expect(fixture.registry.createSession(sessionCommand()))
+      .rejects.toThrow('Execution startup failed: broken control transaction');
+    await expect(fixture.registry.start()).rejects.toThrow('only be started once');
+  });
+
+  it('does not reopen a resolved interaction under a new delivery id', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    const event = {
+      kind: 'interaction-opened' as const,
+      interaction: {
+        interactionId: INTERACTION_ID, runId: RUN_ID, kind: 'approval' as const,
+        presentationRef: 'approval-repeat', responseIds: ['yes', 'no'],
+      },
+    };
+    fixture.backend.emit(RUN_ID, event, { causal: { streamId: 'approval-stream', sequence: 1 } });
+    await settle(fixture.registry);
+    await fixture.registry.resolveInteraction({
+      interactionId: INTERACTION_ID, responseId: 'yes', resolvedAt: 60,
+    });
+    fixture.backend.emit(RUN_ID, event, { causal: { streamId: 'approval-stream', sequence: 2 } });
+    await settle(fixture.registry);
+    expect(fixture.registry.getRun(RUN_ID)?.openInteractionIds).toEqual([]);
+    expect(fixture.registry.getInteraction(INTERACTION_ID)?.status).toBe('resolved');
+    await expect(fixture.controlTransactions.recoverPending()).resolves.toBeUndefined();
+    fixture.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' }, {
+      causal: { streamId: 'approval-stream', sequence: 3 },
+    });
+    await settle(fixture.registry);
+    expect(fixture.registry.getRun(RUN_ID)?.terminal?.kind).toBe('succeeded');
+  });
+
+  it('recovers a waiting run with a resolved interaction and stale create intent across restarts', async () => {
+    const storage = new TestDurableStorage();
+    const first = await startedFixture(storage);
+    await startDefaultRun(first);
+    const interaction = {
+      interactionId: INTERACTION_ID, runId: RUN_ID, kind: 'approval' as const,
+      presentationRef: 'stale-approval', responseIds: ['yes', 'no'],
+    };
+    first.backend.emit(RUN_ID, { kind: 'interaction-opened', interaction });
+    await settle(first.registry);
+    // The old transaction had written its waiting run but could not recreate
+    // an interaction that was already resolved at revision 3.
+    await first.repositories.interactions.update(INTERACTION_ID, 1, record => ({
+      ...record, status: 'resolving', selectedResponseId: 'yes',
+    }));
+    await first.repositories.interactions.update(INTERACTION_ID, 2, record => ({ ...record, status: 'resolved' }));
+    const crashing = new ExecutionControlTransactionCoordinator(storage, first.repositories, {
+      crashInjector: point => { if (point === 'after-intent') throw new Error('crash'); },
+    });
+    await expect(crashing.execute(`tx-${'f'.repeat(32)}`, [{
+      repository: 'interactions', recordId: INTERACTION_ID, expectedRevision: null,
+      record: { ...interaction, status: 'open', createdAt: 100, updatedAt: 100 },
+    }])).rejects.toThrow('crash');
+
+    const restored = createFixture(storage, { transactionOffset: 1_000, instanceOffset: 10 });
+    await restored.registry.start();
+    expect(restored.registry.getRun(RUN_ID)?.terminal).toBeDefined();
+    expect(restored.registry.getInteraction(INTERACTION_ID)?.status).toBe('resolved');
+    expect(restored.backend.resolutions).toEqual([]);
+    await restored.registry.createSession({ ...sessionCommand(), executionSessionId: SESSION_ID_2 });
+    await restored.registry.startRun(SESSION_ID_2, request(RUN_ID_2));
+    const again = createFixture(storage, { transactionOffset: 2_000, instanceOffset: 20 });
+    await expect(again.registry.start()).resolves.toBeUndefined();
+  });
+
   it('keeps startup fail-closed and accepts a backend with no provider association', async () => {
     const fixture = createFixture();
 

@@ -2453,18 +2453,15 @@ export class ContextUsageMeter {
   private renderEmptyState(contextWindow?: number): void {
     this.container.removeClass('grimoire-hidden');
     this.container.removeClass('warning');
-    // Nothing spent yet reads as an outline rather than as a full track.
+    // Keep the context control available without presenting missing telemetry as zero.
     this.container.addClass('is-empty');
     this.container.setCssProps({ '--grimoire-context-meter-pct': '0' });
-    this.percentEl?.setText('0%');
-    const windowLabel = contextWindow ? this.formatTokens(contextWindow) : t('chat.ui.contextUsage.context');
-    setTooltip(
-      this.container,
-      contextWindow
-        ? t('chat.ui.contextUsage.tokens', { used: 0, total: windowLabel })
-        : t('chat.ui.contextUsage.noneYet'),
-      { placement: 'bottom' },
-    );
+    this.percentEl?.setText(contextWindow ? '0%' : '—');
+    const label = contextWindow
+      ? t('chat.ui.contextUsage.tokens', { used: 0, total: this.formatTokens(contextWindow) })
+      : t('chat.ui.contextUsage.hint');
+    this.container.setAttribute('aria-label', label);
+    setTooltip(this.container, label, { placement: 'bottom' });
   }
 
   private formatTokens(tokens: number): string {

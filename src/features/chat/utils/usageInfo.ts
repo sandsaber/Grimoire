@@ -1,4 +1,19 @@
+import type { ProviderChatUiContribution, ProviderScopedSettings } from '../../../core/providers/ProviderModule';
 import type { UsageInfo } from '../../../core/types';
+
+export function resolveContextUsage(
+  usage: UsageInfo | null,
+  chatUI: ProviderChatUiContribution,
+  model: string,
+  settings: ProviderScopedSettings,
+): UsageInfo | null {
+  if (!usage) return null;
+  const normalized = chatUI.normalizeContextUsage ? chatUI.normalizeContextUsage(usage) : usage;
+  return normalized ? recalculateUsageForModel(
+    normalized, model,
+    chatUI.models.contextWindow(model, settings, settings.customContextLimits as Record<string, number> | undefined),
+  ) : null;
+}
 
 export function calculateUsagePercentage(contextTokens: number, contextWindow: number): number {
   return contextWindow > 0

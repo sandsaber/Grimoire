@@ -194,7 +194,7 @@ describe('Reasonix content presenter', () => {
     }));
   });
 
-  it('draws the turn tokens off the vendor status notification', () => {
+  it('does not present aggregate turn tokens as context occupancy', () => {
     // Reasonix sends no `usage_update` of its own; the one that reaches the
     // presenter is synthesised from `_reasonix.io/session/status_update`, with
     // the turn's counts under `_meta` and no window size, because the status
@@ -221,19 +221,7 @@ describe('Reasonix content presenter', () => {
 
     const chunks = presenter.present({ kind: 'session-update', notification });
 
-    expect(chunks).toEqual([expect.objectContaining({
-      type: 'usage',
-      usage: expect.objectContaining({
-        contextTokens: 5_999,
-        inputTokens: 5_996,
-        // No window was stated, so the provider default stands in for one and
-        // is left unauthoritative. A zero here is a meter stuck at 0% for the
-        // length of every turn, which is what shipped before this.
-        contextWindow: 200_000,
-        contextWindowIsAuthoritative: false,
-        percentage: 3,
-      }),
-    })]);
+    expect(chunks).toEqual([]);
     expect(recorded.costs).toEqual([null]);
   });
 
@@ -281,7 +269,7 @@ describe('Reasonix content presenter', () => {
     }));
   });
 
-  it('keeps the turn tokens the status gave when the prompt result carries none', () => {
+  it('does not resurrect aggregate usage at the end of the turn', () => {
     // Reasonix answers `session/prompt` with `{stopReason, transcriptPath}`.
     // Clearing on that answer would drop the counts at the end of every turn.
     const { presenter } = createPresenter();
@@ -297,10 +285,7 @@ describe('Reasonix content presenter', () => {
       response: { stopReason: 'end_turn' },
     });
 
-    expect(chunks).toEqual([expect.objectContaining({
-      type: 'usage',
-      usage: expect.objectContaining({ contextTokens: 5_999, inputTokens: 5_996 }),
-    })]);
+    expect(chunks).toEqual([]);
   });
 
   it('forgets the session a new conversation must not report as its own', () => {

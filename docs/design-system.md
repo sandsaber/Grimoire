@@ -316,7 +316,9 @@ animated a surface that had just appeared, which is where motion is least welcom
   ring with a 2px stroke and a monospace 11px percentage, drawn as a conic gradient with an inner
   disc rather than a radial mask — Obsidian's CSS review rates `css-masks` as partially supported
   against its compatibility baseline, and a warning there is a product score. At 0% it is a hollow
-  1.5px line circle.
+  1.5px line circle. Missing occupancy uses the same outline with an em dash, not a fabricated 0%;
+  the control remains available to open context management. The empty-chat drawing shows this
+  unknown state; a provider explicitly reporting zero still shows 0%.
 
 ### 11.2 Panel switch
 

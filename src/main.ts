@@ -640,6 +640,10 @@ export default class GrimoirePlugin extends Plugin {
       resolveTitleProviderId: () => resolveTitleGenerationProviderId(this.settings),
     });
     await this.applicationRuntime.start();
+    const startupFailure = this.getExecutionKernel().registry.getStartupFailure();
+    if (startupFailure) {
+      new Notice(startupFailure.message, 0);
+    }
   }
 
   async writeDebugLog(event: DebugLogEvent): Promise<void> {
@@ -927,6 +931,8 @@ export default class GrimoirePlugin extends Plugin {
     );
   }
 
+  private savedContextLimits = '';
+
   async saveSettings() {
     ProviderSettingsCoordinator.normalizeProviderSelection(
       this.settings,
@@ -936,6 +942,11 @@ export default class GrimoirePlugin extends Plugin {
     );
 
     await this.storage.saveGrimoireSettings(this.settings);
+    const contextLimits = JSON.stringify(this.settings.customContextLimits ?? {});
+    if (contextLimits !== this.savedContextLimits) {
+      this.savedContextLimits = contextLimits;
+      await Promise.all(this.getAllViews().map(view => view.refreshContextUsage()));
+    }
     this.recordDebugLog({
       data: {
         debugLoggingEnabled: this.settings.debugLoggingEnabled === true,

@@ -2,6 +2,7 @@ import { Menu, Notice, setIcon, setTooltip } from 'obsidian';
 
 import { buildFallbackTitle } from '../../../core/prompt/fallbackTitle';
 import { providerCatalog } from '../../../core/providers/ProviderCatalog';
+import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import type { ProviderId, TitleGenerationService } from '../../../core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatRewindMode } from '../../../core/runtime/types';
@@ -21,6 +22,7 @@ import { requestTabRename } from '../ui/RenameTabModal';
 import type { StatusPanel } from '../ui/StatusPanel';
 import { appendTitleSourceMark } from '../ui/titleSourceMarker';
 import { getRandomGreeting } from '../utils/greetings';
+import { resolveContextUsage } from '../utils/usageInfo';
 
 function runConversationAction(action: () => Promise<void>, failureMessage: string): void {
   void action().catch(() => {
@@ -344,7 +346,7 @@ export class ConversationController {
     }
 
     await this.deps.ensureServiceForConversation?.(conversation);
-    this.restoreConversation(conversation, { autoAttachFile: true });
+    await this.restoreConversation(conversation, { autoAttachFile: true });
     this.updateWelcomeVisibility();
 
     this.callbacks.onConversationLoaded?.();
@@ -412,7 +414,7 @@ export class ConversationController {
       this.deps.getInputEl().value = '';
       this.deps.clearQueuedMessage();
 
-      this.restoreConversation(conversation);
+      await this.restoreConversation(conversation);
 
       this.deps.getHistoryDropdown()?.removeClass('visible');
       this.updateWelcomeVisibility();
@@ -657,16 +659,28 @@ export class ConversationController {
    * Shared logic for restoring a conversation into the current tab.
    * Used by both loadActive() and switchTo() to avoid duplication.
    */
-  private restoreConversation(
+  private async restoreConversation(
     conversation: Conversation,
     options?: { autoAttachFile?: boolean }
-  ): void {
+  ): Promise<void> {
     const { plugin, state, renderer } = this.deps;
 
     state.currentConversationId = conversation.id;
     state.messages = [...conversation.messages];
     settleToolCallsLeftRunning(state.messages);
     state.usage = conversation.usage ?? null;
+    if (state.usage) {
+      const settings = this.deps.getActiveProviderSettings?.()
+        ?? ProviderSettingsCoordinator.getProviderSettingsSnapshot(plugin.settings, conversation.providerId);
+      const model = typeof settings.model === 'string' ? settings.model : conversation.usage?.model ?? '';
+      state.usage = resolveContextUsage(
+        conversation.usage ?? null, providerCatalog().declarations(conversation.providerId).chatUI,
+        model, settings,
+      );
+      if (JSON.stringify(state.usage) !== JSON.stringify(conversation.usage ?? null)) {
+        await plugin.updateConversation(conversation.id, { usage: state.usage ?? undefined });
+      }
+    }
     state.autoScrollEnabled = plugin.settings.enableAutoScroll ?? true;
     state.hasPendingConversationSave = false;
 

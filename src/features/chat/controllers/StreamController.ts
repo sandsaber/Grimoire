@@ -91,6 +91,7 @@ import {
 } from '../services/TurnFeedbackMetrics';
 import type { ChatState } from '../state/ChatState';
 import type { FileContextManager } from '../ui/FileContext';
+import { resolveContextUsage } from '../utils/usageInfo';
 
 export interface StreamControllerDeps {
   plugin: GrimoirePlugin;
@@ -323,6 +324,14 @@ export class StreamController {
           state.usage = activeModel && !chunk.usage.model
             ? { ...chunk.usage, model: activeModel }
             : chunk.usage;
+          const providerId = this.deps.getAgentService?.()?.providerId;
+          if (providerId && activeModel) {
+            const settings = this.deps.getActiveProviderSettings?.()
+              ?? ProviderSettingsCoordinator.getProviderSettingsSnapshot(this.deps.plugin.settings, providerId);
+            state.usage = resolveContextUsage(
+              state.usage, providerCatalog().declarations(providerId).chatUI, activeModel, settings,
+            );
+          }
         }
         break;
       }

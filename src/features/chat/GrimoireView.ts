@@ -41,7 +41,7 @@ import { closeTopmostImageViewer } from './ui/imageViewerStack';
 import { ContextUsageMeter, getNextPermissionMode } from './ui/InputToolbar';
 import { requestTabRename } from './ui/RenameTabModal';
 import { buildAssistantResponseMetadata } from './utils/assistantResponseMetadata';
-import { recalculateUsageForModel } from './utils/usageInfo';
+import { resolveContextUsage } from './utils/usageInfo';
 
 type LoadableView = {
   containerEl?: HTMLElement;
@@ -210,19 +210,7 @@ export class GrimoireView extends ItemView {
       onProviderAvailabilityChanged(tab, this.plugin);
       const providerId = getTabProviderId(tab, this.plugin);
       const providerSettings = getTabSettingsSnapshot(tab, this.plugin);
-      const model = providerSettings.model;
       const capabilities = providerCatalog().capabilities(providerId);
-      const contextWindow = providerCatalog().declarations(providerId)
-        .chatUI.models.contextWindow(
-          model,
-          providerSettings,
-          providerSettings.customContextLimits,
-        );
-
-      if (tab.state.usage) {
-        tab.state.usage = recalculateUsageForModel(tab.state.usage, model, contextWindow);
-      }
-
       tab.ui.modelSelector?.updateDisplay();
       tab.ui.modelSelector?.renderOptions();
       tab.ui.planUsageBadge?.updateDisplay();
@@ -238,7 +226,24 @@ export class GrimoireView extends ItemView {
       );
     }
 
+    void this.refreshContextUsage().catch(error => {
+      this.plugin.recordDebugLog({ event: 'usage.refresh.failed', scope: 'chat', level: 'warn', error });
+    });
     this.tabManager?.primeProviderRuntime();
+  }
+
+  async refreshContextUsage(): Promise<void> {
+    for (const tab of this.tabManager?.getAllTabs() ?? []) {
+      const settings = getTabSettingsSnapshot(tab, this.plugin);
+      const chatUI = providerCatalog().declarations(getTabProviderId(tab, this.plugin)).chatUI;
+      const usage = resolveContextUsage(tab.state.usage, chatUI, settings.model, settings);
+      if (JSON.stringify(usage) === JSON.stringify(tab.state.usage)) continue;
+      tab.state.usage = usage;
+      const conversationId = tab.state.currentConversationId;
+      if (conversationId) {
+        await this.plugin.updateConversation(conversationId, { usage: usage ?? undefined });
+      }
+    }
   }
 
   invalidateProviderCommandCaches(providerIds?: ProviderId[]): void {
