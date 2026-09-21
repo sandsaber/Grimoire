@@ -96,11 +96,7 @@ export function buildReasonixPromptBlocks(
   const text = request.orchestratorMode === true || options.orchestratorMode === true
     ? applyOrchestratorModeInstructions(prompt)
     : prompt;
-  // **Text only, because the agent said so.** The recorded handshake answers
-  // `promptCapabilities: { image: false }`, and the module declares
-  // `imageAttachments: 'unsupported'` on the strength of it. Devin's builder
-  // appends an image block per attachment; carrying that over would send this
-  // agent a block type it told us it does not take, and the composer does not
-  // offer attachments here anyway.
+  // ACP advertises image: false. The composition saves attachments and adds
+  // file references to the request text before reaching this builder.
   return [{ text, type: 'text' }];
 }

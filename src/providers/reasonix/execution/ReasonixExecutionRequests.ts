@@ -37,6 +37,9 @@ export interface ReasonixInvocationEnvironment {
   readonly mcpServers: readonly ManagedMcpServer[];
 }
 
+type PendingRequest = ReasonixExecutionRequest
+  | ((cwd: string) => Promise<ReasonixExecutionRequest>);
+
 const DEFAULT_LIMIT = 64;
 
 /**
@@ -49,7 +52,7 @@ const DEFAULT_LIMIT = 64;
  * nothing can make, and an unbounded map of prompts is a leak.
  */
 export class ReasonixExecutionRequests {
-  private readonly pending = new Map<string, ReasonixExecutionRequest>();
+  private readonly pending = new Map<string, PendingRequest>();
   private readonly startups = new Map<string, ManagedAcpLaunchInvocation>();
   private readonly dynamics = new Map<string, ReasonixAcpDynamicConfig>();
   private readonly recoveryPrompts = new Map<string, () => readonly AcpContentBlock[]>();
@@ -61,7 +64,7 @@ export class ReasonixExecutionRequests {
   ) {}
 
   /** Holds a turn and returns the reference the kernel will carry. */
-  reference(request: ReasonixExecutionRequest): string {
+  reference(request: PendingRequest): string {
     evict(this.pending, this.limit);
     const reference = this.nextReference();
     this.pending.set(reference, request);
@@ -69,8 +72,9 @@ export class ReasonixExecutionRequests {
   }
 
   async resolve(requestRef: string): Promise<ReasonixExecutionInvocation> {
-    const request = this.take(requestRef);
+    const pending = this.take(requestRef);
     const environment = await this.environment();
+    const request = typeof pending === 'function' ? await pending(environment.cwd) : pending;
     const messageId = request.messageId ?? requestRef;
     if (request.recoveryPrompt) {
       evict(this.recoveryPrompts, this.limit);
@@ -146,7 +150,7 @@ export class ReasonixExecutionRequests {
     this.recoveryPrompts.clear();
   }
 
-  private take(requestRef: string): ReasonixExecutionRequest {
+  private take(requestRef: string): PendingRequest {
     const request = this.pending.get(requestRef);
     if (!request) {
       throw new Error('Unknown Reasonix request reference.');

@@ -105,6 +105,14 @@ export const reasonixSettingsTabRenderer: ProviderSettingsTabRenderer = {
       updateCliPathValidation(currentValue, text.inputEl);
     });
 
+    new Setting(container).setName('Image attachments as files')
+      .setDesc('Save pasted or dropped images in the vault and send paths for the agent to read. Enable only with a model or tool that can read images. This requires an extra tool call; ACP image blocks are not sent.')
+      .addToggle(toggle => toggle.setValue(reasonixSettings.imageAttachmentsAsFiles)
+        .onChange(async value => {
+          updateReasonixProviderSettings(settingsBag, { imageAttachmentsAsFiles: value });
+          await context.plugin.saveSettings();
+        }));
+
     // --- Models ---
 
     new Setting(container).setName(t('settings.models')).setHeading();

@@ -201,7 +201,7 @@ export const REASONIX_PROVIDER_CAPABILITIES: Readonly<ProviderCapabilities> = Ob
   // The session announces its own commands on `session/new` (recorded).
   supportsProviderCommands: true,
   // `promptCapabilities.image` is false in the recorded handshake.
-  supportsImageAttachments: false,
+  supportsImageAttachments: true,
   supportsInstructionMode: true,
   supportsMcpTools: false,
   // `_reasonix.io/session/steer` exists and nothing drives it yet.

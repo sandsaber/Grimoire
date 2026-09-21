@@ -65,6 +65,16 @@ describe('Reasonix provider module', () => {
     );
   }
 
+  it('persists image opt-in through the settings codec and rejects non-booleans', () => {
+    expect(reasonixSettingsCodec.defaults().imageAttachmentsAsFiles).toBe(false);
+    const decoded = reasonixSettingsCodec.decode({ imageAttachmentsAsFiles: true });
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) throw new Error('Expected valid settings');
+    expect(reasonixSettingsCodec.encode(decoded.value).imageAttachmentsAsFiles).toBe(true);
+    expect(decoded.preservedUnknown).not.toHaveProperty('imageAttachmentsAsFiles');
+    expect(reasonixSettingsCodec.decode({ imageAttachmentsAsFiles: 'true' }).ok).toBe(false);
+  });
+
   it('declares its identity and ordering', () => {
     expect(reasonixProviderModule.manifest).toEqual({
       id: 'reasonix',

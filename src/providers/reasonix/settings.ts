@@ -45,6 +45,7 @@ export interface PersistedReasonixProviderSettings {
    */
   discoveredModelsFingerprint: string;
   enabled: boolean;
+  imageAttachmentsAsFiles: boolean;
   environmentHash: string;
   environmentVariables: string;
   modelAliases: Record<string, string>;
@@ -68,6 +69,7 @@ export const DEFAULT_REASONIX_PROVIDER_SETTINGS: Readonly<PersistedReasonixProvi
   cliPathsByHost: {},
   discoveredModelsFingerprint: '',
   enabled: false,
+  imageAttachmentsAsFiles: false,
   environmentHash: '',
   environmentVariables: '',
   modelAliases: {},
@@ -221,6 +223,7 @@ export function getReasonixProviderSettings(settings: Record<string, unknown>): 
     environmentVariables: (config.environmentVariables as string | undefined)
       ?? getProviderEnvironmentVariables(settings, 'reasonix')
       ?? DEFAULT_REASONIX_PROVIDER_SETTINGS.environmentVariables,
+    imageAttachmentsAsFiles: config.imageAttachmentsAsFiles === true,
     modelAliases: normalizeReasonixModelAliases(config.modelAliases),
     effortLevel: typeof config.effortLevel === 'string' && config.effortLevel.trim()
       ? config.effortLevel.trim()
@@ -295,6 +298,7 @@ export function updateReasonixProviderSettings(
     discoveredModels: next.discoveredModels,
     discoveredModelsFingerprint: next.discoveredModelsFingerprint,
     enabled: next.enabled,
+    imageAttachmentsAsFiles: next.imageAttachmentsAsFiles,
     environmentHash: next.environmentHash,
     environmentVariables: next.environmentVariables,
     modelAliases: next.modelAliases,

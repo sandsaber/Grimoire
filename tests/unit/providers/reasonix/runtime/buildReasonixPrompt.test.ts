@@ -127,9 +127,7 @@ describe('buildReasonixPrompt', () => {
 
   it('sends no image block, because the agent declares it takes none', () => {
     // The recorded handshake answers `promptCapabilities: { image: false }`
-    // and the module declares `imageAttachments: 'unsupported'`. Devin's
-    // builder appends one block per attachment; carrying that over would send
-    // this agent a block type it said it does not take.
+    // so the composition delivers file references in text instead.
     const blocks = buildReasonixPromptBlocks({
       text: 'What is this?',
       images: [{ data: 'AAAA', mediaType: 'image/png' } as never],

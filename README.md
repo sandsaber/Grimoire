@@ -46,7 +46,7 @@ It's built for people who already work in Obsidian and want AI help that behaves
 | Local persistent runtime | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No |
 | Native history hydration | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No | No | No | No |
 | Plan mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No |
-| Image attachments | Yes | Yes | Yes | No | Yes | Yes | Files | Yes | Yes | Yes | No | Files (opt-in) |
+| Image attachments | Yes | Yes | Yes | No | Yes | Yes | Files | Yes | Yes | Yes | Files (opt-in) | Files (opt-in) |
 | Instruction mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No |
 | Reasoning effort controls | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes (model-specific) |
 | Rewind | No | Yes | No | Yes | No | No | No | No | No | No | No | No |
@@ -125,6 +125,8 @@ Run it once, sign in, then enable it in Grimoire. The standalone installer is th
 - [OpenAI code generation guide](https://developers.openai.com/api/docs/guides/code-generation)
 
 Inside Grimoire, Codex runs on its app-server protocol with native history, fork, plan mode, image input, and reasoning effort controls. Plan usage shows up when Codex reports rate-limit metadata.
+
+**Custom endpoint image limitation:** [#208](https://github.com/sandsaber/Grimoire/issues/208) reports that Command Code's `/provider/v1/responses` endpoint delivers images from tool results (such as `view_image`) as base64 text. The model cannot see them, and their text token cost can overflow the context. User-message image attachments work in the reported setup. This affects Codex configured to use that endpoint, independently of Grimoire's Command Code provider. See [the limitation and recovery guidance](docs/provider-image-limitations.md).
 
 ### Claude Code
 
@@ -267,7 +269,9 @@ Reasoning effort is a picker fed by the session, not a fixed list. Which levels 
 
 One thing to know about Safe mode: `ask` gates the tools Reasonix classifies as permission-gated, not every tool, so a shell command it judges read-only can run without a prompt. Grimoire approves every file write Reasonix makes through the protocol, which is what keeps the vault behind a question. For a session that must not write, use Plan.
 
-Reasonix owns its configuration in `~/.reasonix/config.toml` and reads API keys from the environment under the names that file gives. Vault skills are read from `.reasonix/skills` and `.agents/skills`. Grimoire manages an isolated project MCP list in `.grimoire/mcp/reasonix.json` and injects it into ACP sessions. Usage comes from Reasonix's own status notifications, and a cost appears only when your model provider has a price. Image attachments, fork, and rewind are not supported.
+Reasonix owns its configuration in `~/.reasonix/config.toml` and reads API keys from the environment under the names that file gives. Vault skills are read from `.reasonix/skills` and `.agents/skills`. Grimoire manages an isolated project MCP list in `.grimoire/mcp/reasonix.json` and injects it into ACP sessions. Usage comes from Reasonix's own status notifications, and a cost appears only when your model provider has a price. Fork and rewind are not supported.
+
+Enable **Image attachments as files** in Reasonix settings to use pasted or dropped images. Grimoire saves them in `.grimoire/attachments/` and sends absolute paths with an instruction to read each file. This is off by default: choose a model or tool that can read images, and expect an extra tool call. Reasonix does not advertise ACP image input, so Grimoire sends no image blocks. Missing or unwritable files stop the turn with an error.
 
 ### Command Code
 

@@ -5,6 +5,15 @@ import {
 } from '@/providers/reasonix/settings';
 
 describe('Reasonix provider settings', () => {
+  it('requires explicit image opt-in and preserves it across settings updates', () => {
+    const settings: Record<string, unknown> = {};
+    expect(getReasonixProviderSettings(settings).imageAttachmentsAsFiles).toBe(false);
+    expect(getReasonixProviderSettings({ providerConfigs: { reasonix: { imageAttachmentsAsFiles: 'true' } } }).imageAttachmentsAsFiles).toBe(false);
+    updateReasonixProviderSettings(settings, { imageAttachmentsAsFiles: true });
+    updateReasonixProviderSettings(settings, { enabled: true });
+    expect(getReasonixProviderSettings(settings).imageAttachmentsAsFiles).toBe(true);
+  });
+
   it('defaults the discovery fingerprint to an empty string and ignores a non-string', () => {
     expect(getReasonixProviderSettings({}).discoveredModelsFingerprint).toBe('');
     expect(getReasonixProviderSettings({

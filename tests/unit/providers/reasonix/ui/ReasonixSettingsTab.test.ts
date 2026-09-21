@@ -1,5 +1,5 @@
 import { createMockEl } from '@test/helpers/mockElement';
-import { ButtonComponent, Notice } from 'obsidian';
+import { ButtonComponent, Notice, ToggleComponent } from 'obsidian';
 
 import { getReasonixProviderSettings } from '@/providers/reasonix/settings';
 import { reasonixSettingsTabRenderer } from '@/providers/reasonix/ui/ReasonixSettingsTab';
@@ -89,6 +89,23 @@ describe('ReasonixSettingsTab model refresh', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockRefreshModels.mockResolvedValue(true);
+  });
+
+  it('offers an off-by-default image toggle and persists the choice', async () => {
+    let change: ((value: boolean) => unknown) | undefined;
+    const values = jest.spyOn(ToggleComponent.prototype, 'setValue');
+    jest.spyOn(ToggleComponent.prototype, 'onChange').mockImplementation(function (this: ToggleComponent, handler) {
+      change = handler;
+      return this;
+    });
+    const { plugin } = renderTab([]);
+    expect(values).toHaveBeenCalledWith(false);
+    expect(change).toBeDefined();
+    await change!(true);
+    expect(getReasonixProviderSettings(plugin.settings).imageAttachmentsAsFiles).toBe(true);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    await change!(false);
+    expect(getReasonixProviderSettings(plugin.settings).imageAttachmentsAsFiles).toBe(false);
   });
 
   it('lets the user ask the CLI for its current model list', async () => {

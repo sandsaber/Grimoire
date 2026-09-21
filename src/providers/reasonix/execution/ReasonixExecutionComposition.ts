@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { NodeManagedAcpProcessLauncher } from '@/app/execution/acp/NodeManagedAcpProcessLauncher';
 import { delayThroughWindow } from '@/app/execution/hostTimers';
 import { ProviderWorkspaceHolder } from '@/app/execution/ProviderWorkspaceHolder';
+import { attachImagesAsFiles } from '@/core/attachments/attachImagesAsFiles';
 import {
   executionSessionId,
   interactionId,
@@ -300,8 +301,12 @@ export class ReasonixExecution {
     this.presenters.add(presenter);
     const releaseSettled = this.interactions.onSettled(ref => presenter.dismiss(ref));
 
+    let preparationError: string | undefined;
     const ports: ExecutionChatRuntimeHostPorts = {
       prepareTurn: (request: ChatTurnRequest) => {
+        if (request.images?.length && !getReasonixProviderSettings(this.plugin.settings).imageAttachmentsAsFiles) {
+          throw new Error('Enable "Image attachments as files" in Reasonix settings and select a model that can read images.');
+        }
         // Built once: it is eight context appends over every attached note, and
         // the two fields want the same string.
         const prompt = buildReasonixPromptText(request);
@@ -319,18 +324,31 @@ export class ReasonixExecution {
         options?: ChatRuntimeQueryOptions,
       ) => {
         content.beginTurn();
+        preparationError = undefined;
         const bootstrap = ports.currentSessionId() ? [] : history ?? [];
         const dynamic = this.dynamicConfiguration(sessionConfig, options);
-        return this.requests.reference({
-          prompt: buildReasonixPromptBlocks(turn.request, [...bootstrap], {
-            ...(options?.orchestratorMode ? { orchestratorMode: true } : {}),
-          }),
-          ...(ports.currentSessionId() && history?.length ? {
-            recoveryPrompt: () => buildReasonixPromptBlocks(turn.request, history, {
+        return this.requests.reference(async cwd => {
+          const request = turn.request.images?.length ? {
+            ...turn.request,
+            text: await attachImagesAsFiles(turn.request.text, turn.request.images, cwd,
+              this.plugin.storage.attachments,
+              getReasonixProviderSettings(this.plugin.settings).imageAttachmentsAsFiles, 'Reasonix')
+              .catch((error: unknown) => {
+                preparationError = error instanceof Error ? error.message : String(error);
+                throw error;
+              }),
+          } : turn.request;
+          return {
+            prompt: buildReasonixPromptBlocks(request, [...bootstrap], {
               ...(options?.orchestratorMode ? { orchestratorMode: true } : {}),
             }),
-          } : {}),
-          ...(dynamic ? { dynamic } : {}),
+            ...(ports.currentSessionId() && history?.length ? {
+              recoveryPrompt: () => buildReasonixPromptBlocks(request, history, {
+                ...(options?.orchestratorMode ? { orchestratorMode: true } : {}),
+              }),
+            } : {}),
+            ...(dynamic ? { dynamic } : {}),
+          };
         });
       },
       currentSessionId: () => content.lastSessionId() ?? conversation?.sessionId ?? null,
@@ -345,6 +363,11 @@ export class ReasonixExecution {
       },
       sessionDropped: () => sessionDropped,
       describeFailure: reason => {
+        if (preparationError) {
+          const message = preparationError;
+          preparationError = undefined;
+          return message;
+        }
         if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
           const refused = content.consumeTurnRefusal();
           if (refused?.origin) {

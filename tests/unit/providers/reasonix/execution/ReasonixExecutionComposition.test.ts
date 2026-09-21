@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
+import { attachmentPath, AttachmentStore } from '@/core/attachments/AttachmentStore';
 import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
 import { executionSessionId, type InteractionId, runId } from '@/core/execution/ExecutionIds';
 import type { StreamChunk } from '@/core/types';
@@ -820,6 +821,57 @@ describe('Reasonix execution composition', () => {
     expect(approval).toHaveBeenCalledTimes(1);
     execution.dispose();
     await host.dispose();
+  });
+
+  it.each([false, true])('delivers images as files, including empty native replay=%s', async emptySessionReplay => {
+    const { execution, host, plugin, prompts } = await createHarness({ emptySessionReplay });
+    const files = new Map<string, ArrayBuffer>();
+    plugin.storage = { attachments: new AttachmentStore({
+      exists: async path => files.has(path),
+      readBinary: async path => files.get(path)!,
+      writeBinary: async (path, bytes) => { files.set(path, bytes); },
+      delete: async path => { files.delete(path); },
+      listFiles: async () => [...files.keys()], getResourcePath: path => path,
+    }) };
+    updateReasonixProviderSettings(plugin.settings, { imageAttachmentsAsFiles: true });
+    const image = { id: 'image', name: 'photo.png', mediaType: 'image/png' as const,
+      data: Buffer.from('image bytes').toString('base64'), size: 11, source: 'paste' as const, hash: undefined as string | undefined };
+    const runtime = execution.createRuntime();
+    if (emptySessionReplay) runtime.syncConversationState({ sessionId: 'saved-session' });
+    const history = [{ id: 'prior', role: 'user' as const, content: 'Remember birch7319.', timestamp: 1 }];
+    try {
+      await drain(runtime.query(runtime.prepareTurn({ text: 'Describe this', images: [image] }), history));
+      const blocks = (prompts[0] as { prompt: Array<{ type: string; text: string }> }).prompt;
+      expect(blocks.every(block => block.type === 'text')).toBe(true);
+      const text = blocks.map(block => block.text).join('');
+      expect(text).toContain('birch7319');
+      expect(text).toContain(JSON.stringify(join(plugin.app.vault.adapter.basePath, attachmentPath(image.hash!, image.mediaType))));
+      expect(text).toContain('file-reading tool');
+      expect(text).not.toContain(image.data);
+      expect(Buffer.from(files.get(attachmentPath(image.hash!, image.mediaType))!)).toEqual(Buffer.from('image bytes'));
+    } finally {
+      execution.dispose();
+      await host.dispose();
+    }
+  });
+
+  it('rejects images without opt-in and fails missing files before starting ACP', async () => {
+    const { execution, host, plugin, prompts, startupRefs } = await createHarness();
+    const runtime = execution.createRuntime();
+    const request = { text: 'Describe this', images: [{ id: 'image', name: 'photo.png',
+      mediaType: 'image/png' as const, data: '', hash: 'a'.repeat(64), size: 11, source: 'paste' as const }] };
+    try {
+      expect(() => runtime.prepareTurn(request)).toThrow('Image attachments as files');
+      updateReasonixProviderSettings(plugin.settings, { imageAttachmentsAsFiles: true });
+      plugin.storage = { attachments: { read: async () => null } };
+      const chunks = await drain(runtime.query(runtime.prepareTurn(request)));
+      expect(JSON.stringify(chunks)).toContain('unavailable');
+      expect(prompts).toHaveLength(0);
+      expect(startupRefs).toHaveLength(0);
+    } finally {
+      execution.dispose();
+      await host.dispose();
+    }
   });
 
   it('restores saved history once when a successful native load replays no conversation', async () => {

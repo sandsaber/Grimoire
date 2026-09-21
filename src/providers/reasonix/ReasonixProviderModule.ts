@@ -80,6 +80,7 @@ const KNOWN_SETTINGS_FIELDS = new Set([
   'discoveredModelsFingerprint',
   'effortLevel',
   'enabled',
+  'imageAttachmentsAsFiles',
   'environmentHash',
   'environmentVariables',
   'modelAliases',
@@ -153,9 +154,8 @@ const reasonixCapabilities: ProviderCapabilityDescriptor = {
     reattachment: false,
   },
   input: {
-    // Recorded: `promptCapabilities: { image: false, embeddedContext: true }`.
-    // The CLI takes text and embedded context; an image block is not offered.
-    imageAttachments: 'unsupported',
+    // ACP image blocks are unsupported; opt-in delivery uses file paths in text.
+    imageAttachments: 'grimoire',
     instructionMode: 'native',
   },
   interactions: {
@@ -231,6 +231,7 @@ export const reasonixSettingsCodec: ProviderSettingsCodec<ReasonixProviderSettin
       cliPath: value.cliPath.trim(),
       cliPathsByHost: normalizeStringMap(value.cliPathsByHost),
       enabled: value.enabled,
+      imageAttachmentsAsFiles: value.imageAttachmentsAsFiles,
       environmentHash: value.environmentHash,
       environmentVariables: value.environmentVariables,
       modelAliases: normalizeReasonixModelAliases(value.modelAliases),
@@ -384,6 +385,7 @@ function decodeSettings(record: Readonly<Record<string, unknown>>): ReasonixProv
       : defaults.discoveredModelsFingerprint,
     cliPath: typeof record.cliPath === 'string' ? record.cliPath.trim() : defaults.cliPath,
     cliPathsByHost: normalizeStringMap(record.cliPathsByHost),
+    imageAttachmentsAsFiles: record.imageAttachmentsAsFiles === true,
     enabled: typeof record.enabled === 'boolean' ? record.enabled : defaults.enabled,
     environmentHash: typeof record.environmentHash === 'string'
       ? record.environmentHash
@@ -408,6 +410,7 @@ function decodeSettings(record: Readonly<Record<string, unknown>>): ReasonixProv
 function validateKnownSettings(record: Readonly<Record<string, unknown>>): string[] {
   const issues: string[] = [];
   requireType(record, 'enabled', value => typeof value === 'boolean', issues);
+  requireType(record, 'imageAttachmentsAsFiles', value => typeof value === 'boolean', issues);
   for (const field of [
     'cliPath',
     'effortLevel',

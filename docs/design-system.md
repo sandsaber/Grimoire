@@ -576,6 +576,9 @@ its alias fields work in both modes. The ACP providers retain their existing **C
 Missing selected models remain visible and removable. A native **Image attachments as files** toggle
 starts off and explains the need for a model that can read images and an extra tool call. Screen `2f`
 includes that toggle below the OpenCode example; it uses existing native settings controls.
+Reasonix uses the same native toggle, also off by default, below its CLI path. Its description
+states that images are saved in the vault and sent as paths for a capable model or tool to read,
+with an extra tool call and no ACP image blocks. Screen `2f` includes this Reasonix row.
 
 Obsidian's declarative settings API, rendering native `.setting-item` rows. Grimoire styles the
 content it puts *inside* a row — never `.setting-item`, `.setting-item-info`, `.setting-item-name`,
