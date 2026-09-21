@@ -298,10 +298,11 @@ export class DeterministicFakeSession implements ExecutionSession {
   }
 
   /** Counts the kernel letting the process go; the fake has none to close. */
-  async suspend(): Promise<void> {
+  async suspend(): Promise<boolean> {
     if (!this.disposed) {
       this.suspendCount += 1;
     }
+    return true;
   }
 
   /**

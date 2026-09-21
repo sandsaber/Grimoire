@@ -1125,6 +1125,87 @@ describe('ExecutionLifecycleRegistry', () => {
 });
 
 describe('ExecutionLifecycleRegistry — idle sessions and their processes', () => {
+  it('keeps the idle deadline when a new run is rejected before admission', async () => {
+    const scheduler = new ManualScheduler();
+    const fixture = await startedFixture(undefined, { scheduler, idleSuspendMs: 1_000 });
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    await settle(fixture.registry);
+
+    await expect(fixture.registry.startRun(SESSION_ID, request(RUN_ID)))
+      .rejects.toThrow('already exists');
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(fixture.backend.sessions.get(SESSION_ID)?.suspendCount).toBe(1);
+  });
+
+  it('rechecks an idle process after a temporary lifecycle owner releases it', async () => {
+    const scheduler = new ManualScheduler();
+    const fixture = await startedFixture(undefined, { scheduler, idleSuspendMs: 1_000 });
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    await settle(fixture.registry);
+    const lease = fixture.registry.acquireLease(
+      lifecycleLeaseId(`lease-${'6'.repeat(32)}`), SESSION_ID, 'persistence',
+    );
+
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(fixture.backend.sessions.get(SESSION_ID)?.suspendCount).toBe(0);
+    lease.release();
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(fixture.backend.sessions.get(SESSION_ID)?.suspendCount).toBe(1);
+  });
+
+  it('retries a failed process close without requiring another turn', async () => {
+    const scheduler = new ManualScheduler();
+    const fixture = await startedFixture(undefined, { scheduler, idleSuspendMs: 1_000 });
+    await startDefaultRun(fixture);
+    const session = fixture.backend.sessions.get(SESSION_ID)!;
+    const suspend = jest.spyOn(session, 'suspend').mockRejectedValueOnce(new Error('close failed'));
+    fixture.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    await settle(fixture.registry);
+
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(suspend).toHaveBeenCalledTimes(2);
+    expect(session.suspendCount).toBe(1);
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(suspend).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a backend refusal and clears the retry when the session is disposed', async () => {
+    const scheduler = new ManualScheduler();
+    const fixture = await startedFixture(undefined, { scheduler, idleSuspendMs: 1_000 });
+    await startDefaultRun(fixture);
+    const session = fixture.backend.sessions.get(SESSION_ID)!;
+    const suspend = jest.spyOn(session, 'suspend').mockResolvedValueOnce(false);
+    fixture.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    await settle(fixture.registry);
+
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(session.suspendCount).toBe(0);
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(session.suspendCount).toBe(1);
+
+    await fixture.registry.startRun(SESSION_ID, request(RUN_ID_2));
+    fixture.backend.emit(RUN_ID_2, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    await settle(fixture.registry);
+    suspend.mockResolvedValueOnce(false);
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    await fixture.registry.disposeSession(SESSION_ID);
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(suspend).toHaveBeenCalledTimes(3);
+  });
+
   it('asks an idle session to let its process go, and not one a new turn has claimed', async () => {
     const scheduler = new ManualScheduler();
     const fixture = await startedFixture(undefined, { scheduler, idleSuspendMs: 1_000 });

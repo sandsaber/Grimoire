@@ -6,7 +6,7 @@ User-facing changes by release.
 
 ### Fixed
 
-- Idle provider processes no longer outlive their tab. Closing a tab, switching its conversation or changing settings now always ends the session's `claude` or ACP agent process, including when a turn was still running or a permission prompt was left unanswered (#216).
+- Idle provider processes are released when the last tab leaves a conversation. An admitted turn continues in the background and releases its process after its result is saved; native background tasks remain protected. Adapter-owned sessions also force cleanup when cancellation outlasts the bounded wait (#216).
 
 ### Added
 

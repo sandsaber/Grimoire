@@ -709,6 +709,24 @@ describe('OpencodeExecutionBackend', () => {
     await expect(fixture.backend.dispose()).rejects.toThrow('termination was not confirmed');
   });
 
+  it('retries idle suspension until the retained process is confirmed closed', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+    await expect(session.suspend?.()).resolves.toBe(false);
+    expect(fixture.client.closeCalls).toBe(0);
+    fixture.client.emit(agentText('native-session', 'done'));
+    fixture.client.completePrompt({ stopReason: 'end_turn' });
+    expectTerminal(await events, 'succeeded', 'completed');
+    fixture.client.closeOutcomes = ['unconfirmed', 'confirmed'];
+
+    await expect(session.suspend?.()).resolves.toBe(false);
+    await expect(session.suspend?.()).resolves.toBe(true);
+    expect(fixture.client.closeCalls).toBe(2);
+    expect(session.getSnapshot().nativeSessionRef).toBe('native-session');
+  });
+
   it('quarantines an unconfirmed client and admits no second process tree', async () => {
     const first = new FakeManagedAcpClient('native-session');
     first.closeOutcomes = ['unconfirmed', 'unconfirmed', 'confirmed'];

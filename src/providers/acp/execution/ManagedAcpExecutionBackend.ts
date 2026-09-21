@@ -1099,9 +1099,10 @@ class ManagedAcpExecutionSession implements ExecutionSession {
    * loads `nativeSessionRef`, which is the path a reload already takes.
    * Declined while a turn is still going.
    */
-  async suspend(): Promise<void> {
-    if (this.disposed || !this.client || (this.activeRun && !this.activeRun.isTerminal)) return;
-    await this.closeClient();
+  async suspend(): Promise<boolean> {
+    if (this.disposed) return true;
+    if (this.activeRun && !this.activeRun.isTerminal) return false;
+    return await this.closeClient() === 'confirmed';
   }
 
   dispose(): Promise<void> {

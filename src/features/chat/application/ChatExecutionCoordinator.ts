@@ -86,6 +86,7 @@ import {
 /** The kernel, as a chat turn needs it. `ExecutionLifecycleRegistry` satisfies it. */
 export interface ChatExecutionLifecyclePort {
   createSession(command: CreateExecutionSessionCommand): Promise<ExecutionSessionId>;
+  suspendSession(executionSessionId: ExecutionSessionId): Promise<void>;
   startRun(
     executionSessionId: ExecutionSessionId,
     request: ExecutionRequest,
@@ -409,7 +410,15 @@ export class ChatExecutionCoordinator {
     listener(entry.projection);
     return () => {
       entry.listeners.delete(listener);
+      this.suspendUnobservedSession(entry);
     };
+  }
+
+  private suspendUnobservedSession(entry: ConversationEntry): void {
+    if (this.disposed || entry.listeners.size || entry.active || entry.queue.length || !entry.sessionId) return;
+    // A closed surface leaves admitted work running. Once it is durable and
+    // nobody is watching, release the process through the kernel's busy guard.
+    void this.lifecycle.suspendSession(entry.sessionId).catch(() => undefined);
   }
 
   getProjection(conversationId: string): ChatProjection | null {
@@ -1204,6 +1213,7 @@ export class ChatExecutionCoordinator {
       });
     } finally {
       lease?.release();
+      this.suspendUnobservedSession(entry);
     }
   }
 

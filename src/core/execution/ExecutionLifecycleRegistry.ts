@@ -479,7 +479,6 @@ export class ExecutionLifecycleRegistry {
         if (session.backend.state !== 'stable') {
           throw new Error(`Execution backend "${session.record.backendId}" is draining.`);
         }
-        this.clearIdleSuspend(session);
         if (this.runs.has(request.runId) || session.knownRunIds.has(request.runId)) {
           throw new Error(`Execution run "${request.runId}" already exists.`);
         }
@@ -523,6 +522,7 @@ export class ExecutionLifecycleRegistry {
           revision: createdRun.revision,
         };
         this.runs.set(request.runId, runEntry);
+        this.clearIdleSuspend(session);
 
         let executionRun: ExecutionRun;
         try {
@@ -2429,6 +2429,21 @@ export class ExecutionLifecycleRegistry {
     }
   }
 
+  /** Releases an idle process without disposing its resumable session. */
+  async suspendSession(id: ExecutionSessionId): Promise<void> {
+    await this.enqueueSession(id, async () => {
+      const session = this.sessions.get(id);
+      if (!session || this.state !== 'accepting' || !session.session.suspend) return;
+      this.clearIdleSuspend(session);
+      try {
+        if (this.canDisposeSession(id) && await session.session.suspend()) return;
+      } catch {
+        // A failed close is retried through the same idle policy as busy work.
+      }
+      this.armIdleSuspend(session);
+    });
+  }
+
   /**
    * Starts the clock on a session whose last run just finished.
    *
@@ -2444,23 +2459,14 @@ export class ExecutionLifecycleRegistry {
   private armIdleSuspend(session: SessionEntry): void {
     this.clearIdleSuspend(session);
     const delayMs = this.idleSuspendMs();
-    if (!(delayMs > 0) || typeof session.session.suspend !== 'function') {
+    if (this.state !== 'accepting' || !(delayMs > 0)
+      || typeof session.session.suspend !== 'function') {
       return;
     }
     const id = executionSessionId(session.record.executionSessionId);
     session.idleSuspendTimer = this.scheduler.setTimeout(() => {
       session.idleSuspendTimer = undefined;
-      this.trackEventTask(this.enqueueSession(id, async () => {
-        if (this.sessions.get(id) !== session || !this.canDisposeSession(id)) {
-          return;
-        }
-        try {
-          await session.session.suspend?.();
-        } catch {
-          // The process stays, as it would have without the timer; the next
-          // finished turn arms another one.
-        }
-      }));
+      this.trackEventTask(this.suspendSession(id));
     }, delayMs);
   }
 

@@ -174,7 +174,7 @@ describe('ClaudeExecutionBackend', () => {
     expectTerminal(await firstEvents, 'succeeded', 'completed');
 
     // Idle: the kernel asks for the process, and only the process, to go.
-    await session.suspend?.();
+    await expect(session.suspend?.()).resolves.toBe(true);
     expect(fixture.query.close).toHaveBeenCalledTimes(1);
     expect(session.getSnapshot().nativeSessionRef).toBe('native-session');
 
@@ -202,11 +202,13 @@ describe('ClaudeExecutionBackend', () => {
 
     // The task runs inside the process; closing it would kill work the user
     // can still see in the status panel.
-    await session.suspend?.();
+    await expect(session.suspend?.()).resolves.toBe(false);
     expect(fixture.query.close).not.toHaveBeenCalled();
 
     fixture.query.emit(taskNotification('task-1', 'stopped', 'tool-task-1'));
     await flushPromises();
+    await expect(session.suspend?.()).resolves.toBe(true);
+    expect(fixture.query.close).toHaveBeenCalledTimes(1);
   });
 
   it('forwards the messages a surface draws a turn from, once each', async () => {

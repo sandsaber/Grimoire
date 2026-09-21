@@ -1002,8 +1002,8 @@ export class ExecutionChatRuntimeAdapter {
    * Waits for the run to settle, with a bound.
    *
    * Unbounded would make closing a tab depend on a provider answering, which is
-   * exactly the coupling cancellation is meant to break. On timeout the session
-   * is left to the shutdown path, which terminalizes before disposing.
+   * exactly the coupling cancellation is meant to break. On timeout the caller
+   * forces session disposal, terminalizing any run still awaiting cancellation.
    */
   private async awaitTerminal(stream: ExecutionRunStream): Promise<void> {
     const deadline = (this.ports.now?.() ?? Date.now()) + CLEANUP_TERMINAL_WAIT_MS;

@@ -143,9 +143,10 @@ export interface ExecutionSession {
    * one process across sessions does not, and its absence says so. The
    * session, its native reference and its records stay: the next run launches
    * the process again and resumes, which is what a restart already does.
-   * A no-op while the session has live work the process owns.
+   * Returns false while live work or unconfirmed termination requires another
+   * idle check; true when no process remains. Failures may be retried too.
    */
-  suspend?(): Promise<void>;
+  suspend?(): Promise<boolean>;
 }
 
 export interface ExecutionSessionConfig {

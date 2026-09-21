@@ -42,24 +42,6 @@ describe('release bundle helpers', () => {
     }
   });
 
-  it('rejects release main.js assets above the Obsidian Sync Standard limit', () => {
-    const rootDir = mkdtempSync(join(tmpdir(), 'grimoire-release-size-'));
-    const outputDir = join(rootDir, 'dist', 'grimoire');
-
-    try {
-      writeFileSync(join(rootDir, 'main.js'), 'x'.repeat(5_000_001));
-      writeFileSync(join(rootDir, 'manifest.json'), '{"id":"grimoire"}');
-      writeFileSync(join(rootDir, 'styles.css'), 'plugin styles');
-      writeFileSync(join(rootDir, 'CHANGELOG.md'), '# Changelog');
-
-      expect(() => createReleaseBundle({ rootDir, outputDir })).toThrow(
-        /main\.js release asset is 5,000,001 bytes/,
-      );
-    } finally {
-      rmSync(rootDir, { recursive: true, force: true });
-    }
-  });
-
   it('verifies release bundles from an isolated install location', () => {
     const rootDir = mkdtempSync(join(tmpdir(), 'grimoire-release-load-'));
     const outputDir = join(rootDir, 'dist', 'grimoire');

@@ -1032,13 +1032,14 @@ class ClaudeExecutionSession implements ExecutionSession {
    * operation, a detached native task — for the reason `prepareRun` refuses a
    * restart then.
    */
-  async suspend(): Promise<void> {
-    if (this.disposed || !this.query
-      || this.activeRun || this.preparingRun || this.controlTask
+  async suspend(): Promise<boolean> {
+    if (this.disposed) return true;
+    if (this.activeRun || this.preparingRun || this.controlTask
       || this.hasLiveNativeTasks()) {
-      return;
+      return false;
     }
     await this.closeQuery();
+    return true;
   }
 
   dispose(): Promise<void> {

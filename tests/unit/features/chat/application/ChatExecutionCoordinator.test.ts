@@ -43,6 +43,49 @@ import { grokProviderModule } from '@/providers/grok/GrokProviderModule';
  */
 
 describe('chat execution coordinator', () => {
+  it('releases the idle process only after its last surface detaches', async () => {
+    const harness = await createHarness();
+    const detachFirst = await harness.coordinator.attach(CONVERSATION_ID, () => undefined);
+    const detachLast = await harness.coordinator.attach(CONVERSATION_ID, () => undefined);
+    const ticket = await harness.coordinator.submitTurn(turnCommand());
+    const started = await ticket.started;
+    harness.backend.emit(started.runId, {
+      kind: 'terminal', terminal: 'succeeded', reason: 'completed',
+    });
+    await ticket.completion;
+    const session = harness.backend.sessions.get(started.executionSessionId)!;
+    detachFirst();
+    await harness.registry.waitForIdle();
+    expect(session.suspendCount).toBe(0);
+    detachLast();
+    await waitUntil(() => session.suspendCount === 1, 'idle process suspension');
+    expect(session.disposeCount).toBe(0);
+  });
+
+  it('lets a detached turn finish and persist before releasing its process', async () => {
+    const harness = await createHarness();
+    const detach = await harness.coordinator.attach(CONVERSATION_ID, () => undefined);
+    const ticket = await harness.coordinator.submitTurn(turnCommand());
+    const started = await ticket.started;
+    const session = harness.backend.sessions.get(started.executionSessionId)!;
+    detach();
+    await harness.registry.waitForIdle();
+    expect(session.suspendCount).toBe(0);
+    expect(harness.registry.getRun(started.runId)?.terminal).toBeUndefined();
+    harness.backend.emit(started.runId, {
+      kind: 'output-delta', channel: 'assistant', text: 'Saved after closing.',
+    });
+    harness.backend.emit(started.runId, {
+      kind: 'terminal', terminal: 'succeeded', reason: 'completed',
+    });
+    await ticket.completion;
+    await waitUntil(() => session.suspendCount === 1, 'detached process suspension');
+    await expect(storedMessages(harness)).resolves.toEqual([
+      expect.objectContaining({ role: 'user' }),
+      expect.objectContaining({ role: 'assistant', content: 'Saved after closing.' }),
+    ]);
+  });
+
   it('is satisfied by the registry it was written against', () => {
     // The port is narrow on purpose, and narrow contracts drift: a method
     // renamed on the registry would leave this coordinator compiling against a
@@ -1100,6 +1143,7 @@ function eagerLifecycle(): ChatExecutionLifecyclePort & {
     sessionId,
     runId: eagerRunId,
     createSession: async () => sessionId,
+    suspendSession: async () => undefined,
     startRun: async () => {
       publish({
         eventId: 'eager-delta',

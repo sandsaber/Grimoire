@@ -72,17 +72,21 @@ that no-ops is a lie the surface cannot detect; an absent one is a fact it can r
 
 A provider process belongs to a kernel session, not to a turn. Claude's persistent SDK query and
 every ACP client are launched by the first turn and held warm for the next one; Codex shares one
-app-server across sessions; Command Code and Antigravity spawn per turn. Three things end a held
-process, and a backend that holds one must be reachable by all three:
+app-server across sessions; Command Code and Antigravity spawn per turn. A backend that holds a
+process must be reachable through these release paths:
 
 | Event | What happens |
 |---|---|
-| The tab lets the session go — close, conversation switch, settings change | `ExecutionChatRuntimeAdapter.cleanup()` / `resetSession()` cancel, wait a bounded time, then `disposeSession(id, { force: true })`. Force terminalizes a run past the wait as `indeterminate` and lets an unanswered interaction go, because the surface that would have answered it is gone. A refusal here was how idle `claude` processes outlived their tabs by days (#216) |
+| The last tab leaves a conversation | `ChatExecutionCoordinator` calls `suspendSession()` when the last projection listener detaches and no turn or queued input remains. Admitted work continues without a surface; the persistence barrier releases the process once that work finishes. Another attached surface keeps the session warm |
+| An adapter-owned session is released — cleanup or reset | `ExecutionChatRuntimeAdapter.cleanup()` / `resetSession()` cancel, wait a bounded time, then `disposeSession(id, { force: true })`. This covers the adapter's own session, not the coordinator session used by the chat UI |
 | The session sits idle past `sessionIdleTimeoutMinutes` | The registry calls `ExecutionSession.suspend()`, which closes the process and keeps the session and its native reference; the next turn relaunches and resumes, the way a reload does. Backends that hold a process between turns implement `suspend()`; the others leave it absent. `0` disables the timer |
 | Plugin unload | `shutdown()` terminalizes and disposes everything, owners or not |
 
-`suspend()` is a no-op while the process owns live work the kernel cannot see — Claude's detached
-native tasks — so the backend, not the registry, has the last word on whether the process can go.
+`suspend()` returns `false` while the process owns live work the kernel cannot see — Claude's
+detached native tasks — or its termination is unconfirmed, and `true` once no process remains.
+The registry retries at the configured idle interval when a lifecycle owner, a backend refusal or
+a close failure prevents suspension. A successful close stops the timer. Rejected run admission
+preserves the existing idle deadline.
 
 ## Stop conditions
 

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import type { SpawnedProcess } from '@anthropic-ai/claude-agent-sdk';
 import { loadEsmModule } from '@test/helpers/loadEsmModule';
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
@@ -14,6 +15,7 @@ import type { StreamChunk } from '@/core/types';
 import { claudePlanUsageStore } from '@/providers/claude/app/ClaudePlanUsageStore';
 import { createClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWorkspaceServices';
 import { ClaudeExecution } from '@/providers/claude/execution/ClaudeExecutionComposition';
+import type { ClaudeSdkQueryFunction } from '@/providers/claude/execution/ClaudeSdkExecutionAdapter';
 import { updateClaudeProviderSettings } from '@/providers/claude/settings';
 
 /**
@@ -27,7 +29,8 @@ import { updateClaudeProviderSettings } from '@/providers/claude/settings';
  * `queryFunction` on `createBackendRegistration`.
  *
  * Off by default: it starts the Claude CLI and spends the account's tokens, so
- * CI must never reach it. Run it with `GRIMOIRE_CLAUDE_LIVE=1`.
+ * CI must never reach it. Run with `GRIMOIRE_CLAUDE_LIVE=1` and
+ * `NODE_OPTIONS=--experimental-vm-modules` so Jest can import the real SDK.
  */
 const live = process.env.GRIMOIRE_CLAUDE_LIVE === '1' ? describe : describe.skip;
 
@@ -38,11 +41,11 @@ live('Claude live smoke', () => {
   jest.setTimeout(300_000);
 
   const running: Array<() => Promise<void>> = [];
-  let realQuery: unknown;
+  let realQuery: ClaudeSdkQueryFunction;
 
   beforeAll(async () => {
     const sdk = await loadEsmModule(pathToFileURL(SDK_PATH).href);
-    realQuery = sdk.query;
+    realQuery = sdk.query as ClaudeSdkQueryFunction;
     // Checked rather than assumed: a package that renamed its entry point would
     // otherwise reach the composition as `undefined` and fail every row with a
     // message about the kernel. Thrown rather than expected, because a
@@ -99,6 +102,7 @@ live('Claude live smoke', () => {
     overrides: Record<string, unknown> = {},
     reuseVault?: string,
     cliPath?: string,
+    processOptions: { idleSuspendMs?: number; queryFunction?: ClaudeSdkQueryFunction } = {},
   ): Promise<{
     runtime: any;
     execution: ClaudeExecution;
@@ -126,13 +130,14 @@ live('Claude live smoke', () => {
     });
     const host = new ExecutionKernelHost({
       storage: new TestDurableStorage(),
+      idleSuspendMs: () => processOptions.idleSuspendMs ?? 0,
       scheduler: {
         setTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
         clearTimeout: handle => clearTimeout(handle as NodeJS.Timeout),
       },
     });
     const execution = new ClaudeExecution(plugin, host.registry);
-    host.registerBackend(execution.createBackendRegistration(realQuery as never));
+    host.registerBackend(execution.createBackendRegistration(processOptions.queryFunction ?? realQuery));
     await host.start();
     const release = async (): Promise<void> => {
       execution.dispose();
@@ -223,6 +228,62 @@ live('Claude live smoke', () => {
     // defect the mirrored-update rows exist for, and it reads as one answer
     // here only if nothing repeated it.
     expect(textOf(chunks).toLowerCase().split('ok').length - 1).toBe(1);
+    await shutdown();
+  });
+
+  it('issue 216: exits the idle process, resumes its memory, and exits on tab cleanup', async () => {
+    const spawned: SpawnedProcess[] = [];
+    const exited = new Set<SpawnedProcess>();
+    const queryFunction: ClaudeSdkQueryFunction = args => {
+      const spawn = args.options?.spawnClaudeCodeProcess;
+      if (!spawn) throw new Error('Expected the production Claude process spawner.');
+      return realQuery({
+        ...args,
+        options: {
+          ...args.options,
+          spawnClaudeCodeProcess: options => {
+            const child = spawn(options);
+            spawned.push(child);
+            child.once('exit', () => exited.add(child));
+            return child;
+          },
+        },
+      });
+    };
+    const processOptions = {
+      idleSuspendMs: 1_000, queryFunction,
+    };
+    const { runtime, shutdown } = await createHarness({}, undefined, undefined, processOptions);
+    const waitForExit = async (child: SpawnedProcess): Promise<void> => {
+      const deadline = Date.now() + 15_000;
+      while (!exited.has(child) && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      expect(exited.has(child)).toBe(true);
+    };
+
+    const first = await drain(runtime.query(runtime.prepareTurn({
+      text: 'Remember the codeword amber-lantern-216. Reply with exactly: ok',
+    })));
+    expect(first.filter(chunk => chunk.type === 'error')).toEqual([]);
+    expect(spawned).toHaveLength(1);
+    const nativeSessionId = runtime.getSessionId();
+    expect(typeof nativeSessionId).toBe('string');
+    await waitForExit(spawned[0]);
+    // The second process must exit because of cleanup, not another idle timer.
+    processOptions.idleSuspendMs = 0;
+
+    const second = await drain(runtime.query(runtime.prepareTurn({
+      text: 'What codeword did I ask you to remember? Reply with the codeword only.',
+    })));
+    expect(second.filter(chunk => chunk.type === 'error')).toEqual([]);
+    expect(textOf(second).toLowerCase()).toContain('amber-lantern-216');
+    expect(runtime.getSessionId()).toBe(nativeSessionId);
+    expect(spawned).toHaveLength(2);
+    expect(exited.has(spawned[1])).toBe(false);
+    await runtime.cleanup();
+    await waitForExit(spawned[1]);
+    report('ISSUE 216', 'idle exit confirmed; native memory resumed; tab cleanup exit confirmed');
     await shutdown();
   });
 
