@@ -776,6 +776,10 @@
       "name": "Maximale Dauer eines Zuges",
       "desc": "Minuten, die ein Zug laufen darf, bevor er gestoppt wird — unabhängig davon, wie aktiv er bleibt. Ein stiller Zug wird früher gestoppt, nach zehn Minuten ohne ein Wort. Für lange agentische Arbeit erhöhen oder 0 setzen, um die Obergrenze aufzuheben."
     },
+    "sessionIdleTimeout": {
+      "name": "Zeitlimit für inaktive Prozesse",
+      "desc": "Minuten, die eine Unterhaltung ohne laufenden Zug ihren Anbieterprozess behält, bevor Grimoire ihn freigibt. Die Unterhaltung bleibt erhalten und der nächste Zug setzt sie fort, es kostet also einen Kaltstart. 0 setzen, um jeden Prozess zu behalten, solange sein Tab geöffnet ist."
+    },
     "navMappings": {
       "name": "Vim-Style Navigationszuordnungen",
       "desc": "Eine Zuordnung pro Zeile. Format: \"map <Taste> <Aktion>\" (Aktionen: scrollUp, scrollDown, focusInput)."

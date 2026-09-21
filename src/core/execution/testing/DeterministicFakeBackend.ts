@@ -254,6 +254,7 @@ export class DeterministicFakeSession implements ExecutionSession {
   readonly config: ExecutionSessionConfig;
   readonly steeredRefs: string[] = [];
   disposeCount = 0;
+  suspendCount = 0;
   private readonly listeners = new Set<(event: ProviderExecutionEvent) => void>();
   private instanceId: SessionInstanceId;
   private disposed = false;
@@ -294,6 +295,13 @@ export class DeterministicFakeSession implements ExecutionSession {
       throw new Error('Fake dispatch acknowledgement was lost.');
     }
     return run;
+  }
+
+  /** Counts the kernel letting the process go; the fake has none to close. */
+  async suspend(): Promise<void> {
+    if (!this.disposed) {
+      this.suspendCount += 1;
+    }
   }
 
   /**

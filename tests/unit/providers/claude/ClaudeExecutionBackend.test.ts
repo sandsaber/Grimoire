@@ -162,6 +162,53 @@ describe('ClaudeExecutionBackend', () => {
     await flushPromises();
   });
 
+  it('lets go of the idle query and resumes the native session on the next turn', async () => {
+    const fixture = createFixture({
+      invocations: { first: invocation('message-1'), second: invocation('message-2') },
+    });
+    const session = await createSession(fixture.backend, 'native-session');
+
+    const firstEvents = collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    fixture.query.emit(resultMessage('message-1', 'first result', 'result-1'));
+    expectTerminal(await firstEvents, 'succeeded', 'completed');
+
+    // Idle: the kernel asks for the process, and only the process, to go.
+    await session.suspend?.();
+    expect(fixture.query.close).toHaveBeenCalledTimes(1);
+    expect(session.getSnapshot().nativeSessionRef).toBe('native-session');
+
+    const relaunched = new FakeQuery();
+    fixture.factory.nextQuery = relaunched;
+    const secondEvents = collectEvents(session.createRun(request('2', 'second')));
+    await waitFor(() => relaunched.received.length === 1);
+    relaunched.emit(resultMessage('message-2', 'second result', 'result-2'));
+    expectTerminal(await secondEvents, 'succeeded', 'completed');
+
+    expect(fixture.factory.inputs).toHaveLength(2);
+    expect(fixture.factory.inputs[1]?.nativeSessionRef).toBe('native-session');
+    expect(fixture.stored.map(entry => entry.output)).toEqual(['first result', 'second result']);
+  });
+
+  it('keeps the query while a detached native task is still live', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend);
+
+    const firstEvents = collectEvents(session.createRun(request('1', 'default')));
+    await waitFor(() => fixture.query.received.length === 1);
+    fixture.query.emit(taskStarted('task-1', 'tool-task-1'));
+    fixture.query.emit(resultMessage('message-1', 'parent done', 'result-1'));
+    expectTerminal(await firstEvents, 'succeeded', 'completed');
+
+    // The task runs inside the process; closing it would kill work the user
+    // can still see in the status panel.
+    await session.suspend?.();
+    expect(fixture.query.close).not.toHaveBeenCalled();
+
+    fixture.query.emit(taskNotification('task-1', 'stopped', 'tool-task-1'));
+    await flushPromises();
+  });
+
   it('forwards the messages a surface draws a turn from, once each', async () => {
     // The backend was harvested before the kernel had a content channel, so it
     // reported facts and text and nothing a tool card, a plan or a task could

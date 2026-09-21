@@ -14,6 +14,7 @@ import type { AppSessionStorage } from '@/core/providers/types';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import type { ProviderId } from '@/core/types/provider';
+import { resolveSessionIdleTimeoutMs } from '@/core/types/settings';
 import type GrimoirePlugin from '@/main';
 import { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
 import { ClaudeExecution } from '@/providers/claude/execution/ClaudeExecutionComposition';
@@ -152,6 +153,9 @@ export class ApplicationRuntime {
     const { plugin } = options;
     this.kernel = new ExecutionKernelHost({
       storage: new VaultDurableStorage(options.adapter),
+      // Read at arming time, off the live settings: a changed value applies to
+      // the next finished turn without a reload.
+      idleSuspendMs: () => resolveSessionIdleTimeoutMs(plugin.settings),
       reportShutdownFailure: error => options.report({
         error,
         event: 'execution.shutdown.failed',

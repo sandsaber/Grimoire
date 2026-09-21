@@ -32,10 +32,12 @@ import type {
 import {
   type ChatViewPlacement,
   MAX_RUN_ABSOLUTE_TIMEOUT_MINUTES,
+  MAX_SESSION_IDLE_TIMEOUT_MINUTES,
   MAX_TABS,
   MIN_TABS,
   normalizeMaxTabs,
   normalizeRunAbsoluteTimeoutMinutes,
+  normalizeSessionIdleTimeoutMinutes,
 } from '../../core/types/settings';
 import { getAvailableLocales, getLocaleDisplayName, setLocale, t } from '../../i18n/i18n';
 import type { Locale, TranslationKey } from '../../i18n/types';
@@ -2116,6 +2118,25 @@ export class GrimoireSettingTab extends PluginSettingTab {
             // must never arm a ceiling from whatever was typed.
             const minutes = normalizeRunAbsoluteTimeoutMinutes(Number(rawValue));
             this.plugin.settings.runAbsoluteTimeoutMinutes = minutes;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(advancedContainer)
+      .setName(t('settings.sessionIdleTimeout.name'))
+      .setDesc(t('settings.sessionIdleTimeout.desc'))
+      .addText((text) => {
+        text.inputEl.type = 'number';
+        text.inputEl.min = '0';
+        text.inputEl.max = String(MAX_SESSION_IDLE_TIMEOUT_MINUTES);
+        text.inputEl.setAttribute('aria-label', t('settings.sessionIdleTimeout.name'));
+        text
+          .setValue(String(normalizeSessionIdleTimeoutMinutes(
+            this.plugin.settings.sessionIdleTimeoutMinutes,
+          )))
+          .onChange(async (rawValue) => {
+            const minutes = normalizeSessionIdleTimeoutMinutes(Number(rawValue));
+            this.plugin.settings.sessionIdleTimeoutMinutes = minutes;
             await this.plugin.saveSettings();
           });
       });

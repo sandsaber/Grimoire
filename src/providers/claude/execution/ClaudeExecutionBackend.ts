@@ -1023,6 +1023,24 @@ class ClaudeExecutionSession implements ExecutionSession {
     return { canRewind: true, ...(filesChanged ? { filesChanged } : {}), ...measured };
   }
 
+  /**
+   * Closes the persistent query and its `claude` process, keeping the session.
+   *
+   * The next turn's `prepareRun` finds no query and starts one that resumes
+   * `nativeSessionRef`, which is the same path a plugin reload takes. Declined
+   * while anything the process owns is still going — a turn, a control
+   * operation, a detached native task — for the reason `prepareRun` refuses a
+   * restart then.
+   */
+  async suspend(): Promise<void> {
+    if (this.disposed || !this.query
+      || this.activeRun || this.preparingRun || this.controlTask
+      || this.hasLiveNativeTasks()) {
+      return;
+    }
+    await this.closeQuery();
+  }
+
   dispose(): Promise<void> {
     if (this.disposalTask) {
       return this.disposalTask;

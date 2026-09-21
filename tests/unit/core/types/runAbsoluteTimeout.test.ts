@@ -1,8 +1,12 @@
 import {
   DEFAULT_RUN_ABSOLUTE_TIMEOUT_MINUTES,
+  DEFAULT_SESSION_IDLE_TIMEOUT_MINUTES,
   MAX_RUN_ABSOLUTE_TIMEOUT_MINUTES,
+  MAX_SESSION_IDLE_TIMEOUT_MINUTES,
   normalizeRunAbsoluteTimeoutMinutes,
+  normalizeSessionIdleTimeoutMinutes,
   resolveRunAbsoluteTimeoutMs,
+  resolveSessionIdleTimeoutMs,
 } from '@/core/types/settings';
 
 describe('run ceiling settings', () => {
@@ -29,5 +33,23 @@ describe('run ceiling settings', () => {
 
   it('answers in the milliseconds a backend arms', () => {
     expect(resolveRunAbsoluteTimeoutMs({ runAbsoluteTimeoutMinutes: 90 })).toBe(90 * 60_000);
+  });
+});
+
+describe('idle session settings', () => {
+  it('reads zero as keep-forever and an absence as the default', () => {
+    expect(normalizeSessionIdleTimeoutMinutes(0)).toBe(0);
+    expect(resolveSessionIdleTimeoutMs({ sessionIdleTimeoutMinutes: 0 })).toBe(0);
+    expect(normalizeSessionIdleTimeoutMinutes(undefined))
+      .toBe(DEFAULT_SESSION_IDLE_TIMEOUT_MINUTES);
+    expect(resolveSessionIdleTimeoutMs({}))
+      .toBe(DEFAULT_SESSION_IDLE_TIMEOUT_MINUTES * 60_000);
+  });
+
+  it('bounds what a hand-edited settings file can ask for', () => {
+    expect(normalizeSessionIdleTimeoutMinutes(-1)).toBe(0);
+    expect(normalizeSessionIdleTimeoutMinutes(15.9)).toBe(15);
+    expect(normalizeSessionIdleTimeoutMinutes(10_000))
+      .toBe(MAX_SESSION_IDLE_TIMEOUT_MINUTES);
   });
 });

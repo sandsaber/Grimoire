@@ -776,6 +776,10 @@
       "name": "Maximum turn duration",
       "desc": "Minutes one turn may run before it is stopped, however active it stays. A silent turn is stopped sooner, after ten minutes without a word. Raise this for long agentic work, or set 0 to remove the ceiling."
     },
+    "sessionIdleTimeout": {
+      "name": "Idle process timeout",
+      "desc": "Minutes a conversation with no turn running keeps its provider process before Grimoire lets it go. The conversation stays and the next turn resumes it, so this costs one cold start. Set 0 to keep every process for as long as its tab is open."
+    },
     "navMappings": {
       "name": "Vim-style navigation mappings",
       "desc": "One mapping per line. Format: \"map <key> <action>\" (actions: scrollUp, scrollDown, focusInput)."

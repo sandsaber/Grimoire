@@ -5,7 +5,7 @@
 ## Runtime Rules
 
 - Preserve provider-native SDK semantics before adding Grimoire-side behavior.
-- Persistent query stays alive across turns when possible. Restart only when effective prompt, disabled tools, plugin set, settings source set, CLI path, Chrome enablement, or external context paths require it.
+- Persistent query stays alive across turns when possible. Restart only when effective prompt, disabled tools, plugin set, settings source set, CLI path, Chrome enablement, or external context paths require it. The kernel closes it through `suspend()` after the idle timeout and when the tab lets the session go; the next turn resumes `nativeSessionRef`, so the session survives the process.
 - Dynamic changes such as model, permission mode, MCP servers, and effort level should use SDK update APIs when supported.
 - `createCustomSpawnFunction()` works around Obsidian/Electron process issues. Be careful with Node path resolution and AbortSignal realms.
 

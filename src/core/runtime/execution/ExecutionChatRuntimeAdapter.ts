@@ -985,7 +985,10 @@ export class ExecutionChatRuntimeAdapter {
         dispatchCancellation(this.context, active.runId, active.stream);
         await this.awaitTerminal(active.stream);
       }
-      await this.context.registry.disposeSession(executionSessionId);
+      // Forced, because the id is dropped above and nothing retries: a refusal
+      // here — a run past the wait, an approval nobody will answer now — left
+      // the session and its provider process running with no owner, for days.
+      await this.context.registry.disposeSession(executionSessionId, { force: true });
     } catch (error) {
       // Total by contract. `ChatRuntime.cleanup()` returns void, so every
       // caller discards what this returns — a rejection from anywhere in here,
@@ -1112,7 +1115,8 @@ export class ExecutionChatRuntimeAdapter {
       if (active) {
         await this.awaitTerminal(active.stream);
       }
-      await this.context.registry.disposeSession(executionSessionId);
+      // Forced for the same reason `cleanup()` forces: the id is already gone.
+      await this.context.registry.disposeSession(executionSessionId, { force: true });
     })().catch(error => this.ports.reportCleanupFailure?.(error));
   }
 

@@ -94,6 +94,12 @@ export interface ExecutionLifecycleRegistryOptions {
   readonly recoveryTimeoutMs?: number;
   readonly shutdownGracePeriodMs?: number;
   readonly scheduler: ExecutionLifecycleScheduler;
+  /**
+   * How long a session may sit with no run before its provider process is let
+   * go, read when the timer is armed so a settings change applies to the next
+   * finished turn. `0` keeps every process for the life of the session.
+   */
+  readonly idleSuspendMs?: () => number;
 }
 
 export interface ExecutionLifecycleScheduler {
@@ -186,6 +192,8 @@ interface SessionEntry {
     readonly nextCausalSequence: number;
     readonly runIds: Set<RunId>;
   }>;
+  /** Armed when the session's last run finishes, cleared when one starts. */
+  idleSuspendTimer?: unknown;
   /**
    * Every run this process has seen for the session, finished ones included.
    *
@@ -227,6 +235,7 @@ export class ExecutionLifecycleRegistry {
   private readonly recoveryTimeoutMs: number;
   private readonly shutdownGracePeriodMs: number;
   private readonly scheduler: ExecutionLifecycleScheduler;
+  private readonly idleSuspendMs: () => number;
   private readonly backends = new Map<ExecutionBackendId, BackendEntry>();
   private readonly sessions = new Map<ExecutionSessionId, SessionEntry>();
   private readonly runs = new Map<RunId, RunEntry>();
@@ -264,6 +273,7 @@ export class ExecutionLifecycleRegistry {
       throw new Error('Shutdown grace period must be a positive safe integer.');
     }
     this.scheduler = options.scheduler;
+    this.idleSuspendMs = options.idleSuspendMs ?? (() => 0);
   }
 
   registerBackend(registration: BackendLifecycleRegistration): void {
@@ -469,6 +479,7 @@ export class ExecutionLifecycleRegistry {
         if (session.backend.state !== 'stable') {
           throw new Error(`Execution backend "${session.record.backendId}" is draining.`);
         }
+        this.clearIdleSuspend(session);
         if (this.runs.has(request.runId) || session.knownRunIds.has(request.runId)) {
           throw new Error(`Execution run "${request.runId}" already exists.`);
         }
@@ -1128,7 +1139,22 @@ export class ExecutionLifecycleRegistry {
     return !hasLease && !hasLiveRun && !hasOpenInteraction;
   }
 
-  async disposeSession(executionSessionId: ExecutionSessionId): Promise<void> {
+  /**
+   * Closes a session and the provider process behind it.
+   *
+   * Refused while the session has a live run, an open interaction or a held
+   * lease, unless `force` is given. Force is what a tab means when it closes:
+   * the surface that would have answered the interaction or watched the run is
+   * gone, so refusing here left the kernel session — and its process — with
+   * nothing holding a reference to it, which is how idle `claude` processes
+   * came to outlive their tabs by days. Under force the live runs are
+   * terminalized as `indeterminate`, the way shutdown terminalizes what it
+   * could not wait for, and the disposal proceeds.
+   */
+  async disposeSession(
+    executionSessionId: ExecutionSessionId,
+    options: { readonly force?: boolean } = {},
+  ): Promise<void> {
     await this.enqueueSession(executionSessionId, async () => {
       const session = this.sessions.get(executionSessionId);
       if (!session) {
@@ -1138,8 +1164,12 @@ export class ExecutionLifecycleRegistry {
         return;
       }
       if (!this.canDisposeSession(executionSessionId)) {
-        throw new Error(`Execution session "${executionSessionId}" still has lifecycle owners.`);
+        if (!options.force) {
+          throw new Error(`Execution session "${executionSessionId}" still has lifecycle owners.`);
+        }
+        await this.releaseSessionOwners(session);
       }
+      this.clearIdleSuspend(session);
       session.unsubscribe();
       await session.session.dispose();
       const updated = await this.repositories.sessions.update(
@@ -1156,6 +1186,30 @@ export class ExecutionLifecycleRegistry {
       this.envelopeObservers.delete(executionSessionId);
       this.forgetSessionWork(session);
     });
+  }
+
+  /**
+   * Takes a session's remaining owners away so a forced disposal can proceed.
+   *
+   * A live run is terminalized `indeterminate`: the tab asked for cancellation
+   * and the provider never confirmed it within the wait, which is exactly what
+   * `cancellation-unknown` names. Terminalizing also marks the run's open
+   * interactions cancelling and schedules their cancellation. Leases go the way
+   * shutdown lets them go.
+   */
+  private async releaseSessionOwners(session: SessionEntry): Promise<void> {
+    for (const id of session.knownRunIds) {
+      const run = this.runs.get(runId(id));
+      if (run && !run.record.terminal) {
+        await this.terminalizeRun(run, 'indeterminate', 'cancellation-unknown', this.now());
+      }
+    }
+    for (const [leaseId, lease] of this.leases) {
+      if (lease.executionSessionId === session.record.executionSessionId) {
+        lease.released = true;
+        this.leases.delete(leaseId);
+      }
+    }
   }
 
   /**
@@ -1987,6 +2041,7 @@ export class ExecutionLifecycleRegistry {
       if (run.record.terminal) {
         this.scheduleInteractionCancellations(interactionIds);
         await this.markBackendTransitionsQuiescent(session.backend);
+        this.armIdleSuspend(session);
       } else if (envelope.event.kind === 'connection-lost') {
         this.trackEventTask(this.recoverRun(runId(run.record.runId)));
       }
@@ -2370,6 +2425,49 @@ export class ExecutionLifecycleRegistry {
         synthesized: true,
       });
       await this.markBackendTransitionsQuiescent(session.backend);
+      this.armIdleSuspend(session);
+    }
+  }
+
+  /**
+   * Starts the clock on a session whose last run just finished.
+   *
+   * The process a backend keeps warm between turns is what made an idle
+   * conversation cost a `claude` for as long as its tab stayed open — days,
+   * in the report that found this. When the clock runs out and the session is
+   * still quiescent, the backend is asked to let the process go; the session
+   * itself stays, and the next turn relaunches and resumes. Quiescence is
+   * re-checked at the time of firing, not assumed from the time of arming: a
+   * run admitted in between clears the timer, but an interaction the backend
+   * opened on its own does not, and `canDisposeSession` sees both.
+   */
+  private armIdleSuspend(session: SessionEntry): void {
+    this.clearIdleSuspend(session);
+    const delayMs = this.idleSuspendMs();
+    if (!(delayMs > 0) || typeof session.session.suspend !== 'function') {
+      return;
+    }
+    const id = executionSessionId(session.record.executionSessionId);
+    session.idleSuspendTimer = this.scheduler.setTimeout(() => {
+      session.idleSuspendTimer = undefined;
+      this.trackEventTask(this.enqueueSession(id, async () => {
+        if (this.sessions.get(id) !== session || !this.canDisposeSession(id)) {
+          return;
+        }
+        try {
+          await session.session.suspend?.();
+        } catch {
+          // The process stays, as it would have without the timer; the next
+          // finished turn arms another one.
+        }
+      }));
+    }, delayMs);
+  }
+
+  private clearIdleSuspend(session: SessionEntry): void {
+    if (session.idleSuspendTimer !== undefined) {
+      this.scheduler.clearTimeout(session.idleSuspendTimer);
+      session.idleSuspendTimer = undefined;
     }
   }
 
@@ -2679,6 +2777,7 @@ export class ExecutionLifecycleRegistry {
   }
 
   private async disposeSessionForShutdown(session: SessionEntry): Promise<void> {
+    this.clearIdleSuspend(session);
     session.unsubscribe();
     const updated = await this.repositories.sessions.update(
       session.record.executionSessionId,

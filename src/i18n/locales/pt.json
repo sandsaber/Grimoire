@@ -776,6 +776,10 @@
       "name": "Duração máxima de um turno",
       "desc": "Minutos que um turno pode executar antes de ser interrompido, por mais ativo que continue. Um turno silencioso é interrompido antes, após dez minutos sem dizer nada. Aumente para trabalhos agênticos longos, ou defina 0 para remover o limite."
     },
+    "sessionIdleTimeout": {
+      "name": "Tempo limite de processos inativos",
+      "desc": "Minutos que uma conversa sem turno em execução mantém o processo do provedor antes que o Grimoire o libere. A conversa permanece e o próximo turno a retoma, custando uma inicialização a frio. Defina 0 para manter cada processo enquanto a aba estiver aberta."
+    },
     "navMappings": {
       "name": "Mapeamentos de navegação estilo Vim",
       "desc": "Um mapeamento por linha. Formato: \"map <tecla> <ação>\" (ações: scrollUp, scrollDown, focusInput)."

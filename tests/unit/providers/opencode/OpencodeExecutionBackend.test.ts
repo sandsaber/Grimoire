@@ -464,6 +464,33 @@ describe('OpencodeExecutionBackend', () => {
     ]).toEqual(trace.cases.restartConfiguration);
   });
 
+  it('lets go of the idle agent process and reloads the native session on the next turn', async () => {
+    const first = new FakeManagedAcpClient('native-session');
+    const second = new FakeManagedAcpClient('native-session');
+    const fixture = createFixture({ clients: [first, second] });
+    const session = await createSession(fixture.backend);
+
+    const firstEvents = collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => first.promptRequests.length === 1);
+    first.emit(agentText('native-session', 'first'));
+    first.completePrompt({ stopReason: 'end_turn' });
+    expectTerminal(await firstEvents, 'succeeded', 'completed');
+
+    // Idle: the process goes, the session and its native reference stay.
+    await session.suspend?.();
+    expect(first.closeCalls).toBe(1);
+    expect(session.getSnapshot().nativeSessionRef).toBe('native-session');
+
+    const secondEvents = collectEvents(session.createRun(request('2', 'second')));
+    await waitFor(() => second.promptRequests.length === 1);
+    second.emit(agentText('native-session', 'second'));
+    second.completePrompt({ stopReason: 'end_turn' });
+    expectTerminal(await secondEvents, 'succeeded', 'completed');
+
+    expect(fixture.factory.inputs).toHaveLength(2);
+    expect(second.loadRequests.map(load => load.sessionId)).toEqual(['native-session']);
+  });
+
   it('round-trips a durable ACP approval and resolves retries idempotently', async () => {
     const fixture = createFixture();
     const session = await createSession(fixture.backend);

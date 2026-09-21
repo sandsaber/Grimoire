@@ -776,6 +776,10 @@
       "name": "Durée maximale d'un tour",
       "desc": "Minutes pendant lesquelles un tour peut s'exécuter avant d'être arrêté, aussi actif soit-il. Un tour silencieux est arrêté plus tôt, après dix minutes sans un mot. Augmentez cette valeur pour un long travail agentique, ou mettez 0 pour supprimer la limite."
     },
+    "sessionIdleTimeout": {
+      "name": "Délai d'inactivité des processus",
+      "desc": "Minutes pendant lesquelles une conversation sans tour en cours conserve son processus fournisseur avant que Grimoire le libère. La conversation reste et le tour suivant la reprend, au prix d'un démarrage à froid. Mettez 0 pour conserver chaque processus tant que son onglet est ouvert."
+    },
     "navMappings": {
       "name": "Mappages de navigation style Vim",
       "desc": "Un mappage par ligne. Format : \"map <touche> <action>\" (actions : scrollUp, scrollDown, focusInput)."

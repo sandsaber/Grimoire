@@ -1124,6 +1124,76 @@ describe('ExecutionLifecycleRegistry', () => {
   });
 });
 
+describe('ExecutionLifecycleRegistry — idle sessions and their processes', () => {
+  it('asks an idle session to let its process go, and not one a new turn has claimed', async () => {
+    const scheduler = new ManualScheduler();
+    const fixture = await startedFixture(undefined, { scheduler, idleSuspendMs: 1_000 });
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    await settle(fixture.registry);
+    const session = fixture.backend.sessions.get(SESSION_ID)!;
+
+    // A turn admitted before the clock runs out keeps the process warm: the
+    // timer is cleared on admission, so firing what is left does nothing.
+    await fixture.registry.startRun(SESSION_ID, request(RUN_ID_2));
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(session.suspendCount).toBe(0);
+
+    fixture.backend.emit(RUN_ID_2, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    await settle(fixture.registry);
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(session.suspendCount).toBe(1);
+    // The process went; the session did not. It is still there to dispose.
+    expect(session.disposeCount).toBe(0);
+    await expect(fixture.registry.disposeSession(SESSION_ID)).resolves.toBeUndefined();
+    expect(session.disposeCount).toBe(1);
+  });
+
+  it('arms nothing when the timeout is zero', async () => {
+    const scheduler = new ManualScheduler();
+    const fixture = await startedFixture(undefined, { scheduler, idleSuspendMs: 0 });
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, { kind: 'terminal', terminal: 'succeeded', reason: 'completed' });
+    await settle(fixture.registry);
+    scheduler.fireAll();
+    await settle(fixture.registry);
+    expect(fixture.backend.sessions.get(SESSION_ID)?.suspendCount).toBe(0);
+  });
+
+  it('force-disposes a session whose owners left with its tab', async () => {
+    const fixture = await startedFixture();
+    await startDefaultRun(fixture);
+    fixture.backend.emit(RUN_ID, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: INTERACTION_ID, runId: RUN_ID, kind: 'approval',
+        presentationRef: 'approval-nobody-answers', responseIds: ['yes', 'no'],
+      },
+    });
+    await settle(fixture.registry);
+
+    // The tab that would have answered is gone. Refusing here is what left the
+    // kernel session and its provider process running with no owner.
+    await expect(fixture.registry.disposeSession(SESSION_ID))
+      .rejects.toThrow('still has lifecycle owners');
+    await expect(fixture.registry.disposeSession(SESSION_ID, { force: true }))
+      .resolves.toBeUndefined();
+    await settle(fixture.registry);
+
+    expect(fixture.backend.sessions.get(SESSION_ID)?.disposeCount).toBe(1);
+    const run = await currentRecord<{ terminal?: { kind: string; reason: string } }>(
+      fixture.repositories.runs.read(RUN_ID),
+    );
+    expect(run.payload.terminal).toEqual(expect.objectContaining({
+      kind: 'indeterminate',
+      reason: 'cancellation-unknown',
+    }));
+    expect(fixture.backend.cancelledInteractions).toContain(INTERACTION_ID);
+  });
+});
+
 describe('ExecutionLifecycleRegistry — deleting a conversation', () => {
   const OTHER_OWNER = { kind: 'conversation' as const, ownerId: 'conversation-2' };
 
@@ -1669,6 +1739,7 @@ interface FixtureOptions {
   readonly recovery?: 'native' | 'snapshot';
   readonly scheduler?: ExecutionLifecycleScheduler;
   readonly crashInjector?: (point: TransactionCrashPoint) => void;
+  readonly idleSuspendMs?: number;
 }
 
 function createFixture(
@@ -1698,6 +1769,7 @@ function createFixture(
     now,
     scheduler: options.scheduler ?? new PassiveScheduler(),
     shutdownGracePeriodMs: 10,
+    ...(options.idleSuspendMs !== undefined ? { idleSuspendMs: () => options.idleSuspendMs! } : {}),
   });
   registry.registerBackend({
     backend,

@@ -93,6 +93,27 @@ export function resolveRunAbsoluteTimeoutMs(settings: { runAbsoluteTimeoutMinute
   return normalizeRunAbsoluteTimeoutMinutes(settings.runAbsoluteTimeoutMinutes) * 60_000;
 }
 
+export const DEFAULT_SESSION_IDLE_TIMEOUT_MINUTES = 30;
+export const MAX_SESSION_IDLE_TIMEOUT_MINUTES = 24 * 60;
+
+/**
+ * How long an idle session keeps its provider process, in minutes, with the
+ * same reading as the run ceiling: `0` keeps the process for the life of the
+ * session, a non-number is an absence and gets the default.
+ */
+export function normalizeSessionIdleTimeoutMinutes(value: unknown): number {
+  const numeric = typeof value === 'number' && Number.isFinite(value)
+    ? Math.trunc(value)
+    : DEFAULT_SESSION_IDLE_TIMEOUT_MINUTES;
+
+  return Math.max(0, Math.min(MAX_SESSION_IDLE_TIMEOUT_MINUTES, numeric));
+}
+
+/** The value the kernel arms its idle timer with; `0` arms nothing. */
+export function resolveSessionIdleTimeoutMs(settings: { sessionIdleTimeoutMinutes?: unknown }): number {
+  return normalizeSessionIdleTimeoutMinutes(settings.sessionIdleTimeoutMinutes) * 60_000;
+}
+
 export const CHAT_VIEW_PLACEMENTS = [
   'right-sidebar',
   'left-sidebar',
@@ -204,6 +225,16 @@ export interface GrimoireSettings {
    * agentic turn is a legitimate reason to raise it. `0` removes it.
    */
   runAbsoluteTimeoutMinutes: number;
+  /**
+   * How long a conversation with no turn running keeps its provider process.
+   *
+   * Providers that hold a process warm between turns — Claude Code, every ACP
+   * agent — otherwise hold one per open tab until the tab closes, which a
+   * sidebar left open makes indefinite. Past this the kernel asks the backend
+   * to let the process go; the session stays and the next turn resumes it,
+   * paying a cold start. `0` keeps every process for the life of its tab.
+   */
+  sessionIdleTimeoutMinutes: number;
 
   // Internationalization
   locale: string;

@@ -776,6 +776,10 @@
       "name": "Duración máxima de un turno",
       "desc": "Minutos que un turno puede ejecutarse antes de detenerse, por muy activo que siga. Un turno en silencio se detiene antes, tras diez minutos sin decir nada. Aumenta este valor para trabajos agénticos largos, o pon 0 para quitar el límite."
     },
+    "sessionIdleTimeout": {
+      "name": "Tiempo de espera de procesos inactivos",
+      "desc": "Minutos que una conversación sin un turno en curso conserva su proceso del proveedor antes de que Grimoire lo libere. La conversación se mantiene y el siguiente turno la reanuda, así que cuesta un arranque en frío. Pon 0 para conservar cada proceso mientras su pestaña esté abierta."
+    },
     "navMappings": {
       "name": "Mapeos de navegación estilo Vim",
       "desc": "Un mapeo por línea. Formato: \"map <tecla> <acción>\" (acciones: scrollUp, scrollDown, focusInput)."

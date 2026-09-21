@@ -13,6 +13,8 @@ export interface ExecutionKernelHostOptions {
   readonly storage: DurableStorage;
   readonly now?: () => number;
   readonly scheduler?: ExecutionLifecycleScheduler;
+  /** See `ExecutionLifecycleRegistryOptions.idleSuspendMs`. */
+  readonly idleSuspendMs?: () => number;
   /** Reports a shutdown that could not finish; never thrown at the caller. */
   reportShutdownFailure?(error: unknown): void;
 }
@@ -53,6 +55,7 @@ export class ExecutionKernelHost {
         setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
         clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>),
       },
+      ...(options.idleSuspendMs ? { idleSuspendMs: options.idleSuspendMs } : {}),
     });
   }
 

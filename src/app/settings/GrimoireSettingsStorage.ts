@@ -21,6 +21,7 @@ import {
   normalizeMaxTabs,
   normalizePermissionMode,
   normalizeRunAbsoluteTimeoutMinutes,
+  normalizeSessionIdleTimeoutMinutes,
   type ProviderConfigMap,
   type TabBarPosition,
 } from '../../core/types/settings';
@@ -387,6 +388,9 @@ export class GrimoireSettingsStorage {
     const runAbsoluteTimeoutMinutes = normalizeRunAbsoluteTimeoutMinutes(
       stored.runAbsoluteTimeoutMinutes,
     );
+    const sessionIdleTimeoutMinutes = normalizeSessionIdleTimeoutMinutes(
+      stored.sessionIdleTimeoutMinutes,
+    );
     const legacyProviderSettings = {
       ...stored,
       hiddenProviderCommands,
@@ -413,6 +417,7 @@ export class GrimoireSettingsStorage {
       usageIndicatorsEnabled,
       debugLoggingEnabled,
       runAbsoluteTimeoutMinutes,
+      sessionIdleTimeoutMinutes,
     };
 
     const merged = {

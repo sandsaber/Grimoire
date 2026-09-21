@@ -36,6 +36,7 @@ import type {
 import {
   type ExecutionSessionId,
   executionSessionId,
+  interactionId,
   type RunId,
   runId as toRunId,
   sessionInstanceId,
@@ -1218,6 +1219,40 @@ describe('the assembled ChatRuntime adapter', () => {
     await expect(cleanup).resolves.toBeUndefined();
     await collected;
     expect(adapter.isReady()).toBe(false);
+  });
+
+  it('disposes the session on cleanup even with an approval nobody will answer', async () => {
+    // A tab closed on a pending permission prompt. The registry refuses to
+    // dispose a session with an open interaction, and the rejection went to a
+    // debug log that is off by default — the kernel session and its provider
+    // process then outlived the tab for as long as Obsidian ran.
+    const harness = await createHarness({ ownSession: true });
+    const failures: unknown[] = [];
+    const adapter = createAdapter(harness, {
+      reportCleanupFailure: (error: unknown) => { failures.push(error); },
+    });
+    const runId = toRunId(`run-${'1'.padStart(32, '0')}`);
+    const collected = drain(adapter.query(adapter.prepareTurn({ text: 'hello' })));
+    for (let attempt = 0; attempt < 200 && !harness.dispatched(runId); attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    await harness.emit(runId, {
+      kind: 'interaction-opened',
+      interaction: {
+        interactionId: interactionId(`ix-${'a'.repeat(32)}`),
+        runId,
+        kind: 'approval',
+        presentationRef: 'approval-1',
+        responseIds: ['yes', 'no'],
+      },
+    }, 'd-1');
+
+    await adapter.cleanup();
+    await collected;
+
+    expect(failures).toEqual([]);
+    expect([...harness.backend.sessions.values()].map(session => session.disposeCount))
+      .toEqual([1]);
   });
 
   it('releases the session on cleanup, preserving today\'s tab-close behaviour', async () => {
