@@ -45,6 +45,7 @@
     "npm": ">=12.0.2 <13"
   },
   "allowScripts": {
+    "@parcel/watcher@2.6.0": false,
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": false,
     "unrs-resolver@1.12.2": true
