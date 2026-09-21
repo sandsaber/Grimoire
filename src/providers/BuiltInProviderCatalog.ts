@@ -9,11 +9,12 @@ import { grokProviderModule } from './grok/GrokProviderModule';
 import { kimicodeProviderModule } from './kimicode/KimicodeProviderModule';
 import { mimocodeProviderModule } from './mimocode/MimocodeProviderModule';
 import { opencodeProviderModule } from './opencode/OpencodeProviderModule';
+import { piProviderModule } from './pi/PiProviderModule';
 import { qwenProviderModule } from './qwen/QwenProviderModule';
 import { reasonixProviderModule } from './reasonix/ReasonixProviderModule';
 
 /**
- * The eleven built-in provider modules, in no particular order.
+ * The built-in provider modules, in no particular order.
  *
  * Presentation order is `manifest.order`, which the catalog sorts by. Listing
  * them here in that order too would give a reader two sources for one fact and
@@ -30,6 +31,7 @@ const BUILT_IN_PROVIDER_MODULES = [
   kimicodeProviderModule,
   mimocodeProviderModule,
   opencodeProviderModule,
+  piProviderModule,
   qwenProviderModule,
   reasonixProviderModule,
 ];

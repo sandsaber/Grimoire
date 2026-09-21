@@ -15,6 +15,7 @@ import { grokWorkspaceRegistration } from './grok/app/GrokWorkspaceServices';
 import { kimicodeWorkspaceRegistration } from './kimicode/app/KimicodeWorkspaceServices';
 import { mimocodeWorkspaceRegistration } from './mimocode/app/MimocodeWorkspaceServices';
 import { opencodeWorkspaceRegistration } from './opencode/app/OpencodeWorkspaceServices';
+import { piWorkspaceRegistration } from './pi/PiWorkspaceServices';
 import { qwenWorkspaceRegistration } from './qwen/app/QwenWorkspaceServices';
 import { reasonixWorkspaceRegistration } from './reasonix/app/ReasonixWorkspaceServices';
 
@@ -42,6 +43,7 @@ export const builtInWorkspaceInitializers: Readonly<Record<
   kimicode: context => kimicodeWorkspaceRegistration.initialize(context),
   mimocode: context => mimocodeWorkspaceRegistration.initialize(context),
   opencode: context => opencodeWorkspaceRegistration.initialize(context),
+  pi: context => piWorkspaceRegistration.initialize(context),
   qwen: context => qwenWorkspaceRegistration.initialize(context),
   reasonix: context => reasonixWorkspaceRegistration.initialize(context),
 };

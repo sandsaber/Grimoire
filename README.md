@@ -273,6 +273,53 @@ Reasonix owns its configuration in `~/.reasonix/config.toml` and reads API keys 
 
 Enable **Image attachments as files** in Reasonix settings to use pasted or dropped images. Grimoire saves them in `.grimoire/attachments/` and sends absolute paths with an instruction to read each file. This is off by default: choose a model or tool that can read images, and expect an extra tool call. Reasonix does not advertise ACP image input, so Grimoire sends no image blocks. Missing or unwritable files stop the turn with an error.
 
+### Pi
+
+Install both tools separately. The adapter requires **Node.js 22+** and **Pi 0.80.4+**.
+
+1. Install Pi using the [official Pi installation instructions](https://pi.dev/). With npm:
+
+   ```bash
+   npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+   ```
+
+2. Install the adapter using its [global installation instructions](https://github.com/svkozak/pi-acp#global-install):
+
+   ```bash
+   npm install -g pi-acp
+   ```
+
+3. Open Pi's terminal setup and configure your model provider or API keys:
+
+   ```bash
+   pi-acp --terminal-login
+   ```
+
+4. Restart Obsidian, enable **Pi** in **Settings → Grimoire → Providers**, and click
+   **Refresh all models**. Both `pi` and `pi-acp` must be available on `PATH`.
+   If detection fails, set **Adapter path** to the absolute `pi-acp` executable path;
+   set `PI_ACP_PI_COMMAND=/absolute/path/to/pi` in Pi's **Environment variables** if needed.
+
+Grimoire launches the adapter itself; no Zed configuration or separate adapter server is needed.
+
+Both executables remain external dependencies. Grimoire discovers models and thinking levels from
+Pi, streams answers and tools, accepts native image attachments, and resumes saved sessions.
+The shared model picker preserves your shortlist and aliases when refreshed.
+
+**Thinking-level limitation (pi-acp 0.0.33):** the effort menu only offers levels the adapter
+can apply to the selected model. For example, Pi supports `low`, `high`, and `max` for GLM-5.3,
+but the adapter rejects `max`, so Grimoire offers `low` and `high` alongside **Pi default**.
+`xhigh` is not a substitute for `max`. Upstream [PR #73](https://github.com/svkozak/pi-acp/pull/73)
+proposes adding `max`; [PR #125](https://github.com/svkozak/pi-acp/pull/125) proposes discovering
+the selected model's actual thinking levels. Both were open and unmerged as of 2026-09-21;
+their proposed fixes are not part of the tested adapter release.
+
+Pi owns tool permissions: it can read, write and run commands without asking. Grimoire shows
+permission requests emitted by extensions, but offers no Safe or Plan mode. MCP, skills and prompt
+templates are configured in Pi. Files are read from disk; unsaved editor text, account quotas and
+context occupancy are not supplied by the adapter. Tested with Pi 0.86.1 and pi-acp 0.0.33.
+
+
 ### Command Code
 
 Command Code is opt-in in the unreleased 2.0 build. Install and authenticate in a terminal, then enable it under Settings → Grimoire → Providers:
@@ -388,9 +435,9 @@ The **Parallel workers** approval card shows the inherited model and lets you se
 
 ### Model selector
 
-One picker, grouped by provider and sorted by label: Antigravity, Claude Code, Codex, Command Code, Devin, Gemini CLI (Legacy), Grok Build, Kimi Code, MiMoCode, OpenCode, Qwen Code, and Reasonix. Search runs across labels, descriptions, groups, and model IDs without resizing the menu while you filter. Catalogs load lazily and remember which groups you collapsed. Add custom aliases and context-window overrides in settings. Claude's 1M variants are extra options, not replacements for the base models.
+One picker, grouped by provider and sorted by label: Antigravity, Claude Code, Codex, Command Code, Devin, Gemini CLI (Legacy), Grok Build, Kimi Code, MiMoCode, OpenCode, Pi, Qwen Code, and Reasonix. Search runs across labels, descriptions, groups, and model IDs without resizing the menu while you filter. Catalogs load lazily and remember which groups you collapsed. Add custom aliases and context-window overrides in settings. Claude's 1M variants are extra options, not replacements for the base models.
 
-OpenCode, MiMoCode, Kimi Code, Grok Build, and Command Code use the same model selection in settings: selected rows with aliases, a searchable catalog, and **Refresh all models**. Refresh preserves your configured selection and aliases. Provider filtering is shown when the CLI supplies vendor labels.
+OpenCode, MiMoCode, Kimi Code, Grok Build, Command Code, and Pi use the same model selection in settings: selected rows with aliases, a searchable catalog, and **Refresh all models**. Refresh preserves your configured selection and aliases. Provider filtering is shown when the CLI supplies vendor labels.
 
 ### Usage and cost
 

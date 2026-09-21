@@ -50,6 +50,14 @@
     },
     "commandcode": {
       "enabled": false
+    },
+    "pi": {
+      "enabled": false,
+      "cliPath": "",
+      "cliPathsByHost": {},
+      "environmentVariables": "",
+      "visibleModels": [],
+      "modelAliases": {}
     }
   },
   "sharedEnvironmentVariables": {

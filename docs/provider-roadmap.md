@@ -130,6 +130,49 @@ Current boundaries:
 - Not driven yet, each a separate piece of work: `_reasonix.io/session/steer`, and image attachments the handshake declares unsupported.
 - Plan indicators are spend-only, and a turn is priced only when the configured model provider has a price.
 
+## Integrated Provider: Pi
+
+Pi is opt-in through the external [pi-acp adapter](https://github.com/svkozak/pi-acp) (#207).
+Install Pi and pi-acp separately; neither is a package or bundled dependency of Grimoire.
+Verified locally with Pi 0.86.1 and pi-acp 0.0.33 on 2026-09-21. The integration does not install,
+update, or silently download an adapter. These are tested versions, not an exact-version lock.
+
+- Launch `pi-acp` from PATH or the host-specific adapter path. Resolve Pi independently and pass
+  its absolute path through `PI_ACP_PI_COMMAND`; missing Pi and missing adapter have distinct errors.
+- The execution kernel owns the managed ACP process, cancellation, native resume and permission
+  interactions. Authentication stays with Pi. ACP extension permission requests use standard cards;
+  Pi may otherwise read, write and execute commands without prompting. No Safe/Plan toggle is offered.
+  `--approve` is project-file trust, not a per-tool approval mode.
+- Models come from session config options. Model IDs remain opaque. A disposable metadata session
+  checks which advertised effort values Pi accepts for each model without dispatching prompts.
+  pi-acp 0.0.33 advertises a universal list through `xhigh`; it rejects `max`, even for models such
+  as GLM-5.3 whose native Pi levels are `low`, `high`, `max`. Grimoire only offers levels confirmed
+  through the adapter (`low` and `high` for that model); native `max` requires adapter support. Refresh
+  preserves the shortlist and aliases; an empty shortlist exposes the complete discovered catalog.
+  A refused model or thinking selection stops dispatch. ACP modes are never mapped to permissions.
+- Upstream tracking: [pi-acp PR #73](https://github.com/svkozak/pi-acp/pull/73) adds `max` to the
+  adapter's fixed list; [PR #125](https://github.com/svkozak/pi-acp/pull/125) instead discovers
+  model-specific levels through Pi's `get_available_thinking_levels` and refreshes applied state
+  after configuration changes. Both were open and unmerged on 2026-09-21. Revalidate discovery,
+  model switching, `max`, and restored sessions against a released adapter containing a fix
+  before updating the compatibility note; an open PR is not released support.
+- Images use native ACP blocks; the selected model must support images. Vault context is sent as
+  text, leaving `PI_ACP_ENABLE_EMBEDDED_CONTEXT` at the adapter's default rather than modifying
+  the user's Pi configuration. Slash commands are taken from active-session announcements.
+- Pi owns MCP, skills, prompts and extensions. No Grimoire MCP selector is exposed because the
+  adapter does not forward ACP MCP configuration. Pi reads disk, not unsaved editor buffers.
+- Grimoire stores its rendered transcript and ACP session ID. An empty local transcript can be
+  recovered from the adapter's session map and Pi v3 JSONL, following the active branch. Existing
+  local messages take precedence. Removing a Grimoire chat never deletes native Pi files.
+- Context usage and account quotas remain unknown; the adapter supplies neither. Thinking can be
+  configured but pi-acp does not stream separate thought chunks. Startup information follows the
+  user's Pi `quietStartup` setting. Auxiliary workflows, fork, rewind and steering are unsupported.
+
+`PiChatProjectionLiveSmoke.integration.test.ts` checks disk persistence, tool output, native image recognition, attachment-byte recovery and native recall across two kernel/process restarts. Run with `GRIMOIRE_PI_LIVE=1` and an explicit
+inexpensive `GRIMOIRE_PI_MODEL=pi:provider/model`; it makes four model requests and requires an image-capable model.
+Set `GRIMOIRE_PI_EFFORT=high` to cover explicit effort across restarts. The separate model-specific
+effort discovery test makes no model requests.
+
 ## Other Candidates
 
 - Google consumer provider work should extend `src/providers/antigravity/`; Antigravity CLI is Grimoire's recommended Google provider. Keep `src/providers/gemini/` available only for legacy Gemini CLI compatibility with Standard, Enterprise, Google Cloud, and paid API-key users. Both Google providers should receive the same Grimoire per-turn context shape (active note, editor/browser/canvas selections, vault search, and project workspace), even though Antigravity currently carries it through `agy --print` and Gemini carries it through ACP prompt blocks. Until AGY exposes an approval-capable runtime, keep Antigravity Safe/normal mode fail-closed and launch `agy --print` only from explicit Auto-approve/full-access mode.

@@ -20,6 +20,7 @@ describe('built-in provider catalog', () => {
       'kimicode',
       'mimocode',
       'opencode',
+      'pi',
       'qwen',
       'reasonix',
     ]);
@@ -44,6 +45,7 @@ describe('built-in provider catalog', () => {
       'devin',
       'reasonix',
       'commandcode',
+      'pi',
     ]);
   });
 
@@ -149,6 +151,7 @@ describe('built-in provider catalog', () => {
       'Devin',
       'Reasonix',
       'Command Code',
+      'Pi',
     ]);
   });
 });

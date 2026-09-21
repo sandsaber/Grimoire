@@ -11,6 +11,7 @@ import type { RunTerminal } from '@/core/execution/ExecutionContracts';
 import type { ExecutionChatRuntimeAdapter } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import { describeRunFailure } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { ChatTurnMetadata } from '@/core/runtime/types';
+import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
 import type { ChatMessage } from '@/core/types';
 import type { ProviderId } from '@/core/types/provider';
 import type { ChatExecutionLifecyclePort } from '@/features/chat/application/ChatExecutionCoordinator';
@@ -95,7 +96,7 @@ export interface ChatProjectionHarnessOptions {
    * vault, so a row that certifies one has to hand the vault across. Left out,
    * each harness gets its own.
    */
-  readonly vaultAdapter?: ReturnType<typeof createDurableInMemoryVaultAdapter>;
+  readonly vaultAdapter?: VaultFileAdapter;
   /**
    * The working directory the provider was launched in.
    *

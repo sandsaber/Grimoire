@@ -384,6 +384,7 @@ describe('GrimoireSettingTab settings hub', () => {
       'Qwen Code',
       'Devin',
       'Reasonix',
+      'Pi',
       'Command Code',
     ]);
     expect(collectText(settingEl)).not.toContain('Enabled');
@@ -406,6 +407,7 @@ describe('GrimoireSettingTab settings hub', () => {
       'devin',
       'reasonix',
       'commandcode',
+      'pi',
     ]);
   });
 

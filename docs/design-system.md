@@ -535,7 +535,7 @@ and what does it cost" was a question the composer could not answer.
 
 ### 11.8 Settings
 
-OpenCode, MiMoCode, Kimi Code, Grok Build and Command Code use one `ProviderModelPicker` and one
+OpenCode, MiMoCode, Kimi Code, Grok Build, Command Code and Pi use one `ProviderModelPicker` and one
 `provider-model-picker.css`, based on the OpenCode layout on screen `2f`. A native **Visible models**
 row holds **Refresh all models** above the count, selected rows and collapsible catalog. Each selected
 row has a provider label when known, model name, native ID, alias field and remove action. The alias
@@ -579,6 +579,12 @@ includes that toggle below the OpenCode example; it uses existing native setting
 Reasonix uses the same native toggle, also off by default, below its CLI path. Its description
 states that images are saved in the vault and sent as paths for a capable model or tool to read,
 with an extra tool call and no ACP image blocks. Screen `2f` includes this Reasonix row.
+
+Pi follows the same native provider rows and shared model picker. Screen `2f` records its adapter
+path and native-permissions explanation. Both Pi and pi-acp are installed externally. Its composer
+has no Safe, Auto-approve or Plan toggle: ACP modes mean thinking levels, and tool execution remains
+Pi-owned. The discovered thinking selector is separate. MCP controls are absent and an unreported
+context reading remains unknown. No additional stylesheet or visual control is introduced.
 
 Obsidian's declarative settings API, rendering native `.setting-item` rows. Grimoire styles the
 content it puts *inside* a row — never `.setting-item`, `.setting-item-info`, `.setting-item-name`,
