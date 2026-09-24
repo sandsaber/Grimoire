@@ -351,26 +351,24 @@ Enable **Image attachments as files** to send pasted or dropped images through t
 
 Pick OpenCode for a model-agnostic agent that brings its own provider configuration.
 
-```bash
-curl -fsSL https://opencode.ai/install | bash
-opencode
-```
-
-Homebrew, npm, bun, and package-manager installs work too. Configure your provider credentials in OpenCode, then enable it in Grimoire.
-
-OpenCode 1.x remains supported. OpenCode V2 has a separate installer:
+Grimoire supports **OpenCode V1 and V2** through the same provider entry. V2 requires a Grimoire build containing [the V2 integration](https://github.com/sandsaber/Grimoire/pull/223). Install the V2 CLI with its dedicated installer:
 
 ```bash
 curl -fsSL https://opencode.ai/v2/install | bash
+opencode --version
+opencode
 ```
 
-Grimoire detects the CLI version: V1 uses ACP; V2 uses a private, authenticated local OpenCode server. This avoids a V2 ACP discovery race that can hide managed permission modes. See [OpenCode V2 compatibility](docs/opencode-v2-compatibility.md) for verified versions and remaining limits.
+V2 is also available as `npm install -g @opencode/cli` or `brew install anomalyco/tap/opencode-v2`. For Windows, use a standalone binary from the [V2 installation page](https://opencode.ai/v2/docs). V1 and V2 both use the `opencode` command; follow the [migration guide](https://opencode.ai/v2/docs/migrate-v1/) when replacing an existing install.
 
-- [OpenCode download](https://opencode.ai/download)
-- [OpenCode provider docs](https://opencode.ai/docs/providers)
-- [OpenCode config docs](https://opencode.ai/docs/config)
+Connect your providers in OpenCode, then enable **OpenCode** in Grimoire's provider settings. If multiple CLI copies are installed, set **OpenCode CLI path** to the intended executable. After upgrading, reload Grimoire, click **Refresh all models**, and select the models you want under **Browse models**. Refresh preserves existing selections; newly discovered models need to be selected before they appear in chat. The open chat tab picks up those changes.
 
-Inside Grimoire, OpenCode uses managed launch artifacts, with persistent sessions, native history, plan mode, image input, provider commands, and reasoning effort. V2 questions use the chat's existing question cards. It reports monthly spend when cost metadata is available.
+V1 remains supported through its [original installation path](https://opencode.ai/docs). Grimoire detects the executable version: V1 uses ACP; V2 uses a private, authenticated local OpenCode server that Grimoire starts and stops automatically.
+
+V2 supports persistent sessions, native history, Safe and Plan modes, streamed tool activity, model and reasoning controls, provider commands, and questions through the existing chat cards. Monthly spend appears when cost metadata is available. Verified CLI versions are **1.18.32, 2.0.15, and 2.0.16**; see [OpenCode V2 setup and compatibility](docs/opencode-v2-compatibility.md) for test coverage and limits, including unsupported external/conditional forms and SSE MCP transport.
+
+- [OpenCode V2 providers](https://opencode.ai/v2/docs/providers)
+- [OpenCode V2 configuration](https://opencode.ai/v2/docs/config)
 
 ### MiMoCode
 
@@ -467,7 +465,7 @@ A badge next to the model selector keeps the active provider's usage in view, wi
 | Devin | Session credit total reported over ACP, as monthly spend |
 | Reasonix | Per-turn cost from its own status notifications, when the configured model provider has a price |
 | Pi | Not reported by pi-acp |
-| OpenCode | Monthly spend aggregated from ACP and session cost metadata |
+| OpenCode | Monthly spend from native runtime events and session cost metadata (V1 and V2) |
 | MiMoCode | Monthly spend aggregated from ACP and session cost metadata |
 | Kimi Code | Monthly spend aggregated from ACP and session cost metadata |
 | Grok Build | Shared weekly Grok usage, reset time, and Extra Usage Credits through OAuth; monthly API spend from session cost metadata |
