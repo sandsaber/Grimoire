@@ -159,7 +159,12 @@ describe('OpenCode execution composition', () => {
               currentModelId: 'opencode/big-pickle',
             },
             modes: {
-              availableModes: [{ id: 'build', name: 'Build' }],
+              availableModes: [
+                { id: 'build', name: 'Build' },
+                { id: 'plan', name: 'Plan' },
+                { id: 'grimoire-full-access', name: 'Auto-approve' },
+                { id: 'grimoire-safe', name: 'Safe' },
+              ],
               currentModeId: 'build',
             },
           }),

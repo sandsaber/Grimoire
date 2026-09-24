@@ -358,11 +358,19 @@ opencode
 
 Homebrew, npm, bun, and package-manager installs work too. Configure your provider credentials in OpenCode, then enable it in Grimoire.
 
+OpenCode 1.x remains supported. OpenCode V2 has a separate installer:
+
+```bash
+curl -fsSL https://opencode.ai/v2/install | bash
+```
+
+Grimoire detects the CLI version: V1 uses ACP; V2 uses a private, authenticated local OpenCode server. This avoids a V2 ACP discovery race that can hide managed permission modes. See [OpenCode V2 compatibility](docs/opencode-v2-compatibility.md) for verified versions and remaining limits.
+
 - [OpenCode download](https://opencode.ai/download)
 - [OpenCode provider docs](https://opencode.ai/docs/providers)
 - [OpenCode config docs](https://opencode.ai/docs/config)
 
-Inside Grimoire, OpenCode runs over ACP with Grimoire-managed launch artifacts, plus persistent runtime, native history, plan mode, image input, provider commands, and reasoning effort. It reports monthly spend when cost metadata is available.
+Inside Grimoire, OpenCode uses managed launch artifacts, with persistent sessions, native history, plan mode, image input, provider commands, and reasoning effort. V2 questions use the chat's existing question cards. It reports monthly spend when cost metadata is available.
 
 ### MiMoCode
 

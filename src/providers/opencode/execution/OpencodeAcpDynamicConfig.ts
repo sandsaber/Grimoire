@@ -1,4 +1,7 @@
-import { extractAcpSessionThoughtLevelState } from '@/providers/acp/AcpSessionConfig';
+import {
+  extractAcpSessionModeState,
+  extractAcpSessionThoughtLevelState,
+} from '@/providers/acp/AcpSessionConfig';
 import type { AcpSessionConfigOption } from '@/providers/acp/types';
 
 import type { OpencodeExecutionDynamicApplier } from './OpencodeExecutionBackend';
@@ -33,9 +36,21 @@ export class OpencodeAcpDynamicConfigApplier implements OpencodeExecutionDynamic
   async apply(input: Parameters<OpencodeExecutionDynamicApplier['apply']>[0]): Promise<void> {
     if (!input.dynamicRef) return;
     const config = await this.resolver.resolve(input.dynamicRef);
-    const effort = config.effort ?? this.resolveEffort(config.effortValue, input.sessionConfigOptions);
+    let updatedOptions: AcpSessionConfigOption[] | undefined;
     throwIfAborted(input.signal);
     if (config.modeId?.trim()) {
+      const advertised = extractAcpSessionModeState({
+        configOptions: input.sessionConfigOptions ? [...input.sessionConfigOptions] : undefined,
+        modes: input.sessionModes,
+      });
+      if (advertised.availableModes.length > 0
+        && !advertised.availableModes.some(mode => mode.id === config.modeId?.trim())) {
+        // Never substitute build for Safe: its native permissions can allow writes.
+        throw new Error(
+          'OpenCode did not expose the requested permission mode. '
+          + 'Check that its configuration loads the Grimoire agents and use a supported OpenCode version.',
+        );
+      }
       await input.client.setConfigOption({
         configId: 'mode',
         sessionId: input.sessionId,
@@ -45,14 +60,19 @@ export class OpencodeAcpDynamicConfigApplier implements OpencodeExecutionDynamic
     }
     throwIfAborted(input.signal);
     if (config.modelId?.trim()) {
-      await input.client.setConfigOption({
+      const result = await input.client.setConfigOption({
         configId: 'model',
         sessionId: input.sessionId,
         type: 'select',
         value: config.modelId.trim(),
       });
+      if (result.configOptions?.length) updatedOptions = result.configOptions;
     }
     throwIfAborted(input.signal);
+    // A model switch can remove or rename the previous model's effort options.
+    const effort = updatedOptions
+      ? this.resolveEffort(config.effort?.value ?? config.effortValue, updatedOptions)
+      : config.effort ?? this.resolveEffort(config.effortValue, input.sessionConfigOptions);
     if (effort?.configId.trim() && effort.value.trim()) {
       await input.client.setConfigOption({
         configId: effort.configId.trim(),

@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import { NodeManagedAcpProcessLauncher } from '@/app/execution/acp/NodeManagedAcpProcessLauncher';
 import { delayThroughWindow } from '@/app/execution/hostTimers';
 import { ProviderWorkspaceHolder } from '@/app/execution/ProviderWorkspaceHolder';
-import type { InteractionRequest } from '@/core/execution/ExecutionContracts';
 import {
   executionSessionId,
   interactionId,
@@ -25,7 +24,6 @@ import {
   type BoundConversation,
   ExecutionChatRuntimeAdapter,
   type ExecutionChatRuntimeHostPorts,
-  type ExecutionInteractionAnswer,
 } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type {
   ApprovalCallback,
@@ -38,6 +36,7 @@ import { resolveRunAbsoluteTimeoutMs } from '@/core/types/settings';
 import type GrimoirePlugin from '@/main';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
 import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
+import { AcpQuestionPresenter } from '@/providers/acp/execution/AcpQuestionPresenter';
 import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
 import type {
   ManagedAcpClient,
@@ -150,7 +149,7 @@ export class QwenExecution {
    */
   private readonly writeApprovers = new Map<string, () => ApprovalCallback | undefined>();
 
-  private readonly presenters = new Set<QwenQuestionPresenter>();
+  private readonly presenters = new Set<AcpQuestionPresenter>();
 
   /**
    * Every open tab, told which session took which reasoning level.
@@ -438,7 +437,7 @@ export class QwenExecution {
       },
     });
 
-    const presenter = new QwenQuestionPresenter(
+    const presenter = new AcpQuestionPresenter(
       new QwenInteractionPresenter(
         this.interactions,
         () => adapter?.interactionCallbacks() ?? {},
@@ -951,68 +950,6 @@ class QwenRuntimeAdapter extends ExecutionChatRuntimeAdapter {
     } finally {
       this.releaseTab();
     }
-  }
-}
-
-/**
- * The two interactions one Qwen tab can be shown, behind one port.
- *
- * The adapter installs a single interaction presenter, and this provider opens
- * two kinds through it. An approval goes to the shared ACP presenter, which
- * every managed-ACP provider uses; a question goes to the tab's own question
- * callback, which the chat surface already installs and which no other provider
- * on this transport has ever had reason to reach.
- */
-class QwenQuestionPresenter {
-  private readonly open = new Map<string, AbortController>();
-
-  constructor(
-    private readonly approvals: QwenInteractionPresenter,
-    private readonly questions: (presentationRef: string)
-    => readonly QwenAskUserQuestion[] | undefined,
-    private readonly callbacks: () => Readonly<Record<string, unknown>>,
-  ) {}
-
-  async present(request: InteractionRequest): Promise<string | ExecutionInteractionAnswer | null> {
-    const asked = this.questions(request.presentationRef);
-    if (!asked) {
-      return this.approvals.present(request);
-    }
-    const ask = this.callbacks().question as
-      | ((input: Record<string, unknown>, signal?: AbortSignal)
-      => Promise<Record<string, string | string[]> | null>)
-      | undefined;
-    if (typeof ask !== 'function') {
-      // No surface installed one, so nobody can answer. Cancelled rather than
-      // left open: a turn waiting on a prompt nothing will show never ends.
-      return 'cancel';
-    }
-    const abort = new AbortController();
-    this.open.set(request.presentationRef, abort);
-    try {
-      const answers = await ask({ questions: [...asked] }, abort.signal);
-      // The answers ride on the resolution and are never written down, which is
-      // what D2 requires of anything a person typed.
-      return answers === null ? 'cancel' : { responseId: 'answered', payload: { answers } };
-    } catch {
-      return 'cancel';
-    } finally {
-      this.open.delete(request.presentationRef);
-    }
-  }
-
-  dismiss(presentationRef: string): void {
-    this.open.get(presentationRef)?.abort();
-    this.open.delete(presentationRef);
-    this.approvals.dismiss(presentationRef);
-  }
-
-  dismissAll(): void {
-    for (const abort of this.open.values()) {
-      abort.abort();
-    }
-    this.open.clear();
-    this.approvals.dismissAll();
   }
 }
 

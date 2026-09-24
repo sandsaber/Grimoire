@@ -30,6 +30,21 @@ export async function loadOpencodeSessionMessages(
     return [];
   }
 
+  const v2 = await readAcpSqliteRows<StoredRow>(databasePath, [{
+    params: [sessionId],
+    sql: "select id, type, time_created, data from session_message where session_id = ? and type in ('user', 'assistant') order by seq asc",
+  }]);
+  if (v2?.[0].length) {
+    return mapOpencodeMessages(v2[0].flatMap(row => {
+      const data = parseJsonObject(row.data);
+      if (!data) return [];
+      const parts = row.type === 'user'
+        ? [{ type: 'text', text: data.text }]
+        : (Array.isArray(data.content) ? data.content.filter(isPlainObject).map(normalizeV2Part) : []);
+      return [{ info: { ...data, id: row.id, role: row.type, time_created: row.time_created }, parts }];
+    }));
+  }
+
   const rows = await loadOpencodeSessionRows(databasePath, sessionId);
   if (!rows) {
     return [];
@@ -38,6 +53,30 @@ export async function loadOpencodeSessionMessages(
   return mapOpencodeMessages(
     hydrateStoredMessages(rows.messageRows, rows.partRows),
   );
+}
+
+/** Adapt V2's embedded content to the same presentation path used for V1 parts. */
+function normalizeV2Part(part: StoredRow): StoredRow {
+  const time = getObject(part.time);
+  if (part.type !== 'tool') {
+    return { ...part, ...(time ? { time: { ...time, start: time.created, end: time.completed } } : {}) };
+  }
+  const state = getObject(part.state) ?? {};
+  const output = Array.isArray(state.content)
+    ? state.content.filter(isPlainObject)
+      .filter(content => content.type === 'text')
+      .map(content => getString(content.text) ?? '').join('\n')
+    : undefined;
+  return {
+    ...part,
+    callID: part.id,
+    tool: part.name,
+    state: {
+      ...state,
+      output,
+      error: getString(getObject(state.error)?.message) ?? getString(state.error),
+    },
+  };
 }
 
 export function mapOpencodeMessages(messages: StoredMessage[]): ChatMessage[] {

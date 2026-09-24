@@ -1,9 +1,18 @@
 import {
   createOpencodeToolStreamAdapter,
   normalizeOpencodeToolInput,
+  normalizeOpencodeToolName,
 } from '../../../../src/providers/opencode/normalization/opencodeToolNormalization';
 
 describe('normalizeOpencodeToolInput', () => {
+  it.each(['read', 'write', 'edit'])('keeps V2 %s file paths', (tool) => {
+    expect(normalizeOpencodeToolInput(tool, { path: 'Note.md' })).toMatchObject({ file_path: 'Note.md' });
+  });
+
+  it('normalizes the V2 shell tool for the command renderer', () => {
+    expect(normalizeOpencodeToolName('shell')).toBe('Bash');
+  });
+
   it('maps websearch payloads to the WebSearch renderer shape', () => {
     expect(normalizeOpencodeToolInput('websearch', {
       action: {

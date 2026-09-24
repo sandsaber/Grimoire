@@ -1,6 +1,6 @@
 # OpenCode Provider Agent Instructions
 
-`src/providers/opencode/` adapts OpenCode through ACP and Grimoire-managed launch artifacts.
+`src/providers/opencode/` adapts OpenCode V1 through ACP and V2 through its native local API, with Grimoire-managed launch artifacts.
 
 ## Scope
 

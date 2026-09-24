@@ -16,6 +16,14 @@ export async function loadOpencodeSessionCost(
     return null;
   }
 
+  const v2 = await readAcpSqliteRows<StoredCostRow>(databasePath, [{
+    params: [sessionId],
+    sql: 'select cost from session_v2 where id = ?',
+  }]);
+  if (v2?.[0].length) {
+    return sumOpencodeCostRows(v2[0]);
+  }
+
   const messageCost = sumOpencodeCostRows(await loadOpencodeCostRows(databasePath, sessionId, 'message'));
   if (messageCost) {
     return messageCost;
