@@ -314,6 +314,8 @@ export class QwenExecution {
       },
       sessionInstanceIdFactory: () => sessionInstanceId(opaqueId('si')),
       interactionIdFactory: () => interactionId(opaqueId('ix')),
+      // Model, mode and /effort run sequentially; their setup is not a cancel acknowledgement.
+      sessionConfigTimeoutMs: 30_000,
       resultCommitTimeoutMs: 2_000,
       recoveryTimeoutMs: 2_000,
       runTimeoutMs: 10 * 60_000,

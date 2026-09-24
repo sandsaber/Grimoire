@@ -676,14 +676,36 @@ describe('OpencodeExecutionBackend', () => {
     });
   });
 
-  it('reports a configuration timeout without dispatching a late configuration', async () => {
+  it('lets session configuration finish within its own budget after the control timeout', async () => {
     const pending = deferred<void>();
     const apply = jest.fn(() => pending.promise);
-    const fixture = createFixture({ dynamicApply: apply });
+    const fixture = createFixture({ sessionConfigTimeoutMs: 30_000, dynamicApply: apply });
     const session = await createSession(fixture.backend);
     const events = collectEvents(session.createRun(request('1')));
     await waitFor(() => apply.mock.calls.length === 1);
-    fixture.scheduler.fireAllUpTo(500);
+
+    fixture.scheduler.fireAllUpTo(2_000);
+    await flushPromises();
+    expect(fixture.client.promptRequests).toHaveLength(0);
+    pending.resolve();
+    await waitFor(() => fixture.client.promptRequests.length === 1);
+
+    fixture.client.emit(agentText('native-session', 'Qwen result'));
+    fixture.client.completePrompt({ stopReason: 'end_turn' });
+    expectTerminal(await events, 'succeeded', 'completed');
+  });
+
+  it.each([
+    { sessionConfigTimeoutMs: undefined, timeout: 500 },
+    { sessionConfigTimeoutMs: 30_000, timeout: 30_000 },
+  ])('reports a configuration timeout at $timeout ms without dispatching late', async ({ sessionConfigTimeoutMs, timeout }) => {
+    const pending = deferred<void>();
+    const apply = jest.fn(() => pending.promise);
+    const fixture = createFixture({ sessionConfigTimeoutMs, dynamicApply: apply });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => apply.mock.calls.length === 1);
+    fixture.scheduler.fireAllUpTo(timeout);
 
     const captured = await events;
     expectTerminal(captured, 'invalidated', 'pre-dispatch-rejected');
@@ -1247,6 +1269,7 @@ function createFixture(options: {
   }) => void;
   readonly onReconcile?: (query: RunRecoveryQuery) => RunRecoveryEvidence | null;
   readonly dynamicApply?: () => Promise<void>;
+  readonly sessionConfigTimeoutMs?: number;
   readonly interactionPrepare?: () => Promise<ManagedAcpPreparedInteraction>;
   readonly auxiliaryExecute?: (requestRef: string, signal: AbortSignal) => Promise<string>;
   readonly auxiliaryDispose?: () => Promise<void>;
@@ -1305,6 +1328,7 @@ function createFixture(options: {
     interactionIdFactory: () => interactionId(`ix-${'b'.repeat(32)}`),
     now: () => 1,
     controlTimeoutMs: 500,
+    ...(options.sessionConfigTimeoutMs !== undefined ? { sessionConfigTimeoutMs: options.sessionConfigTimeoutMs } : {}),
     resultCommitTimeoutMs: 500,
     recoveryTimeoutMs: 500,
     runTimeoutMs: 60_000,

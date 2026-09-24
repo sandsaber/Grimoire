@@ -250,6 +250,8 @@ export interface ManagedAcpExecutionBackendContext {
   readonly interactionIdFactory: () => InteractionId;
   readonly now?: () => number;
   readonly controlTimeoutMs?: number;
+  /** Session setup may include model loading or native commands, unlike cancellation. */
+  readonly sessionConfigTimeoutMs?: number;
   /**
    * How long the agent has to answer `initialize` when it is first started.
    *
@@ -693,7 +695,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
           (error: unknown) => ({ ok: false, error } as const),
         ),
         this.context.scheduler,
-        this.context.controlTimeoutMs ?? 2_000,
+        this.context.sessionConfigTimeoutMs ?? this.context.controlTimeoutMs ?? 2_000,
       );
       if (run.isTerminal || generation !== this.clientGeneration) return;
       if (!applied) {
