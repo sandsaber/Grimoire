@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 
-import { NodeManagedAcpProcessLauncher } from '@/app/execution/acp/NodeManagedAcpProcessLauncher';
 import { auxiliaryPurposeKey } from '@/app/execution/auxiliaryPurpose';
 import { delayThroughWindow } from '@/app/execution/hostTimers';
 import { KernelAuxQueryRunner } from '@/app/execution/KernelAuxQueryRunner';
@@ -42,7 +41,7 @@ import type { ChatMessage } from '@/core/types';
 import { resolveRunAbsoluteTimeoutMs } from '@/core/types/settings';
 import type GrimoirePlugin from '@/main';
 import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
-import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
+import { AcpQuestionPresenter } from '@/providers/acp/execution/AcpQuestionPresenter';
 import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
 import { ManagedAcpAuxiliaryQuery } from '@/providers/acp/execution/ManagedAcpAuxiliaryQuery';
 import type { ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
@@ -96,6 +95,8 @@ import { getOpencodeState } from '@/providers/opencode/types';
 import { opencodeChatUIConfig } from '@/providers/opencode/ui/OpencodeChatUIConfig';
 import { getEnhancedPath } from '@/utils/env';
 import { getVaultPath } from '@/utils/path';
+
+import { OpencodeClientFactory } from './OpencodeClientFactory';
 
 /** What a turn may answer with, before it is refused as too large. */
 const MAX_RESULT_BYTES = 256_000;
@@ -195,7 +196,7 @@ export class OpencodeExecution {
    */
   private readonly writeApprovers = new Map<string, () => ApprovalCallback | undefined>();
 
-  private readonly presenters = new Set<OpencodeInteractionPresenter>();
+  private readonly presenters = new Set<AcpQuestionPresenter>();
   private readonly disposers: Array<() => void> = [];
 
   private backend: OpencodeExecutionBackend | undefined;
@@ -410,8 +411,9 @@ export class OpencodeExecution {
       },
     });
 
-    const presenter = new OpencodeInteractionPresenter(
-      this.interactions,
+    const presenter = new AcpQuestionPresenter(
+      new OpencodeInteractionPresenter(this.interactions, () => adapter?.interactionCallbacks() ?? {}),
+      ref => this.interactions.question(ref),
       () => adapter?.interactionCallbacks() ?? {},
     );
     this.presenters.add(presenter);
@@ -708,6 +710,7 @@ export class OpencodeExecution {
       disposer();
     }
     this.presenters.clear();
+    this.interactions.clearQuestions();
     this.requests.dispose();
     // The backend closes these when it is disposed, and a composition disposed
     // without one still has processes to close: an auxiliary turn needs no chat
@@ -818,7 +821,7 @@ export class OpencodeExecution {
     const fileSystem = createOpencodeAuxiliaryFileSystem(
       () => getVaultPath(this.plugin.app) ?? process.cwd(),
     );
-    return new AcpManagedClientAdapterFactory({
+    return new OpencodeClientFactory({
       clientInfo: {
         name: 'grimoire-aux',
         version: this.plugin.manifest?.version ?? '0.0.0',
@@ -829,10 +832,7 @@ export class OpencodeExecution {
           writeTextFile: request => fileSystem.writeTextFile(request),
         },
       },
-      processLauncher: new NodeManagedAcpProcessLauncher({
-        resolve: startupRef => this.requests.resolveLaunch(startupRef),
-      }),
-    });
+    }, { resolve: startupRef => this.requests.resolveLaunch(startupRef) });
   }
 
   private createClientFactory(): ManagedAcpClientFactory {
@@ -845,7 +845,7 @@ export class OpencodeExecution {
       }),
       approveWrite: input => this.approveWrite(input),
     });
-    return new AcpManagedClientAdapterFactory({
+    return new OpencodeClientFactory({
       clientInfo: {
         name: 'grimoire',
         version: this.plugin.manifest?.version ?? '0.0.0',
@@ -859,10 +859,7 @@ export class OpencodeExecution {
           writeTextFile: request => fileSystem.writeTextFile(request),
         },
       },
-      processLauncher: new NodeManagedAcpProcessLauncher({
-        resolve: startupRef => this.requests.resolveLaunch(startupRef),
-      }),
-    });
+    }, { resolve: startupRef => this.requests.resolveLaunch(startupRef) });
   }
 
   private fullAccess(): boolean {

@@ -48,6 +48,7 @@
     "@parcel/watcher@2.6.0": false,
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": false,
+    "msgpackr-extract@3.0.4": false,
     "unrs-resolver@1.12.2": true
   },
   "devDependencies": {
@@ -74,6 +75,7 @@
     "@codemirror/state": "6.5.0",
     "@codemirror/view": "6.38.6",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@opencode/client": "2.0.0",
     "smol-toml": "^1.8.0",
     "tslib": "^2.8.1",
     "yaml": "^2.9.1"

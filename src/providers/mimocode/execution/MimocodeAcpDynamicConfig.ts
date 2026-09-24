@@ -33,7 +33,7 @@ export class MimocodeAcpDynamicConfigApplier implements MimocodeExecutionDynamic
   async apply(input: Parameters<MimocodeExecutionDynamicApplier['apply']>[0]): Promise<void> {
     if (!input.dynamicRef) return;
     const config = await this.resolver.resolve(input.dynamicRef);
-    const effort = config.effort ?? this.resolveEffort(config.effortValue, input.sessionConfigOptions);
+    let updatedOptions: AcpSessionConfigOption[] | undefined;
     throwIfAborted(input.signal);
     if (config.modeId?.trim()) {
       await input.client.setConfigOption({
@@ -45,14 +45,19 @@ export class MimocodeAcpDynamicConfigApplier implements MimocodeExecutionDynamic
     }
     throwIfAborted(input.signal);
     if (config.modelId?.trim()) {
-      await input.client.setConfigOption({
+      const result = await input.client.setConfigOption({
         configId: 'model',
         sessionId: input.sessionId,
         type: 'select',
         value: config.modelId.trim(),
       });
+      if (result.configOptions?.length) updatedOptions = result.configOptions;
     }
     throwIfAborted(input.signal);
+    // A model switch can remove or rename the previous model's effort options.
+    const effort = updatedOptions
+      ? this.resolveEffort(config.effort?.value ?? config.effortValue, updatedOptions)
+      : config.effort ?? this.resolveEffort(config.effortValue, input.sessionConfigOptions);
     if (effort?.configId.trim() && effort.value.trim()) {
       await input.client.setConfigOption({
         configId: effort.configId.trim(),

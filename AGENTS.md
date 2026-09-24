@@ -18,7 +18,7 @@ Repository documentation and user-facing product copy should be in English unles
 - `src/providers/antigravity/` - Antigravity CLI print-mode adapter and Google's official Gemini CLI replacement.
 - `src/providers/gemini/` - Legacy Gemini CLI ACP adapter and Google-owned runtime, history, settings, and UI behavior.
 - `src/providers/grok/` - Grok Build ACP adapter and xAI-owned runtime, history, settings, and UI behavior.
-- `src/providers/opencode/` - OpenCode ACP adapter and launch/workspace artifacts.
+- `src/providers/opencode/` - OpenCode V1 ACP and V2 native API adapters, plus launch/workspace artifacts.
 - `src/providers/mimocode/` - MiMoCode ACP adapter and launch/workspace artifacts.
 - `src/providers/kimicode/` - Kimi Code ACP adapter and launch/workspace artifacts.
 - `src/providers/qwen/` - Qwen Code ACP adapter and Qwen-owned runtime, history, settings, and UI behavior.
@@ -193,7 +193,7 @@ for required behavior and verification; custom-ID inputs and refresh-only rows a
 | `.grimoire/cache/conversation-headers.json` | Disposable history-list cache keyed by session-file modification time and size. Keeps summaries and session headers, never message arrays. Rebuilt for missing or changed records; opening a chat reads its authoritative session record. Startup loads full transcripts only for restored open tabs |
 | `.grimoire/logs/YYYY-MM-DD.jsonl` | Optional sanitized debug logs, written only when Advanced debug logging is enabled |
 | `.grimoire/control/**` | Grimoire-owned execution lifecycle control records: ownership, generations, state-machine positions, terminals, dispatch intents, and recovery evidence. Never a second provider transcript, and never prompts, secrets, or raw payloads. Written by the execution kernel the plugin constructs at load and shuts down at unload; retention, deletion, versioning, and redaction are decided in [`docs/provider-execution-persistence-decisions.md`](docs/provider-execution-persistence-decisions.md). A plugin build that does not read these files must neither depend on them nor break on their presence, which is what makes a downgrade safe |
-| `.grimoire/mcp/<provider>.json` | Grimoire-owned MCP servers injected into ACP sessions for OpenCode, Grok Build, MiMoCode, Kimi Code, Qwen Code, Gemini CLI, Devin, and Reasonix |
+| `.grimoire/mcp/<provider>.json` | Grimoire-owned MCP servers injected into provider sessions: ACP for OpenCode V1, Grok Build, MiMoCode, Kimi Code, Qwen Code, Gemini CLI, Devin, and Reasonix; native API for OpenCode V2 |
 | `.grimoire/claude/statusline-usage.json` | Claude Code status-line usage snapshot used to hydrate plan-limit indicators |
 | `.claude/settings.json` | Claude Code-compatible project settings and permissions |
 | `.claude/mcp.json` | Claude-compatible MCP servers plus Grimoire metadata under `_grimoire.servers` |

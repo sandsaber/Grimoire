@@ -11,11 +11,12 @@ import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import type { StreamChunk } from '@/core/types';
 import { opencodePlanUsageStore } from '@/providers/opencode/app/OpencodePlanUsageStore';
 import { OpencodeExecution } from '@/providers/opencode/execution/OpencodeExecutionComposition';
+import { loadOpencodeSessionMessages } from '@/providers/opencode/history/OpencodeHistoryStore';
 import { loadOpencodeSessionCost } from '@/providers/opencode/history/OpencodeUsageMetadataStore';
 import { getOpencodeProviderSettings, updateOpencodeProviderSettings } from '@/providers/opencode/settings';
 
 /**
- * The OpenCode flip against a real `opencode acp` process.
+ * The OpenCode runtime against a real V1 ACP or V2 server process.
  *
  * The manual smoke matrix has two halves: what the protocol does, and what the
  * surface draws. This is the first half, run headlessly — a real agent, real
@@ -41,6 +42,7 @@ live('OpenCode live smoke', () => {
 
   function createPlugin(vault: string, overrides: Record<string, unknown> = {}): any {
     const settings: Record<string, unknown> = {
+      settingsProvider: 'opencode',
       permissionMode: 'full_access',
       mediaFolder: 'media',
       systemPrompt: '',
@@ -50,6 +52,7 @@ live('OpenCode live smoke', () => {
     updateOpencodeProviderSettings(settings, { enabled: true });
     if (process.env.GRIMOIRE_OPENCODE_MODEL) {
       settings.model = process.env.GRIMOIRE_OPENCODE_MODEL;
+      settings.savedProviderModel = { opencode: process.env.GRIMOIRE_OPENCODE_MODEL };
     }
     return {
       settings,
@@ -128,7 +131,7 @@ live('OpenCode live smoke', () => {
 
   function summarize(chunks: readonly StreamChunk[]): string[] {
     return chunks.map(chunk => (
-      chunk.type === 'text' || chunk.type === 'thinking'
+      chunk.type === 'text' || chunk.type === 'thinking' || chunk.type === 'notice' || chunk.type === 'error'
         ? `${chunk.type}:${chunk.content.slice(0, 40).replaceAll('\n', ' ')}`
         : chunk.type === 'tool_use'
           ? `tool_use:${chunk.name}`
@@ -145,9 +148,10 @@ live('OpenCode live smoke', () => {
       .join('');
   }
 
-  /** The `opencode acp` processes this run is responsible for. */
+  /** The V1 ACP or V2 server processes this run is responsible for. */
   function agents(): string[] {
-    return ownedProcesses(command => command.includes('opencode') && command.includes('acp'))
+    return ownedProcesses(command => command.includes('opencode')
+      && (command.includes('acp') || command.includes('serve')))
       .map(row => row.command);
   }
 
@@ -196,6 +200,8 @@ live('OpenCode live smoke', () => {
     // tokens come from the answer. The badge needs the pair.
     expect(usage?.usage.contextWindow).toBeGreaterThan(0);
     expect(usage?.usage.inputTokens).toBeGreaterThan(0);
+    const anyModel = expect.any(String);
+    expect(usage?.usage.model).toEqual(process.env.GRIMOIRE_OPENCODE_MODEL ?? anyModel);
     await shutdown();
   });
 
@@ -252,6 +258,10 @@ live('OpenCode live smoke', () => {
     // nothing: the session lives in that database and no other.
     expect((updates.providerState as { databasePath?: string })?.databasePath).toBeTruthy();
     expect(answerOf(chunks).toLowerCase()).toContain('cobalt');
+    const history = await loadOpencodeSessionMessages(String(updates.sessionId), updates.providerState);
+    expect(history.filter(message => message.role === 'user')).toHaveLength(2);
+    expect(history.some(message => message.role === 'assistant'
+      && message.content.toLowerCase().includes('cobalt'))).toBe(true);
     await second.shutdown();
   });
 
@@ -302,6 +312,8 @@ live('OpenCode live smoke', () => {
     report('ROW 12/13', JSON.stringify(asked), JSON.stringify(summarize(chunks)));
     expect(asked.length).toBeGreaterThan(0);
     expect(existsSync(join(vault, 'allowed-live.txt'))).toBe(true);
+    expect(chunks.filter(chunk => chunk.type === 'error' || chunk.type === 'notice')).toEqual([]);
+    expect(answerOf(chunks).toLowerCase()).toContain('done');
     await shutdown();
   });
 
@@ -336,6 +348,29 @@ live('OpenCode live smoke', () => {
     expect(discovered).toBe(true);
     expect(models.length).toBeGreaterThan(0);
     await shutdown();
+  });
+
+  describe('V2 native forms', () => {
+    if (process.env.GRIMOIRE_OPENCODE_V2_LIVE !== '1') return;
+    it('answers a native question through the chat interaction callback', async () => {
+      const { runtime, shutdown } = await createHarness();
+      const asked: unknown[] = [];
+      runtime.installInteractions({ question: async (input: {
+        questions: Array<{ id: string; options: Array<{ label: string }> }>;
+      }) => {
+        asked.push(input);
+        return Object.fromEntries(input.questions.map(question => [question.id, 'Blue']));
+      } });
+      const chunks = await drain(runtime.query(runtime.prepareTurn({
+        text: 'Use the question tool to ask me to choose a color, with options Red and Blue. '
+          + 'Wait for my answer, then reply with exactly the selected color. You must call the question tool.',
+      })));
+      report('QUESTION', JSON.stringify(asked), JSON.stringify(summarize(chunks)));
+      expect(asked).toHaveLength(1);
+      expect(chunks.filter(chunk => chunk.type === 'error' || chunk.type === 'notice')).toEqual([]);
+      expect(answerOf(chunks)).toContain('Blue');
+      await shutdown();
+    });
   });
 
   it('row 18: lists the commands a session announces', async () => {

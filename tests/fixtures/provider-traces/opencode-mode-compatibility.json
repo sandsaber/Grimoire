@@ -1,0 +1,98 @@
+{
+  "recordedAt": "2026-09-24",
+  "platform": "darwin-arm64",
+  "scenario": "Isolated ACP initialize, session/new, and selecting a generated Grimoire primary agent; no model prompt.",
+  "probes": [
+    {
+      "version": "1.18.32",
+      "configOptions": [
+        {
+          "id": "mode",
+          "name": "Session Mode",
+          "category": "mode",
+          "type": "select",
+          "currentValue": "build",
+          "options": [
+            {
+              "value": "build",
+              "name": "build",
+              "description": "The default agent. Executes tools based on configured permissions."
+            },
+            {
+              "value": "grimoire-full-access",
+              "name": "grimoire-full-access"
+            },
+            {
+              "value": "grimoire-safe",
+              "name": "grimoire-safe"
+            },
+            {
+              "value": "plan",
+              "name": "plan",
+              "description": "Plan mode. Disallows all edit tools."
+            }
+          ]
+        }
+      ],
+      "setModeSucceeded": true
+    },
+    {
+      "version": "2.0.15",
+      "configOptions": [
+        {
+          "id": "mode",
+          "name": "Session Mode",
+          "category": "mode",
+          "type": "select",
+          "currentValue": "build",
+          "options": [
+            {
+              "value": "build",
+              "name": "Build",
+              "description": "The default agent. Executes tools based on configured permissions."
+            },
+            {
+              "value": "plan",
+              "name": "Plan",
+              "description": "Read-only agent for exploring the codebase and planning work before implementation."
+            }
+          ]
+        }
+      ],
+      "setModeSucceeded": false
+    },
+    {
+      "version": "2.0.16",
+      "configOptions": [
+        {
+          "id": "mode",
+          "name": "Session Mode",
+          "category": "mode",
+          "type": "select",
+          "currentValue": "build",
+          "options": [
+            {
+              "value": "build",
+              "name": "Build",
+              "description": "The default agent. Executes tools based on configured permissions."
+            },
+            {
+              "value": "plan",
+              "name": "Plan",
+              "description": "Read-only agent for exploring the codebase and planning work before implementation."
+            },
+            {
+              "value": "grimoire-full-access",
+              "name": "grimoire-full-access"
+            },
+            {
+              "value": "grimoire-safe",
+              "name": "grimoire-safe"
+            }
+          ]
+        }
+      ],
+      "setModeSucceeded": true
+    }
+  ]
+}
