@@ -2,6 +2,24 @@
 
 User-facing changes by release.
 
+## 2.0.5 - 2026-09-24
+
+### Added
+
+- OpenCode V2 support alongside V1, with persistent sessions, native history, permission prompts, question cards, model controls, and cancellation. Verified with OpenCode 2.0.15 and 2.0.16 (#220, #223).
+
+### Fixed
+
+- Codex model refresh discovers the current CLI catalog and updates existing chat tabs while preserving their selected model and turn options. Failed refreshes no longer show a success notice (#219).
+- Qwen session configuration has its own 30-second budget for model, mode, and effort changes, avoiding premature turn rejection without extending cancellation deadlines (#218, #221).
+- Claude loads user settings, including `apiKeyHelper`, in Safe and Plan as well as Auto-approve. Authentication no longer depends on the selected work mode (#222, #224).
+- OpenCode V2 waits for managed permission modes to load instead of retaining an incomplete ACP catalog. V2 history and spend use its native storage format (#220, #223).
+- OpenCode and MiMoCode use the new model's reasoning options after a model switch instead of applying options from the previous model (#223).
+
+### Known limitations
+
+- OpenCode V2 external and conditional forms and SSE MCP transports are not supported. See the [OpenCode V2 setup and compatibility guide](https://github.com/sandsaber/Grimoire/blob/main/docs/opencode-v2-compatibility.md) for setup steps and verification boundaries.
+
 ## 2.0.4 - 2026-09-21
 
 ### Fixed
