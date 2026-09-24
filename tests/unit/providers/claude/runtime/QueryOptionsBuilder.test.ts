@@ -291,28 +291,30 @@ describe('QueryOptionsBuilder', () => {
       expect(config.enableChrome).toBe(true);
     });
 
-    it('sets settingSources to user,project,local when Claude user settings are enabled', () => {
-      const ctx = createMockContext({
-        settings: createMockSettings({
-          permissionMode: 'full_access',
-          providerConfigs: { claude: { loadUserSettings: true } },
-        }),
+    describe.each([
+      ['normal', 'default'], ['plan', 'plan'], ['full_access', 'bypassPermissions'],
+    ] as const)('settings sources in %s mode', (permissionMode, sdkMode) => {
+      it.each([
+        [true, true], [true, false], [false, true], [false, false],
+      ])('honors loadUserSettings=%s with respectProjectSettings=%s', (loadUserSettings, respectProjectSettings) => {
+        const canUseTool = jest.fn();
+        const ctx = {
+          ...createMockContext({ settings: createMockSettings({
+            permissionMode,
+            providerConfigs: { claude: { loadUserSettings, respectProjectSettings } },
+          }) }),
+          abortController: new AbortController(), hooks: {}, canUseTool, hasEditorContext: false,
+        };
+        const sources = loadUserSettings ? ['user', 'project', 'local'] : ['project', 'local'];
+
+        expect(QueryOptionsBuilder.buildPersistentQueryConfig(ctx).settingSources).toBe(sources.join(','));
+        expect(QueryOptionsBuilder.buildPersistentQueryOptions(ctx)).toMatchObject({
+          settingSources: sources, permissionMode: sdkMode, canUseTool,
+        });
+        expect(QueryOptionsBuilder.buildColdStartQueryOptions(ctx)).toMatchObject({
+          settingSources: sources, permissionMode: sdkMode, canUseTool,
+        });
       });
-      const config = QueryOptionsBuilder.buildPersistentQueryConfig(ctx);
-
-      expect(config.settingSources).toBe('user,project,local');
-    });
-
-    it('excludes user settings sources in safe mode even when user settings are enabled', () => {
-      const ctx = createMockContext({
-        settings: createMockSettings({
-          permissionMode: 'normal',
-          providerConfigs: { claude: { loadUserSettings: true } },
-        }),
-      });
-      const config = QueryOptionsBuilder.buildPersistentQueryConfig(ctx);
-
-      expect(config.settingSources).toBe('project,local');
     });
 
     it('changes systemPromptKey when orchestrator mode is active', () => {

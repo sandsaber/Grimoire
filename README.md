@@ -145,6 +145,8 @@ Inside Grimoire, Claude Code reads and preserves your `.claude/` files, runs on 
 
 **Respect Claude Code settings** is enabled by default. Grimoire reads Claude Code user settings (`~/.claude/settings.json`) and vault settings (`.claude/settings.json`) for `model` and `env`, then uses those values in the Claude model selector and runtime environment. This lets Claude Code custom models work in Grimoire too, including Anthropic-compatible gateways such as MiniMax, Z.ai, and others. Project settings override user settings, and explicit Grimoire environment settings override both.
 
+The SDK also loads native user, project, and local settings by default in Safe, Plan, and Auto-approve. This includes `apiKeyHelper` and native permission rules. The model/env toggle above does not disable SDK authentication helpers; the selected work mode is still passed to the SDK separately.
+
 If the effective Claude environment includes `ANTHROPIC_API_KEY`, Grimoire can refresh Anthropic's model catalog and merge discovered models into the picker. Without an API key, or if the refresh fails, the picker keeps working from Claude Code aliases such as `Best`, `Fable 5`, `Opus Plan`, and 1M variants, plus your `.claude` and custom Grimoire models.
 
 ```json
