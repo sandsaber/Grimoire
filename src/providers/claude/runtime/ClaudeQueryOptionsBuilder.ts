@@ -115,7 +115,6 @@ export class QueryOptionsBuilder {
 
     const settingSources = resolveClaudeSettingSources(
       claudeSettings.loadUserSettings,
-      ctx.settings.permissionMode,
     );
 
     return {
@@ -309,7 +308,6 @@ export class QueryOptionsBuilder {
       pathToClaudeCodeExecutable: ctx.cliPath,
       settingSources: resolveClaudeSettingSources(
         claudeSettings.loadUserSettings,
-        ctx.settings.permissionMode,
       ),
       env: {
         ...process.env,

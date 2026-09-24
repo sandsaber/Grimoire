@@ -92,7 +92,7 @@ export async function runColdStartQuery(
     },
     permissionMode: 'bypassPermissions',
     allowDangerouslySkipPermissions: true,
-    settingSources: resolveClaudeSettingSources(claudeSettings.loadUserSettings, 'full_access'),
+    settingSources: resolveClaudeSettingSources(claudeSettings.loadUserSettings),
     spawnClaudeCodeProcess: createCustomSpawnFunction(enhancedPath),
   };
 

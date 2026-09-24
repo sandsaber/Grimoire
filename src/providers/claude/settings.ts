@@ -4,7 +4,7 @@ import {
   getRuntimeEnvironmentText,
   getRuntimeEnvironmentVariables,
 } from '../../core/providers/providerEnvironment';
-import type { HostnameCliPaths, PermissionMode, SlashCommand } from '../../core/types/settings';
+import type { HostnameCliPaths, SlashCommand } from '../../core/types/settings';
 import {
   getHostnameKey,
   getLegacyHostnameKey,
@@ -363,12 +363,8 @@ export function getClaudeRuntimeEnvironmentText(
 
 export function resolveClaudeSettingSources(
   loadUserSettings: boolean,
-  permissionMode: PermissionMode = 'full_access',
 ): ClaudeSettingSource[] {
-  if (permissionMode !== 'full_access') {
-    return ['project', 'local'];
-  }
-
+  // Authentication helpers and native preferences must not depend on the tool permission mode.
   return loadUserSettings
     ? ['user', 'project', 'local']
     : ['project', 'local'];

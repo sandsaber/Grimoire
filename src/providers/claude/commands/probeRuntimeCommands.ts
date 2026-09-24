@@ -80,7 +80,7 @@ export async function probeRuntimeCommands(plugin: GrimoirePlugin): Promise<Slas
         env: { ...process.env, ...customEnv, PATH: enhancedPath },
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
-        settingSources: resolveClaudeSettingSources(claudeSettings.loadUserSettings, 'full_access'),
+        settingSources: resolveClaudeSettingSources(claudeSettings.loadUserSettings),
         ...(Object.keys(extraArgs).length > 0 ? { extraArgs } : {}),
         spawnClaudeCodeProcess: createCustomSpawnFunction(enhancedPath),
         persistSession: false,

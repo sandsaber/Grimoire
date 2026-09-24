@@ -76,7 +76,7 @@ export async function probeRuntimeModels(plugin: GrimoirePlugin): Promise<Claude
         env: { ...process.env, ...customEnv, PATH: enhancedPath },
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
-        settingSources: resolveClaudeSettingSources(claudeSettings.loadUserSettings, 'full_access'),
+        settingSources: resolveClaudeSettingSources(claudeSettings.loadUserSettings),
         ...(extraArgs ? { extraArgs } : {}),
         spawnClaudeCodeProcess: createCustomSpawnFunction(enhancedPath),
         persistSession: false,
