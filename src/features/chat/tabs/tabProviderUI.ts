@@ -184,7 +184,7 @@ export async function updateTabProviderSettings(
   const snapshot = getTabSettingsSnapshot(tab, plugin);
   update(snapshot);
   if (tab.lifecycleState === 'blank') {
-    tab.draftSettings = createDraftSettingsSnapshot(snapshot, providerId);
+    tab.draftSettings = createDraftSettingsSnapshot(snapshot);
     plugin.settings.settingsProvider = providerId;
     snapshot.settingsProvider = providerId;
   }

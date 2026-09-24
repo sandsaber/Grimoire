@@ -27,6 +27,7 @@ import {
 import { syncComposerStopButton } from '@/features/chat/tabs/tabContextUI';
 import { getTabPermissionMode } from '@/features/chat/tabs/tabSettings';
 import { setLocale } from '@/i18n/i18n';
+import { updateCodexModelDiscoveryState } from '@/providers/codex/modelDiscoveryState';
 import {
   DEFAULT_CODEX_PRIMARY_MODEL,
   DEFAULT_CODEX_PRIMARY_MODEL_LABEL,
@@ -4544,6 +4545,48 @@ describe('Tab - Bound Conversation Model', () => {
 describe('Tab - Blank Tab Draft Model Change', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('shows refreshed models in an existing draft and keeps them when its settings are saved', async () => {
+    jest.restoreAllMocks();
+    const plugin = createMockPlugin();
+    const oldModels = [{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol' }];
+    plugin.settings.providerConfigs.codex = { enabled: true, discoveredModels: oldModels };
+    const tab = createTab(createMockOptions({
+      plugin,
+      draftModel: 'gpt-5.6-sol',
+      draftSettings: {
+        model: 'gpt-5.6-sol',
+        effortLevel: 'high',
+        permissionMode: 'plan',
+        providerConfigs: { codex: { enabled: true, discoveredModels: oldModels } },
+      },
+    }));
+    initializeTabUI(tab, plugin);
+    const toolbarModule = jest.requireMock('@/features/chat/ui/InputToolbar');
+    const callbacks = toolbarModule.createInputToolbar.mock.calls.at(-1)?.[1];
+    const models = () => callbacks.getChatUI().models.options(callbacks.getSettings())
+      .filter((option: { providerId: string }) => option.providerId === 'codex')
+      .map((option: { value: string }) => option.value);
+    expect(models()).toEqual(['gpt-5.6-sol']);
+
+    const refreshedModels = [
+      { id: 'gpt-6-astra', label: 'GPT-6-Astra' },
+      ...oldModels,
+    ];
+    updateCodexModelDiscoveryState(plugin.settings, { discoveredModels: refreshedModels });
+    onProviderAvailabilityChanged(tab, plugin);
+
+    expect(models()).toEqual(['gpt-6-astra', 'gpt-5.6-sol']);
+    expect(callbacks.getSettings()).toMatchObject({
+      model: 'gpt-5.6-sol', effortLevel: 'high', permissionMode: 'plan',
+    });
+    await callbacks.onEffortLevelChange('medium');
+    expect(plugin.settings.providerConfigs.codex.discoveredModels).toEqual(refreshedModels);
+    await callbacks.onModelChange('gpt-6-astra');
+    expect(tab.draftModel).toBe('gpt-6-astra');
+    expect(plugin.settings.savedProviderModel.codex).toBe('gpt-6-astra');
+    expect(plugin.settings.providerConfigs.codex.discoveredModels).toEqual(refreshedModels);
   });
 
   it('updates draft model and provider without creating runtime', async () => {

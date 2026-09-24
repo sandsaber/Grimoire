@@ -8,7 +8,7 @@ const mockGetHostnameKey = jest.fn(() => 'host-a');
 const mockRenderEnvironmentSettingsSection = jest.fn();
 const mockSaveSettings = jest.fn().mockResolvedValue(undefined);
 const mockBroadcastToAllTabs = jest.fn().mockResolvedValue(undefined);
-const mockRefreshModels = jest.fn().mockResolvedValue(true);
+const mockRefreshModels = jest.fn().mockResolvedValue('refreshed');
 
 jest.mock('fs');
 jest.mock('@/core/providers/ProviderSettingsCoordinator', () => ({
@@ -683,6 +683,28 @@ describe('CodexSettingsTab', () => {
     const plugin = createPlugin();
     const context = createContext(plugin);
 
+    codexSettingsTabRenderer.render(createContainer(), context);
+    const button = findSetting('settings.refreshModels.name').buttonComponents[0];
+
+    await button.onClickCallback?.();
+
+    expect(Notice).toHaveBeenCalledWith('settings.provider.loadModelsFailed');
+    expect(context.refreshModelSelectors).not.toHaveBeenCalled();
+    expect(button.setDisabled).toHaveBeenLastCalledWith(false);
+  });
+
+  it('reports a failed refresh even when an older model catalog is still available', async () => {
+    const { Notice } = await import('obsidian');
+    mockRefreshModels.mockResolvedValueOnce('failed');
+    const plugin = createPlugin({
+      providerConfigs: {
+        codex: {
+          ...DEFAULT_CODEX_PROVIDER_SETTINGS,
+          discoveredModels: [{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol' }],
+        },
+      },
+    });
+    const context = createContext(plugin);
     codexSettingsTabRenderer.render(createContainer(), context);
     const button = findSetting('settings.refreshModels.name').buttonComponents[0];
 

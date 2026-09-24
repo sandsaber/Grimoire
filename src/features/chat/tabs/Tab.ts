@@ -1488,7 +1488,7 @@ export function initializeTabControllers(
 
       tab.providerId = providerId;
       tab.draftModel = targetModel;
-      tab.draftSettings = createDraftSettingsSnapshot(snapshot, providerId);
+      tab.draftSettings = createDraftSettingsSnapshot(snapshot);
       if (tab.service) {
         cleanupTabRuntime(tab);
       }

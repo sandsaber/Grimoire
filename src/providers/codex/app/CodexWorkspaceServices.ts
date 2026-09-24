@@ -15,10 +15,7 @@ import type {
 import { getVaultPath } from '../../../utils/path';
 import { CodexAgentMentionProvider } from '../agents/CodexAgentMentionProvider';
 import { CodexSkillCatalog } from '../commands/CodexSkillCatalog';
-import {
-  buildCodexModelCatalogFingerprint,
-  resolveCodexModelCatalogFingerprint,
-} from '../modelCatalogFingerprint';
+import { resolveCodexModelCatalogFingerprint } from '../modelCatalogFingerprint';
 import { updateCodexModelDiscoveryState } from '../modelDiscoveryState';
 import { codexCliResolver } from '../runtime/CodexCliResolver';
 import { CodexModelListingService } from '../runtime/CodexModelListingService';
@@ -45,31 +42,8 @@ const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
 function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
   const modelListingService = new CodexModelListingService(plugin);
-  const initialSettings = getCodexProviderSettings(plugin.settings ?? {});
   const refreshCache = new ProviderModelCatalogRefreshCache(MODEL_CATALOG_CACHE_TTL_MS);
-  if (initialSettings.discoveredModels.length > 0) {
-    // The resolved CLI path is part of the fingerprint but is not available
-    // here: this catalog is built inside createCodexWorkspaceServices, which runs
-    // before the workspace manager publishes the services, and it assigns
-    // this.services[providerId] only after that resolves - until then
-    // getResolvedProviderCliPath returns null and an eager seed would be filed
-    // under settings.cliPath while every later refresh looks it up under the
-    // resolved path. Hold the seed back until the path is known.
-    const initialEnvironmentVariables = plugin.getActiveEnvironmentVariables?.('codex')
-      ?? initialSettings.environmentVariables;
-    if (plugin.getResolvedProviderCliPath?.('codex') == null) {
-      refreshCache.seedOnFirstRefresh(() => buildCodexModelCatalogFingerprint(
-        initialSettings,
-        plugin.getResolvedProviderCliPath?.('codex') ?? initialSettings.cliPath,
-        initialEnvironmentVariables,
-      ));
-    } else {
-      refreshCache.seed(
-        resolveCodexModelCatalogFingerprint(plugin, initialSettings),
-        initialSettings.discoveredModelsFingerprint,
-      );
-    }
-  }
+  let lastCatalogCheckAt = 0;
   return {
     isAvailable(settings) {
       return getCodexProviderSettings(settings).enabled;
@@ -77,27 +51,13 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
     async refreshModels({ force, settings }) {
       const currentSettings = getCodexProviderSettings(settings);
       const fingerprint = resolveCodexModelCatalogFingerprint(plugin, currentSettings);
-      const appliedDeferredSeed = refreshCache.applyDeferredSeed(
-        fingerprint,
-        currentSettings.discoveredModels.length > 0,
-        currentSettings.discoveredModelsFingerprint,
+      // Account model access can change without a CLI or environment change.
+      // Keep persisted models for immediate display, then check on first use
+      // after startup and at most once per interval while the picker is used.
+      const shouldReload = force || (
+        lastCatalogCheckAt > 0 && Date.now() - lastCatalogCheckAt >= MODEL_CATALOG_CACHE_TTL_MS
       );
-      if (appliedDeferredSeed && !force) {
-        plugin.recordDebugLog?.({
-          data: {
-            modelCount: currentSettings.discoveredModels.length,
-            providerId: 'codex',
-            reason: 'seeded_on_first_use',
-            ttlMs: MODEL_CATALOG_CACHE_TTL_MS,
-          },
-          event: 'modelCatalog.refresh.skipped',
-          level: 'debug',
-          scope: 'provider.codex',
-        });
-        return 'skipped';
-      }
-
-      if (!force && refreshCache.isFresh(fingerprint, currentSettings.discoveredModels.length > 0)) {
+      if (!shouldReload && refreshCache.isFresh(fingerprint, currentSettings.discoveredModels.length > 0)) {
         plugin.recordDebugLog?.({
           data: {
             modelCount: currentSettings.discoveredModels.length,
@@ -114,7 +74,7 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
 
       return refreshCache.refresh({
         fingerprint,
-        force,
+        force: shouldReload,
         hasCachedModels: currentSettings.discoveredModels.length > 0,
         load: async () => {
       plugin.recordDebugLog?.({
@@ -168,7 +128,10 @@ function createCodexModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
           level: 'warn',
           scope: 'provider.codex',
         });
-        throw error;
+        return 'failed';
+      } finally {
+        // Failed probes cost a CLI spawn too; only an explicit refresh retries early.
+        lastCatalogCheckAt = Date.now();
       }
         },
       });
@@ -239,4 +202,3 @@ export function maybeGetCodexWorkspaceServices(
   return plugin.getApplicationRuntimeOrNull?.()
     ?.workspaceServicesFor('codex') as CodexWorkspaceServices | null ?? null;
 }
-

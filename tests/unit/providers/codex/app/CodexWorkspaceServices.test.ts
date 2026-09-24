@@ -142,7 +142,76 @@ describe('createCodexWorkspaceServices', () => {
     ]);
   });
 
-  it('suppresses the reload listing when the CLI resolver is not reachable yet at construction', async () => {
+  it('updates the picker when the account catalog adds GPT-6 models without a CLI change', async () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    const listModelsSpy = jest
+      .spyOn(CodexModelListingService.prototype, 'listModels')
+      .mockResolvedValueOnce([{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol' }])
+      .mockResolvedValueOnce([
+        { id: 'gpt-6-astra', label: 'GPT-6-Astra' },
+        { id: 'gpt-6-sol', label: 'GPT-6-Sol' },
+      ]);
+    const settings = { providerConfigs: { codex: { enabled: true } } };
+    const plugin = {
+      app: { vault: { adapter: { basePath: '/repo' } } },
+      saveSettings: jest.fn().mockResolvedValue(undefined),
+      settings,
+    };
+    const services = await createCodexWorkspaceServices(
+      plugin as any,
+      createStubAdapter() as any,
+      createStubAdapter() as any,
+    );
+
+    await services.modelCatalog?.refreshModels({ plugin: plugin as any, settings });
+    clock.mockReturnValue(1_000 + 9 * 60_000);
+    expect(await services.modelCatalog?.refreshModels({ plugin: plugin as any, settings })).toBe('skipped');
+    expect(listModelsSpy).toHaveBeenCalledTimes(1);
+
+    clock.mockReturnValue(1_000 + 10 * 60_000);
+    expect(await services.modelCatalog?.refreshModels({ plugin: plugin as any, settings })).toBe('refreshed');
+    expect(listModelsSpy).toHaveBeenCalledTimes(2);
+    expect(codexChatUIConfig.getModelOptions(settings)).toEqual([
+      { value: 'gpt-6-astra', label: 'GPT-6-Astra', description: undefined },
+      { value: 'gpt-6-sol', label: 'GPT-6-Sol', description: undefined },
+    ]);
+  });
+
+  it.each(['empty', 'rejected'])('paces %s catalog retries while keeping persisted models', async (failure) => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    const oldModels = [{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol' }];
+    const list = jest.spyOn(CodexModelListingService.prototype, 'listModels');
+    if (failure === 'empty') {
+      list.mockResolvedValue([]);
+    } else {
+      list.mockRejectedValue(new Error('CLI unavailable'));
+    }
+    const settings = { providerConfigs: { codex: { enabled: true, discoveredModels: oldModels } } };
+    const plugin = { app: { vault: { adapter: { basePath: '/repo' } } }, settings };
+    const services = await createCodexWorkspaceServices(
+      plugin as any, createStubAdapter() as any, createStubAdapter() as any,
+    );
+    const refresh = (force = false) => services.modelCatalog.refreshModels({
+      plugin: plugin as any, settings, force,
+    });
+
+    expect(await refresh()).toBe('failed');
+    clock.mockReturnValue(2_000);
+    expect(await refresh()).toBe('skipped');
+    expect(list).toHaveBeenCalledTimes(1);
+    clock.mockReturnValue(1_000 + 10 * 60_000);
+    expect(await refresh()).toBe('failed');
+    expect(await refresh()).toBe('skipped');
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(settings.providerConfigs.codex.discoveredModels).toEqual(oldModels);
+
+    list.mockResolvedValue([{ id: 'gpt-6-astra', label: 'GPT-6-Astra' }]);
+    expect(await refresh(true)).toBe('refreshed');
+    expect(list).toHaveBeenCalledTimes(3);
+    expect(codexChatUIConfig.getModelOptions(settings).map(model => model.value)).toEqual(['gpt-6-astra']);
+  });
+
+  it('rechecks persisted models on first use after startup when the CLI resolver arrives later', async () => {
     const listModelsSpy = jest
       .spyOn(CodexModelListingService.prototype, 'listModels')
       .mockResolvedValue([{ id: 'gpt-5.6', label: 'GPT-5.6' }]);
@@ -176,8 +245,8 @@ describe('createCodexWorkspaceServices', () => {
       settings: settings,
     });
 
-    expect(outcome).toBe('skipped');
-    expect(listModelsSpy).not.toHaveBeenCalled();
+    expect(outcome).toBe('refreshed');
+    expect(listModelsSpy).toHaveBeenCalledTimes(1);
   });
 
   it('still relists models when the environment changed before the first refresh', async () => {
@@ -311,7 +380,7 @@ describe('createCodexWorkspaceServices', () => {
     expect(listModelsSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps trusting a catalog persisted before the fingerprint existed', async () => {
+  it('rechecks a catalog persisted before the fingerprint existed', async () => {
     const listModelsSpy = jest
       .spyOn(CodexModelListingService.prototype, 'listModels')
       .mockResolvedValue([{ id: 'gpt-5.6', label: 'GPT-5.6' }]);
@@ -337,9 +406,9 @@ describe('createCodexWorkspaceServices', () => {
     );
     const outcome = await services.modelCatalog?.refreshModels({ plugin: plugin as any, settings });
 
-    expect(outcome).toBe('skipped');
-    expect(listModelsSpy).not.toHaveBeenCalled();
-    expect(plugin.saveSettings).not.toHaveBeenCalled();
+    expect(outcome).toBe('refreshed');
+    expect(listModelsSpy).toHaveBeenCalledTimes(1);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
   });
 
   it('re-records the fingerprint when the CLI changed but the list did not', async () => {

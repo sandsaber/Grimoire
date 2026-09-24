@@ -224,9 +224,7 @@ export const codexSettingsTabRenderer: ProviderSettingsTabRenderer = {
 
     new Setting(container).setName(t('settings.models')).setHeading();
 
-    // A settled catalog is never re-probed in the background, and the binary
-    // fingerprint only notices an upgrade that changed the file Grimoire resolved.
-    // This is the one place a user can ask the app-server for its current list.
+    // Explicit refresh bypasses the background catalog check interval.
     new Setting(container)
       .setName(t('settings.refreshModels.name'))
       .setDesc(t('settings.refreshModels.desc', { provider: 'Codex' }))
@@ -241,13 +239,13 @@ export const codexSettingsTabRenderer: ProviderSettingsTabRenderer = {
 
             button.setDisabled(true);
             try {
-              await catalog.refreshModels({
+              const outcome = await catalog.refreshModels({
                 force: true,
                 plugin: context.plugin,
                 settings: settingsBag,
               });
               const modelCount = getCodexProviderSettings(settingsBag).discoveredModels.length;
-              if (modelCount === 0) {
+              if (outcome === 'failed' || modelCount === 0) {
                 new Notice(t('settings.provider.loadModelsFailed'));
                 return;
               }

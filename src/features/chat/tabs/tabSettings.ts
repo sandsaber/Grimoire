@@ -114,11 +114,6 @@ export function getBlankTabModelOptions(
   });
 }
 
-export function getRecordEntry(record: Record<string, unknown>, key: string): Record<string, unknown> | null {
-  const value = record[key];
-  return isRecord(value) ? value : null;
-}
-
 export function hasStartedConversation(conversation: Conversation | null | undefined): conversation is Conversation {
   if (!conversation) {
     return false;
@@ -172,7 +167,6 @@ export function cloneSerializableRecord(value: unknown): Record<string, unknown>
 
 export function createDraftSettingsSnapshot(
   settings: Record<string, unknown>,
-  providerId: ProviderId,
 ): Record<string, unknown> {
   const draftSettings: Record<string, unknown> = {};
 
@@ -181,16 +175,6 @@ export function createDraftSettingsSnapshot(
     if (typeof value === 'string') {
       draftSettings[key] = value;
     }
-  }
-
-  const providerConfigs = isRecord(settings.providerConfigs)
-    ? settings.providerConfigs
-    : null;
-  const providerConfig = providerConfigs ? cloneSerializableRecord(providerConfigs[providerId]) : null;
-  if (providerConfig) {
-    draftSettings.providerConfigs = {
-      [providerId]: providerConfig,
-    };
   }
 
   return draftSettings;
@@ -205,32 +189,25 @@ export function mergeDraftSettingsSnapshot(
     return baseSettings;
   }
 
+  // A draft owns the user's turn options, not the provider's shared catalog,
+  // credentials or CLI configuration. Ignore configs in already-open drafts too.
+  const selections = createDraftSettingsSnapshot(draftSettings);
   const merged: TabProviderSettings = {
     ...baseSettings,
-    ...draftSettings,
+    ...selections,
   };
-
-  const baseProviderConfigs = isRecord(baseSettings.providerConfigs)
-    ? baseSettings.providerConfigs
-    : {};
-  const draftProviderConfigs = isRecord(draftSettings.providerConfigs)
-    ? draftSettings.providerConfigs
-    : {};
-  const baseProviderConfig = getRecordEntry(baseProviderConfigs, providerId) ?? {};
-  const draftProviderConfig = getRecordEntry(draftProviderConfigs, providerId);
-
-  if (draftProviderConfig) {
-    const providerConfig: Record<string, unknown> = {
-      ...baseProviderConfig,
-      ...draftProviderConfig,
-    };
-    const providerConfigs: Record<string, unknown> = {
-      ...baseProviderConfigs,
-      [providerId]: providerConfig,
-    };
-    merged.providerConfigs = providerConfigs;
-  } else {
-    merged.providerConfigs = baseProviderConfigs;
+  const chatUI = providerCatalog().declarations(providerId).chatUI;
+  const turnOptions = createDraftSettingsSnapshot(merged);
+  chatUI.models.applyDefaults(merged.model, merged);
+  Object.assign(merged, turnOptions);
+  if (typeof selections.permissionMode === 'string') {
+    chatUI.permissionMode?.apply?.(selections.permissionMode, merged);
+  }
+  if (chatUI.reasoning) {
+    const key = chatUI.reasoning.isTiered(merged.model, merged) ? 'effortLevel' : 'thinkingBudget';
+    if (typeof selections[key] === 'string') {
+      chatUI.reasoning.apply?.(merged.model, selections[key], merged);
+    }
   }
 
   return merged;
