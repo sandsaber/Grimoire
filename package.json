@@ -48,6 +48,7 @@
     "@parcel/watcher@2.6.0": false,
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": false,
+    "msgpackr-extract@3.0.4": false,
     "unrs-resolver@1.12.2": true
   },
   "devDependencies": {
