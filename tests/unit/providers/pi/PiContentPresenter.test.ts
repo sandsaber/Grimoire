@@ -2,7 +2,7 @@ import { PiContentPresenter } from '@/providers/pi/execution/PiContentPresenter'
 
 describe('Pi terminal output', () => {
   it('accumulates terminal deltas and retains the result when completion has only exit metadata', () => {
-    const presenter = new PiContentPresenter(() => undefined, () => undefined);
+    const presenter = new PiContentPresenter(() => undefined, () => undefined, () => 'pi:zai/test');
     const emit = (update: unknown) => presenter.present({ kind: 'session-update', notification: { sessionId: 'pi', update } });
     expect(emit({ sessionUpdate: 'tool_call', toolCallId: 't', kind: 'execute', title: 'printf hello', status: 'in_progress',
       content: [{ type: 'terminal', terminalId: 't' }], _meta: { terminal_info: { terminal_id: 't', cwd: '/vault' } } }))
@@ -21,5 +21,28 @@ describe('Pi terminal output', () => {
     const next = emit({ sessionUpdate: 'tool_call_update', toolCallId: 't', status: 'failed',
       _meta: { terminal_output: { terminal_id: 't', data: 'failure' } } });
     expect(next).toContainEqual({ type: 'tool_result', id: 't', content: 'failure', isError: true });
+  });
+});
+
+describe('Pi context occupancy (#228)', () => {
+  it('forwards zero, populated and compacted readings without accumulating tokens', () => {
+    const presenter = new PiContentPresenter(() => undefined, () => undefined, () => 'pi:zai/test');
+    for (const used of [0, 2611, 1500]) {
+      expect(presenter.present({ kind: 'session-update', notification: { sessionId: 'pi-session',
+        update: { sessionUpdate: 'usage_update', used, size: 1000000 } } }))
+        .toEqual([{ type: 'usage', sessionId: 'pi-session', usage: expect.objectContaining({
+          contextTokens: used, contextWindow: 1000000, contextWindowIsAuthoritative: true, model: 'pi:zai/test',
+        }) }]);
+    }
+  });
+
+  it('does not invent occupancy from turn totals or replay a previous session reading', () => {
+    const presenter = new PiContentPresenter(() => undefined, () => undefined, () => 'pi');
+    presenter.present({ kind: 'session-update', notification: { sessionId: 'old',
+      update: { sessionUpdate: 'usage_update', used: 2000, size: 1000000 } } });
+    presenter.beginTurn();
+    expect(presenter.present({ kind: 'prompt-result', response: { usage: { totalTokens: 999999 } } })).toEqual([]);
+    presenter.forget();
+    expect(presenter.present({ kind: 'session-config', session: { sessionId: 'new' } })).toEqual([]);
   });
 });

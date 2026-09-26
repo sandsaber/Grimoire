@@ -12,7 +12,8 @@ import { VaultDurableStorage } from '@/app/storage/VaultDurableStorage';
 import { AttachmentStore } from '@/core/attachments/AttachmentStore';
 import { hydrateImagesForSend } from '@/core/attachments/hydrateImages';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
-import type { Conversation, ImageAttachment } from '@/core/types';
+import type { Conversation, ImageAttachment, UsageInfo } from '@/core/types';
+import { recalculateUsageForModel } from '@/features/chat/utils/usageInfo';
 import { PiExecution } from '@/providers/pi/execution/PiExecutionComposition';
 import { piProviderModule } from '@/providers/pi/PiProviderModule';
 import { hydratePiHistory } from '@/providers/pi/runtime/PiHistory';
@@ -47,6 +48,12 @@ live('Pi live chat projection', () => {
   it('persists an answer, reloads the kernel, and resumes the native conversation', async () => {
     const model = process.env.GRIMOIRE_PI_MODEL;
     if (!model) throw new Error('Set GRIMOIRE_PI_MODEL to an explicitly selected inexpensive model (pi:provider/id).');
+    const expectOccupancy = (usage: UsageInfo | null | undefined) => {
+      expect(usage).toMatchObject({ model, contextWindowIsAuthoritative: true });
+      expect(usage!.contextTokens).toBeGreaterThan(0);
+      expect(usage!.contextWindow).toBeGreaterThan(0);
+      expect(recalculateUsageForModel(usage!, model, 0).contextWindow).toBe(usage!.contextWindow);
+    };
     const vault = mkdtempSync(join(tmpdir(), 'grimoire-pi-live-'));
     const running: Array<() => Promise<void>> = [];
     async function open() {
@@ -66,6 +73,7 @@ live('Pi live chat projection', () => {
       const runtime = execution.createRuntime();
       const harness = await openChatProjection({ backendId: piProviderModule.execution.descriptor.backendId,
         conversationId: 'pi-live', lifecycle: host.registry, providerId: 'pi', runtime,
+        getActiveProviderSettings: () => ProviderSettingsCoordinator.getProviderSettingsSnapshot(settings, 'pi'),
         vaultPath: vault, vaultAdapter, syncConversation: true });
       let closed = false;
       const close = async () => {
@@ -84,6 +92,7 @@ live('Pi live chat projection', () => {
       await first.harness.tab.settled();
       await first.harness.saveAfterTurn();
       expect(first.harness.column.drawn.join('')).toContain('cobalt-5827');
+      expectOccupancy(first.harness.column.state.usage);
       const session = first.runtime.getSessionId();
       expect(session).toBeTruthy();
       const saved = await first.harness.sessions.records.read('pi-live');
@@ -110,6 +119,7 @@ live('Pi live chat projection', () => {
       expect(second.runtime.getSessionId()).toBe(session);
       expect(second.harness.column.drawn.join('')).toContain('cobalt-5827');
       expect(second.harness.column.failures).toEqual([]);
+      expectOccupancy(second.harness.column.state.usage);
       await second.harness.saveAfterTurn();
       const attachments = new AttachmentStore(nodeVaultAdapter(vault));
       const pngs = [1, 2].map(index => readFileSync(join(__dirname, '../../../fixtures/pi', `attachment-${index}.png`)));
@@ -154,6 +164,8 @@ live('Pi live chat projection', () => {
       expect(recalled).toMatch(/yellow[\s\S]*green/i);
       expect(third.harness.column.state.messages.filter(message => message.role === 'user')).toHaveLength(4);
       expect(third.harness.column.failures).toEqual([]);
+      expectOccupancy(third.harness.column.state.usage);
+      process.stdout.write(`PI CONTEXT QA: ${JSON.stringify(third.harness.column.state.usage)}\n`);
       process.stdout.write(`PI QA: disk reload, tool results, two native images, image bytes and native recall passed (${model}).\n`);
     } finally {
       for (const close of running) await close();
