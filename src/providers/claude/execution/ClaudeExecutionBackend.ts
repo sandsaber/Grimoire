@@ -67,6 +67,9 @@ export interface ClaudeDynamicExecutionConfig {
   readonly mcpServers?: Readonly<Record<string, McpServerConfig>>;
 }
 
+export type ClaudeDispatchPhase =
+  | 'request' | 'query-startup' | 'model' | 'permission-mode' | 'effort' | 'mcp' | 'dispatch';
+
 export interface ClaudeExecutionInvocation {
   /** Opaque provider-owned reference resolved only by the query factory. */
   readonly startupRef: string;
@@ -236,11 +239,11 @@ export interface ClaudeExecutionBackendContext {
   /**
    * Where a dialog left deliberately unanswered is written down.
    *
-   * Optional because nothing else in this backend logs, and a backend that
-   * cannot log must still run: the record is for diagnosing a parked dialog,
-   * not for deciding one.
+   * Also records dispatch failures through the host sanitizer. Logging is
+   * optional and does not decide whether a turn can run.
    */
   readonly recordDebugLog?: (entry: {
+    readonly error?: unknown;
     readonly data: Record<string, unknown>;
     readonly event: string;
     readonly level: 'debug' | 'warn' | 'error';
@@ -297,6 +300,8 @@ export interface ClaudeExecutionBackendContext {
   readonly runAbsoluteTimeoutMs?: () => number;
   readonly resultCommitTimeoutMs?: number;
   readonly recoveryTimeoutMs?: number;
+  /** Startup and configuration may wait for CLI initialization; cleanup stays short. */
+  readonly preparationTimeoutMs?: number;
   readonly controlTimeoutMs?: number;
   readonly taskResultLoadTimeoutMs?: number;
   readonly maxResultBytes?: number;
@@ -837,6 +842,7 @@ class ClaudeExecutionSession implements ExecutionSession {
         );
       }
       if (!this.query || restartRequired) {
+        run.setDispatchPhase('query-startup');
         await this.startQuery(invocation, run, resumeCheckpoint);
       }
       await this.applyDynamicUpdates(invocation.dynamic ?? {}, run);
@@ -1138,20 +1144,26 @@ class ClaudeExecutionSession implements ExecutionSession {
       },
       onUserDialog: (request, options) => this.answerUserDialog(request, options),
     });
-    const query = await withAbortableTimeout(
-      creation,
+    const created = await withAbortableTimeout(
+      Promise.race([
+        creation.then(query => ({ query }), (error: unknown) => ({ error })),
+        run.finished.then(() => undefined),
+      ]),
       creationAbort,
       this.context.scheduler,
-      this.context.controlTimeoutMs ?? 2_000,
+      this.context.preparationTimeoutMs ?? 60_000,
     );
     if (this.queryCreationAbort === creationAbort) {
       this.queryCreationAbort = undefined;
     }
-    if (!query) {
+    if (!created || 'error' in created) {
+      creationAbort.abort();
       channel.close();
       void creation.then(lateQuery => lateQuery.close(), () => undefined);
-      throw new ExecutionDispatchError('Claude query creation did not complete safely.', true);
+      if (created && 'error' in created) throw created.error;
+      throw new ExecutionDispatchError('Claude query creation timed out.', true);
     }
+    const query = created.query;
     if (this.disposed || this.activeRun !== run || run.isTerminal) {
       channel.close();
       query.close();
@@ -1286,14 +1298,17 @@ class ClaudeExecutionSession implements ExecutionSession {
       throw new Error('Claude persistent query is not active.');
     }
     if (next.model !== this.appliedDynamic.model) {
+      run.setDispatchPhase('model');
       await this.applyControl(query, run, query.setModel(next.model));
     }
     if (next.permissionMode !== undefined
       && next.permissionMode !== this.appliedDynamic.permissionMode) {
+      run.setDispatchPhase('permission-mode');
       await this.applyControl(query, run, query.setPermissionMode(next.permissionMode));
     }
     if (next.effortLevel !== undefined
       && next.effortLevel !== this.appliedDynamic.effortLevel) {
+      run.setDispatchPhase('effort');
       await this.applyControl(
         query,
         run,
@@ -1302,6 +1317,7 @@ class ClaudeExecutionSession implements ExecutionSession {
     }
     if (next.mcpServers !== undefined
       && stableStringify(next.mcpServers) !== stableStringify(this.appliedDynamic.mcpServers)) {
+      run.setDispatchPhase('mcp');
       await this.applyControl(query, run, query.setMcpServers({ ...next.mcpServers }));
     }
     this.appliedDynamic = copyDynamicConfig(next);
@@ -1314,11 +1330,14 @@ class ClaudeExecutionSession implements ExecutionSession {
   ): Promise<void> {
     const generation = this.queryGeneration;
     const completed = await withTimeout(
-      operation.then(() => true),
+      Promise.race([
+        operation.then(() => ({ ok: true }), (error: unknown) => ({ error })),
+        run.finished.then(() => undefined),
+      ]),
       this.context.scheduler,
-      this.context.controlTimeoutMs ?? 2_000,
+      this.context.preparationTimeoutMs ?? 60_000,
     );
-    if (completed === true
+    if (completed && 'ok' in completed
       && this.isCurrentQuery(query, generation)
       && this.activeRun === run
       && !run.isTerminal) {
@@ -1327,7 +1346,11 @@ class ClaudeExecutionSession implements ExecutionSession {
     if (this.isCurrentQuery(query, generation)) {
       await this.closeQuery();
     }
-    throw new ExecutionDispatchError('Claude dynamic control update lost ownership.', true);
+    if (completed && 'error' in completed) throw completed.error;
+    throw new ExecutionDispatchError(
+      completed ? 'Claude dynamic control update lost ownership.' : 'Claude configuration timed out.',
+      true,
+    );
   }
 
   private async consume(query: ClaudeExecutionQuery, generation: number): Promise<void> {
@@ -1760,6 +1783,7 @@ class ClaudeExecutionSession implements ExecutionSession {
 }
 
 class ClaudeExecutionRun implements ExecutionRun {
+  private dispatchPhase: ClaudeDispatchPhase = 'request';
   readonly events: AsyncIterable<ProviderExecutionEvent>;
   private readonly queue = new ExecutionEventQueue<ProviderExecutionEvent>();
   private readonly resultCommitAborts = new Set<AbortController>();
@@ -1778,7 +1802,8 @@ class ClaudeExecutionRun implements ExecutionRun {
   private absoluteTimeoutHandle: unknown;
   private deliverySequence = 0;
   private resolveFinished!: () => void;
-  private readonly finished: Promise<void>;
+  readonly finished: Promise<void>;
+  private preparation: Promise<void> | undefined;
 
   constructor(
     private readonly request: ExecutionRequest,
@@ -1831,6 +1856,8 @@ class ClaudeExecutionRun implements ExecutionRun {
     }
     if (!this.dispatched) {
       this.finish('cancelled', 'cancellation-confirmed', true);
+      // Finishing releases preparation waits; let them relinquish query ownership before retry.
+      await this.preparation?.catch(() => undefined);
       return;
     }
     await this.requestTermination();
@@ -2008,6 +2035,25 @@ class ClaudeExecutionRun implements ExecutionRun {
     return this.storeResult(output, source, maxBytes, nativeAgentKey, true);
   }
 
+  setDispatchPhase(phase: ClaudeDispatchPhase): void {
+    this.dispatchPhase = phase;
+  }
+
+  private reportDispatchFailure(error: unknown): void {
+    this.context.recordDebugLog?.({
+      scope: 'claude',
+      event: 'execution.dispatch.failed',
+      level: 'error',
+      data: { phase: this.dispatchPhase },
+      error,
+    });
+    // Only a fixed phase enters the content stream; raw errors stay in sanitized debug logs.
+    this.emit({
+      kind: 'provider-content',
+      payload: { type: 'grimoire_dispatch_error', phase: this.dispatchPhase },
+    });
+  }
+
   private async execute(): Promise<void> {
     let invocation: ClaudeExecutionInvocation;
     try {
@@ -2015,8 +2061,9 @@ class ClaudeExecutionRun implements ExecutionRun {
       validateInvocation(invocation);
       this.nativeUserMessageId = invocation.message.uuid;
       this.allowedTools = invocation.allowedTools ? [...invocation.allowedTools] : undefined;
-    } catch {
+    } catch (error) {
       if (!this.terminal) {
+        if (!this.cancellation) this.reportDispatchFailure(error);
         this.finish(
           this.cancellation ? 'cancelled' : 'invalidated',
           this.cancellation ? 'cancellation-confirmed' : 'pre-dispatch-rejected',
@@ -2032,13 +2079,15 @@ class ClaudeExecutionRun implements ExecutionRun {
       return;
     }
     try {
-      await this.session.prepareRun(invocation, this, this.request.resumeCheckpoint);
+      this.preparation = this.session.prepareRun(invocation, this, this.request.resumeCheckpoint);
+      await this.preparation;
       if (this.terminal || this.cancellation) {
         if (!this.terminal) {
           this.finish('cancelled', 'cancellation-confirmed', true);
         }
         return;
       }
+      this.setDispatchPhase('dispatch');
       this.dispatched = true;
       this.session.dispatch(invocation.message);
       this.emit({ kind: 'run-started' });
@@ -2057,6 +2106,7 @@ class ClaudeExecutionRun implements ExecutionRun {
       if (this.terminal) {
         return;
       }
+      this.reportDispatchFailure(error);
       const sideEffectFree = !this.dispatched
         || (error instanceof ExecutionDispatchError && error.sideEffectFree);
       this.finish(

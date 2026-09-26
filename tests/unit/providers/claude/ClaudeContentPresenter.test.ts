@@ -21,6 +21,20 @@ describe('Claude content presenter', () => {
     });
   }
 
+  it('describes a dispatch phase without exposing raw error content and clears it next turn', () => {
+    const presenter = createPresenter();
+    expect(presenter.present({
+      type: 'grimoire_dispatch_error', phase: 'permission-mode', error: 'private prompt',
+    })).toEqual([]);
+    expect(presenter.lastFailure()).toContain('configuring permissions');
+    expect(presenter.lastFailure()).toContain('execution.dispatch.failed');
+    expect(presenter.lastFailure()).not.toContain('private prompt');
+    presenter.beginTurn();
+    expect(presenter.lastFailure()).toBeUndefined();
+    presenter.present({ type: 'grimoire_dispatch_error', phase: 'private prompt' });
+    expect(presenter.lastFailure()).toBeUndefined();
+  });
+
   function assistantMessage(content: unknown[], uuid = 'assistant-1'): SDKMessage {
     return {
       type: 'assistant',

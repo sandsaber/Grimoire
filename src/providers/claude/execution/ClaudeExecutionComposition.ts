@@ -410,12 +410,11 @@ export class ClaudeExecution {
         conversation = next;
       },
       presentProviderContent: payload => content.present(payload),
-      // The SDK's own words for a failure it reported, instead of the neutral
-      // sentence. The error chunk itself is dropped by the presenter — a
-      // result-level error *is* how the turn ended, and the kernel owns that
-      // fact — so this is the only place that failure is rendered.
+      // The presenter retains SDK failures and safe dispatch diagnostics so
+      // the terminal renders one actionable error instead of a generic refusal.
       describeFailure: reason => (
-        reason === 'provider-failure' ? content.lastFailure() : undefined
+        reason === 'provider-failure' || reason === 'pre-dispatch-rejected' || reason === 'dispatch-unknown'
+          ? content.lastFailure() : undefined
       ),
       consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
       interactionPresenter: presenter,

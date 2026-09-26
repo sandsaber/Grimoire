@@ -81,6 +81,7 @@ describe('Claude execution composition', () => {
    * a finished turn against.
    */
   function createFakeSdk(script: {
+    readonly startupError?: Error;
     readonly askAbout?: { readonly toolName: string; readonly input: Record<string, unknown> };
     readonly toolCall?: { readonly id: string; readonly name: string };
   } = {}): {
@@ -94,6 +95,7 @@ describe('Claude execution composition', () => {
       prompt: AsyncIterable<SDKUserMessage>;
       options: Options;
     }) => {
+      if (script.startupError) throw script.startupError;
       startedWith.push(input.options);
       const messages = (async function* respond(): AsyncGenerator<SDKMessage> {
         for await (const sent of input.prompt) {
@@ -241,6 +243,26 @@ describe('Claude execution composition', () => {
     }
     return collected;
   }
+
+  it('renders a startup diagnostic once and logs the original cause through the host', async () => {
+    const plugin = createPlugin();
+    plugin.recordDebugLog = jest.fn();
+    const startupError = new Error('CLI not available');
+    const { execution, host } = await createHarness(plugin, { startupError });
+    try {
+      const runtime = execution.createRuntime();
+      const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'hello' })));
+      expect(chunks.filter(chunk => chunk.type === 'error')).toEqual([
+        expect.objectContaining({ content: expect.stringContaining('starting the Claude CLI') }),
+      ]);
+      expect(plugin.recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
+        event: 'execution.dispatch.failed', data: { phase: 'query-startup' }, error: startupError,
+      }));
+    } finally {
+      execution.dispose();
+      await host.dispose();
+    }
+  });
 
   it('renders a turn a tab can draw, and learns the session it is on', async () => {
     // The runtime half end to end: a tab prepares a turn, the kernel dispatches

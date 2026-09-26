@@ -10,6 +10,17 @@ import {
   type TransformOptions,
   transformSDKMessage,
 } from '../stream/transformClaudeMessage';
+import type { ClaudeDispatchPhase } from './ClaudeExecutionBackend';
+
+const DISPATCH_PHASE_LABELS: Readonly<Record<ClaudeDispatchPhase, string>> = {
+  request: 'preparing the request',
+  'query-startup': 'starting the Claude CLI',
+  model: 'configuring the model',
+  'permission-mode': 'configuring permissions',
+  effort: 'configuring reasoning effort',
+  mcp: 'configuring MCP servers',
+  dispatch: 'sending the message',
+};
 
 /** What the surface needs to know about the vault to size a context window. */
 export interface ClaudeContentSettings {
@@ -137,6 +148,16 @@ export class ClaudeContentPresenter {
   }
 
   present(payload: unknown): readonly StreamChunk[] {
+    if (typeof payload === 'object' && payload !== null
+      && 'type' in payload && payload.type === 'grimoire_dispatch_error') {
+      const phase = 'phase' in payload ? payload.phase : undefined;
+      if (typeof phase === 'string' && Object.hasOwn(DISPATCH_PHASE_LABELS, phase)) {
+        this.failure = `Claude failed while ${DISPATCH_PHASE_LABELS[phase as ClaudeDispatchPhase]}. `
+          + 'Enable Advanced debug logging in Grimoire settings, retry, and check '
+          + 'the execution.dispatch.failed entry in .grimoire/logs/ for details.';
+      }
+      return [];
+    }
     const message = payload as SDKMessage | null;
     if (!message || typeof (message as { type?: unknown }).type !== 'string') {
       return [];
