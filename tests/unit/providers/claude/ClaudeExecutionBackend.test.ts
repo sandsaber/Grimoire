@@ -26,6 +26,144 @@ import {
 } from '@/providers/claude/execution/ClaudeExecutionBackend';
 
 describe('ClaudeExecutionBackend', () => {
+  it('allows a cold CLI more than two seconds to acknowledge configuration', async () => {
+    const fixture = createFixture({
+      invocations: { default: invocation('message-1', { model: 'sonnet' }) },
+    });
+    let acknowledge!: () => void;
+    fixture.query.setModel.mockImplementationOnce(() => new Promise(resolve => {
+      acknowledge = resolve;
+    }));
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1', 'default')));
+    await waitFor(() => fixture.query.setModel.mock.calls.length === 1);
+    await flushPromises();
+    fixture.scheduler.fireWithin(3_000);
+    await flushPromises();
+    acknowledge();
+    await flushPromises();
+
+    expect(fixture.query.close).not.toHaveBeenCalled();
+    expect(fixture.query.received).toHaveLength(1);
+    fixture.query.emit(resultMessage('message-1', 'answer', 'result-1'));
+    expectTerminal(await events, 'succeeded', 'completed');
+  });
+
+  it('bounds a stalled configuration and reports its phase without sending the prompt', async () => {
+    const fixture = createFixture({
+      invocations: { default: invocation('message-1', { permissionMode: 'default' }) },
+    });
+    fixture.query.setPermissionMode.mockImplementationOnce(() => new Promise(() => {}));
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1', 'default')));
+    await waitFor(() => fixture.query.setPermissionMode.mock.calls.length === 1);
+    await flushPromises();
+    fixture.scheduler.fireNext();
+    const captured = await events;
+
+    expectTerminal(captured, 'invalidated', 'pre-dispatch-rejected');
+    expect(fixture.query.received).toHaveLength(0);
+    expect(fixture.query.close).toHaveBeenCalledTimes(1);
+    expect(captured.map(item => item.event)).toContainEqual({
+      kind: 'provider-content',
+      payload: { type: 'grimoire_dispatch_error', phase: 'permission-mode' },
+    });
+    expect(fixture.recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'execution.dispatch.failed',
+      data: { phase: 'permission-mode' },
+      error: expect.any(Error),
+    }));
+  });
+
+  it('closes a query after a rejected control update and starts a fresh one on retry', async () => {
+    const fixture = createFixture({
+      invocations: {
+        first: invocation('message-1', { model: 'sonnet' }),
+        second: invocation('message-2', { model: 'sonnet' }),
+      },
+    });
+    const failure = new Error('CLI configuration failed');
+    fixture.query.setModel.mockRejectedValueOnce(failure);
+    const session = await createSession(fixture.backend);
+    const captured = await collectEvents(session.createRun(request('1', 'first')));
+    expectTerminal(captured, 'invalidated', 'pre-dispatch-rejected');
+    expect(fixture.query.close).toHaveBeenCalledTimes(1);
+    expect(fixture.recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({ error: failure }));
+    const nextQuery = new FakeQuery();
+    fixture.factory.nextQuery = nextQuery;
+    const retry = collectEvents(session.createRun(request('2', 'second')));
+    await waitFor(() => nextQuery.received.length === 1);
+    nextQuery.emit(resultMessage('message-2', 'answer', 'result-2'));
+    expectTerminal(await retry, 'succeeded', 'completed');
+    expect(fixture.factory.inputs).toHaveLength(2);
+  });
+
+  it('preserves a query factory failure for sanitized logging', async () => {
+    const fixture = createFixture();
+    const failure = new Error('CLI executable was not found');
+    jest.spyOn(fixture.factory, 'create').mockRejectedValueOnce(failure);
+    const session = await createSession(fixture.backend);
+    const captured = await collectEvents(session.createRun(request('1', 'default')));
+    expectTerminal(captured, 'invalidated', 'pre-dispatch-rejected');
+    expect(fixture.recordDebugLog).toHaveBeenCalledWith(expect.objectContaining({
+      data: { phase: 'query-startup' }, error: failure,
+    }));
+    expect(captured.map(item => item.event)).toContainEqual({
+      kind: 'provider-content',
+      payload: { type: 'grimoire_dispatch_error', phase: 'query-startup' },
+    });
+    expect(fixture.query.received).toHaveLength(0);
+  });
+
+  it('aborts a stalled query factory and closes a query returned after the deadline', async () => {
+    const fixture = createFixture();
+    let finishCreation!: (query: FakeQuery) => void;
+    const create = jest.spyOn(fixture.factory, 'create').mockImplementationOnce(() => (
+      new Promise(resolve => { finishCreation = resolve; })
+    ));
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1', 'default')));
+    await waitFor(() => create.mock.calls.length === 1);
+    fixture.scheduler.fireWithin(3_000);
+    expect(create.mock.calls[0][0].signal.aborted).toBe(false);
+    fixture.scheduler.fireNext();
+    expectTerminal(await events, 'invalidated', 'pre-dispatch-rejected');
+    expect(create.mock.calls[0][0].signal.aborted).toBe(true);
+    finishCreation(fixture.query);
+    await flushPromises();
+    expect(fixture.query.close).toHaveBeenCalledTimes(1);
+    expect(fixture.query.received).toHaveLength(0);
+  });
+
+  it.each(['query-startup', 'model'])('cancels stalled %s preparation without waiting for its deadline', async phase => {
+    const fixture = createFixture({
+      invocations: { default: invocation('message-1', { model: 'sonnet' }) },
+    });
+    const create = jest.spyOn(fixture.factory, 'create');
+    if (phase === 'query-startup') {
+      create.mockImplementationOnce(() => new Promise(() => {}));
+    } else {
+      fixture.query.setModel.mockImplementationOnce(() => new Promise(() => {}));
+    }
+    const session = await createSession(fixture.backend);
+    const run = session.createRun(request('1', 'default'));
+    const events = collectEvents(run);
+    await waitFor(() => phase === 'query-startup'
+      ? create.mock.calls.length === 1
+      : fixture.query.setModel.mock.calls.length === 1);
+    await run.cancel();
+    expectTerminal(await events, 'cancelled', 'cancellation-confirmed');
+    await flushPromises();
+    expect(fixture.scheduler.pending(60_000)).toEqual([]);
+    expect(fixture.recordDebugLog).not.toHaveBeenCalled();
+    const nextQuery = new FakeQuery();
+    fixture.factory.nextQuery = nextQuery;
+    const retry = collectEvents(session.createRun(request('2', 'default')));
+    await waitFor(() => nextQuery.received.length === 1);
+    nextQuery.emit(resultMessage('message-1', 'answer', 'result-1'));
+    expectTerminal(await retry, 'succeeded', 'completed');
+  });
+
   it('keeps one persistent query across turns and applies only dynamic changes', async () => {
     const fixture = createFixture({
       invocations: {
@@ -1166,7 +1304,9 @@ function createFixture(options: {
   let interactionSequence = 0;
   const invocations = options.invocations ?? { default: invocation('message-1') };
   const scheduler = new FakeScheduler();
+  const recordDebugLog = jest.fn();
   const backend = new ClaudeExecutionBackend({
+    recordDebugLog,
     queryFactory: factory,
     requestResolver: {
       resolve: async requestRef => {
@@ -1237,6 +1377,7 @@ function createFixture(options: {
     stored,
     taskLoads,
     auxiliaryRefs,
+    recordDebugLog,
     scheduler,
   };
 }
@@ -1334,6 +1475,15 @@ class FakeScheduler implements ClaudeExecutionScheduler {
     if (typeof handle === 'object' && handle !== null) {
       this.tasks.delete(handle);
       this.delays.delete(handle);
+    }
+  }
+
+  fireWithin(ms: number): void {
+    for (const [handle, callback] of [...this.tasks]) {
+      if ((this.delays.get(handle) ?? 0) <= ms) {
+        this.clearTimeout(handle);
+        callback();
+      }
     }
   }
 
