@@ -345,7 +345,7 @@ Under **Models → Visible models**, search the live CLI catalog and select the 
 
 Enable **Image attachments as files** to send pasted or dropped images through the CLI's file-reading tool. Choose a model that supports images: the catalog does not report this capability. Grimoire keeps the image in `.grimoire/attachments/` and appends its path to the prompt; reading it requires an extra tool call. Missing or unwritable attachments fail the turn instead of being silently omitted.
 
-**Safe** pauses edits, commands and other non-read tools for a one-time approval in Grimoire. Denying, cancelling or losing the approval connection prevents execution. Safe currently requires the verified Command Code 1.53.0 npm installation and disables native subagents, whose separate loops cannot use this approval bridge. **Auto-approve** runs without Grimoire prompts; native deny and ask rules still apply in both modes. This integration does not expose interactive questions, plan controls, slash commands, managed MCP/skills/agents, auxiliary tasks, fork, rewind, or native history import.
+**Safe** pauses edits, commands and other non-read tools for a one-time approval in Grimoire. Denying, cancelling or losing the approval connection prevents execution. Safe currently requires a verified Command Code npm installation (1.53.0 or 1.66.0) and disables native subagents, whose separate loops cannot use this approval bridge. **Auto-approve** runs without Grimoire prompts; native deny and ask rules still apply in both modes. This integration does not expose interactive questions, plan controls, slash commands, managed MCP/skills/agents, auxiliary tasks, fork, rewind, or native history import.
 
 - [Command Code headless documentation](https://commandcode.ai/docs/headless)
 

@@ -15,7 +15,7 @@ export const commandcodeSettingsTabRenderer: ProviderSettingsTabRenderer = {
     new Setting(container).setName('Setup')
       .setDesc('Install with npm i -g command-code, then run command-code login in a terminal. Authentication stays with the CLI.');
     new Setting(container).setName('Headless permissions')
-      .setDesc('Safe asks in Grimoire before each edit, command or other non-read tool. It requires command-code 1.53.0 from npm and does not run native subagents. Auto-approve runs without asking. Native deny and ask rules still apply. Questions and slash commands are unavailable here.');
+      .setDesc('Safe asks in Grimoire before each edit, command or other non-read tool. It requires command-code 1.53.0 or 1.66.0 from npm and does not run native subagents. Auto-approve runs without asking. Native deny and ask rules still apply. Questions and slash commands are unavailable here.');
     new Setting(container).setName('Image attachments as files')
       .setDesc('Open pasted or dropped images with the file-reading tool. Select a model that can read images; the CLI does not report image support. This requires an extra tool call. Images stay in the vault attachment store with the conversation.')
       .addToggle(toggle => toggle.setValue(getCommandcodeSettings(plugin.settings).imageAttachmentsAsFiles)
