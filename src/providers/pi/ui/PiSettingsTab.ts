@@ -17,7 +17,7 @@ export const piSettingsTabRenderer: ProviderSettingsTabRenderer = {
     new Setting(container).setName('Native tool permissions')
       .setDesc('Pi can read, write and run commands without asking. Grimoire displays permission requests from pi extensions, but cannot enforce safe or plan mode. Pi reads saved files on disk, not unsaved editor buffers.');
     new Setting(container).setName('Pi-owned configuration')
-      .setDesc('Authentication, skills, prompt templates and extensions stay with pi. Configure external tools through a pi extension. Context usage and account quotas are not reported by the adapter.');
+      .setDesc('Authentication, skills, prompt templates and extensions stay with pi. Configure external tools through a pi extension. Context usage requires pi-acp 0.0.34 or newer. Account quotas are not reported by the adapter.');
     new Setting(container).setName('Adapter path')
       .setDesc('Absolute path to pi-acp on this computer, or leave empty for auto-detection. Pi must also be installed.')
       .addText(text => {

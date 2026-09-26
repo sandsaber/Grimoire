@@ -324,8 +324,10 @@ their proposed fixes are not part of the tested adapter release.
 
 Pi owns tool permissions: it can read, write and run commands without asking. Grimoire shows
 permission requests emitted by extensions, but offers no Safe or Plan mode. MCP, skills and prompt
-templates are configured in Pi. Files are read from disk; unsaved editor text, account quotas and
-context occupancy are not supplied by the adapter. Tested with Pi 0.86.1 and pi-acp 0.0.33.
+templates are configured in Pi. Files are read from disk; unsaved editor text and account quotas
+are not supplied by the adapter. Context occupancy uses the adapter's reported token count and
+window size with pi-acp 0.0.34 or newer; older adapters leave it unknown. Context reporting was
+verified with Pi 0.87.1 and pi-acp 0.0.34.
 
 
 ### Command Code

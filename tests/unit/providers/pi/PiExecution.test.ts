@@ -4,6 +4,7 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import type { StreamChunk } from '@/core/types';
+import { recalculateUsageForModel } from '@/features/chat/utils/usageInfo';
 import type { ManagedAcpClient, ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
 import type { AcpNewSessionResponse, AcpSessionNotification } from '@/providers/acp/types';
 import { PiExecution } from '@/providers/pi/execution/PiExecutionComposition';
@@ -32,14 +33,18 @@ describe('Pi execution wiring', () => {
       initialize: jest.fn(async () => undefined),
       newSession: jest.fn(async () => opened('native-pi')),
       loadSession: jest.fn(async request => opened(request.sessionId)),
-      setConfigOption: jest.fn(async () => {
+      setConfigOption: jest.fn(async request => {
         if (refuseModel) throw new Error('Selected model unavailable');
-        return { configOptions: opened('native-pi').configOptions! };
+        return { configOptions: opened('native-pi').configOptions!.map(option =>
+          option.type === 'select' && typeof request.value === 'string'
+            ? { ...option, currentValue: request.value } : option) };
       }),
       setMode: jest.fn(), setModel: jest.fn(),
       prompt: jest.fn(async () => {
+        notify({ sessionUpdate: 'usage_update', used: 0, size: 1000000 });
         notify({ sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'compact', description: 'Compact' }] });
         notify({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'answer' } });
+        notify({ sessionUpdate: 'usage_update', used: 2611, size: 1000000 });
         return { stopReason: 'end_turn' };
       }),
       cancel: jest.fn(), close: jest.fn(async () => 'confirmed' as const),
@@ -51,7 +56,7 @@ describe('Pi execution wiring', () => {
     host.registerBackend(execution.createBackendRegistration(factory));
     await host.start();
     const runtime = execution.createRuntime();
-    return { client, runtime, execution, host, plugin,
+    return { client, runtime, execution, host, plugin, notify,
       close: async () => { await runtime.cleanup(); execution.dispose(); await host.dispose(); } };
   }
 
@@ -94,6 +99,32 @@ describe('Pi execution wiring', () => {
       const chunks = await drain(h.runtime.query(h.runtime.prepareTurn({ text: 'Hello' })));
       expect(h.client.prompt).not.toHaveBeenCalled();
       expect(chunks).toContainEqual(expect.objectContaining({ type: 'error', content: expect.stringContaining('Selected model unavailable') }));
+    } finally { await h.close(); }
+  });
+
+  it.each(['pi:zai/test', 'pi:zai/override', 'pi'])('preserves the reported window for displayed model %s', async model => {
+    const h = await harness();
+    try {
+      const chunks = await drain(h.runtime.query(h.runtime.prepareTurn({ text: 'Hello' }), [], { model }));
+      const usage = chunks.filter(chunk => chunk.type === 'usage').at(-1)?.usage;
+      expect(usage).toMatchObject({ model, contextTokens: 2611, contextWindow: 1000000, contextWindowIsAuthoritative: true });
+      expect(recalculateUsageForModel(usage!, model, 0).contextWindow).toBe(1000000);
+    } finally { await h.close(); }
+  });
+
+  it('keeps in-flight usage tied to the turn model when another tab changes the saved selection', async () => {
+    const h = await harness();
+    try {
+      jest.mocked(h.client.prompt).mockImplementationOnce(async () => {
+        h.plugin.settings.savedProviderModel.pi = 'pi:zai/other-tab';
+        h.notify({ sessionUpdate: 'usage_update', used: 4000, size: 1000000 });
+        h.notify({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'answer' } });
+        return { stopReason: 'end_turn' };
+      });
+      const first = await drain(h.runtime.query(h.runtime.prepareTurn({ text: 'First' })));
+      expect(first.filter(chunk => chunk.type === 'usage').at(-1)?.usage.model).toBe('pi:zai/test');
+      const next = await drain(h.runtime.query(h.runtime.prepareTurn({ text: 'Next' })));
+      expect(next.filter(chunk => chunk.type === 'usage').at(-1)?.usage.model).toBe('pi:zai/other-tab');
     } finally { await h.close(); }
   });
 });

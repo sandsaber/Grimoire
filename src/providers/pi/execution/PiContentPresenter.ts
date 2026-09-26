@@ -1,6 +1,7 @@
 import type { ChatTurnMetadata } from '@/core/runtime/types';
 import type { SlashCommand, StreamChunk } from '@/core/types';
 import { AcpSessionUpdateNormalizer } from '@/providers/acp/AcpSessionUpdateNormalizer';
+import { buildAcpUsageInfo } from '@/providers/acp/buildAcpUsageInfo';
 import type { AcpContentPayload, AcpTurnRefusal } from '@/providers/acp/execution/AcpContentPayload';
 import type { AcpNewSessionResponse, AcpSessionUpdate } from '@/providers/acp/types';
 import { isRecord } from '@/utils/records';
@@ -14,7 +15,8 @@ export class PiContentPresenter {
   private readonly terminals = new Map<string, string>();
 
   constructor(private readonly onDiscovery: (session: Partial<AcpNewSessionResponse>) => void,
-    private readonly onCommands: (commands: readonly SlashCommand[]) => void) {}
+    private readonly onCommands: (commands: readonly SlashCommand[]) => void,
+    private readonly displayModel: () => string) {}
 
   beginTurn(): void { this.normalizer.reset(); this.terminals.clear(); this.refusal = undefined; this.metadata = {}; }
 
@@ -46,6 +48,10 @@ export class PiContentPresenter {
       this.sessionId = content.notification.sessionId;
       const normalized = this.normalizer.normalize(this.terminalUpdate(content.notification.update));
       switch (normalized.type) {
+        case 'usage': {
+          const usage = buildAcpUsageInfo({ contextWindow: normalized.usage, model: this.displayModel() });
+          return usage ? [{ type: 'usage', usage, sessionId: this.sessionId }] : [];
+        }
         case 'commands': this.onCommands(normalized.commands); break;
         case 'config_options': this.onDiscovery({ configOptions: normalized.configOptions }); break;
         case 'message_chunk':
@@ -58,7 +64,6 @@ export class PiContentPresenter {
         case 'plan': return normalized.streamChunks;
       }
     }
-    // pi-acp 0.0.33 does not report context occupancy or usage; never invent it.
     return [];
   }
 

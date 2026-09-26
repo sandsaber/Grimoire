@@ -165,11 +165,13 @@ update, or silently download an adapter. These are tested versions, not an exact
 - Grimoire stores its rendered transcript and ACP session ID. An empty local transcript can be
   recovered from the adapter's session map and Pi v3 JSONL, following the active branch. Existing
   local messages take precedence. Removing a Grimoire chat never deletes native Pi files.
-- Context usage and account quotas remain unknown; the adapter supplies neither. Thinking can be
+- Context occupancy uses `usage_update` from pi-acp 0.0.34 or newer, including the reported window
+  size for the turn's selected model. Older adapters leave occupancy unknown; account quotas
+  remain unavailable. Thinking can be
   configured but pi-acp does not stream separate thought chunks. Startup information follows the
   user's Pi `quietStartup` setting. Auxiliary workflows, fork, rewind and steering are unsupported.
 
-`PiChatProjectionLiveSmoke.integration.test.ts` checks disk persistence, tool output, native image recognition, attachment-byte recovery and native recall across two kernel/process restarts. Run with `GRIMOIRE_PI_LIVE=1` and an explicit
+`PiChatProjectionLiveSmoke.integration.test.ts` checks context occupancy, disk persistence, tool output, native image recognition, attachment-byte recovery and native recall across two kernel/process restarts. Run with `GRIMOIRE_PI_LIVE=1` and an explicit
 inexpensive `GRIMOIRE_PI_MODEL=pi:provider/model`; it makes four model requests and requires an image-capable model.
 Set `GRIMOIRE_PI_EFFORT=high` to cover explicit effort across restarts. The separate model-specific
 effort discovery test makes no model requests.

@@ -84,11 +84,12 @@ export class PiExecution {
     let conversation: BoundConversation | null = null;
     let runtime: ExecutionChatRuntimeAdapter;
     let commands: readonly ProviderCommandDescriptor[] = [];
+    let displayModel = 'pi';
     const tabId = opaqueId('pitab');
     const content = new PiContentPresenter(session => {
       if (syncPiDiscovery(this.plugin.settings, session)) this.refreshSelectors();
     }, announced => { commands = announced.map(command => ({ name: command.name,
-      ...(command.description ? { description: command.description } : {}), source: 'session' })); });
+      ...(command.description ? { description: command.description } : {}), source: 'session' })); }, () => displayModel);
     const presenter = new AcpApprovalPresenter(this.interactions, () => runtime?.interactionCallbacks() ?? {});
     this.presenters.add(presenter);
     const unsubscribe = this.interactions.onSettled(ref => presenter.dismiss(ref));
@@ -104,6 +105,8 @@ export class PiExecution {
         const snapshot = ProviderSettingsCoordinator.getProviderSettingsSnapshot(this.plugin.settings, 'pi');
         const selected = options?.model ?? this.plugin.settings.savedProviderModel?.pi;
         const modelId = typeof selected === 'string' ? decodePiModel(selected) : undefined;
+        // Bind occupancy to this turn, even if another tab changes the saved selection.
+        displayModel = modelId ? `pi:${modelId}` : 'pi';
         const thinking = typeof snapshot.effortLevel === 'string' && snapshot.effortLevel !== 'default'
           ? snapshot.effortLevel : undefined;
         return this.requests.reference({

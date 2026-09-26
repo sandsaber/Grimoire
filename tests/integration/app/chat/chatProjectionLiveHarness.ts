@@ -82,6 +82,8 @@ export interface ChatProjectionHarness {
 }
 
 export interface ChatProjectionHarnessOptions {
+  /** The tab's selected model and settings, used to normalize reported occupancy. */
+  readonly getActiveProviderSettings?: () => Record<string, unknown>;
   /** The kernel. `ExecutionKernelHost.registry` satisfies it. */
   readonly lifecycle: ChatExecutionLifecyclePort;
   /** The provider runtime this tab encodes and presents with. */
@@ -126,6 +128,7 @@ export function recordingColumn(
   runtime: ExecutionChatRuntimeAdapter,
   providerId: ProviderId,
   vaultPath?: string,
+  getActiveProviderSettings?: () => Record<string, unknown>,
 ) {
   const column = createRealChatColumn({
     providerId,
@@ -133,6 +136,7 @@ export function recordingColumn(
     // belongs to and the model a usage report is against.
     getAgentService: () => runtime,
     ...(vaultPath ? { vaultPath } : {}),
+    ...(getActiveProviderSettings ? { getActiveProviderSettings } : {}),
   });
   return {
     column,
@@ -213,6 +217,7 @@ export async function openChatProjection(
       options.runtime,
       options.providerId,
       options.vaultPath,
+      options.getActiveProviderSettings,
     );
     const tab = new ChatTabExecution({
       composition,

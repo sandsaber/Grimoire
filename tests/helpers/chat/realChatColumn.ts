@@ -37,6 +37,7 @@ export interface RealChatColumnOptions {
   readonly providerId: ProviderId;
   /** The tab's runtime, as `getAgentService` answers it. Cold until first send. */
   readonly getAgentService?: () => ExecutionChatRuntimeAdapter | null;
+  readonly getActiveProviderSettings?: () => Record<string, unknown>;
   /**
    * The vault the provider is working in.
    *
@@ -153,6 +154,7 @@ export function createRealChatColumn(options: RealChatColumnOptions): RealChatCo
     getFileContextManager: () => null,
     updateQueueIndicator: () => undefined,
     ...(options.getAgentService ? { getAgentService: options.getAgentService } : {}),
+    ...(options.getActiveProviderSettings ? { getActiveProviderSettings: options.getActiveProviderSettings } : {}),
   });
   subagentManager.setCallback(subagent => controller.onAsyncSubagentStateChange(subagent));
 
