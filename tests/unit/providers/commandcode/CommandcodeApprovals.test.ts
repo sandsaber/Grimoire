@@ -35,13 +35,13 @@ await (process.env.GUARD_SCENARIO === 'parallel' ? Promise.all([runTool('edit-1'
 process.stdout.write(JSON.stringify({type:'result', subtype:'success', finalText:'Done'}) + '\\n');
 `;
 
-describe('Command Code Safe process guard', () => {
+describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', version => {
   jest.setTimeout(15_000);
   let directory: string;
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), 'gcc-test-'));
     mkdirSync(join(directory, 'dist'));
-    writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: 'command-code', version: '1.53.0' }));
+    writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: 'command-code', version }));
     writeFileSync(join(directory, 'dist/index.mjs'), CLI);
     writeFileSync(join(directory, 'Note.md'), 'OLD');
   });
@@ -101,8 +101,8 @@ describe('Command Code Safe process guard', () => {
     } finally { await handle.terminate('forced'); }
   });
 
-  it('refuses an unverified CLI version without executing it', () => {
-    writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: 'command-code', version: '9.0.0' }));
+  it.each(['1.66.1', '9.0.0'])('refuses unverified CLI %s without executing it', unsupportedVersion => {
+    writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: 'command-code', version: unsupportedVersion }));
     expect(() => start(async () => true)).toThrow('Safe mode requires');
     expect(contents()).toBe('OLD');
   });
