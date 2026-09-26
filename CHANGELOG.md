@@ -2,6 +2,14 @@
 
 User-facing changes by release.
 
+## 2.0.6 - 2026-09-26
+
+### Fixed
+
+- Claude has a separate 60-second startup and configuration budget, avoiding premature turn rejection while the CLI initializes. Startup failures include sanitized diagnostics; cancellation remains bounded (#225, #226).
+- Command Code Safe mode supports the verified 1.66.0 npm release alongside 1.53.0, including tool approval, denial and cancellation (#227).
+- Pi displays context occupancy reported by pi-acp 0.0.34 or newer, preserving the model's reported window size across turns and restored sessions (#228, #229).
+
 ## 2.0.5 - 2026-09-24
 
 ### Added
