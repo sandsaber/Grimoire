@@ -67,7 +67,7 @@
     "jest-environment-jsdom": "^30.5.0",
     "obsidian": "^1.13.1",
     "ts-jest": "^29.4.12",
-    "tsx": "^4.23.13",
+    "tsx": "^4.23.15",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "dependencies": {
