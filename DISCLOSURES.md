@@ -128,8 +128,8 @@ The MCP SDK range is `^1.30.0`, whose dependency contract accepts `@hono/node-se
 | `@modelcontextprotocol/sdk` | Direct dependency | Verify from release bundle | 1.30.0 | Direct SDK; audit gate applies | Locked from the declared `^1.30.0` range |
 | `hono` | MCP SDK | Verify from release bundle | 4.13.0 | `<4.12.34` | Above tracked ranges |
 | `@hono/node-server` | MCP SDK | Verify from release bundle | 2.1.0 | `<2.0.5` | Narrow override to a patched release |
-| `fast-uri` | MCP SDK / AJV | Verify from release bundle | 3.1.6 | `>=3.0.0 <=3.1.5` | Above tracked ranges |
-| `ip-address` | MCP SDK / Express rate limit | Verify from release bundle | 10.4.0 | `<=10.1.0` | Above tracked range |
+| `fast-uri` | MCP SDK / AJV | Verify from release bundle | 3.1.8 | `>=3.0.0 <=3.1.5`; `=2.4.5`, `=3.1.6`, `=4.1.3` | Above tracked ranges, including [GHSA-58mr-gqgx-xq4g](https://github.com/advisories/GHSA-58mr-gqgx-xq4g) |
+| `ip-address` | MCP SDK / Express rate limit | Verify from release bundle | 10.7.2 | `<=10.1.0`; `>=10.2.0 <=10.5.0` | Above tracked ranges, including [GHSA-2vr4-cq9g-pvrc](https://github.com/advisories/GHSA-2vr4-cq9g-pvrc) |
 | `qs` | MCP SDK / Express | Verify from release bundle | 6.16.0 | `>=2.2.5 <6.16.0` | Above tracked range; admitted before the 7-day quarantine through a `lockfile-age-exceptions.json` entry that expires at its natural eligibility |
 | `@anthropic-ai/sdk` | Claude Agent SDK | Verify from release bundle | 0.115.0 | `>=0.79.0 <0.91.1` | Above tracked range |
 | `ws` | jsdom | Development dependency | 8.21.2 | `>=8.0.0 <8.20.1` | Development-only; above tracked range |

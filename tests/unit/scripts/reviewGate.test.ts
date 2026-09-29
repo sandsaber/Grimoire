@@ -106,7 +106,7 @@ describe('Obsidian review gate', () => {
       '': { version: '1.0.0' },
       'node_modules/hono': { version: '4.12.34' },
       'node_modules/@hono/node-server': { version: '2.0.5' },
-      'node_modules/fast-uri': { version: '3.1.6' },
+      'node_modules/fast-uri': { version: '3.1.7' },
       'node_modules/qs': { version: '6.16.0' },
       'node_modules/brace-expansion': { version: '5.0.9' },
       'node_modules/example/node_modules/brace-expansion': { version: '1.1.18' },
@@ -114,6 +114,33 @@ describe('Obsidian review gate', () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Obsidian review dependency check passed.');
+  });
+
+  it.each([
+    ['fast-uri', '2.4.5', 'GHSA-58mr-gqgx-xq4g'],
+    ['fast-uri', '3.1.6', 'GHSA-58mr-gqgx-xq4g'],
+    ['fast-uri', '4.1.3', 'GHSA-58mr-gqgx-xq4g'],
+    ['ip-address', '10.2.0', 'GHSA-2vr4-cq9g-pvrc'],
+    ['ip-address', '10.4.0', 'GHSA-2vr4-cq9g-pvrc'],
+    ['ip-address', '10.5.0', 'GHSA-2vr4-cq9g-pvrc'],
+  ])('rejects %s@%s for %s, including nested dependencies', (name, version, advisory) => {
+    const result = runDependencyGate({
+      [`node_modules/example/node_modules/${name}`]: { version },
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`${name}@${version}`);
+    expect(result.stderr).toContain(advisory);
+  });
+
+  it.each([
+    ['fast-uri', '2.4.6'],
+    ['fast-uri', '3.1.7'],
+    ['fast-uri', '4.1.4'],
+    ['ip-address', '10.1.1'],
+    ['ip-address', '10.5.1'],
+  ])('accepts %s@%s outside the tracked advisory ranges', (name, version) => {
+    expect(runDependencyGate({ [`node_modules/${name}`]: { version } }).status).toBe(0);
   });
 
   it('passes Obsidian source-review rules to eslint without shell quoting', () => {

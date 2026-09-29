@@ -28,6 +28,18 @@ const advisories = [
     isVulnerable: (version) => greaterThanOrEqual(version, "3.0.0") && lessThanOrEqual(version, "3.1.5"),
   },
   {
+    packageName: "fast-uri",
+    vulnerableRange: "=2.4.5 || =3.1.6 || =4.1.3",
+    advisory: "GHSA-58mr-gqgx-xq4g",
+    isVulnerable: (version) => ["2.4.5", "3.1.6", "4.1.3"].some((affected) => compareVersions(version, affected) === 0),
+  },
+  {
+    packageName: "ip-address",
+    vulnerableRange: ">=10.2.0 <=10.5.0",
+    advisory: "GHSA-2vr4-cq9g-pvrc",
+    isVulnerable: (version) => greaterThanOrEqual(version, "10.2.0") && lessThanOrEqual(version, "10.5.0"),
+  },
+  {
     packageName: "ip-address",
     vulnerableRange: "<=10.1.0",
     advisory: "GHSA-v2v4-37r5-5v8g",
