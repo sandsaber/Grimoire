@@ -2,6 +2,18 @@
 
 User-facing changes by release.
 
+## 2.0.8 - 2026-09-30
+
+### Fixed
+
+- Claude Code discovers all models from custom Anthropic-compatible endpoints, uses endpoint display names, and keeps configured defaults and custom IDs available. Refresh falls back to native discovery when model listing is unavailable (#235, #236).
+- Claude Code rereads user, project, and local settings when refreshing models. Changing profiles, removing stale selections, and switching back to an earlier configuration update the picker without restarting Obsidian (#235, #236).
+- Update vulnerable transitive dependencies (`fast-uri`, `ip-address`, and `brace-expansion`) and use a patched Moment version for the development-only Obsidian SDK (#236).
+
+### Improved
+
+- Update the Claude Agent SDK to 0.3.278 (#234).
+
 ## 2.0.6 - 2026-09-26
 
 ### Fixed
