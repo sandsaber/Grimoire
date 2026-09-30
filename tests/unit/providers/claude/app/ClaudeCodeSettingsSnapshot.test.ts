@@ -1,3 +1,5 @@
+import * as path from 'node:path';
+
 import { HomeFileAdapter } from '@/core/storage/HomeFileAdapter';
 import { readClaudeCodeSettingsSnapshot } from '@/providers/claude/app/ClaudeCodeSettingsSnapshot';
 import { updateClaudeProviderSettings } from '@/providers/claude/settings';
@@ -52,7 +54,7 @@ describe('readClaudeCodeSettingsSnapshot', () => {
     const { settings, read } = setup();
     updateClaudeProviderSettings(settings, { environmentVariables: 'CLAUDE_CONFIG_DIR=profiles/team' });
     await read();
-    expect(HomeFileAdapter).toHaveBeenCalledWith('/vault/profiles/team');
+    expect(HomeFileAdapter).toHaveBeenCalledWith(path.resolve('/vault', 'profiles/team'));
   });
 
   it('rejects malformed settings without returning a partial snapshot', async () => {
