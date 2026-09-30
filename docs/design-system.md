@@ -550,6 +550,13 @@ list. Keyboard selection preserves focus; a refresh also preserves an unfinished
 The drawing shows OpenCode and Command Code with the same selected-row layout. Other providers'
 custom-ID inputs and refresh-only rows serve different functions and do not use this selection UI.
 
+Claude Code keeps its refresh-only row. For a custom Anthropic-compatible endpoint, the picker
+uses the endpoint's model IDs and display names; configured defaults do not hide that catalog.
+Explicit custom IDs remain additive. User, project and local Claude Code settings are reread on
+catalog refresh, including the refresh triggered by opening the chat picker. If model listing is
+unavailable, discovery falls back to Claude Code's native catalog. Environment display names are
+fallbacks when the endpoint omits a name; explicit Grimoire aliases remain user preferences.
+
 **Future changes.** Reuse `src/features/settings/ui/ProviderModelPicker.ts` and
 `src/style/settings/provider-model-picker.css` for every settings model shortlist. Change the shared
 component when the common layout changes; add provider behavior through its adapter. Do not fork

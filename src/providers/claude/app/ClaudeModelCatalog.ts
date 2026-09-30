@@ -4,26 +4,33 @@ import {
   hashCatalogFingerprint,
   seedFingerprintMatches,
 } from '../../../core/providers/catalogFingerprint';
+import { getRuntimeEnvironmentText } from '../../../core/providers/providerEnvironment';
 import type { ProviderCatalogRefreshOutcome } from '../../../core/providers/ProviderModelCatalogRefreshCache';
+import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
 import type GrimoirePlugin from '../../../main';
 import type { ProviderModelCatalog } from '../../../providers/shared/providerHostContracts';
+import { getVaultPath } from '../../../utils/path';
 import {
   buildClaudeCatalogCacheKey,
   CLAUDE_EMPTY_DISCOVERY_RETRY_MS,
 } from '../cli/claudeCatalogCache';
 import { probeRuntimeModels } from '../commands/probeRuntimeModels';
+import { getClaudeApiModelId, getEnvironmentModelName, getEnvironmentModelSlots } from '../env/claudeModelEnv';
 import {
   type ClaudeDiscoveredModel,
+  type ClaudeProviderSettings,
   getClaudeEffectiveEnvironmentVariables,
   getClaudeProviderSettings,
   normalizeClaudeDiscoveredModels,
   updateClaudeProviderSettings,
 } from '../settings';
+import { readClaudeCodeSettingsSnapshot } from './ClaudeCodeSettingsSnapshot';
 
 const ANTHROPIC_DEFAULT_BASE_URL = 'https://api.anthropic.com';
 const ANTHROPIC_API_VERSION = '2023-06-01';
 const MODEL_CATALOG_LIMIT = 1000;
 const MODEL_CATALOG_MAX_PAGES = 10;
+const MODEL_CATALOG_TIMEOUT_MS = 10_000;
 // Only paces retries after an attempt that found nothing. A catalog that holds
 // models is rediscovered solely on a cache-key change or an explicit request.
 
@@ -31,6 +38,8 @@ interface ClaudeModelsApiResponse {
   data?: unknown;
   has_more?: unknown;
   last_id?: unknown;
+  hasMore?: unknown;
+  lastId?: unknown;
 }
 
 function normalizeAnthropicBaseUrl(value: string | undefined): string {
@@ -46,17 +55,27 @@ function buildModelsApiUrl(baseUrl: string, afterId?: string): string {
   return `${baseUrl}/models?${params.toString()}`;
 }
 
-function toClaudeDiscoveredModels(value: unknown): ClaudeDiscoveredModel[] {
-  return normalizeClaudeDiscoveredModels(value);
+function toClaudeDiscoveredModels(value: unknown, envVars: Record<string, string>): ClaudeDiscoveredModel[] {
+  if (!Array.isArray(value)) return [];
+  return normalizeClaudeDiscoveredModels(value.map((entry: unknown) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+    const record = entry as Record<string, unknown>;
+    if (typeof record.id !== 'string') return entry;
+    return {
+      ...record,
+      displayName: (typeof record.display_name === 'string' && record.display_name.trim())
+        || (typeof record.displayName === 'string' && record.displayName.trim())
+        || getEnvironmentModelName(envVars, record.id)
+        || record.id,
+    };
+  }));
 }
 
 async function fetchClaudeModelsFromAnthropicApi(
   envVars: Record<string, string>,
 ): Promise<ClaudeDiscoveredModel[]> {
   const apiKey = envVars.ANTHROPIC_API_KEY?.trim();
-  if (!apiKey) {
-    return [];
-  }
+  const authToken = envVars.ANTHROPIC_AUTH_TOKEN?.trim();
 
   const baseUrl = normalizeAnthropicBaseUrl(envVars.ANTHROPIC_BASE_URL);
   const models: ClaudeDiscoveredModel[] = [];
@@ -69,7 +88,7 @@ async function fetchClaudeModelsFromAnthropicApi(
       method: 'GET',
       headers: {
         'anthropic-version': ANTHROPIC_API_VERSION,
-        'x-api-key': apiKey,
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : apiKey ? { 'x-api-key': apiKey } : {}),
       },
     });
 
@@ -78,7 +97,7 @@ async function fetchClaudeModelsFromAnthropicApi(
     }
 
     const payload = response.json as ClaudeModelsApiResponse;
-    for (const model of toClaudeDiscoveredModels(payload.data)) {
+    for (const model of toClaudeDiscoveredModels(payload.data, envVars)) {
       if (seen.has(model.id)) {
         continue;
       }
@@ -87,30 +106,72 @@ async function fetchClaudeModelsFromAnthropicApi(
       models.push({ ...model, source: 'api' });
     }
 
-    if (payload.has_more !== true || typeof payload.last_id !== 'string' || !payload.last_id) {
+    const hasMore = payload.has_more ?? payload.hasMore;
+    const lastId = payload.last_id ?? payload.lastId;
+    if (hasMore !== true || typeof lastId !== 'string' || !lastId || lastId === afterId) {
       break;
     }
 
-    afterId = payload.last_id;
+    afterId = lastId;
   }
 
+  // Keep native slot selections in existing chats, but only for targets that
+  // actually appear in the endpoint catalog. Names and limits come from it too.
+  for (const slot of getEnvironmentModelSlots(envVars)) {
+    const target = models.find(model => model.id === getClaudeApiModelId(slot.model));
+    if (!target || seen.has(slot.id)) continue;
+    models.push({ ...target, id: slot.id, resolvedModel: slot.model, description: `Claude Code ${slot.id} default` });
+    seen.add(slot.id);
+  }
   return models;
 }
 
-export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelCatalog {
+async function fetchModelsWithTimeout(envVars: Record<string, string>): Promise<ClaudeDiscoveredModel[]> {
+  let timer: number | undefined;
+  try {
+    return await Promise.race([
+      fetchClaudeModelsFromAnthropicApi(envVars),
+      new Promise<never>((_, reject) => {
+        timer = window.setTimeout(() => reject(new Error('Model catalog request timed out')), MODEL_CATALOG_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) window.clearTimeout(timer);
+  }
+}
+
+function hasCustomEndpoint(envVars: Record<string, string>): boolean {
+  return !!envVars.ANTHROPIC_BASE_URL?.trim()
+    && normalizeAnthropicBaseUrl(envVars.ANTHROPIC_BASE_URL) !== `${ANTHROPIC_DEFAULT_BASE_URL}/v1`;
+}
+
+export function createClaudeModelCatalog(
+  plugin: GrimoirePlugin,
+  adapter: Pick<VaultFileAdapter, 'exists' | 'read'>,
+): ProviderModelCatalog {
   const refreshAttemptsByKey = new Map<string, number>();
   const refreshesByKey = new Map<string, Promise<ProviderCatalogRefreshOutcome>>();
+  const cacheKeyFor = (settings: Record<string, unknown>, claudeSettings: ClaudeProviderSettings, cliPath: string) =>
+    buildClaudeCatalogCacheKey({
+      ...claudeSettings,
+      environmentVariables: getRuntimeEnvironmentText(settings, 'claude'),
+    }, cliPath);
+  const settingsSourceKey = (settings: Record<string, unknown>) => cacheKeyFor(settings, {
+    ...getClaudeProviderSettings(settings),
+    projectSettingsSnapshot: { model: '', env: {}, hash: '' },
+  }, plugin.getResolvedProviderCliPath?.('claude') ?? '');
 
   // The attempt log only lives in memory, so every plugin load would otherwise
   // probe again on the first picker that is built - and probing starts a full
   // Claude Code session, which bills against the plan window.
   //
-  // Only an already SDK-sourced catalog is seeded. A persisted `api` catalog
-  // (or a partial one) still gets its single per-load probe, because that probe
-  // exists to upgrade the cheap API listing to the authenticated SDK list.
+  // Native SDK catalogs can be reused across loads. Custom endpoints get one
+  // fresh listing attempt per load, including older SDK-only cached catalogs.
   const initialSettings = getClaudeProviderSettings(plugin.settings ?? {});
+  const initialEnvironment = getRuntimeEnvironmentText(plugin.settings ?? {}, 'claude');
   const catalogIsFullySdkSourced = initialSettings.discoveredModels.length > 0
-    && initialSettings.discoveredModels.every(model => model.source === 'sdk');
+    && initialSettings.discoveredModels.every(model => model.source === 'sdk')
+    && !hasCustomEndpoint(getClaudeEffectiveEnvironmentVariables(plugin.settings ?? {}));
 
   // The CLI path is part of the cache key, but it cannot always be resolved
   // here: this catalog is constructed inside createClaudeWorkspaceServices,
@@ -134,7 +195,7 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
       // A recorded fingerprint turns the guess into a check. An unrecorded one
       // (a catalog persisted before this field existed) keeps the old behaviour
       // rather than spending a probe to migrate.
-      const initialCacheKey = buildClaudeCatalogCacheKey(initialSettings, initialCliPath);
+      const initialCacheKey = cacheKeyFor(plugin.settings ?? {}, initialSettings, initialCliPath);
       if (seedFingerprintMatches(initialSettings.discoveredModelsFingerprint, initialCacheKey)) {
         refreshAttemptsByKey.set(initialCacheKey, Date.now());
       }
@@ -146,8 +207,21 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
       return getClaudeProviderSettings(settings).enabled;
     },
     async refreshModels({ force, settings }) {
+      // Refresh files even on a cache hit: switching a CLI profile must invalidate
+      // the catalog, and deleted settings must not survive as extra picker rows.
+      const beforeReadKey = settingsSourceKey(settings);
+      try {
+        const projectSettingsSnapshot = await readClaudeCodeSettingsSnapshot(settings, adapter, getVaultPath(plugin.app));
+        if (beforeReadKey !== settingsSourceKey(settings)) {
+          return 'failed';
+        }
+        updateClaudeProviderSettings(settings, { projectSettingsSnapshot });
+      } catch {
+        return 'failed';
+      }
       const currentSettings = getClaudeProviderSettings(settings);
-      const cacheKey = buildClaudeCatalogCacheKey(
+      const cacheKey = cacheKeyFor(
+        settings,
         currentSettings,
         plugin.getResolvedProviderCliPath?.('claude') ?? '',
       );
@@ -159,7 +233,7 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
         // the probe, so the seed applies only while the rest of the key still
         // matches the catalog that was persisted.
         const seededCacheKey = buildClaudeCatalogCacheKey(
-          initialSettings,
+          { ...initialSettings, environmentVariables: initialEnvironment },
           plugin.getResolvedProviderCliPath?.('claude') ?? '',
         );
         if (!force
@@ -184,7 +258,10 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
       const lastAttemptAt = refreshAttemptsByKey.get(cacheKey) ?? 0;
       const cacheAgeMs = lastAttemptAt > 0 ? Date.now() - lastAttemptAt : Number.POSITIVE_INFINITY;
       const hasCachedModels = currentSettings.discoveredModels.length > 0;
-      if (!force && lastAttemptAt > 0 && (hasCachedModels || cacheAgeMs < CLAUDE_EMPTY_DISCOVERY_RETRY_MS)) {
+      // An earlier attempt for A cannot reuse the single catalog now holding B.
+      const cacheMatches = seedFingerprintMatches(currentSettings.discoveredModelsFingerprint, cacheKey);
+      if (!force && lastAttemptAt > 0
+        && ((hasCachedModels && cacheMatches) || (!hasCachedModels && cacheAgeMs < CLAUDE_EMPTY_DISCOVERY_RETRY_MS))) {
         plugin.recordDebugLog?.({
           data: {
             ageMs: cacheAgeMs,
@@ -208,16 +285,32 @@ export function createClaudeModelCatalog(plugin: GrimoirePlugin): ProviderModelC
         const previousFingerprint = currentSettings.discoveredModelsFingerprint;
         const before = JSON.stringify(previousDiscoveredModels);
         try {
-          let discoveredModels = await probeRuntimeModels(plugin);
-          if (discoveredModels.length === 0 && envVars.ANTHROPIC_API_KEY?.trim()) {
-            discoveredModels = await fetchClaudeModelsFromAnthropicApi(envVars);
+          const customEndpoint = hasCustomEndpoint(envVars);
+          let discoveredModels: ClaudeDiscoveredModel[] = [];
+          if (customEndpoint) {
+            try {
+              discoveredModels = await fetchModelsWithTimeout(envVars);
+            } catch {
+              // Many compatible gateways implement messages but not model listing.
+            }
+          }
+          if (discoveredModels.length === 0) {
+            discoveredModels = await probeRuntimeModels(plugin);
+          }
+          if (!customEndpoint && discoveredModels.length === 0 && (envVars.ANTHROPIC_API_KEY?.trim() || envVars.ANTHROPIC_AUTH_TOKEN?.trim())) {
+            discoveredModels = await fetchModelsWithTimeout(envVars);
           }
           if (discoveredModels.length === 0) {
             return 'failed';
           }
 
+          const latestSnapshot = await readClaudeCodeSettingsSnapshot(settings, adapter, getVaultPath(plugin.app));
+          if (latestSnapshot.hash !== currentSettings.projectSettingsSnapshot.hash) {
+            return 'failed';
+          }
           const latestSettings = getClaudeProviderSettings(settings);
-          const latestCacheKey = buildClaudeCatalogCacheKey(
+          const latestCacheKey = cacheKeyFor(
+            settings,
             latestSettings,
             plugin.getResolvedProviderCliPath?.('claude') ?? '',
           );

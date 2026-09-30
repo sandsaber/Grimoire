@@ -93,7 +93,7 @@ export async function createClaudeWorkspaceServices(
     agentManager,
     commandCatalog,
     agentMentionProvider: agentManager,
-    modelCatalog: createClaudeModelCatalog(plugin),
+    modelCatalog: createClaudeModelCatalog(plugin, adapter),
     getClaudeConfigDir,
     usageProvider: claudePlanUsageStore,
     settingsTabRenderer: claudeSettingsTabRenderer,
@@ -129,4 +129,3 @@ export function maybeGetClaudeWorkspaceServices(
   return plugin.getApplicationRuntimeOrNull?.()
     ?.workspaceServicesFor('claude') as ClaudeWorkspaceServices | null ?? null;
 }
-

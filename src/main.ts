@@ -87,13 +87,12 @@ import { GrimoireSettingTab } from './features/settings/GrimoireSettings';
 import { setLocale, t } from './i18n/i18n';
 import type { Locale } from './i18n/types';
 import { builtInWorkspaceInitializers } from './providers';
+import { readClaudeCodeSettingsSnapshot } from './providers/claude/app/ClaudeCodeSettingsSnapshot';
 import {
-  getClaudeProviderSettings,
   getClaudeRuntimeEnvironmentText,
   snapshotClaudeCodeSettings,
   updateClaudeProviderSettings,
 } from './providers/claude/settings';
-import { CCSettingsStorage } from './providers/claude/storage/CCSettingsStorage';
 import { OPENCODE_PLAN_MODE_ID, OPENCODE_SAFE_MODE_ID } from './providers/opencode/modes';
 import type {
   ProviderWorkspaceServices,
@@ -884,19 +883,12 @@ export default class GrimoirePlugin extends Plugin {
 
   private async hydrateClaudeCodeProjectSettingsSnapshot(): Promise<void> {
     try {
-      const claudeSettings = getClaudeProviderSettings(this.settings);
-      const projectSettings = await new CCSettingsStorage(this.storage.getAdapter()).load();
-      const userSettings = claudeSettings.loadUserSettings
-        ? await new CCSettingsStorage(new HomeFileAdapter()).load()
-        : {};
       updateClaudeProviderSettings(
         this.settings,
         {
-          projectSettingsSnapshot: snapshotClaudeCodeSettings({
-            includeUserSettings: claudeSettings.loadUserSettings,
-            user: userSettings,
-            project: projectSettings,
-          }),
+          projectSettingsSnapshot: await readClaudeCodeSettingsSnapshot(
+            this.settings, this.storage.getAdapter(), getVaultPath(this.app),
+          ),
         },
       );
     } catch {
