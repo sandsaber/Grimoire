@@ -119,6 +119,8 @@ Grimoire keeps patched versions selected by the current dependency graph. Server
 
 The MCP SDK range is `^1.30.0`, whose dependency contract accepts `@hono/node-server` 2.x. Grimoire uses the npm lockfile plus a narrow override for `@hono/node-server` so a clean release graph can be verified without resolver bypasses or stale advisory assumptions. Vault YAML frontmatter uses the `yaml` package (not `js-yaml`).
 
+The development-only Obsidian SDK pins an older Moment version. A scoped `obsidian` → `moment` override selects 2.31.0 to resolve GHSA-4p3w-j4w9-5jqw without downgrading the SDK. Obsidian supplies the runtime module; this override applies to the development dependency graph.
+
 - Clean installation, the full unit suite, release-bundle verification, and `npm audit --omit=dev` are required release gates before publication.
 - A clean audit is a verified release target, not a standing claim in this document.
 - `.npmrc` sets `min-release-age=7`, so a freshly published release cannot enter the lockfile for a week. When a security fix lands inside that window, it is admitted through `lockfile-age-exceptions.json` with an `expiresAt` no later than the package's natural eligibility, never by lowering the quarantine itself.
@@ -128,14 +130,15 @@ The MCP SDK range is `^1.30.0`, whose dependency contract accepts `@hono/node-se
 | `@modelcontextprotocol/sdk` | Direct dependency | Verify from release bundle | 1.30.0 | Direct SDK; audit gate applies | Locked from the declared `^1.30.0` range |
 | `hono` | MCP SDK | Verify from release bundle | 4.13.0 | `<4.12.34` | Above tracked ranges |
 | `@hono/node-server` | MCP SDK | Verify from release bundle | 2.1.0 | `<2.0.5` | Narrow override to a patched release |
-| `fast-uri` | MCP SDK / AJV | Verify from release bundle | 3.1.6 | `>=3.0.0 <=3.1.5` | Above tracked ranges |
-| `ip-address` | MCP SDK / Express rate limit | Verify from release bundle | 10.4.0 | `<=10.1.0` | Above tracked range |
+| `fast-uri` | MCP SDK / AJV | Verify from release bundle | 3.1.8 | `>=3.0.0 <=3.1.5`; `=2.4.5`, `=3.1.6`, `=4.1.3` | Above tracked ranges, including [GHSA-58mr-gqgx-xq4g](https://github.com/advisories/GHSA-58mr-gqgx-xq4g) |
+| `ip-address` | MCP SDK / Express rate limit | Verify from release bundle | 10.7.2 | `<=10.1.0`; `>=10.2.0 <=10.5.0` | Above tracked ranges, including [GHSA-2vr4-cq9g-pvrc](https://github.com/advisories/GHSA-2vr4-cq9g-pvrc) |
 | `qs` | MCP SDK / Express | Verify from release bundle | 6.16.0 | `>=2.2.5 <6.16.0` | Above tracked range; admitted before the 7-day quarantine through a `lockfile-age-exceptions.json` entry that expires at its natural eligibility |
 | `@anthropic-ai/sdk` | Claude Agent SDK | Verify from release bundle | 0.115.0 | `>=0.79.0 <0.91.1` | Above tracked range |
 | `ws` | jsdom | Development dependency | 8.21.2 | `>=8.0.0 <8.20.1` | Development-only; above tracked range |
-| `brace-expansion` 1.x | Nested tooling dependency | Development dependency | 1.1.18 | `<1.1.18` | Development-only; patched |
-| `brace-expansion` 2.x | Nested tooling dependency | Development dependency | 2.1.4 | `>=2.0.0 <2.1.4` | Development-only; patched |
-| `brace-expansion` 4.x / 5.x | Nested tooling dependency | Development dependency | 5.0.9 (no 4.x copy) | `>=4.0.0 <5.0.9` | Development-only; patched |
+| `brace-expansion` 1.x | Nested tooling dependency | Development dependency | 1.1.21 | `<=1.1.20` | Development-only; patched |
+| `brace-expansion` 2.x | Nested tooling dependency | Development dependency | 2.1.7 | `>=2.0.0 <=2.1.6` | Development-only; patched |
+| `brace-expansion` 4.x / 5.x | Nested tooling dependency | Development dependency | 5.0.12 (no 4.x copy) | `>=4.0.0 <=5.0.11` | Development-only; patched |
+| `moment` | Obsidian SDK | Development dependency | 2.31.0 | `>=2.29.2 <=2.30.1` | Scoped override; patched |
 | `yaml` | Direct dependency (frontmatter) | Verify from release bundle | current lockfile | npm audit gate | Replaces `js-yaml` for skills/agents/command YAML |
 
 The `npm run review:deps` check (run automatically by `npm run build:release`) enforces the resolved versions for tracked review advisories. The release workflow also runs the unmodified `npm audit --omit=dev` command and requires a clean result.

@@ -5,6 +5,10 @@ import { createClaudeWorkspaceServices } from '@/providers/claude/app/ClaudeWork
 import { getClaudeModelOptions } from '@/providers/claude/modelOptions';
 import { getClaudeProviderSettings, updateClaudeProviderSettings } from '@/providers/claude/settings';
 
+jest.mock('@/core/storage/HomeFileAdapter', () => ({
+  HomeFileAdapter: jest.fn().mockImplementation(() => ({ exists: async () => false })),
+}));
+
 const sdkMock = sdkModule as unknown as {
   getLastOptions: () => sdkModule.Options | undefined;
   getQueryCallCount: () => number;

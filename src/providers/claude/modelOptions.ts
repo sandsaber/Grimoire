@@ -1,5 +1,5 @@
 import type { ProviderUIOption } from '../../core/providers/types';
-import { getCurrentModelFromEnvironment, getModelsFromEnvironment } from './env/claudeModelEnv';
+import { getClaudeApiModelId, getCurrentModelFromEnvironment, getModelsFromEnvironment } from './env/claudeModelEnv';
 import { formatCustomModelLabel } from './modelLabels';
 import {
   type ClaudeDiscoveredModel,
@@ -74,11 +74,9 @@ export function getClaudeModelOptions(settings: Record<string, unknown>): Provid
     getClaudeEffectiveEnvironmentVariables(settings),
     customModelAliases,
   );
-  if (customModels.length > 0) {
-    return customModels;
-  }
-
   const claudeSettings = getClaudeProviderSettings(settings);
+  const discovered = claudeSettings.discoveredModels;
+  const apiCatalog = discovered.length > 0 && discovered.every(model => model.source === 'api');
   const models: ProviderUIOption[] = [];
   const seenValues = new Set<string>();
 
@@ -90,9 +88,19 @@ export function getClaudeModelOptions(settings: Record<string, unknown>): Provid
     });
   }
 
-  if (claudeSettings.discoveredModels.length === 0) {
-    for (const model of DEFAULT_CLAUDE_MODELS) {
+  if (discovered.length === 0) {
+    for (const model of customModels.length > 0 ? customModels : DEFAULT_CLAUDE_MODELS) {
       appendModelOption(models, seenValues, model);
+    }
+  } else {
+    for (const option of customModels) {
+      const match = discovered.find(model => model.id === getClaudeApiModelId(option.value));
+      if (apiCatalog && !match) continue;
+      if (discovered.some(model => model.resolvedModel === option.value)) continue;
+      appendModelOption(models, seenValues, {
+        ...option,
+        ...(match ? { label: customModelAliases[option.value] ?? `${match.displayName}${option.value !== match.id ? ' (1M)' : ''}` } : {}),
+      });
     }
   }
 
@@ -112,7 +120,8 @@ export function getClaudeModelOptions(settings: Record<string, unknown>): Provid
   const projectSettingsModel = claudeSettings.respectProjectSettings
     ? claudeSettings.projectSettingsSnapshot.model
     : '';
-  if (projectSettingsModel && !seenValues.has(projectSettingsModel)) {
+  if (projectSettingsModel && !seenValues.has(projectSettingsModel)
+    && (!apiCatalog || discovered.some(model => model.id === getClaudeApiModelId(projectSettingsModel)))) {
     seenValues.add(projectSettingsModel);
     models.push({
       value: projectSettingsModel,

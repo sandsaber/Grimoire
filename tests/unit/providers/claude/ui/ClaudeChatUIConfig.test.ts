@@ -287,7 +287,7 @@ describe('claudeChatUIConfig', () => {
       }]);
     });
 
-    it('keeps environment-defined custom models as a full override', () => {
+    it('keeps manually configured IDs alongside environment defaults', () => {
       const options = claudeChatUIConfig.getModelOptions({
         providerConfigs: {
           claude: {
@@ -303,6 +303,24 @@ describe('claudeChatUIConfig', () => {
           label: 'Sonnet 4.5',
           description: 'Custom model (model)',
         },
+        { value: 'claude-opus-4-6', label: 'Opus 4.6', description: 'Custom model' },
+      ]);
+    });
+
+    it('keeps endpoint names and context variants without hiding the endpoint catalog', () => {
+      const options = claudeChatUIConfig.getModelOptions({ providerConfigs: { claude: {
+        environmentVariables: 'ANTHROPIC_DEFAULT_OPUS_MODEL=vendor/reasoner[1M]\nANTHROPIC_DEFAULT_OPUS_MODEL_NAME=Stale label',
+        customModels: 'manual/model',
+        discoveredModels: [
+          { id: 'vendor/reasoner', displayName: 'Endpoint reasoner', source: 'api' },
+          { id: 'another-vendor/coder', displayName: 'Endpoint coder', source: 'api' },
+        ],
+      } } });
+      expect(options.map(option => [option.value, option.label])).toEqual([
+        ['vendor/reasoner', 'Endpoint reasoner'],
+        ['another-vendor/coder', 'Endpoint coder'],
+        ['vendor/reasoner[1M]', 'Endpoint reasoner (1M)'],
+        ['manual/model', 'model'],
       ]);
     });
 

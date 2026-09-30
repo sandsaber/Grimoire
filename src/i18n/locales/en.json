@@ -933,7 +933,7 @@
     },
     "customModels": {
       "name": "Custom models",
-      "desc": "Append additional Claude model IDs to the picker, one per line. Environment model overrides still replace the picker.",
+      "desc": "Append additional model IDs to the Claude Code picker, one per line. Discovered models and configured defaults remain available.",
       "placeholder": "claude-opus-4-6\nclaude-opus-4-6[1m]\nclaude-opus-4-5-20251101"
     },
     "refreshModels": {
