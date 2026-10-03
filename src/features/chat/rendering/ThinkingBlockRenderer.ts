@@ -98,6 +98,13 @@ function applyThinkingAffordance(
   headerEl.removeAttribute('aria-label');
 }
 
+function completedThinkingLabel(durationSeconds: number | undefined): string {
+  // A buffered stream can arrive within one timer tick; zero is not a model thinking duration.
+  return durationSeconds !== undefined && durationSeconds > 0
+    ? t('chat.ui.thinking.completed', { seconds: durationSeconds })
+    : t('chat.ui.thinking.thought');
+}
+
 export function finalizeThinkingBlock(state: ThinkingBlockState): number {
   // Stop the timer
   if (state.timerInterval) {
@@ -109,7 +116,7 @@ export function finalizeThinkingBlock(state: ThinkingBlockState): number {
   const durationSeconds = Math.floor((Date.now() - state.startTime) / 1000);
 
   // Update label to show final duration (without "...")
-  state.labelEl.setText(t('chat.ui.thinking.completed', { seconds: durationSeconds }));
+  state.labelEl.setText(completedThinkingLabel(durationSeconds));
 
   // Collapse when done and sync state
   const header = state.wrapperEl.querySelector('.grimoire-thinking-header');
@@ -147,10 +154,7 @@ export function renderStoredThinkingBlock(
   markDecorative(caretEl);
 
   const labelEl = header.createSpan({ cls: 'grimoire-thinking-label' });
-  const labelText = durationSeconds !== undefined
-    ? t('chat.ui.thinking.completed', { seconds: durationSeconds })
-    : t('chat.ui.thinking.thought');
-  labelEl.setText(labelText);
+  labelEl.setText(completedThinkingLabel(durationSeconds));
 
   // Collapsible content
   const contentEl = wrapperEl.createDiv({ cls: 'grimoire-thinking-content' });
