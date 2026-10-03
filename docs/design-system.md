@@ -349,7 +349,10 @@ the chrome around it, because it is the thing being read.
 - **Assistant turn.** `gap: 10px`. The meta line is monospace 11px faint — an 11px provider mark in
   ink, then `Claude Code · Opus 4.5 · high`. It is a caption, not a heading; it was uppercase,
   tracked and semibold, which is section-title weight on three words of provenance. Then the
-  reasoning toggle: a 12px chevron and "Thought for 8s" in faint, muted on hover.
+  reasoning toggle: a 12px chevron and "Thought for 8s" in faint, muted on hover. A completed
+  block with zero or unknown duration says "Thought" without seconds, both live and when restored.
+  The client timer measures stream delivery; a buffered burst below one second does not establish
+  how long the model reasoned. Screen `2b` includes the duration-free state beside the timed one.
 - **Tool steps.** A run of steps is drawn against **one hairline**, offset 6px so it sits under the
   centre of the provider mark on the line above. The rule is a pseudo-element rather than a border,
   so a step can extend it up through the gap when it follows another step — the run reads as one line
