@@ -2,6 +2,13 @@
 
 User-facing changes by release.
 
+## 2.0.9 - 2026-10-03
+
+### Fixed
+
+- Completed reasoning blocks with zero or unknown duration show "Thought" without seconds, both live and in reopened chats. Positive durations keep their existing labels (#237, #238).
+- Update the vulnerable transitive Hono dependency to 4.13.9 (#238).
+
 ## 2.0.8 - 2026-09-30
 
 ### Fixed
