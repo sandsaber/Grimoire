@@ -10,6 +10,36 @@ const lockfile = JSON.parse(readFileSync(lockfilePath, "utf8"));
 
 const advisories = [
   {
+    packageName: "@modelcontextprotocol/sdk",
+    vulnerableRange: ">=1.12.0 <1.31.0",
+    advisory: "GHSA-6qxp-vccf-f47h",
+    isVulnerable: (version) => greaterThanOrEqual(version, "1.12.0") && lessThan(version, "1.31.0"),
+  },
+  {
+    packageName: "handlebars",
+    vulnerableRange: ">=3.0.0 <=4.7.9",
+    advisory: "GHSA-xw65-4hp5-5hc7 / GHSA-8r5x-fm3f-whwj / GHSA-p8wg-vrv2-v86f",
+    isVulnerable: (version) => greaterThanOrEqual(version, "3.0.0") && lessThanOrEqual(version, "4.7.9"),
+  },
+  {
+    packageName: "proxy-addr",
+    vulnerableRange: ">=1.1.0 <2.0.8",
+    advisory: "GHSA-jqcg-44mw-7w3h",
+    isVulnerable: (version) => greaterThanOrEqual(version, "1.1.0") && lessThan(version, "2.0.8"),
+  },
+  {
+    packageName: "smol-toml",
+    vulnerableRange: "<=1.8.0",
+    advisory: "GHSA-r4xh-jqrq-34v2",
+    isVulnerable: (version) => lessThanOrEqual(version, "1.8.0"),
+  },
+  {
+    packageName: "sprintf-js",
+    vulnerableRange: "<=1.1.3",
+    advisory: "GHSA-hp3w-g68c-fv3c",
+    isVulnerable: (version) => lessThanOrEqual(version, "1.1.3"),
+  },
+  {
     packageName: "hono",
     vulnerableRange: "<4.12.34",
     advisory: "GHSA-26pp-8wgv-hjvm / GHSA-r5rp-j6wh-rvv4 / GHSA-xf4j-xp2r-rqqx / GHSA-wmmm-f939-6g9c / GHSA-458j-xx4x-4375 / GHSA-xpcf-pg52-r92g / GHSA-qp7p-654g-cw7p / GHSA-hm8q-7f3q-5f36 / GHSA-p77w-8qqv-26rm / GHSA-9vqf-7f2p-gf9v / GHSA-69xw-7hcm-h432 / GHSA-xrhx-7g5j-rcj5 / GHSA-3hrh-pfw6-9m5x / GHSA-f577-qrjj-4474 / GHSA-2gcr-mfcq-wcc3 / GHSA-wwfh-h76j-fc44 / GHSA-j6c9-x7qj-28xf / GHSA-88fw-hqm2-52qc / GHSA-rv63-4mwf-qqc2 / GHSA-wgpf-jwqj-8h8p / GHSA-8j4g-w8fx-2239",

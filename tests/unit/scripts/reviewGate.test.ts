@@ -123,6 +123,16 @@ describe('Obsidian review gate', () => {
     ['ip-address', '10.2.0', 'GHSA-2vr4-cq9g-pvrc'],
     ['ip-address', '10.4.0', 'GHSA-2vr4-cq9g-pvrc'],
     ['ip-address', '10.5.0', 'GHSA-2vr4-cq9g-pvrc'],
+    ['@modelcontextprotocol/sdk', '1.12.0', 'GHSA-6qxp-vccf-f47h'],
+    ['@modelcontextprotocol/sdk', '1.30.1', 'GHSA-6qxp-vccf-f47h'],
+    ['handlebars', '3.0.0', 'GHSA-xw65-4hp5-5hc7'],
+    ['handlebars', '4.7.9', 'GHSA-8r5x-fm3f-whwj'],
+    ['handlebars', '4.7.9', 'GHSA-p8wg-vrv2-v86f'],
+    ['proxy-addr', '1.1.0', 'GHSA-jqcg-44mw-7w3h'],
+    ['proxy-addr', '2.0.7', 'GHSA-jqcg-44mw-7w3h'],
+    ['smol-toml', '1.8.0', 'GHSA-r4xh-jqrq-34v2'],
+    ['sprintf-js', '1.0.3', 'GHSA-hp3w-g68c-fv3c'],
+    ['sprintf-js', '1.1.3', 'GHSA-hp3w-g68c-fv3c'],
   ])('rejects %s@%s for %s, including nested dependencies', (name, version, advisory) => {
     const result = runDependencyGate({
       [`node_modules/example/node_modules/${name}`]: { version },
@@ -139,6 +149,10 @@ describe('Obsidian review gate', () => {
     ['fast-uri', '4.1.4'],
     ['ip-address', '10.1.1'],
     ['ip-address', '10.5.1'],
+    ['@modelcontextprotocol/sdk', '1.31.0'],
+    ['handlebars', '4.7.10'],
+    ['proxy-addr', '2.0.8'],
+    ['smol-toml', '1.9.0'],
   ])('accepts %s@%s outside the tracked advisory ranges', (name, version) => {
     expect(runDependencyGate({ [`node_modules/${name}`]: { version } }).status).toBe(0);
   });
