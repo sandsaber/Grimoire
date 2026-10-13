@@ -33,9 +33,9 @@ function createHarness() {
       switchAgent: jest.fn().mockResolvedValue(undefined), switchModel: jest.fn().mockResolvedValue(undefined),
       prompt: jest.fn().mockResolvedValue({ id: 'user-message' }),
       interrupt: jest.fn().mockResolvedValue(undefined), compact: jest.fn().mockResolvedValue(undefined),
+      form: { cancel: jest.fn().mockResolvedValue(undefined), reply: jest.fn().mockResolvedValue(undefined) },
     },
     mcp: { add: jest.fn().mockResolvedValue(undefined) },
-    form: { cancel: jest.fn().mockResolvedValue(undefined), reply: jest.fn().mockResolvedValue(undefined) },
     event: { subscribe: async function* ({ signal }: { signal: AbortSignal }) {
       yield { type: 'server.connected', data: {} } as OpenCodeEvent;
       while (!signal.aborted) {
@@ -169,7 +169,7 @@ describe('OpenCode V2 transport', () => {
     h.push('form.created', { form: { id: 'form', sessionID: 'session', title: 'Question',
       fields: [{ key: 'auth', type: 'external', url: 'https://example.test/auth' }] } });
     await flush();
-    expect(h.api.form.cancel).toHaveBeenCalledWith({ sessionID: 'session', formID: 'form' }, expect.anything());
+    expect(h.api.session.form.cancel).toHaveBeenCalledWith({ sessionID: 'session', formID: 'form' }, expect.anything());
     expect(h.api.session.interrupt).toHaveBeenCalled();
     h.push('session.execution.interrupted', { reason: 'user' });
     await expect(pending).rejects.toThrow('OpenCode CLI');
@@ -190,9 +190,25 @@ describe('OpenCode V2 transport', () => {
     h.push('form.created', { form });
     await flush();
     expect(h.requestPermission).toHaveBeenCalledTimes(1);
-    expect(h.api.form.reply).toHaveBeenCalledWith({ sessionID: 'session', formID: 'form', answer: { color: 'blue' } }, expect.anything());
+    expect(h.api.session.form.reply).toHaveBeenCalledWith({ sessionID: 'session', formID: 'form', answer: { color: 'blue' } }, expect.anything());
     h.push('session.execution.succeeded', {});
     await pending;
+    await h.client.close();
+  });
+
+  it('cancels a native form when the question is dismissed', async () => {
+    const h = createHarness();
+    h.requestPermission.mockResolvedValue({ outcome: { outcome: 'cancelled' } });
+    await h.open();
+    const pending = h.client.prompt({ sessionId: 'session', prompt: [{ type: 'text', text: 'ask' }] });
+    h.push('form.created', { form: { id: 'form', sessionID: 'session', title: 'Color', fields: [
+      { key: 'color', title: 'Choose a color', type: 'string', required: true },
+    ] } });
+    await flush();
+    expect(h.api.session.form.cancel).toHaveBeenCalledWith({ sessionID: 'session', formID: 'form' }, expect.anything());
+    expect(h.api.session.form.reply).not.toHaveBeenCalled();
+    h.push('session.execution.interrupted', { reason: 'user' });
+    await expect(pending).resolves.toMatchObject({ stopReason: 'cancelled' });
     await h.client.close();
   });
 

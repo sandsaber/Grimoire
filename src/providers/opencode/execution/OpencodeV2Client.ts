@@ -431,7 +431,7 @@ export class OpencodeV2Client implements ManagedAcpClient {
     if (!questions) {
       this.turnErrors.set(form.sessionID, new JsonRpcErrorResponse('session/prompt', -32603,
         'OpenCode requested an external or conditional form. Complete this interaction in the OpenCode CLI.'));
-      await this.api.form.cancel({ sessionID: form.sessionID, formID: form.id }, this.requestOptions());
+      await this.api.session.form.cancel({ sessionID: form.sessionID, formID: form.id }, this.requestOptions());
       await this.api.session.interrupt({ sessionID: form.sessionID }, this.requestOptions());
       return;
     }
@@ -443,12 +443,11 @@ export class OpencodeV2Client implements ManagedAcpClient {
     if (this.closed || this.turns.get(form.sessionID) !== turn) return;
     const answer = response.outcome.outcome === 'selected' && response.answers
       ? opencodeFormAnswers(form, response.answers) : null;
-    if (!answer) await this.api.form.cancel({ sessionID: form.sessionID, formID: form.id }, this.requestOptions());
-    else await this.api.form.reply({ sessionID: form.sessionID, formID: form.id, answer }, this.requestOptions());
+    if (!answer) await this.api.session.form.cancel({ sessionID: form.sessionID, formID: form.id }, this.requestOptions());
+    else await this.api.session.form.reply({ sessionID: form.sessionID, formID: form.id, answer }, this.requestOptions());
   }
 
-  // These two payload names changed after client 2.0.0. Keep the verified V2.0.16
-  // wire shape while the SDK dependency remains within the repository's age gate.
+  // Keep command and permission payload names explicit for the verified V2 wire protocol.
   private async post(path: string, body: Record<string, unknown>): Promise<void> {
     const response = await createNodeFetch()(new URL(path, this.options.url), {
       method: 'POST', signal: this.lifetime.signal,
