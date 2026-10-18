@@ -13,15 +13,15 @@ import {
 } from '@/providers/acp/execution/AcpManagedClientAdapter';
 import type {
   ManagedAcpClient,
-  ManagedAcpClientFactory,
   ManagedAcpClientFactoryInput,
 } from '@/providers/acp/execution/ManagedAcpClient';
 import { isRecord } from '@/utils/records';
 
+import type { OpencodeMetadataClient, OpencodeMetadataClientFactory } from './OpencodeMetadataSession';
 import { OpencodeV2Client } from './OpencodeV2Client';
 
 /** V1 uses ACP; V2 owns a private server so discovery can await its ready catalog. */
-export class OpencodeClientFactory implements ManagedAcpClientFactory {
+export class OpencodeClientFactory implements OpencodeMetadataClientFactory {
   private readonly launchers = new Set<NodeManagedAcpProcessLauncher>();
 
   constructor(
@@ -30,6 +30,14 @@ export class OpencodeClientFactory implements ManagedAcpClientFactory {
   ) {}
 
   async create(input: ManagedAcpClientFactoryInput): Promise<ManagedAcpClient> {
+    return this.createClient(input, false);
+  }
+
+  async createMetadata(input: ManagedAcpClientFactoryInput): Promise<OpencodeMetadataClient> {
+    return this.createClient(input, true);
+  }
+
+  private async createClient(input: ManagedAcpClientFactoryInput, metadata: boolean): Promise<OpencodeMetadataClient> {
     const invocation = await this.resolver.resolve(input.startupRef);
     const probeLauncher = this.launcher({ ...invocation, arguments: ['--version'] });
     const probe = await probeLauncher.launch(input.startupRef, input.signal);
@@ -45,7 +53,10 @@ export class OpencodeClientFactory implements ManagedAcpClientFactory {
     const parsed = /(?:^|\s)v?(\d+)\.(\d+)\.(\d+)/.exec(version.trim());
     if (!parsed) throw new Error('Cannot determine the installed OpenCode version.');
     if (Number(parsed[1]) < 2) {
-      const launcher = this.launcher(invocation);
+      const launcher = this.launcher(metadata ? {
+        ...invocation,
+        environment: { ...invocation.environment, OPENCODE_DB: ':memory:' },
+      } : invocation);
       const client = await new AcpManagedClientAdapterFactory({
         ...this.options,
         processLauncher: launcher,
@@ -102,7 +113,7 @@ export class OpencodeClientFactory implements ManagedAcpClientFactory {
     return launcher;
   }
 
-  private track(client: ManagedAcpClient, launcher: NodeManagedAcpProcessLauncher): ManagedAcpClient {
+  private track<T extends ManagedAcpClient>(client: T, launcher: NodeManagedAcpProcessLauncher): T {
     const close = client.close.bind(client);
     client.close = async () => {
       const outcome = await close();

@@ -110,6 +110,30 @@ describe('OpenCode V2 transport', () => {
     await h.client.close();
   });
 
+  it('reads Go models, effort and commands without creating or configuring a session (#253)', async () => {
+    const h = createHarness();
+    const go = { id: 'kimi-k3', providerID: 'opencode-go', name: 'Kimi K3', enabled: true,
+      limit: { context: 200_000 }, variants: [{ id: 'high' }] };
+    h.api.model.list.mockResolvedValue({ data: [go] });
+    h.api.model.default.mockResolvedValue({ data: go });
+    await h.client.initialize();
+
+    const metadata = await h.client.readMetadata('opencode-go/kimi-k3');
+
+    expect(metadata.state.configOptions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'model', options: [{ value: 'opencode-go/kimi-k3', name: 'Kimi K3' }] }),
+    ]));
+    expect(metadata.modelConfigOptions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'effort', options: [{ value: 'default', name: 'default' }, { value: 'high', name: 'high' }] }),
+    ]));
+    expect(metadata.commands).toEqual([{ name: 'review' }]);
+    expect(h.api.session.create).not.toHaveBeenCalled();
+    expect(h.api.session.switchModel).not.toHaveBeenCalled();
+    expect(h.api.mcp.add).not.toHaveBeenCalled();
+    await expect(h.client.readMetadata('missing/model')).rejects.toThrow('unavailable');
+    await h.client.close();
+  });
+
   it.each(['once', 'reject'])('replies to a native permission with the selected %s decision', async decision => {
     const h = createHarness();
     h.requestPermission.mockResolvedValue({ outcome: { outcome: 'selected', optionId: decision } });

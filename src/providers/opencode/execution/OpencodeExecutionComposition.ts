@@ -69,6 +69,7 @@ import {
 import { OpencodeInteractionBridge } from '@/providers/opencode/execution/OpencodeInteractionBridge';
 import { OpencodeInteractionPresenter } from '@/providers/opencode/execution/OpencodeInteractionPresenter';
 import {
+  type OpencodeMetadataClientFactory,
   type OpencodeMetadataLaunch,
   OpencodeMetadataSession,
 } from '@/providers/opencode/execution/OpencodeMetadataSession';
@@ -119,9 +120,6 @@ const AUXILIARY_RESULT_BYTE_LIMIT = 64_000;
  * that will not answer.
  */
 const AUXILIARY_TIMEOUT_MS = 60_000;
-
-/** Where a session opened only to answer a question keeps its state. */
-const METADATA_DATABASE = ':memory:';
 
 /**
  * OpenCode chat execution, assembled from the running plugin.
@@ -184,7 +182,7 @@ export class OpencodeExecution {
   private readonly interactions = new OpencodeInteractionBridge(() => opaqueId('ocix'));
 
   private metadataSession: OpencodeMetadataSession | undefined;
-  private clientFactory: ManagedAcpClientFactory | undefined;
+  private clientFactory: OpencodeMetadataClientFactory | undefined;
   private auxiliaryClientFactory: ManagedAcpClientFactory | undefined;
   private injectedClientFactory: ManagedAcpClientFactory | undefined;
 
@@ -634,7 +632,7 @@ export class OpencodeExecution {
    *
    * The model catalog, the settings tab and the chat toolbar all need the same
    * two answers, and each of them used to build a whole chat runtime to get
-   * them. One isolated session serves all of them instead.
+   * them. One metadata reader serves all of them instead.
    */
   get metadata(): OpencodeMetadataSession {
     this.metadataSession ??= new OpencodeMetadataSession({
@@ -835,7 +833,7 @@ export class OpencodeExecution {
     }, { resolve: startupRef => this.requests.resolveLaunch(startupRef) });
   }
 
-  private createClientFactory(): ManagedAcpClientFactory {
+  private createClientFactory(): OpencodeMetadataClientFactory {
     const fileSystem = new OpencodeAcpFileSystem({
       // Full access opts into unrestricted file access; safe and plan modes
       // confine an ACP-delegated read or write to the session workspace.
@@ -903,10 +901,8 @@ export class OpencodeExecution {
   /**
    * The process a question is asked in, which is nobody's conversation.
    *
-   * The database is in memory, which is what makes it isolated: the legacy
-   * warmups passed the same override for the same reason, so that asking what
-   * models exist never binds a session to a tab or writes OpenCode state into
-   * the vault.
+   * V2 needs its native database for credentials and reads the catalog without
+   * creating a session. The client factory isolates V1 ACP sessions in memory.
    */
   private async metadataLaunch(): Promise<OpencodeMetadataLaunch> {
     const settings = ProviderSettingsCoordinator.getProviderSettingsSnapshot(
@@ -915,7 +911,7 @@ export class OpencodeExecution {
     );
     const cwd = getVaultPath(this.plugin.app) ?? process.cwd();
     const executable = this.plugin.getResolvedProviderCliPath('opencode') ?? 'opencode';
-    const runtimeEnv = buildOpencodeRuntimeEnv(settings, executable, METADATA_DATABASE);
+    const runtimeEnv = buildOpencodeRuntimeEnv(settings, executable);
     const artifacts = await prepareOpencodeLaunchArtifacts({
       runtimeEnv,
       settings: {

@@ -20,6 +20,14 @@ Use a Grimoire build containing [the V2 integration in PR #223](https://github.c
 
 Grimoire starts and stops its private V2 server automatically. There is no second provider to enable or server to launch manually.
 
+V2 model discovery uses OpenCode's native database for saved credentials and reads models,
+agents, reasoning options, and commands without creating a session. OpenCode V2 stores
+credentials in SQLite; the in-memory database used by V1 ACP metadata sessions cannot see
+them. When credentials are saved only in SQLite, launching V2 discovery with
+`OPENCODE_DB=:memory:` hides Console-backed models, including OpenCode Go and paid
+OpenCode models ([#253](https://github.com/sandsaber/Grimoire/issues/253)).
+After installing this fix, use **Refresh all models** to replace an incomplete catalog.
+
 ## If the selected mode or model is unavailable
 
 V2 ACP can capture an incomplete agent catalog during startup and retain it for the session. This reproduces outside Grimoire: the native API initially returns only built-in agents, then exposes the managed agents after configuration discovery finishes. Sleeping before the first ACP session or upgrading from 2.0.15 to 2.0.16 does not reliably fix it. Grimoire's V2 adapter waits for the required agents and enabled models before creating a session.
@@ -70,6 +78,19 @@ The session-scoped reply POST and cancellation DELETE endpoints are also defined
 The automated V2 live suite used temporary vaults, isolated databases, and an available free model. The later Obsidian checks used the normal local configuration and the free model. External MCP servers, image handling, paid billing accuracy, and the native OpenCode CLI on Windows have not been verified. Cross-platform CI validates Grimoire's tests and lifecycle contracts; it is not a live Windows CLI test.
 
 External and conditional native forms are cancelled with an explicit unsupported-interaction error instead of leaving a turn waiting for an invisible UI. SSE MCP transports are rejected; native stdio and HTTP MCP configuration is mapped to the API. V1 ACP does not deliver V2 native forms to the question callback.
+
+The metadata-only regression suite runs with `GRIMOIRE_OPENCODE_METADATA_LIVE=1` and an
+optional `GRIMOIRE_OPENCODE_CLI` path. It uses a real V2 CLI, temporary databases, a local
+Console fixture, and a fake key. It checks credential-backed Go discovery, reasoning options,
+commands, and unchanged session and credential counts without making inference requests.
+This suite passed on macOS arm64 with CLI 2.0.27 and SDK 2.0.24 on 2026-10-18.
+It does not verify a real Go subscription, paid inference, or Windows behavior.
+
+On the same date, a real Console login was checked in Obsidian 1.14.4 with the
+same CLI and SDK versions. After fully restarting Grimoire and refreshing models,
+discovery increased from 12 to 58 models, matching `opencode models --standalone`.
+That account's native catalog did not include Go models, so this check confirms
+Console authentication and catalog parity, not access to a real Go subscription.
 
 The live suite is opt-in with `GRIMOIRE_OPENCODE_LIVE=1` and can make model requests. Set `GRIMOIRE_OPENCODE_V2_LIVE=1` as well to include the V2-only question scenario. Versions older than the V2 builds above have not been validated.
 

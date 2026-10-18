@@ -23,6 +23,7 @@ import type {
 import { isRecord } from '@/utils/records';
 
 import { normalizeOpencodeToolInput } from '../normalization/opencodeToolNormalization';
+import type { OpencodeMetadata } from './OpencodeMetadataSession';
 import { opencodeFormAnswers, opencodeFormQuestions, type OpencodeQuestionResponse } from './OpencodeQuestions';
 
 interface Deferred<T> {
@@ -104,6 +105,22 @@ export class OpencodeV2Client implements ManagedAcpClient {
       ...(model ? { model: { providerID: model.providerID, id: model.id } } : {}),
     }, this.requestOptions());
     return this.opened(session);
+  }
+
+  /** Metadata uses native credentials without adding a session to the user's history. */
+  async readMetadata(rawModelId?: string): Promise<OpencodeMetadata> {
+    const model = (await this.api.model.default({ location: { directory: this.options.cwd } }, this.requestOptions())).data;
+    const selected = rawModelId
+      ? this.models.find(entry => `${entry.providerID}/${entry.id}` === rawModelId)
+      : undefined;
+    if (rawModelId && !selected) throw new Error('Requested OpenCode model is unavailable.');
+    return {
+      state: { configOptions: this.configOptions({ model: model ? { providerID: model.providerID, id: model.id } : undefined }) },
+      ...(selected ? {
+        modelConfigOptions: this.configOptions({ model: { providerID: selected.providerID, id: selected.id } }),
+      } : {}),
+      commands: this.commands,
+    };
   }
 
   async loadSession(request: Parameters<ManagedAcpClient['loadSession']>[0]) {
@@ -254,7 +271,7 @@ export class OpencodeV2Client implements ManagedAcpClient {
     return session;
   }
 
-  private currentModel(session: SessionInfo) {
+  private currentModel(session: Pick<SessionInfo, 'model'>) {
     return this.models.find(model => model.providerID === session.model?.providerID && model.id === session.model?.id);
   }
 
@@ -264,7 +281,7 @@ export class OpencodeV2Client implements ManagedAcpClient {
     return { sessionId: session.id, configOptions: this.configOptions(session) };
   }
 
-  private configOptions(session: SessionInfo): AcpSessionConfigOption[] {
+  private configOptions(session: Partial<Pick<SessionInfo, 'model' | 'agent'>>): AcpSessionConfigOption[] {
     const model = this.currentModel(session);
     return [
       { id: 'mode', name: 'Mode', category: 'mode', type: 'select', currentValue: session.agent ?? 'build',

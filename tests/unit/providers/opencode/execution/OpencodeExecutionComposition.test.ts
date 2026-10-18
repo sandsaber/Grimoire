@@ -767,16 +767,17 @@ describe('OpenCode execution composition', () => {
     await host.dispose();
   });
 
-  it('asks its questions in a process bound to no conversation', async () => {
-    // The four surfaces that ask what models exist must not bind a session to
-    // a tab or write OpenCode state into the vault while they do it.
-    const { execution, host, startupRefs } = await createHarness();
+  it('preserves the native credential database for metadata discovery (#253)', async () => {
+    const plugin = createPlugin();
+    const databasePath = join(plugin.app.vault.adapter.basePath, 'native.db');
+    plugin.settings.sharedEnvironmentVariables = `OPENCODE_DB=${databasePath}`;
+    const { execution, host, startupRefs } = await createHarness({ plugin });
 
     await execution.metadata.discoverMetadata();
 
     expect(startupRefs).toHaveLength(1);
     const launch = await execution.turnRequests.resolveLaunch(startupRefs[0]);
-    expect(launch.environment.OPENCODE_DB).toBe(':memory:');
+    expect(launch.environment.OPENCODE_DB).toBe(databasePath);
     expect(launch.arguments).toEqual(['acp']);
     execution.dispose();
     await host.dispose();

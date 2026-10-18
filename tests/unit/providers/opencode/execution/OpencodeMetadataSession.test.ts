@@ -6,7 +6,7 @@ import type {
   ManagedAcpClientFactoryInput,
 } from '@/providers/acp/execution/ManagedAcpClient';
 import type { AcpSessionNotification, AcpSetSessionConfigOptionRequest } from '@/providers/acp/types';
-import { OpencodeMetadataSession } from '@/providers/opencode/execution/OpencodeMetadataSession';
+import { type OpencodeMetadataClient, type OpencodeMetadataClientFactory, OpencodeMetadataSession } from '@/providers/opencode/execution/OpencodeMetadataSession';
 import { getOpencodeProviderSettings } from '@/providers/opencode/settings';
 
 /**
@@ -19,7 +19,7 @@ import { getOpencodeProviderSettings } from '@/providers/opencode/settings';
  */
 describe('OpenCode metadata session', () => {
   interface Fake {
-    readonly factory: ManagedAcpClientFactory;
+    readonly factory: OpencodeMetadataClientFactory;
     readonly startupRefs: string[];
     readonly configOptions: AcpSetSessionConfigOptionRequest[];
     readonly closes: number[];
@@ -27,6 +27,7 @@ describe('OpenCode metadata session', () => {
   }
 
   class FakeClient implements ManagedAcpClient {
+    readMetadata?: OpencodeMetadataClient['readMetadata'];
     initializeCalls = 0;
     closeCalls = 0;
     newSessionError: Error | undefined;
@@ -204,6 +205,54 @@ describe('OpenCode metadata session', () => {
 
     await expect(session.discoverMetadata()).resolves.toBe(false);
 
+    expect(fake.client.closeCalls).toBe(1);
+  });
+
+  it('discovers the native V2 catalog and selected-model effort without a session (#253)', async () => {
+    const fake = createFake();
+    fake.client.newSessionError = new Error('V2 metadata must not create a session');
+    fake.factory.createMetadata = jest.fn().mockResolvedValue(fake.client);
+    const create = jest.spyOn(fake.factory, 'create');
+    const models = [
+      { id: 'opencode/free', name: 'Free' },
+      { id: 'opencode-go/kimi-k3', name: 'Kimi K3' },
+    ];
+    const read = jest.fn().mockResolvedValue({
+      state: {
+        models: { availableModels: models, currentModelId: 'opencode/free' },
+        modes: { availableModes: [{ id: 'build', name: 'Build' }], currentModeId: 'build' },
+      },
+      modelConfigOptions: [{
+        id: 'effort', category: 'thought_level', name: 'Effort', type: 'select', currentValue: 'high',
+        options: [{ name: 'High', value: 'high' }],
+      }],
+      commands: [{ name: 'review' }],
+    });
+    fake.client.readMetadata = read;
+    const { session, settings } = createSession(fake);
+
+    await expect(session.discoverMetadata({ rawModelId: 'opencode-go/kimi-k3' })).resolves.toBe(true);
+
+    expect(fake.factory.createMetadata).toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(read).toHaveBeenCalledWith('opencode-go/kimi-k3');
+    expect(getOpencodeProviderSettings(settings).discoveredModels.map(model => model.rawId))
+      .toEqual(['opencode/free', 'opencode-go/kimi-k3']);
+    expect(getOpencodeProviderSettings(settings).thinkingOptionsByModel['opencode-go/kimi-k3'])
+      .toEqual([expect.objectContaining({ value: 'high' })]);
+    expect((settings.savedProviderModel as Record<string, string>).opencode).toBe('opencode:opencode/free');
+    expect(fake.configOptions).toEqual([]);
+    expect(fake.client.closeCalls).toBe(1);
+
+    await expect(session.listCommands()).resolves.toEqual([{ name: 'review' }]);
+    expect(fake.client.closeCalls).toBe(2);
+  });
+
+  it('closes the native V2 process after a metadata failure', async () => {
+    const fake = createFake();
+    fake.client.readMetadata = jest.fn().mockRejectedValue(new Error('catalog failed'));
+    const { session } = createSession(fake);
+    await expect(session.discoverMetadata()).resolves.toBe(false);
     expect(fake.client.closeCalls).toBe(1);
   });
 });

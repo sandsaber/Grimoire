@@ -5,13 +5,17 @@ const mockTerminate = jest.fn().mockResolvedValue('confirmed');
 const mockLegacy = { close: jest.fn().mockResolvedValue('confirmed') };
 const mockNative = { close: jest.fn().mockResolvedValue('confirmed') };
 const mockNativeOptions = jest.fn();
+const mockLegacyOptions = jest.fn();
 let mockVersion = 'opencode v2.0.16';
 let mockAddress = 'http://127.0.0.1:3210';
 jest.mock('@/providers/opencode/execution/OpencodeV2Client', () => ({
   OpencodeV2Client: jest.fn().mockImplementation(options => { mockNativeOptions(options); return mockNative; }),
 }));
 jest.mock('@/providers/acp/execution/AcpManagedClientAdapter', () => ({
-  AcpManagedClientAdapterFactory: jest.fn().mockImplementation(() => ({ create: async () => mockLegacy })),
+  AcpManagedClientAdapterFactory: jest.fn().mockImplementation(options => {
+    mockLegacyOptions(options);
+    return { create: async () => mockLegacy };
+  }),
 }));
 jest.mock('@/app/execution/acp/NodeManagedAcpProcessLauncher', () => ({
   NodeManagedAcpProcessLauncher: class {
@@ -36,10 +40,10 @@ const artifact = {
   },
 };
 
-function factory() {
+function factory(environment: Record<string, string> = {}) {
   return new OpencodeClientFactory({ clientInfo: { name: 'test', version: '1' } }, {
     resolve: async () => ({ executable: '/cli/opencode', arguments: ['acp'], cwd: '/vault',
-      environment: { OPENCODE_CONFIG_CONTENT: JSON.stringify(artifact) } }),
+      environment: { ...environment, OPENCODE_CONFIG_CONTENT: JSON.stringify(artifact) } }),
   });
 }
 
@@ -79,6 +83,27 @@ describe('OpenCode client selection', () => {
       .rejects.toThrow('local loopback');
     expect(mockNativeOptions).not.toHaveBeenCalled();
     expect(mockTerminate).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([undefined, '/native/opencode.db'])('keeps the V2 credential database %s during discovery (#253)', async database => {
+    const owner = factory(database ? { OPENCODE_DB: database } : {});
+    const client = await owner.createMetadata({ startupRef: 'launch', signal: new AbortController().signal, requestPermission: jest.fn() });
+    expect(mockLaunches[1].environment.OPENCODE_DB).toBe(database);
+    expect(mockLaunches[1].environment.OPENCODE_PASSWORD).toHaveLength(43);
+    await client.close();
+    await owner.dispose();
+  });
+
+  it('keeps V1 metadata sessions in memory', async () => {
+    mockVersion = '1.18.32';
+    const owner = factory({ OPENCODE_DB: '/native/opencode.db' });
+    const input = { startupRef: 'launch', signal: new AbortController().signal, requestPermission: jest.fn() };
+    const client = await owner.createMetadata(input);
+    await mockLegacyOptions.mock.calls[0][0].processLauncher.launch(input.startupRef, input.signal);
+    expect(mockLaunches[1].environment.OPENCODE_DB).toBe(':memory:');
+    expect(mockLaunches[1].arguments).toEqual(['acp']);
+    await client.close();
+    await owner.dispose();
   });
 
   it('preserves native inline settings while enforcing the managed Safe boundary', () => {

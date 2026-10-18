@@ -1,8 +1,9 @@
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
+  ManagedAcpClientFactoryInput,
 } from '@/providers/acp/execution/ManagedAcpClient';
-import type { AcpNewSessionRequest, AcpSessionNotification } from '@/providers/acp/types';
+import type { AcpNewSessionRequest, AcpNewSessionResponse, AcpSessionConfigOption, AcpSessionNotification } from '@/providers/acp/types';
 import { OpencodeSessionConfigState } from '@/providers/opencode/execution/OpencodeSessionConfigState';
 
 /** Where an isolated OpenCode process is launched, and what it is launched for. */
@@ -13,7 +14,7 @@ export interface OpencodeMetadataLaunch {
 }
 
 export interface OpencodeMetadataSessionPorts {
-  readonly clientFactory: ManagedAcpClientFactory;
+  readonly clientFactory: OpencodeMetadataClientFactory;
   /** The process to spawn, prepared for this question and no conversation. */
   readonly launch: () => Promise<OpencodeMetadataLaunch>;
   readonly settingsBag: () => Record<string, unknown>;
@@ -25,6 +26,20 @@ export interface OpencodeMetadataSessionPorts {
 export interface OpencodeMetadataCommand {
   readonly name: string;
   readonly description?: string;
+}
+
+export interface OpencodeMetadata {
+  readonly state: Omit<AcpNewSessionResponse, 'sessionId'>;
+  readonly modelConfigOptions?: AcpSessionConfigOption[];
+  readonly commands: readonly OpencodeMetadataCommand[];
+}
+
+export interface OpencodeMetadataClient extends ManagedAcpClient {
+  readMetadata?(rawModelId?: string): Promise<OpencodeMetadata>;
+}
+
+export interface OpencodeMetadataClientFactory extends ManagedAcpClientFactory {
+  createMetadata?(input: ManagedAcpClientFactoryInput): Promise<OpencodeMetadataClient>;
 }
 
 /** How long a session is given to announce its commands before it is closed. */
@@ -39,43 +54,32 @@ const COMMAND_ANNOUNCEMENT_MS = 250;
  * only thing the legacy runtime was doing for them: opening a session and
  * reading its reply.
  *
- * Isolated by construction. The launch it asks for points OpenCode at an
- * in-memory database, so nothing here binds a session to a conversation, writes
- * to the vault's OpenCode state, or leaves a process behind — the client is
- * closed on every path, including the ones that failed.
+ * V2 reads metadata directly, using the native database for credentials without
+ * creating a session. V1 opens an in-memory ACP session. Both close their owned
+ * process on success and failure.
  */
 export class OpencodeMetadataSession {
   constructor(private readonly ports: OpencodeMetadataSessionPorts) {}
 
-  /**
-   * Opens a session, keeps what it reports, and closes it.
-   *
-   * With a model, it also sets that model first: the thinking levels a model
-   * offers are reported in the reply to selecting it and nowhere else, which is
-   * what the model-metadata warmups are actually for.
-   */
+  /** Reads the catalog and, when requested, a model's reasoning options. */
   async discoverMetadata(options: { readonly rawModelId?: string } = {}): Promise<boolean> {
-    return this.withSession(async (client, sessionId, config, opened) => {
+    const metadata = await this.readMetadata(options);
+    if (!metadata) return false;
+    const config = this.createConfigState();
+    try {
       await config.syncSessionModelState({
-        configOptions: opened.configOptions ?? null,
-        models: opened.models ?? null,
+        configOptions: metadata.state.configOptions ?? null,
+        models: metadata.state.models ?? null,
       });
       await config.syncSessionModeState({
-        configOptions: opened.configOptions ?? null,
-        // The default agent a new session reports is OpenCode's, not the
-        // user's pick, and this session has no toolbar to push it at anyway.
+        configOptions: metadata.state.configOptions ?? null,
+        // Discovery must not change the user's permission mode.
         emitPermissionSync: false,
-        modes: opened.modes ?? null,
+        modes: metadata.state.modes ?? null,
       });
-      if (options.rawModelId) {
-        const applied = await client.setConfigOption({
-          configId: 'model',
-          sessionId,
-          type: 'select',
-          value: options.rawModelId,
-        });
+      if (options.rawModelId && metadata.modelConfigOptions) {
         await config.syncSessionModelState(
-          { configOptions: applied.configOptions },
+          { configOptions: metadata.modelConfigOptions },
           {
             currentRawModelId: options.rawModelId,
             // A question asked from a settings surface must not become the
@@ -86,47 +90,33 @@ export class OpencodeMetadataSession {
         );
       }
       return true;
-    });
+    } catch {
+      return false;
+    }
   }
 
-  /**
-   * The slash commands a fresh session announces.
-   *
-   * ACP reports them as an update rather than as an answer, so there is nothing
-   * to await but the announcement itself — bounded, because a session that
-   * offers none says nothing at all and the caller is a UI that must not wait
-   * on silence.
-   */
+  /** Reads native V2 commands or waits briefly for a V1 ACP announcement. */
   async listCommands(): Promise<readonly OpencodeMetadataCommand[]> {
-    let announced: readonly OpencodeMetadataCommand[] = [];
-    const collected = await this.withSession(async (client, _sessionId, _config, _opened, updates) => {
-      announced = await updates;
-      return true;
-    });
-    return collected ? announced : [];
+    return (await this.readMetadata({ commands: true }))?.commands ?? [];
   }
 
-  private async withSession(
-    read: (
-      client: ManagedAcpClient,
-      sessionId: string,
-      config: OpencodeSessionConfigState,
-      opened: Awaited<ReturnType<ManagedAcpClient['newSession']>>,
-      commands: Promise<readonly OpencodeMetadataCommand[]>,
-    ) => Promise<boolean>,
-  ): Promise<boolean> {
+  private async readMetadata(options: { rawModelId?: string; commands?: boolean }): Promise<OpencodeMetadata | undefined> {
     const launch = await this.ports.launch();
     const abort = new AbortController();
-    let client: ManagedAcpClient | undefined;
+    let client: OpencodeMetadataClient | undefined;
     try {
-      client = await this.ports.clientFactory.create({
+      const input: ManagedAcpClientFactoryInput = {
         startupRef: launch.startupRef,
         signal: abort.signal,
         // Nothing here runs a tool, so nothing here may be asked to allow one.
         requestPermission: async () => ({ outcome: { outcome: 'cancelled' } }),
-      });
-      const announcement = collectAnnouncedCommands(client);
+      };
+      client = await (this.ports.clientFactory.createMetadata?.(input)
+        ?? this.ports.clientFactory.create(input));
       await client.initialize();
+      if (client.readMetadata) return await client.readMetadata(options.rawModelId);
+
+      const announcement = collectAnnouncedCommands(client);
       const opened = await client.newSession({
         cwd: launch.cwd,
         mcpServers: [...launch.mcpServers],
@@ -134,18 +124,19 @@ export class OpencodeMetadataSession {
       // The session exists, so the announcement is either already in or is
       // about to be; from here the wait is bounded.
       announcement.arm();
-      return await read(
-        client,
-        opened.sessionId,
-        this.createConfigState(),
-        opened,
-        announcement.commands,
-      );
+      const applied = options.rawModelId ? await client.setConfigOption({
+        configId: 'model', sessionId: opened.sessionId, type: 'select', value: options.rawModelId,
+      }) : undefined;
+      return {
+        state: opened,
+        modelConfigOptions: applied?.configOptions,
+        commands: options.commands ? await announcement.commands : [],
+      };
     } catch {
       // Every caller is opportunistic: a metadata session that could not open
       // is a question left unanswered, not a failure to report. The first real
       // turn asks it again.
-      return false;
+      return undefined;
     } finally {
       abort.abort();
       if (client) {
