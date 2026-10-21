@@ -75,7 +75,7 @@
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.43.13",
     "@modelcontextprotocol/sdk": "^1.31.0",
-    "@opencode/client": "2.0.24",
+    "@opencode/client": "2.0.29",
     "smol-toml": "^1.9.0",
     "tslib": "^2.8.1",
     "yaml": "^2.9.1"
