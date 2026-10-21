@@ -1,3 +1,5 @@
+import { runInNewContext } from 'node:vm';
+
 import * as rendererSafeUnrefHelpers from '../../../scripts/rendererSafeUnref.js';
 
 const {
@@ -199,6 +201,25 @@ describe('rendererSafeUnref helpers', () => {
     ]);
     expect(result.contents).toContain('closeTimeout.unref?.();');
     expect(findUnsafeTimerUnrefSites(result.contents)).toEqual([]);
+  });
+
+  it.each([false, true])('keeps the SDK backlog timer working with unref support: %s', (hasUnref) => {
+    const input = 'backlog.stuck="suspected",setTimeout(checkStuck,gracePeriod,backlog,appendSince).unref();';
+    const result = patchRendererUnsafeUnrefSites(input);
+    const backlog = { stuck: 'no', appendSince: 123 };
+    const unref = jest.fn();
+    const setTimeout = jest.fn(() => hasUnref ? { unref } : 42);
+    const checkStuck = jest.fn();
+
+    expect(result.appliedPatches).toEqual([
+      { name: 'claude-sdk-debug-backlog-stuck-timer', count: 1 },
+    ]);
+    expect(findUnsafeTimerUnrefSites(result.contents)).toEqual([]);
+    runInNewContext(result.contents, { backlog, checkStuck, gracePeriod: 100, appendSince: 123, setTimeout });
+
+    expect(backlog.stuck).toBe('suspected');
+    expect(setTimeout).toHaveBeenCalledWith(checkStuck, 100, backlog, 123);
+    expect(unref).toHaveBeenCalledTimes(hasUnref ? 1 : 0);
   });
 
   it('reports remaining direct timer .unref() calls but ignores guarded usage', () => {
