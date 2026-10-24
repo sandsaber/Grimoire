@@ -380,6 +380,21 @@ describe('MentionDropdownController', () => {
   });
 
   describe('pending input cancellation', () => {
+    it('synchronizes MCP mentions even when the pending menu is dismissed', () => {
+      const { extractMcpMentions } = jest.requireMock('@/utils/mcp');
+      extractMcpMentions.mockReturnValueOnce(new Set(['example']));
+      (callbacks.setMentionedMcpServers as jest.Mock).mockReturnValue(true);
+      controller.setMcpManager(createMockMcpService([{ name: 'example' }]));
+      inputEl.value = '@example please help';
+      inputEl.selectionStart = inputEl.value.length;
+      controller.handleInputChange();
+      jest.advanceTimersByTime(50);
+      controller.hide();
+      jest.advanceTimersByTime(500);
+      expect(callbacks.onMcpMentionChange).toHaveBeenCalledWith(new Set(['example']));
+      expect(mockDropdownVisible).toBe(false);
+    });
+
     it('does not reopen a dismissed menu when its debounce expires', () => {
       inputEl.value = '@';
       inputEl.selectionStart = 1;

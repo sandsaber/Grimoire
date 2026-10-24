@@ -287,6 +287,46 @@ describe('SlashCommandDropdown', () => {
   });
 
   describe('race condition handling', () => {
+    it.each([
+      { search: 'rev', key: 'Enter', expected: '/rev' },
+      { search: 'add', key: 'Tab', expected: '/add-dir ' },
+    ])('filters built-ins before discovery finishes for /$search', ({ search, key, expected }) => {
+      const pending = new Promise<ProviderCommandEntry[]>(() => {});
+      const d = new SlashCommandDropdown(containerEl, inputEl, callbacks, {
+        providerConfig: CLAUDE_CONFIG, getProviderEntries: () => pending,
+      });
+      inputEl.value = '/';
+      inputEl.selectionStart = 1;
+      d.handleInputChange();
+      inputEl.value = `/${search}`;
+      inputEl.selectionStart = inputEl.value.length;
+      d.handleInputChange();
+      d.handleKeydown({ key, preventDefault: jest.fn() } as unknown as KeyboardEvent);
+      expect(inputEl.value).toBe(expected);
+      d.destroy();
+    });
+
+    it.each([{ entries: [] }, { entries: [makeEntry('aaa-command')] }])('preserves the selected built-in when discovery returns $entries', async ({ entries }) => {
+      let resolveEntries!: (entries: ProviderCommandEntry[]) => void;
+      const pending = new Promise<ProviderCommandEntry[]>(resolve => { resolveEntries = resolve; });
+      const d = new SlashCommandDropdown(containerEl, inputEl, callbacks, {
+        providerConfig: CLAUDE_CONFIG, getProviderEntries: () => pending,
+      });
+      inputEl.value = '/';
+      inputEl.selectionStart = 1;
+      d.handleInputChange();
+      const clearIndex = getRenderedCommandNames(containerEl).indexOf('clear');
+      expect(clearIndex).toBeGreaterThanOrEqual(0);
+      for (let index = 0; index < clearIndex; index++) {
+        d.handleKeydown({ key: 'ArrowDown', preventDefault: jest.fn() } as unknown as KeyboardEvent);
+      }
+      resolveEntries(entries);
+      await new Promise(resolve => window.setTimeout(resolve, 0));
+      d.handleKeydown({ key: 'Enter', preventDefault: jest.fn() } as unknown as KeyboardEvent);
+      expect(inputEl.value).toBe('/clear ');
+      d.destroy();
+    });
+
     it('shares discovery across keystrokes and filters using the latest input', async () => {
       let resolveFirst: (value: ProviderCommandEntry[]) => void;
       const firstPromise = new Promise<ProviderCommandEntry[]>(resolve => { resolveFirst = resolve; });
@@ -314,6 +354,9 @@ describe('SlashCommandDropdown', () => {
       expect(getProviderEntries).toHaveBeenCalledTimes(1);
       expect(names).toContain('review');
       expect(names).not.toContain('commit');
+
+      d.handleKeydown({ key: 'Tab', preventDefault: jest.fn() } as unknown as KeyboardEvent);
+      expect(inputEl.value).toBe('/review ');
 
       d.destroy();
     });

@@ -239,38 +239,42 @@ export class SlashCommandDropdown {
   private async showDropdown(searchText: string, isAtPosition0 = true): Promise<void> {
     const currentRequest = ++this.requestId;
     const searchLower = searchText.toLowerCase();
+    const includeBuiltIns = isAtPosition0 && this.activeTriggerChar === '/';
+    const discoveryPending = !this.providerEntriesFetched && this.getProviderEntries !== null;
 
     // Local commands are usable while the provider discovers its skill catalog.
-    if (!this.providerEntriesFetched && searchText === '' && isAtPosition0 && this.activeTriggerChar === '/') {
-      this.filteredItems = this.buildItemList(true);
+    if (discoveryPending) {
+      this.filteredItems = this.buildFilteredItems(searchLower, includeBuiltIns);
+      this.selectedIndex = 0;
       if (this.filteredItems.length > 0) {
-        this.selectedIndex = 0;
         this.render();
+      } else {
+        // Hide stale rows without invalidating discovery or the active trigger.
+        this.dropdownEl?.removeClass('visible');
       }
+      await this.fetchProviderEntries();
+
+      if (currentRequest !== this.requestId) return;
     }
-    await this.fetchProviderEntries();
 
-    if (currentRequest !== this.requestId) return;
-
-    const includeBuiltIns = isAtPosition0 && this.activeTriggerChar === '/';
-    const allItems = this.buildItemList(includeBuiltIns);
-
-    this.filteredItems = allItems
-      .filter(item =>
-        item.name.toLowerCase().includes(searchLower) ||
-        item.description?.toLowerCase().includes(searchLower)
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    if (currentRequest !== this.requestId) return;
-
+    const selectedName = discoveryPending ? this.filteredItems[this.selectedIndex]?.name : undefined;
+    this.filteredItems = this.buildFilteredItems(searchLower, includeBuiltIns);
     if (searchText.length > 0 && this.filteredItems.length === 0) {
       this.hide();
       return;
     }
 
-    this.selectedIndex = 0;
+    this.selectedIndex = Math.max(0, this.filteredItems.findIndex(item => item.name === selectedName));
     this.render();
+  }
+
+  private buildFilteredItems(searchLower: string, includeBuiltIns: boolean): DropdownItem[] {
+    return this.buildItemList(includeBuiltIns)
+      .filter(item =>
+        item.name.toLowerCase().includes(searchLower) ||
+        item.description?.toLowerCase().includes(searchLower)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   private async fetchProviderEntries(): Promise<void> {
