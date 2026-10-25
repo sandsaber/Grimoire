@@ -12,7 +12,8 @@ import { maybeGetAntigravityWorkspaceServices } from './AntigravityWorkspaceServ
  *
  * The smallest of the nine, and the last to get one: Antigravity runs in print
  * mode, so it has no conversation to bind to, no history to hydrate and no
- * session to resolve — three slots and nothing else. Its workspace contribution
+ * session to resolve. Its vault skills still need a command catalog even though
+ * the CLI has no native slash commands. Its workspace contribution
  * was built inline in the module until now, which is why it was the one
  * provider with no context at all.
  */
@@ -27,6 +28,7 @@ export function createAntigravityModuleContext(
   });
 
   return {
+    commandsPort: () => workspace.commandsPort(),
     cachedPlanUsage: () => workspace.cachedPlanUsage(),
     listModels: () => workspace.listModels(),
     // The options are forwarded, not dropped. A zero-argument function is
