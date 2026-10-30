@@ -749,7 +749,6 @@ public static class GrimoireJobGuardian
                 // A print-mode CLI may wait for EOF before producing any output.
                 if (pipeInput) StartPump(Console.OpenStandardInput(), process.StandardInput.BaseStream, true);
                 process.WaitForExit();
-                if (pipeInput) process.StandardInput.Close();
                 stdout.Join(250);
                 stderr.Join(250);
                 Environment.Exit(process.ExitCode);
