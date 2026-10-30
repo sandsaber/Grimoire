@@ -37,7 +37,8 @@ process.stdout.write(JSON.stringify({type:'result', subtype:'success', finalText
 `;
 
 describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', version => {
-  jest.setTimeout(15_000);
+  // Windows pays for a cold guardian compile before the CLI can answer.
+  jest.setTimeout(process.platform === 'win32' ? 60_000 : 15_000);
   let directory: string;
   let handles: CommandcodeProcessHandle[];
   beforeEach(() => {
@@ -59,7 +60,9 @@ describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', versio
   const start = (approve: CommandcodeApprovalHandler, scenario = '') => {
     const handle = new NodeCommandcodeProcessRunner().start({
       command: join(directory, 'dist/index.mjs'), cwd: directory,
-      environment: { PATH: process.env.PATH!, GUARD_SCENARIO: scenario }, prompt: 'Edit Note.md', permissionMode: 'normal',
+      environment: { PATH: process.env.PATH!, GUARD_SCENARIO: scenario,
+        ...(process.env.LOCALAPPDATA ? { LOCALAPPDATA: process.env.LOCALAPPDATA } : {}) },
+      prompt: 'Edit Note.md', permissionMode: 'normal',
     }, () => undefined, () => undefined, approve);
     handles.push(handle);
     return handle;
