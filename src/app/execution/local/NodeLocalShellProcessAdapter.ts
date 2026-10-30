@@ -617,7 +617,7 @@ public static class GrimoireJobGuardian
     // stalled - the request never reached the app-server, and its reply never
     // reached us. Threads rather than async so the source compiles under the
     // CodeDom compiler Add-Type uses.
-    private static Thread StartPump(Stream source, Stream destination)
+    private static Thread StartPump(Stream source, Stream destination, bool closeDestination = false)
     {
         Thread pump = new Thread(delegate()
         {
@@ -633,6 +633,15 @@ public static class GrimoireJobGuardian
             }
             catch (IOException) { }
             catch (ObjectDisposedException) { }
+            finally
+            {
+                if (closeDestination)
+                {
+                    try { destination.Close(); }
+                    catch (IOException) { }
+                    catch (ObjectDisposedException) { }
+                }
+            }
         });
         pump.IsBackground = true;
         pump.Start();
@@ -737,7 +746,8 @@ public static class GrimoireJobGuardian
                 Console.Error.Flush();
                 Thread stdout = StartPump(process.StandardOutput.BaseStream, Console.OpenStandardOutput());
                 Thread stderr = StartPump(process.StandardError.BaseStream, Console.OpenStandardError());
-                if (pipeInput) StartPump(Console.OpenStandardInput(), process.StandardInput.BaseStream);
+                // A print-mode CLI may wait for EOF before producing any output.
+                if (pipeInput) StartPump(Console.OpenStandardInput(), process.StandardInput.BaseStream, true);
                 process.WaitForExit();
                 if (pipeInput) process.StandardInput.Close();
                 stdout.Join(250);

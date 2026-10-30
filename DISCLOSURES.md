@@ -124,6 +124,7 @@ The development-only Obsidian SDK pins an older Moment version. A scoped `obsidi
 The development-only NYC configuration loader uses `js-yaml.load()`. A scoped `@istanbuljs/load-nyc-config` → `js-yaml` override selects 4.3.2, removing the older `argparse` → `sprintf-js` chain affected by GHSA-hp3w-g68c-fv3c without downgrading Jest or ts-jest. The loader retains ordinary YAML configuration and inheritance; executable JavaScript YAML tags are rejected. This override does not affect vault frontmatter.
 
 - Clean installation, the full unit suite, release-bundle verification, and `npm audit --omit=dev` are required release gates before publication.
+- `npm run audit:deps` reports the full npm audit output. Until 2026-11-30 it accepts only [GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4) for development-only `deepmerge` 4.3.1 and its Jest dependency chain. No patched version is published. Jest uses it to merge trusted local test configuration; it is not a Grimoire runtime dependency. Every reported node must remain development-only, and other advisories, severity changes, malformed reports and expiry fail the gate. Production audit remains unmodified. Remove the exception when a compatible upstream fix is available.
 - A clean audit is a verified release target, not a standing claim in this document.
 - `.npmrc` sets `min-release-age=7`, so a freshly published release cannot enter the lockfile for a week. When a security fix lands inside that window, it is admitted through `lockfile-age-exceptions.json` with an `expiresAt` no later than the package's natural eligibility, never by lowering the quarantine itself.
 
@@ -135,7 +136,7 @@ The development-only NYC configuration loader uses `js-yaml.load()`. A scoped `@
 | `handlebars` | ts-jest | Development dependency | 4.7.10 | `>=3.0.0 <=4.7.9` | Patched for GHSA-xw65-4hp5-5hc7, GHSA-8r5x-fm3f-whwj, and GHSA-p8wg-vrv2-v86f |
 | `sprintf-js` | Former NYC YAML dependency | Absent | Not installed | `<=1.1.3` | Removed through the scoped YAML override; [GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c) has no patched release |
 | `hono` | MCP SDK | Verify from release bundle | 4.13.0 | `<4.12.34` | Above tracked ranges |
-| `@hono/node-server` | MCP SDK | Verify from release bundle | 2.1.0 | `<2.0.5` | Narrow override to a patched release |
+| `@hono/node-server` | MCP SDK | Verify from release bundle | 2.1.5 | `<2.0.5`; `>=1.19.10 <=2.1.2` | Patched for tracked ranges, including [GHSA-rmxm-3fg6-px4f](https://github.com/advisories/GHSA-rmxm-3fg6-px4f) |
 | `fast-uri` | MCP SDK / AJV | Verify from release bundle | 3.1.8 | `>=3.0.0 <=3.1.5`; `=2.4.5`, `=3.1.6`, `=4.1.3` | Above tracked ranges, including [GHSA-58mr-gqgx-xq4g](https://github.com/advisories/GHSA-58mr-gqgx-xq4g) |
 | `ip-address` | MCP SDK / Express rate limit | Verify from release bundle | 10.7.2 | `<=10.1.0`; `>=10.2.0 <=10.5.0` | Above tracked ranges, including [GHSA-2vr4-cq9g-pvrc](https://github.com/advisories/GHSA-2vr4-cq9g-pvrc) |
 | `qs` | MCP SDK / Express | Verify from release bundle | 6.16.0 | `>=2.2.5 <6.16.0` | Above tracked range; admitted before the 7-day quarantine through a `lockfile-age-exceptions.json` entry that expires at its natural eligibility |

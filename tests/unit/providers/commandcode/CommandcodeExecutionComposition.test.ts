@@ -1,5 +1,7 @@
 import '@/providers';
 
+import { join } from 'node:path';
+
 import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStorage';
 
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
@@ -43,8 +45,8 @@ describe('Command Code image execution composition', () => {
       for await (const chunk of runtime.query(turn, [], { model: 'commandcode:vendor/vision' })) chunks.push(chunk);
       expect(invocations).toHaveLength(1);
       expect(invocations[0]).toMatchObject({ cwd: '/vault', model: 'vendor/vision' });
-      expect(invocations[0].prompt).toContain('/vault/.grimoire/attachments/');
       expect(files.size).toBe(1);
+      expect(invocations[0].prompt).toContain(JSON.stringify(join('/vault', [...files.keys()][0])));
       expect(chunks).toContainEqual({ type: 'text', content: 'red' });
       updateCommandcodeSettings(plugin.settings, { imageAttachmentsAsFiles: false });
       expect(() => runtime.prepareTurn(request)).toThrow('Image attachments as files');

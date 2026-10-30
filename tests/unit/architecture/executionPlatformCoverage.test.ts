@@ -55,7 +55,7 @@ function collectTestFiles(root: string): string[] {
         continue;
       }
       if (entry.endsWith('.test.ts')) {
-        found.push(relative(process.cwd(), path));
+        found.push(relative(process.cwd(), path).split(sep).join('/'));
       }
     }
   };

@@ -13,7 +13,7 @@ describe('OpencodePaths', () => {
     expect(resolveOpencodeDataDir({
       HOME: '/home/tester',
       XDG_DATA_HOME: '/tmp/xdg-data',
-    })).toBe('/tmp/xdg-data/opencode');
+    })).toBe(path.join('/tmp/xdg-data', 'opencode'));
   });
 
   it('falls back to the existing resolved database when persisted metadata points at a missing path', () => {

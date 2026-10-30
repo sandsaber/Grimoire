@@ -15,6 +15,7 @@
     "review:deps": "node scripts/check-review-dependencies.mjs",
     "check:release-metadata": "node scripts/check-release-metadata.mjs",
     "check:lockfile-age": "node scripts/check-lockfile-age.js",
+    "audit:deps": "node scripts/audit-dependencies.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --max-warnings=0",
     "lint:fix": "npm run lint -- --fix",

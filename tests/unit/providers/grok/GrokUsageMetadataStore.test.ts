@@ -100,8 +100,8 @@ describe('GrokUsageMetadataStore', () => {
     }));
 
     const providerState = { workspacePath };
-    const previousHome = process.env.HOME;
-    process.env.HOME = home;
+    const previousEnv = process.env;
+    process.env = { ...previousEnv, HOME: home, USERPROFILE: home };
 
     try {
       await expect(loadGrokSessionCost(sessionId, providerState)).resolves.toEqual({
@@ -113,7 +113,7 @@ describe('GrokUsageMetadataStore', () => {
         size: 200000,
       });
     } finally {
-      process.env.HOME = previousHome;
+      process.env = previousEnv;
     }
   });
 });

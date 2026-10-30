@@ -24,6 +24,35 @@ describe('local shell process ownership on the host OS', () => {
   // lands.
   jest.setTimeout(120_000);
 
+  it.each([0, 7])('preserves native Windows argv, stdin EOF and exit code %s', async code => {
+    if (localShellPlatformForNode(process.platform) !== 'windows') return;
+    const adapter = new NodeLocalShellProcessAdapter();
+    const args = ['space and "quotes"', 'trailing\\', '$() & literal'];
+    const input = 'A prompt without a final newline: sõnum';
+    const script = `let input = ''; process.stdin.setEncoding('utf8');
+      process.stdin.on('data', chunk => { input += chunk; });
+      process.stdin.on('end', () => {
+        process.stdout.write(JSON.stringify({ args: process.argv.slice(1), input }));
+        process.stderr.write('native-stderr'); process.exitCode = ${code};
+      });`;
+    const child = adapter.launch({ executable: process.execPath,
+      arguments: ['-e', script, '--', ...args],
+      stdin: 'pipe', terminationKind: 'windows-process-tree', windowsInvocationMode: 'direct' });
+    const stdout = collectOutput(child.stdout);
+    const stderr = collectOutput(child.stderr);
+    try {
+      await within(child.started, 60_000, 'the native Windows child to start');
+      child.stdin!.end(input);
+      const [exit, output, error] = await within(Promise.all([child.exited, stdout, stderr]),
+        15_000, 'the Windows child to receive stdin EOF and exit');
+      expect(exit.code).toBe(code);
+      expect(JSON.parse(output)).toEqual({ args, input });
+      expect(error).toBe('native-stderr');
+    } finally {
+      await adapter.terminate(child.termination, 'forced');
+    }
+  });
+
   it('owns and terminates a POSIX descendant after the root shell exits', async () => {
     if (localShellPlatformForNode(process.platform) !== 'posix') {
       return;
@@ -101,6 +130,12 @@ describe('local shell process ownership on the host OS', () => {
     }
   });
 });
+
+async function collectOutput(source: AsyncIterable<Uint8Array>): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of source) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('utf8');
+}
 
 function windowsSpec(command: string): LocalShellLaunchSpec {
   return {

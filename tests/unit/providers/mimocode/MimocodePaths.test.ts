@@ -13,7 +13,7 @@ describe('MimocodePaths', () => {
     expect(resolveMimocodeDataDir({
       HOME: '/home/tester',
       XDG_DATA_HOME: '/tmp/xdg-data',
-    })).toBe('/tmp/xdg-data/mimocode');
+    })).toBe(path.join('/tmp/xdg-data', 'mimocode'));
   });
 
   it('falls back to the existing resolved database when persisted metadata points at a missing path', () => {

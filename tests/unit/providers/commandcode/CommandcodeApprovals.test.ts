@@ -2,12 +2,13 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { NodeLocalShellProcessAdapter } from '@/app/execution/local/NodeLocalShellProcessAdapter';
 import type { InteractionRequest } from '@/core/execution/ExecutionContracts';
 import type { ProviderExecutionEvent } from '@/core/execution/ExecutionEvents';
 import { runId } from '@/core/execution/ExecutionIds';
 import { CommandcodeApprovalPresenter, CommandcodeApprovals } from '@/providers/commandcode/execution/CommandcodeApprovals';
 import type { CommandcodeApprovalHandler } from '@/providers/commandcode/runtime/CommandcodeApprovalTransport';
-import { NodeCommandcodeProcessRunner } from '@/providers/commandcode/runtime/CommandcodeProcess';
+import { type CommandcodeProcessHandle, NodeCommandcodeProcessRunner } from '@/providers/commandcode/runtime/CommandcodeProcess';
 
 // Exercise the actual process guard and IPC; this fake only replaces the vendor loop.
 const CLI = `
@@ -38,19 +39,31 @@ process.stdout.write(JSON.stringify({type:'result', subtype:'success', finalText
 describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', version => {
   jest.setTimeout(15_000);
   let directory: string;
+  let handles: CommandcodeProcessHandle[];
   beforeEach(() => {
+    handles = [];
     directory = mkdtempSync(join(tmpdir(), 'gcc-test-'));
     mkdirSync(join(directory, 'dist'));
     writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: 'command-code', version }));
     writeFileSync(join(directory, 'dist/index.mjs'), CLI);
     writeFileSync(join(directory, 'Note.md'), 'OLD');
   });
-  afterEach(() => rmSync(directory, { recursive: true, force: true }));
+  afterEach(async () => {
+    for (const handle of handles) {
+      await handle.terminate('forced');
+      await handle.completed.catch(() => undefined);
+    }
+    rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
   const contents = () => readFileSync(join(directory, 'Note.md'), 'utf8');
-  const start = (approve: CommandcodeApprovalHandler, scenario = '') => new NodeCommandcodeProcessRunner().start({
-    command: join(directory, 'dist/index.mjs'), cwd: directory,
-    environment: { PATH: process.env.PATH!, GUARD_SCENARIO: scenario }, prompt: 'Edit Note.md', permissionMode: 'normal',
-  }, () => undefined, () => undefined, approve);
+  const start = (approve: CommandcodeApprovalHandler, scenario = '') => {
+    const handle = new NodeCommandcodeProcessRunner().start({
+      command: join(directory, 'dist/index.mjs'), cwd: directory,
+      environment: { PATH: process.env.PATH!, GUARD_SCENARIO: scenario }, prompt: 'Edit Note.md', permissionMode: 'normal',
+    }, () => undefined, () => undefined, approve);
+    handles.push(handle);
+    return handle;
+  };
 
   it.each([true, false])('waits for an explicit answer before writing: allow=%s', async allow => {
     let answer!: (allow: boolean) => void;
@@ -68,6 +81,18 @@ describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', versio
       expect((await handle.completed).code).toBe(0);
       expect(contents()).toBe(allow ? 'NEW' : 'OLD');
     } finally { await handle.terminate('forced'); }
+  });
+
+  it('launches the verified Node executable directly inside the owned process tree', async () => {
+    const launch = jest.spyOn(NodeLocalShellProcessAdapter.prototype, 'launch');
+    const handle = start(async () => true);
+    try {
+      expect(launch).toHaveBeenCalledWith(expect.objectContaining({ windowsInvocationMode: 'direct' }));
+      expect((await handle.completed).code).toBe(0);
+    } finally {
+      await handle.terminate('forced');
+      launch.mockRestore();
+    }
   });
 
   it.each(['missing', 'skipped'])('stops before execution if the approval mod is %s', async scenario => {

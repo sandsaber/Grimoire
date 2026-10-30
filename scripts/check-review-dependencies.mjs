@@ -47,9 +47,9 @@ const advisories = [
   },
   {
     packageName: "@hono/node-server",
-    vulnerableRange: "<2.0.5",
-    advisory: "GHSA-92pp-h63x-v22m / GHSA-frvp-7c67-39w9",
-    isVulnerable: (version) => lessThan(version, "2.0.5"),
+    vulnerableRange: "<2.1.3",
+    advisory: "GHSA-92pp-h63x-v22m / GHSA-frvp-7c67-39w9 / GHSA-rmxm-3fg6-px4f",
+    isVulnerable: (version) => lessThan(version, "2.1.3"),
   },
   {
     packageName: "fast-uri",

@@ -448,7 +448,9 @@ describe('GrokSettingsTab', () => {
 
     const cliPathSetting = findSetting(t('settings.cliPath.name'));
     expect(cliPathSetting.desc).toBe(t('settings.grok.cliPath.desc'));
-    expect(cliPathSetting.textComponents[0].placeholder).toBe('/usr/local/bin/grok');
+    expect(cliPathSetting.textComponents[0].placeholder).toBe(process.platform === 'win32'
+      ? 'C:\\Users\\you\\AppData\\Roaming\\npm\\grok.cmd'
+      : '/usr/local/bin/grok');
     await cliPathSetting.textComponents[0].onChangeCallback?.('/custom/grok');
 
     expect(plugin.settings.providerConfigs.grok.cliPathsByHost).toEqual({

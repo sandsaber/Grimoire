@@ -294,9 +294,10 @@ function launchSpec(): CodexLaunchSpec {
     platformOs: 'linux' as const,
     distroName: 'Ubuntu',
   };
-  const toTargetPath = (hostPath: string): string | null => (
-    hostPath.startsWith('/') ? `/mnt/wsl${hostPath}` : null
-  );
+  const toTargetPath = (hostPath: string): string | null => {
+    const normalized = hostPath.replaceAll('\\', '/');
+    return normalized.startsWith('/') ? `/mnt/wsl${normalized}` : null;
+  };
   return {
     target,
     command: 'wsl.exe',

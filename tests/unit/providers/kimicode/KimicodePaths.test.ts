@@ -13,7 +13,7 @@ describe('KimicodePaths', () => {
     expect(resolveKimicodeDataDir({
       HOME: '/home/tester',
       XDG_DATA_HOME: '/tmp/xdg-data',
-    })).toBe('/tmp/xdg-data/kimicode');
+    })).toBe(path.join('/tmp/xdg-data', 'kimicode'));
   });
 
   it('falls back to the existing resolved database when persisted metadata points at a missing path', () => {

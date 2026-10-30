@@ -86,7 +86,7 @@ function resolveNodeInstallation(invocation: CommandcodeInvocation): { node: str
         && (manifest.version === '1.53.0' || manifest.version === '1.66.0');
     } catch { return false; }
   });
-  const node = resolveExecutableFromPath('node', invocation.environment.PATH);
+  const node = resolveExecutableFromPath(process.platform === 'win32' ? 'node.exe' : 'node', invocation.environment.PATH);
   if (!entry || !node) throw new Error('Safe mode requires a verified command-code npm installation (1.53.0 or 1.66.0) and Node.js on PATH.');
   return { node, entry };
 }

@@ -30,13 +30,13 @@ describe('GrokPaths', () => {
   it('falls back to auth.json under the resolved data dir', () => {
     expect(resolveGrokAuthPath({
       HOME: '/home/tester',
-    })).toBe('/home/tester/.grok/auth.json');
+    })).toBe(path.join('/home/tester', '.grok', 'auth.json'));
   });
 
   it('falls back to ~/.grok when GROK_HOME is unset', () => {
     expect(resolveGrokDataDir({
       HOME: '/home/tester',
-    })).toBe('/home/tester/.grok');
+    })).toBe(path.join('/home/tester', '.grok'));
   });
 
   it('resolves chat history from the encoded workspace session directory', () => {
@@ -64,10 +64,10 @@ describe('GrokPaths', () => {
 
   it('resolves managed Grok home under the vault .grimoire directory', () => {
     expect(resolveManagedGrokHomePath('/vault/root')).toBe(
-      path.join('/vault/root', '.grimoire', 'grok'),
+      path.join(path.resolve('/vault/root'), '.grimoire', 'grok'),
     );
     expect(buildManagedGrokProcessEnv('/vault/root')).toEqual({
-      GROK_HOME: path.join('/vault/root', '.grimoire', 'grok'),
+      GROK_HOME: path.join(path.resolve('/vault/root'), '.grimoire', 'grok'),
     });
   });
 

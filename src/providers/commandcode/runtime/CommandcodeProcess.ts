@@ -67,6 +67,8 @@ export class NodeCommandcodeProcessRunner implements CommandcodeProcessRunner {
       const spec = approval ? commandcodeLaunchSpec({ ...invocation, effort: undefined, permissionMode: 'full_access' })
         : commandcodeLaunchSpec(invocation, mod?.path);
       child = this.adapter.launch(approval ? { ...spec, executable: approval.node,
+        // The verified Node executable needs native argv quoting, not a CLI shim shell.
+        windowsInvocationMode: 'direct',
         arguments: [approval.wrapperPath, ...spec.arguments, '--mod', approval.guardPath] } : spec);
     }
     catch (error) { cleanup(); throw error; }
