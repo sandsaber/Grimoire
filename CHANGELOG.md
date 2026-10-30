@@ -2,6 +2,18 @@
 
 User-facing changes by release.
 
+## 2.0.12 - 2026-10-30
+
+### Fixed
+
+- Use the native Node launcher for Command Code Safe mode on Windows.
+- Deliver stdin EOF to Windows CLI processes and preserve their exit codes.
+- Update the transitive Hono server dependency to fix a static-path middleware bypass.
+
+### Improved
+
+- Update the Claude Agent SDK to 0.3.303 and the OpenCode client to 2.0.32 (#263, #264).
+
 ## 2.0.11 - 2026-10-24
 
 ### Fixed
