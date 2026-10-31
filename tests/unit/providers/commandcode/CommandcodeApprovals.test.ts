@@ -1,11 +1,13 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { clearTimeout, setTimeout } from 'node:timers';
 
 import { NodeLocalShellProcessAdapter } from '@/app/execution/local/NodeLocalShellProcessAdapter';
 import type { InteractionRequest } from '@/core/execution/ExecutionContracts';
 import type { ProviderExecutionEvent } from '@/core/execution/ExecutionEvents';
 import { runId } from '@/core/execution/ExecutionIds';
+import type { LocalShellLaunchSpec } from '@/core/execution/local/LocalShellBackend';
 import { CommandcodeApprovalPresenter, CommandcodeApprovals } from '@/providers/commandcode/execution/CommandcodeApprovals';
 import type { CommandcodeApprovalHandler } from '@/providers/commandcode/runtime/CommandcodeApprovalTransport';
 import { type CommandcodeProcessHandle, NodeCommandcodeProcessRunner } from '@/providers/commandcode/runtime/CommandcodeProcess';
@@ -36,11 +38,50 @@ await (process.env.GUARD_SCENARIO === 'parallel' ? Promise.all([runTool('edit-1'
 process.stdout.write(JSON.stringify({type:'result', subtype:'success', finalText:'Done'}) + '\\n');
 `;
 
+type TracedHandle = CommandcodeProcessHandle & { trace: string[] };
+
+class TracingProcessAdapter extends NodeLocalShellProcessAdapter {
+  constructor(private readonly trace: string[]) { super(); }
+
+  override launch(spec: LocalShellLaunchSpec) {
+    const child = super.launch(spec);
+    const trace = this.trace;
+    void child.started.then(() => trace.push('child ready'), error => trace.push(`child startup error: ${String(error)}`));
+    void child.exited.then(exit => trace.push(`child exit: ${exit.code}`));
+    return { ...child, stderr: (async function* () {
+      for await (const chunk of child.stderr) {
+        trace.push(`stderr: ${Buffer.from(chunk).toString('utf8').slice(0, 2048)}`);
+        yield chunk;
+      }
+    })() };
+  }
+}
+
+function phase<T>(handle: TracedHandle, name: string, promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`${name} timed out. ${handle.trace.join(' | ')}`)), timeoutMs);
+    void promise.then(value => {
+      clearTimeout(timeout);
+      resolve(value);
+    }, error => {
+      clearTimeout(timeout);
+      reject(new Error(`${name} failed: ${String(error)}. ${handle.trace.join(' | ')}`));
+    });
+  });
+}
+
+async function waitForApproval(handle: TracedHandle, opened: Promise<void>): Promise<void> {
+  await phase(handle, 'CLI startup', handle.started, 35_000);
+  await phase(handle, 'Approval request', Promise.race([opened, handle.completed.then(exit => {
+    throw new Error(`CLI exited with code ${exit.code} before opening an approval.`);
+  })]), 5_000);
+}
+
 describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', version => {
   // Windows pays for a cold guardian compile before the CLI can answer.
   jest.setTimeout(process.platform === 'win32' ? 60_000 : 15_000);
   let directory: string;
-  let handles: CommandcodeProcessHandle[];
+  let handles: TracedHandle[];
   beforeEach(() => {
     handles = [];
     directory = mkdtempSync(join(tmpdir(), 'gcc-test-'));
@@ -51,19 +92,34 @@ describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', versio
   });
   afterEach(async () => {
     for (const handle of handles) {
-      await handle.terminate('forced');
-      await handle.completed.catch(() => undefined);
+      await phase(handle, 'Forced termination', handle.terminate('forced'), 5_000);
+      await phase(handle, 'Output drain', handle.completed.catch(() => undefined), 5_000);
+      if (!await handle.confirmTerminated()) throw new Error(`Process tree remained live. ${handle.trace.join(' | ')}`);
     }
     rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   const contents = () => readFileSync(join(directory, 'Note.md'), 'utf8');
   const start = (approve: CommandcodeApprovalHandler, scenario = '') => {
-    const handle = new NodeCommandcodeProcessRunner().start({
+    const trace: string[] = [];
+    const processHandle = new NodeCommandcodeProcessRunner(new TracingProcessAdapter(trace)).start({
       command: join(directory, 'dist/index.mjs'), cwd: directory,
-      environment: { PATH: process.env.PATH!, GUARD_SCENARIO: scenario,
+      environment: { PATH: process.env.PATH!, GUARD_SCENARIO: scenario, NODE_DEBUG: 'net',
         ...(process.env.LOCALAPPDATA ? { LOCALAPPDATA: process.env.LOCALAPPDATA } : {}) },
       prompt: 'Edit Note.md', permissionMode: 'normal',
-    }, () => undefined, () => undefined, approve);
+    }, event => { trace.push(`event: ${String(event.type)}`); }, () => undefined, async (request, signal) => {
+      trace.push('approval opened');
+      try {
+        const allowed = await approve(request, signal);
+        trace.push(`approval answered: ${allowed}`);
+        return allowed;
+      } catch (error) {
+        trace.push(`approval handler failed: ${String(error)}`);
+        throw error;
+      }
+    });
+    const handle = { ...processHandle, trace };
+    void handle.started.then(() => trace.push('started'), error => trace.push(`startup error: ${String(error)}`));
+    void handle.completed.then(exit => trace.push(`completed: ${exit.code}`), error => trace.push(`completion error: ${String(error)}`));
     handles.push(handle);
     return handle;
   };
@@ -78,10 +134,10 @@ describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', versio
       return new Promise(resolve => { answer = resolve; });
     });
     try {
-      await waiting;
+      await waitForApproval(handle, waiting);
       expect(contents()).toBe('OLD');
       answer(allow);
-      expect((await handle.completed).code).toBe(0);
+      expect((await phase(handle, 'CLI completion', handle.completed, 15_000)).code).toBe(0);
       expect(contents()).toBe(allow ? 'NEW' : 'OLD');
     } finally { await handle.terminate('forced'); }
   });
@@ -140,7 +196,7 @@ describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', versio
     const waiting = new Promise<void>(resolve => { opened = resolve; });
     let answer!: (allow: boolean) => void;
     const handle = start(async () => { opened(); return new Promise(resolve => { answer = resolve; }); });
-    await waiting;
+    await waitForApproval(handle, waiting);
     await handle.terminate('forced');
     answer(true);
     await handle.completed;
