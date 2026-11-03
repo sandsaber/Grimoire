@@ -1,6 +1,7 @@
 import type {
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
+  ProviderCommandsPort,
   ProviderModelDescriptor,
   ProviderModelRefreshOptions,
   ProviderModule,
@@ -42,7 +43,7 @@ import { antigravityChatUIConfig } from './ui/AntigravityChatUIConfig';
  * `execution.create` and the chat runtime from `features`.
  *
  * Honest absences, per the contract's "absent means unsupported" rule:
- * Antigravity has no resume, no native history, no commands, no MCP, no
+ * Antigravity has no resume, no native history, no native commands, no MCP, no
  * interactions, and no agents — and its auxiliary services are registered
  * today as no-ops, so this module contributes none rather than contributing
  * three that silently do nothing.
@@ -82,6 +83,7 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 ]);
 
 export interface AntigravityWorkspaceContext {
+  commandsPort(): ProviderCommandsPort;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
   refreshPlanUsage(): Promise<ProviderUsageSnapshot | null>;
@@ -251,6 +253,7 @@ AntigravityProviderSettings
     providerId: 'antigravity',
     async initialize(context): Promise<AntigravityWorkspace> {
       return {
+        commands: context.commandsPort(),
         transcripts: {
           deleteSession: (conversation, vaultPath) => (
             antigravityHistory.deleteConversationSession(conversation, vaultPath)
@@ -291,6 +294,12 @@ AntigravityProviderSettings
     warmup: 'none',
     providerId: 'antigravity',
     chatUI: antigravityChatUi,
+    commandDropdown: {
+      triggerChars: ['/'],
+      builtInPrefix: '/',
+      skillPrefix: '/',
+      commandPrefix: '/',
+    },
     cli: { resolve: settings => antigravityCliResolver().resolveFromSettings(settings) },
     conversationState: {
       forkState: (sessionId, resumeAt, state) => (

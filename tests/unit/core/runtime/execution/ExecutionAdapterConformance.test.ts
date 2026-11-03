@@ -66,6 +66,7 @@ import type {
 } from '@/core/runtime/types';
 import type { StreamChunk } from '@/core/types/chat';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
+import { AntigravityCommandCatalog } from '@/providers/antigravity/commands/AntigravityCommandCatalog';
 import { claudeProviderModule } from '@/providers/claude/ClaudeProviderModule';
 import { codexProviderModule } from '@/providers/codex/CodexProviderModule';
 import { devinProviderModule } from '@/providers/devin/DevinProviderModule';
@@ -1072,6 +1073,7 @@ describe('the assembled ChatRuntime adapter', () => {
         delay: immediately,
       },
       antigravityProviderModule.runtimePorts({
+        commandsPort: () => new AntigravityCommandCatalog(),
         cachedPlanUsage: () => null,
         listModels: async () => [],
         refreshPlanUsage: async () => null,
@@ -1455,6 +1457,7 @@ describe('concurrent readiness', () => {
         delay: immediately,
       },
       antigravityProviderModule.runtimePorts({
+        commandsPort: () => new AntigravityCommandCatalog(),
         cachedPlanUsage: () => null,
         listModels: async () => [],
         refreshPlanUsage: async () => null,

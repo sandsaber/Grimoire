@@ -5,6 +5,8 @@ import {
   antigravityProviderModule,
   antigravitySettingsCodec,
 } from '@/providers/antigravity/AntigravityProviderModule';
+import { createAntigravityModuleContext } from '@/providers/antigravity/app/AntigravityModuleContext';
+import { AntigravityCommandCatalog } from '@/providers/antigravity/commands/AntigravityCommandCatalog';
 
 /**
  * The first module written against the M1 contract.
@@ -69,6 +71,7 @@ describe('Antigravity provider module', () => {
 
     it('omits the ports it has nothing to put in', () => {
       const ports = antigravityProviderModule.runtimePorts({
+        commandsPort: () => new AntigravityCommandCatalog(),
         cachedPlanUsage: () => null,
         listModels: async () => [],
         refreshPlanUsage: async () => null,
@@ -156,7 +159,9 @@ describe('Antigravity provider module', () => {
   });
 
   describe('workspace contribution', () => {
+    const commandCatalog = new AntigravityCommandCatalog();
     const context = {
+      commandsPort: () => commandCatalog,
       cachedPlanUsage: jest.fn().mockReturnValue(null),
       listModels: jest.fn().mockResolvedValue([{ id: 'a', label: 'A' }]),
       refreshPlanUsage: jest.fn().mockResolvedValue(null),
@@ -172,9 +177,59 @@ describe('Antigravity provider module', () => {
 
       expect(workspace.models).toBeDefined();
       expect(workspace.usage).toBeDefined();
-      expect(workspace.commands).toBeUndefined();
+      expect(workspace.commands).toBe(commandCatalog);
       expect(workspace.mcp).toBeUndefined();
       expect(workspace.agentMentions).toBeUndefined();
+    });
+
+    it('declares a slash menu for vault skills without advertising native CLI commands', () => {
+      expect(antigravityProviderModule.declarations.commandDropdown).toEqual({
+        triggerChars: ['/'],
+        builtInPrefix: '/',
+        skillPrefix: '/',
+        commandPrefix: '/',
+      });
+      expect(antigravityProviderModule.capabilities.commands.discovery).toBe('unsupported');
+    });
+
+    it('lists vault skills through the production module context and workspace', async () => {
+      const adapter = {
+        delete: jest.fn(),
+        deleteFolderRecursive: jest.fn(),
+        ensureFolder: jest.fn(),
+        exists: jest.fn().mockResolvedValue(true),
+        listFiles: jest.fn().mockResolvedValue([]),
+        listFolders: jest.fn(async (path: string) => (
+          path === '.claude/skills' ? ['.claude/skills/fitness'] : []
+        )),
+        read: jest.fn().mockResolvedValue('Help plan an exercise routine.'),
+        rename: jest.fn(),
+        write: jest.fn(),
+      };
+      const catalog = new AntigravityCommandCatalog(adapter);
+      const plugin = {
+        settings: {},
+        getApplicationRuntimeOrNull: () => ({
+          workspaceServicesFor: (providerId: string) => (
+            providerId === 'antigravity' ? { commandCatalog: catalog } : null
+          ),
+        }),
+      } as never;
+      const workspace = await antigravityProviderModule.workspace.initialize(
+        createAntigravityModuleContext(plugin),
+        new AbortController().signal,
+      );
+
+      await expect(workspace.commands?.listDropdownEntries({ includeBuiltIns: false }))
+        .resolves.toEqual([expect.objectContaining({
+          name: 'fitness',
+          kind: 'skill',
+          content: 'Help plan an exercise routine.',
+          isEditable: false,
+          isDeletable: false,
+        })]);
+      expect(adapter.read).toHaveBeenCalledWith('.claude/skills/fitness/SKILL.md');
+      expect(adapter.write).not.toHaveBeenCalled();
     });
 
 
