@@ -83,10 +83,18 @@ export interface ClaudeExecutionInvocation {
 
 export interface ClaudeExecutionRequestResolver {
   resolve(requestRef: string): Promise<ClaudeExecutionInvocation>;
+  /**
+   * Resolves input sent into a run that is already going, without starting a
+   * new one.
+   *
+   * The SDK may fold it into the current turn or queue another native turn.
+   * Its UUID must remain owned until a result consumes it.
+   */
+  resolveSteer(requestRef: string): Promise<SDKUserMessage>;
 }
 
 export interface ClaudeExecutionQuery extends AsyncIterable<SDKMessage> {
-  interrupt(): Promise<unknown>;
+  interrupt(options?: ClaudeExecutionInterruptOptions): Promise<unknown>;
   setPermissionMode(mode: PermissionMode): Promise<void>;
   setModel(model?: string): Promise<void>;
   applyFlagSettings(settings: { readonly effortLevel: EffortLevel | null }): Promise<void>;
@@ -95,6 +103,10 @@ export interface ClaudeExecutionQuery extends AsyncIterable<SDKMessage> {
   stopTask(taskId: string): Promise<void>;
   onConnectionLost(listener: (error?: Error) => void): Unsubscribe;
   close(): void;
+}
+
+export interface ClaudeExecutionInterruptOptions {
+  readonly cancelQueued?: boolean;
 }
 
 export interface ClaudeExecutionQueryFactoryInput {
@@ -738,6 +750,7 @@ class ClaudeExecutionSession implements ExecutionSession {
   private query: ClaudeExecutionQuery | undefined;
   private messageChannel: ClaudeExecutionMessageChannel | undefined;
   private queryGeneration = 0;
+  private canCancelQueuedInput = false;
   private querySessionIntent: ClaudeSessionIntent | undefined;
   private queryObservedSessionRef: string | undefined;
   private restartFingerprint: string | undefined;
@@ -873,14 +886,41 @@ class ClaudeExecutionSession implements ExecutionSession {
     if (!query) {
       throw new Error('Claude persistent query is not active.');
     }
-    const acknowledged = await withTimeout(
-      query.interrupt().then(() => true),
-      this.context.scheduler,
-      this.context.controlTimeoutMs ?? 2_000,
-    );
-    if (acknowledged !== true) {
-      throw new Error('Claude interrupt acknowledgement timed out.');
+    const run = this.activeRun;
+    const cancelQueued = run?.hasSteeredInput ?? false;
+    if (cancelQueued) this.messageChannel?.discardPending();
+    try {
+      const acknowledged = await withTimeout(
+        (cancelQueued ? query.interrupt({ cancelQueued: true }) : query.interrupt()).then(receipt => {
+          if (cancelQueued && (!isRecord(receipt) || !Array.isArray(receipt.still_queued)
+            || receipt.still_queued.some(id => typeof id === 'string' && run?.ownsPendingInput(id)))) {
+            throw new Error('Claude did not confirm cancellation of queued input.');
+          }
+          return true;
+        }),
+        this.context.scheduler,
+        this.context.controlTimeoutMs ?? 2_000,
+      );
+      if (acknowledged !== true) {
+        throw new Error('Claude interrupt acknowledgement timed out.');
+      }
+    } catch (error) {
+      // An unconfirmed queue must not run behind an indeterminate terminal.
+      if (cancelQueued && this.query === query) await this.closeQuery();
+      throw error;
     }
+  }
+
+  /** Adds input only while the same run and query still own its delivery. */
+  async steer(requestRef: string): Promise<boolean> {
+    const run = this.activeRun;
+    const query = this.query;
+    if (!run?.canSteer || !query || !this.messageChannel || this.disposed || !this.canCancelQueuedInput) {
+      return false;
+    }
+    const message = await this.context.requestResolver.resolveSteer(requestRef);
+    if (this.disposed || this.activeRun !== run || this.query !== query) return false;
+    return run.steer(message);
   }
 
   async stopNativeTask(taskId: string): Promise<void> {
@@ -1381,6 +1421,8 @@ class ClaudeExecutionSession implements ExecutionSession {
         if (!await this.captureNativeSession(message.session_id)) {
           return;
         }
+        this.canCancelQueuedInput = message.capabilities?.includes('interrupt_receipt_v1') === true
+          && message.capabilities.includes('interrupt_cancel_queued_v1');
       } else if (this.nativeSessionRef && message.session_id !== this.nativeSessionRef) {
         return;
       }
@@ -1765,6 +1807,7 @@ class ClaudeExecutionSession implements ExecutionSession {
     const query = this.query;
     this.query = undefined;
     this.queryGeneration += 1;
+    this.canCancelQueuedInput = false;
     this.restartFingerprint = undefined;
     this.querySessionIntent = undefined;
     this.queryObservedSessionRef = undefined;
@@ -1792,6 +1835,11 @@ class ClaudeExecutionRun implements ExecutionRun {
   private terminal = false;
   private cancellation: CancellationReason | undefined;
   private nativeUserMessageId: string | undefined;
+  private readonly pendingInputIds = new Set<string>();
+  private readonly resultParts: string[] = [];
+  private resultBytes = 0;
+  private steered = false;
+  private completionFailure: RunTerminalReason | undefined;
   private allowedTools: readonly string[] | undefined;
   private dispatched = false;
   private timeoutTriggered = false;
@@ -1838,6 +1886,37 @@ class ClaudeExecutionRun implements ExecutionRun {
 
   get dispatchStarted(): boolean {
     return this.dispatched;
+  }
+
+  get hasSteeredInput(): boolean {
+    return this.steered;
+  }
+
+  get canSteer(): boolean {
+    // SDK result correlation lists hold at most 64 UUIDs. Decline overflow so
+    // the controller keeps it in its own queue instead of losing ownership.
+    return this.dispatched && !this.terminal && !this.cancellation && !this.timeoutTriggered
+      && !this.providerCompletionObserved && this.pendingInputIds.size < 64;
+  }
+
+  ownsPendingInput(uuid: string): boolean {
+    return this.pendingInputIds.has(uuid);
+  }
+
+  steer(message: SDKUserMessage): boolean {
+    if (!this.canSteer) return false;
+    const uuid = message.uuid ?? '';
+    requireNativeId(uuid, 'Claude steered message id');
+    if (this.pendingInputIds.has(uuid)) return false;
+    this.pendingInputIds.add(uuid);
+    try {
+      this.session.dispatch(message);
+    } catch (error) {
+      this.pendingInputIds.delete(uuid);
+      throw error;
+    }
+    this.steered = true;
+    return true;
   }
 
   start(): void {
@@ -1943,19 +2022,43 @@ class ClaudeExecutionRun implements ExecutionRun {
   }
 
   handleResult(message: Extract<SDKMessage, { type: 'result' }>): void {
-    if (this.terminal) {
+    if (this.terminal || this.completionTask || this.cancellation || this.timeoutTriggered) {
       return;
     }
     const userMessageId = 'user_message_uuid' in message
       && typeof message.user_message_uuid === 'string'
       ? message.user_message_uuid.trim()
       : '';
-    if (!userMessageId) {
+    const ids = new Set([
+      ...(userMessageId ? [userMessageId] : []),
+      ...(message.user_message_uuids ?? []),
+    ]);
+    if (ids.size === 0) {
       this.handleUncorrelatedResult();
       return;
     }
-    if (userMessageId !== this.nativeUserMessageId) {
+    const consumed = [...this.pendingInputIds].filter(id => ids.has(id));
+    if (consumed.length === 0) {
       return;
+    }
+    for (const id of consumed) this.pendingInputIds.delete(id);
+    if (message.subtype === 'success' && !message.is_error) {
+      const output = message.result.trim();
+      if (output) {
+        this.resultBytes += Buffer.byteLength(output, 'utf8') + (this.resultParts.length ? 2 : 0);
+        if (this.resultBytes > (this.context.maxResultBytes ?? 1024 * 1024)) {
+          this.completionFailure = 'output-limit';
+        } else {
+          this.resultParts.push(output);
+        }
+      }
+      if (!this.completionFailure && this.pendingInputIds.size > 0) {
+        // A native result need not end the kernel run: an accepted follow-up
+        // still owns its permissions, timers, output and process lifetime.
+        this.emit({ kind: 'provider-content', payload: { type: 'grimoire_turn_boundary' } });
+        if (output) this.emit({ kind: 'output-delta', channel: 'assistant', text: '\n\n' });
+        return;
+      }
     }
     this.beginProviderCompletion(message);
   }
@@ -2060,6 +2163,7 @@ class ClaudeExecutionRun implements ExecutionRun {
       invocation = await this.context.requestResolver.resolve(this.request.requestRef);
       validateInvocation(invocation);
       this.nativeUserMessageId = invocation.message.uuid;
+      this.pendingInputIds.add(invocation.message.uuid!);
       this.allowedTools = invocation.allowedTools ? [...invocation.allowedTools] : undefined;
     } catch (error) {
       if (!this.terminal) {
@@ -2124,11 +2228,19 @@ class ClaudeExecutionRun implements ExecutionRun {
       return;
     }
     this.session.completeTurn();
-    if (message.subtype !== 'success' || message.is_error) {
-      this.finish('failed', 'provider-failure');
+    if (message.subtype !== 'success' || message.is_error || this.completionFailure) {
+      if (this.pendingInputIds.size > 0) {
+        try {
+          await this.session.interrupt();
+        } catch {
+          await this.reconcileSafely();
+          return;
+        }
+      }
+      this.finish('failed', this.completionFailure ?? 'provider-failure');
       return;
     }
-    const output = message.result.trim();
+    const output = this.resultParts.join('\n\n');
     if (!output) {
       this.finish(
         this.request.resultExpectation === 'required' ? 'failed' : 'succeeded',
@@ -2164,7 +2276,16 @@ class ClaudeExecutionRun implements ExecutionRun {
     }
     this.providerCompletionObserved = true;
     this.clearRunTimeouts();
-    this.completionTask = this.reconcileSafely();
+    this.completionTask = (async () => {
+      if (this.steered) {
+        try {
+          await this.session.interrupt();
+        } catch {
+          // Recovery, rather than a successful terminal, owns uncertainty.
+        }
+      }
+      await this.reconcileSafely();
+    })();
   }
 
   private async storeResult(

@@ -228,6 +228,50 @@ describe('ClaudeExecutionBackend', () => {
     expect(fixture.stored.map(entry => entry.output)).toEqual(['first result', 'second result']);
   });
 
+  it('enqueues a steer message on the live query instead of starting a turn', async () => {
+    const steerMessage = {
+      ...userMessage('steer-1'),
+      message: { role: 'user' as const, content: 'Actually, do it the other way' },
+    } as SDKUserMessage;
+    const fixture = createFixture({
+      invocations: {
+        first: invocation('message-1'),
+        steer: { ...invocation('unused'), message: steerMessage },
+      },
+    });
+    const session = await createSession(fixture.backend, 'native-session');
+
+    const events = collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    fixture.query.emit(initMessage('native-session'));
+
+    const steered = await session.steer!('steer');
+    expect(steered).toBe(true);
+    // The steer is a message on the channel the running query already reads,
+    // not a second query: steering joins the turn it is steering.
+    await waitFor(() => fixture.query.received.length === 2);
+    expect(fixture.factory.inputs).toHaveLength(1);
+    expect(fixture.query.received[1].message.content).toBe('Actually, do it the other way');
+
+    fixture.query.emit(resultMessage('message-1', 'done', 'result-1'));
+    fixture.query.emit(resultMessage('steer-1', 'follow-up', 'result-steer'));
+    expectTerminal(await events, 'succeeded', 'completed');
+  });
+
+  it('declines to steer once the session has no live query', async () => {
+    const fixture = createFixture({
+      invocations: {
+        first: invocation('message-1'),
+        steer: { ...invocation('unused'), message: userMessage('steer-1') },
+      },
+    });
+    const session = await createSession(fixture.backend, 'native-session');
+
+    // Before any run the query has not started; a steer has nothing to join.
+    expect(await session.steer!('steer')).toBe(false);
+    expect(fixture.query.received).toHaveLength(0);
+  });
+
   it('leaves a dialog kind it never declared for the client that did', async () => {
     // **A `request_user_dialog` this host does not draw belongs to another
     // client on the session.** `cancelled` is a real settlement and would close
@@ -1282,6 +1326,7 @@ describe('ClaudeExecutionBackend', () => {
 });
 
 function createFixture(options: {
+  readonly resolveSteer?: ClaudeExecutionBackendContext['requestResolver']['resolveSteer'];
   readonly invocations?: Readonly<Record<string, ClaudeExecutionInvocation>>;
   readonly taskOutput?: string | null;
   readonly taskResultLoad?: ClaudeExecutionBackendContext['taskResultLoader']['load'];
@@ -1316,6 +1361,13 @@ function createFixture(options: {
         }
         return resolved;
       },
+      resolveSteer: options.resolveSteer ?? (async requestRef => {
+        const resolved = invocations[requestRef];
+        if (!resolved) {
+          throw new Error('Unknown request.');
+        }
+        return resolved.message;
+      }),
     },
     interactionBridge: {
       prepare: options.interactionPrepare ?? (async ({ toolName, toolInput }) => ({
@@ -1422,7 +1474,7 @@ class FakeQuery implements ClaudeExecutionQuery {
     async () => ({ canRewind: true }),
   );
   readonly stopTask = jest.fn<Promise<void>, [string]>(async () => {});
-  readonly interrupt = jest.fn<Promise<void>, []>(async () => {});
+  readonly interrupt = jest.fn<Promise<unknown>, [{ cancelQueued?: boolean }?]>(async () => ({ still_queued: [] }));
   readonly close = jest.fn<void, []>(() => { this.output.close(); });
   private readonly output = new ExecutionEventQueue<SDKMessage>();
   private readonly lossListeners = new Set<(error?: Error) => void>();
@@ -1559,6 +1611,7 @@ function initMessage(sessionId: string): SDKMessage {
   return {
     type: 'system',
     subtype: 'init',
+    capabilities: ['interrupt_receipt_v1', 'interrupt_cancel_queued_v1'],
     session_id: sessionId,
     uuid: `init-${sessionId}`,
   } as unknown as SDKMessage;
@@ -1779,3 +1832,216 @@ function deferred<T>() {
   const promise = new Promise<T>(res => { resolve = res; });
   return { promise, resolve };
 }
+
+describe('Claude steering lifecycle', () => {
+  function setup(resolveSteer?: ClaudeExecutionBackendContext['requestResolver']['resolveSteer']) {
+    return createFixture({
+      resolveSteer,
+      invocations: {
+        first: invocation('message-1'),
+        steer: invocation('steer-1'),
+        second: { ...invocation('message-2'), restartFingerprint: 'startup-v2' },
+      },
+    });
+  }
+
+  it('owns sequential SDK turns until every accepted input has a durable answer', async () => {
+    const fixture = setup();
+    const session = await createSession(fixture.backend, 'native-session');
+    const observed: ProviderExecutionEvent[] = [];
+    session.subscribe(event => observed.push(event));
+    const events = collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    expect(await session.steer!('steer')).toBe(true);
+    fixture.query.emit({ ...resultMessage('message-1', 'first answer', 'result-1'), queued_turn_count: 1 } as SDKMessage);
+    await flushPromises(30);
+    try {
+      expect(observed.some(event => event.event.kind === 'terminal')).toBe(false);
+      expect(await session.suspend?.()).toBe(false);
+      const permission = fixture.factory.inputs[0].canUseTool(
+        'Write', { file_path: 'note.md' },
+        { signal: new AbortController().signal, requestId: 'steered-write', toolUseId: 'steered-tool' },
+      );
+      await waitFor(() => observed.some(event => event.event.kind === 'interaction-opened'));
+      const opened = observed.find(event => event.event.kind === 'interaction-opened')!;
+      if (opened.event.kind !== 'interaction-opened') throw new Error('Expected an approval.');
+      await fixture.backend.resolve({
+        interactionId: opened.event.interaction.interactionId, responseId: 'allow-once', resolvedAt: 1,
+      });
+      await expect(permission).resolves.toMatchObject({ behavior: 'allow' });
+      fixture.query.emit(textDeltaMessage('steered answer'));
+      fixture.query.emit(resultMessage('steer-1', 'steered answer', 'result-steer'));
+      expectTerminal(await events, 'succeeded', 'completed');
+      expect(fixture.stored.map(entry => entry.output)).toEqual(['first answer\n\nsteered answer']);
+    } finally {
+      await fixture.backend.dispose();
+    }
+  });
+
+  it('correlates a batch result against every consumed UUID', async () => {
+    const fixture = setup();
+    const session = await createSession(fixture.backend, 'native-session');
+    const events = collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    expect(await session.steer!('steer')).toBe(true);
+    fixture.query.emit({
+      ...resultMessage('steer-1', 'combined answer', 'result-merged'),
+      user_message_uuids: ['message-1', 'steer-1'],
+    } as SDKMessage);
+    await flushPromises(30);
+    try {
+      expect(fixture.stored.map(entry => entry.output)).toEqual(['combined answer']);
+      expectTerminal(await events, 'succeeded', 'completed');
+    } finally {
+      await fixture.backend.dispose();
+    }
+  });
+
+  it('declines input resolved after its run completed', async () => {
+    const resolved = deferred<SDKUserMessage>();
+    const fixture = setup(() => resolved.promise);
+    const session = await createSession(fixture.backend, 'native-session');
+    const events = collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    const steering = session.steer!('steer');
+    fixture.query.emit(resultMessage('message-1', 'answer', 'result-1'));
+    await events;
+    resolved.resolve(userMessage('steer-1'));
+    try {
+      await expect(steering).resolves.toBe(false);
+      expect(fixture.query.received).toHaveLength(1);
+    } finally {
+      await fixture.backend.dispose();
+    }
+  });
+
+  it('declines input when disposal starts during resolution', async () => {
+    const fixture = setup();
+    const session = await createSession(fixture.backend, 'native-session');
+    void collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    const steering = session.steer!('steer');
+    const disposal = session.dispose();
+    try {
+      await expect(steering).resolves.toBe(false);
+      expect(fixture.query.received).toHaveLength(1);
+    } finally {
+      await disposal;
+    }
+  });
+
+  it('never sends a delayed steer into a replacement run', async () => {
+    const resolved = deferred<SDKUserMessage>();
+    const fixture = setup(() => resolved.promise);
+    const session = await createSession(fixture.backend, 'native-session');
+    const events = collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    const steering = session.steer!('steer');
+    fixture.query.emit(resultMessage('message-1', 'answer', 'result-1'));
+    await events;
+    const nextQuery = new FakeQuery();
+    fixture.factory.nextQuery = nextQuery;
+    void collectEvents(session.createRun(request('2', 'second')));
+    await waitFor(() => nextQuery.received.length === 1);
+    resolved.resolve(userMessage('steer-1'));
+    try {
+      await expect(steering).resolves.toBe(false);
+      expect(nextQuery.received.map(message => message.uuid)).toEqual(['message-2']);
+    } finally {
+      await fixture.backend.dispose();
+    }
+  });
+
+  it('declines steering when the CLI cannot cancel queued input safely', async () => {
+    const fixture = setup();
+    const session = await createSession(fixture.backend, 'native-session');
+    void collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    fixture.query.emit({ ...initMessage('native-session'), capabilities: [] } as SDKMessage);
+    await flushPromises();
+    try {
+      expect(await session.steer!('steer')).toBe(false);
+      expect(fixture.query.received).toHaveLength(1);
+    } finally {
+      await fixture.backend.dispose();
+    }
+  });
+
+  it('cancels queued steers together with the active native turn', async () => {
+    const fixture = setup();
+    const session = await createSession(fixture.backend, 'native-session');
+    const run = session.createRun(request('1', 'first'));
+    const events = collectEvents(run);
+    await waitFor(() => fixture.query.received.length === 1);
+    expect(await session.steer!('steer')).toBe(true);
+    await run.cancel();
+    expectTerminal(await events, 'cancelled', 'cancellation-confirmed');
+    expect(fixture.query.interrupt).toHaveBeenCalledWith({ cancelQueued: true });
+    await fixture.backend.dispose();
+  });
+
+  it('refuses input after provider completion while its result is being stored', async () => {
+    const stored = deferred<ResultCommitOutcome>();
+    const fixture = createFixture({ resultStore: () => stored.promise });
+    const session = await createSession(fixture.backend, 'native-session');
+    const events = collectEvents(session.createRun(request('1', 'default')));
+    await waitFor(() => fixture.query.received.length === 1);
+    fixture.query.emit(resultMessage('message-1', 'answer', 'result-1'));
+    await flushPromises();
+    expect(await session.steer!('never-resolved')).toBe(false);
+    stored.resolve({ kind: 'committed', result: { resultId: 'stored', storage: 'projection' } });
+    expectTerminal(await events, 'succeeded', 'completed');
+    await fixture.backend.dispose();
+  });
+
+  it.each([undefined, { still_queued: ['steer-1'] }])('fails closed on an unconfirmed queue cancellation: %p', async receipt => {
+    const fixture = setup();
+    const session = await createSession(fixture.backend, 'native-session');
+    const run = session.createRun(request('1', 'first'));
+    const events = collectEvents(run);
+    await waitFor(() => fixture.query.received.length === 1);
+    expect(await session.steer!('steer')).toBe(true);
+    fixture.query.interrupt.mockResolvedValueOnce(receipt);
+    await run.cancel();
+    expectTerminal(await events, 'indeterminate', 'cancellation-unknown');
+    expect(fixture.query.close).toHaveBeenCalledTimes(1);
+    await fixture.backend.dispose();
+  });
+
+  it('cancels pending input when an earlier native turn fails', async () => {
+    const fixture = setup();
+    const session = await createSession(fixture.backend, 'native-session');
+    const events = collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    expect(await session.steer!('steer')).toBe(true);
+    fixture.query.emit({ ...resultMessage('message-1', '', 'error-1'), subtype: 'error_during_execution', is_error: true } as SDKMessage);
+    expectTerminal(await events, 'failed', 'provider-failure');
+    expect(fixture.query.interrupt).toHaveBeenCalledWith({ cancelQueued: true });
+    await fixture.backend.dispose();
+  });
+
+  it('bounds the combined durable output across native turns', async () => {
+    const fixture = setup();
+    const session = await createSession(fixture.backend, 'native-session');
+    const events = collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    expect(await session.steer!('steer')).toBe(true);
+    fixture.query.emit(resultMessage('message-1', 'x'.repeat(700), 'result-1'));
+    fixture.query.emit(resultMessage('steer-1', 'y'.repeat(400), 'result-steer'));
+    expectTerminal(await events, 'failed', 'output-limit');
+    expect(fixture.stored).toEqual([]);
+    await fixture.backend.dispose();
+  });
+
+  it('leaves input above the SDK correlation limit in the caller queue', async () => {
+    let sequence = 0;
+    const fixture = setup(async () => userMessage(`steer-${++sequence}`));
+    const session = await createSession(fixture.backend, 'native-session');
+    void collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    for (let index = 0; index < 63; index += 1) expect(await session.steer!('steer')).toBe(true);
+    expect(await session.steer!('steer')).toBe(false);
+    await waitFor(() => fixture.query.received.length === 64);
+    await fixture.backend.dispose();
+  });
+});

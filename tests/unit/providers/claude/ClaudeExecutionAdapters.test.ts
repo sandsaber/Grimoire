@@ -20,6 +20,36 @@ import {
 import { ClaudeTaskOutputLoader } from '@/providers/claude/execution/ClaudeTaskOutputLoader';
 
 describe('Claude execution adapters', () => {
+  it('withdraws unread messages on cancellation while leaving the next turn writable', async () => {
+    const channel = new ClaudeExecutionMessageChannel();
+    const message: SDKUserMessage = {
+      type: 'user', uuid: '11111111-1111-4111-8111-111111111111',
+      parent_tool_use_id: null, session_id: 'native-session',
+      message: { role: 'user', content: 'cancel me' },
+    };
+    channel.enqueue(message);
+    channel.discardPending();
+    const next = channel[Symbol.asyncIterator]().next();
+    const fresh: SDKUserMessage = { ...message, uuid: '22222222-2222-4222-8222-222222222222' };
+    channel.enqueue(fresh);
+    await expect(next).resolves.toEqual({ value: fresh, done: false });
+    channel.close();
+  });
+
+  it('forwards queued-input cancellation through the SDK boundary and preserves its receipt', async () => {
+    const receipt = { still_queued: [], cancelled: ['steer-1'] };
+    const interrupt = jest.fn(async () => receipt);
+    const generator = createSdkQuery([], { interrupt });
+    const factory = new ClaudeSdkExecutionQueryFactory(
+      { resolve: async () => ({}) },
+      jest.fn(() => generator),
+    );
+    const wrapped = await factory.create(factoryInput());
+    await expect(wrapped.interrupt({ cancelQueued: true })).resolves.toBe(receipt);
+    expect(interrupt).toHaveBeenCalledWith({ cancelQueued: true });
+    wrapped.close();
+  });
+
   it('preserves the exact native run UUID when the SDK starts consuming lazily', async () => {
     const channel = new ClaudeExecutionMessageChannel();
     const message = {

@@ -81,6 +81,8 @@ describe('Claude execution composition', () => {
    * a finished turn against.
    */
   function createFakeSdk(script: {
+    readonly beforeFirstResult?: Promise<void>;
+    readonly answers?: readonly string[];
     readonly startupError?: Error;
     readonly askAbout?: { readonly toolName: string; readonly input: Record<string, unknown> };
     readonly toolCall?: { readonly id: string; readonly name: string };
@@ -98,10 +100,13 @@ describe('Claude execution composition', () => {
       if (script.startupError) throw script.startupError;
       startedWith.push(input.options);
       const messages = (async function* respond(): AsyncGenerator<SDKMessage> {
+        let index = 0;
         for await (const sent of input.prompt) {
+          const answer = script.answers?.[index] ?? 'the answer';
           yield {
             type: 'system',
             subtype: 'init',
+            capabilities: ['interrupt_receipt_v1', 'interrupt_cancel_queued_v1'],
             session_id: 'native-session',
             uuid: 'init-1',
           } as unknown as SDKMessage;
@@ -143,30 +148,32 @@ describe('Claude execution composition', () => {
           yield {
             type: 'stream_event',
             session_id: 'native-session',
-            uuid: 'delta-1',
+            uuid: `delta-${sent.uuid}`,
             event: {
               type: 'content_block_delta',
               index: 0,
-              delta: { type: 'text_delta', text: 'the answer' },
+              delta: { type: 'text_delta', text: answer },
             },
           } as unknown as SDKMessage;
+          if (index === 0) await script.beforeFirstResult;
           yield {
             type: 'result',
             subtype: 'success',
             is_error: false,
-            result: 'the answer',
+            result: answer,
             user_message_uuid: sent.uuid,
-            uuid: 'result-1',
+            uuid: `result-${sent.uuid}`,
             session_id: 'native-session',
             // What the SDK reports a finished turn cost. Nothing else carries
             // it, which is why the plan indicator is fed from this message.
             modelUsage: { 'claude-opus-5': { costUSD: 0.42 } },
           } as unknown as SDKMessage;
+          index += 1;
         }
       })();
       return {
         [Symbol.asyncIterator]: () => messages[Symbol.asyncIterator](),
-        interrupt: async () => undefined,
+        interrupt: async () => ({ still_queued: [] }),
         setPermissionMode: async () => undefined,
         setModel: async () => undefined,
         applyFlagSettings: async () => undefined,
@@ -259,6 +266,35 @@ describe('Claude execution composition', () => {
         event: 'execution.dispatch.failed', data: { phase: 'query-startup' }, error: startupError,
       }));
     } finally {
+      execution.dispose();
+      await host.dispose();
+    }
+  });
+
+  it('keeps production steering references and sequential SDK replies in one owned run', async () => {
+    let release!: () => void;
+    const beforeFirstResult = new Promise<void>(resolve => { release = resolve; });
+    const { execution, host, startedWith } = await createHarness(createPlugin(), {
+      beforeFirstResult, answers: ['first answer', 'follow-up answer'],
+    });
+    const runtime = execution.createRuntime();
+    const chunks: StreamChunk[] = [];
+    const completion = (async () => {
+      for await (const chunk of runtime.query(runtime.prepareTurn({ text: 'first question' }))) chunks.push(chunk);
+    })();
+    try {
+      for (let attempt = 0; attempt < 200 && !chunks.some(chunk => chunk.type === 'text'); attempt += 1) {
+        await new Promise(resolve => { setTimeout(resolve, 5); });
+      }
+      expect(chunks.some(chunk => chunk.type === 'text')).toBe(true);
+      expect(await runtime.steer!(runtime.prepareTurn({ text: 'follow-up question' }))).toBe(true);
+      release();
+      await completion;
+      expect(chunks.filter(chunk => chunk.type === 'text').map(chunk => chunk.content).join(''))
+        .toBe('first answer\n\nfollow-up answer');
+      expect(startedWith).toHaveLength(1);
+    } finally {
+      release();
       execution.dispose();
       await host.dispose();
     }

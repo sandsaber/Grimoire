@@ -10,6 +10,7 @@ import type { Unsubscribe } from '@/core/execution/ExecutionContracts';
 
 import { CLAUDE_ASK_USER_QUESTION_DIALOG_KIND } from '../runtime/claudeAskUserQuestion';
 import type {
+  ClaudeExecutionInterruptOptions,
   ClaudeExecutionQuery,
   ClaudeExecutionQueryFactory,
   ClaudeExecutionQueryFactoryInput,
@@ -122,8 +123,16 @@ class ClaudeSdkExecutionQuery implements ClaudeExecutionQuery {
     return this.query[Symbol.asyncIterator]();
   }
 
-  interrupt(): Promise<unknown> {
-    return this.query.interrupt();
+  interrupt(options?: ClaudeExecutionInterruptOptions): Promise<unknown> {
+    if (!options) return this.query.interrupt();
+    // SDK 0.3.310 accepts cancelQueued and emits cancel_queued on the wire,
+    // but its Query declaration still omits that parameter. Keep the widening
+    // at this boundary; the backend requires the CLI's advertised capability
+    // and validates the receipt before confirming cancellation.
+    const query = this.query as Query & {
+      interrupt(options: ClaudeExecutionInterruptOptions): ReturnType<Query['interrupt']>;
+    };
+    return query.interrupt(options);
   }
 
   setPermissionMode(mode: Parameters<Query['setPermissionMode']>[0]): Promise<void> {

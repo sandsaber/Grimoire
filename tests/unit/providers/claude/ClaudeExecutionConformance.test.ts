@@ -46,7 +46,10 @@ function createDriver(
         return query;
       },
     },
-    requestResolver: { resolve: () => requestResolution.promise },
+    requestResolver: {
+      resolve: () => requestResolution.promise,
+      resolveSteer: () => Promise.reject(new Error('No steering in conformance driver.')),
+    },
     interactionBridge: {
       prepare: () => Promise.reject(new Error('No interactions in conformance driver.')),
     },
