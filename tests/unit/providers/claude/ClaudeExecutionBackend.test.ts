@@ -228,6 +228,49 @@ describe('ClaudeExecutionBackend', () => {
     expect(fixture.stored.map(entry => entry.output)).toEqual(['first result', 'second result']);
   });
 
+  it('enqueues a steer message on the live query instead of starting a turn', async () => {
+    const steerMessage = {
+      ...userMessage('steer-1'),
+      message: { role: 'user' as const, content: 'Actually, do it the other way' },
+    } as SDKUserMessage;
+    const fixture = createFixture({
+      invocations: {
+        first: invocation('message-1'),
+        steer: { ...invocation('unused'), message: steerMessage },
+      },
+    });
+    const session = await createSession(fixture.backend, 'native-session');
+
+    const events = collectEvents(session.createRun(request('1', 'first')));
+    await waitFor(() => fixture.query.received.length === 1);
+    fixture.query.emit(initMessage('native-session'));
+
+    const steered = await session.steer('steer');
+    expect(steered).toBe(true);
+    // The steer is a message on the channel the running query already reads,
+    // not a second query: steering joins the turn it is steering.
+    await waitFor(() => fixture.query.received.length === 2);
+    expect(fixture.factory.inputs).toHaveLength(1);
+    expect(fixture.query.received[1].message.content).toBe('Actually, do it the other way');
+
+    fixture.query.emit(resultMessage('message-1', 'done', 'result-1'));
+    expectTerminal(await events, 'succeeded', 'completed');
+  });
+
+  it('declines to steer once the session has no live query', async () => {
+    const fixture = createFixture({
+      invocations: {
+        first: invocation('message-1'),
+        steer: { ...invocation('unused'), message: userMessage('steer-1') },
+      },
+    });
+    const session = await createSession(fixture.backend, 'native-session');
+
+    // Before any run the query has not started; a steer has nothing to join.
+    expect(await session.steer('steer')).toBe(false);
+    expect(fixture.query.received).toHaveLength(0);
+  });
+
   it('leaves a dialog kind it never declared for the client that did', async () => {
     // **A `request_user_dialog` this host does not draw belongs to another
     // client on the session.** `cancelled` is a real settlement and would close
@@ -1315,6 +1358,13 @@ function createFixture(options: {
           throw new Error('Unknown request.');
         }
         return resolved;
+      },
+      resolveSteer: async requestRef => {
+        const resolved = invocations[requestRef];
+        if (!resolved) {
+          throw new Error('Unknown request.');
+        }
+        return resolved.message;
       },
     },
     interactionBridge: {

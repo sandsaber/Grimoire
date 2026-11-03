@@ -83,6 +83,16 @@ export interface ClaudeExecutionInvocation {
 
 export interface ClaudeExecutionRequestResolver {
   resolve(requestRef: string): Promise<ClaudeExecutionInvocation>;
+  /**
+   * Resolves input sent into a run that is already going, without starting a
+   * new one.
+   *
+   * The SDK takes one turn at a time, so unlike Codex this cannot inject
+   * mid-turn. It returns the user message to enqueue on the live query's
+   * message channel, which the SDK reads once the current turn ends — the
+   * queue-based degradation the claude provider is built around.
+   */
+  resolveSteer(requestRef: string): Promise<SDKUserMessage>;
 }
 
 export interface ClaudeExecutionQuery extends AsyncIterable<SDKMessage> {
@@ -881,6 +891,25 @@ class ClaudeExecutionSession implements ExecutionSession {
     if (acknowledged !== true) {
       throw new Error('Claude interrupt acknowledgement timed out.');
     }
+  }
+
+  /**
+   * Steers a run that is still going.
+   *
+   * The SDK takes one turn at a time, so this cannot inject mid-turn the way
+   * Codex does. It enqueues the user message on the live query's message
+   * channel, which the SDK reads once the current turn ends — queue-based
+   * degradation. Answers `false`, never throws, when no query is up to steer
+   * into (the run already went terminal, or the session is gone), matching the
+   * contract that `false` means the provider declined.
+   */
+  async steer(requestRef: string): Promise<boolean> {
+    if (!this.query || !this.messageChannel || this.disposed) {
+      return false;
+    }
+    const message = await this.context.requestResolver.resolveSteer(requestRef);
+    this.dispatch(message);
+    return true;
   }
 
   async stopNativeTask(taskId: string): Promise<void> {

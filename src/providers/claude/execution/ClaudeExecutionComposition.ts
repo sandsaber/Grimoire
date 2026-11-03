@@ -392,6 +392,15 @@ export class ClaudeExecution {
         },
         });
       },
+      // Steering carries the input and nothing else: the turn it joins was
+      // launched with the parameters, and it is not being started again. No
+      // `beginTurn` — that marks the one place a turn is known to be starting,
+      // and a steer joins one already under way.
+      encodeSteerRef: (turn: PreparedChatTurn) => this.requests.reference({
+        prompt: turn.prompt,
+        ...(turn.request.images?.length ? { images: [...turn.request.images] } : {}),
+        session: () => claudeSessionIntent(boundConversation(), content.lastSessionId()),
+      }),
       // The session this conversation is on, which the kernel records and a
       // resume asks for. The presenter's copy comes first because a new
       // conversation learns its session mid-turn, and the record is written

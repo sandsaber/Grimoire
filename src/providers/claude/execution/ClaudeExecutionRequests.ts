@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { Options } from '@anthropic-ai/claude-agent-sdk';
+import type { Options, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
 import { createStopSubagentHook } from '@/providers/claude/hooks/SubagentHooks';
 
@@ -132,6 +132,24 @@ export class ClaudeExecutionRequests implements ClaudeExecutionRequestResolver {
       },
       ...(request.allowedTools ? { allowedTools: [...request.allowedTools] } : {}),
     };
+  }
+
+  /**
+   * Turns a steer reference into the user message to append to the running
+   * query.
+   *
+   * No startup options, no restart fingerprint: the turn being steered was
+   * launched with those, and adding input to it is not starting it again. The
+   * message is enqueued on the live query's channel and lands once the SDK
+   * finishes the turn it is on.
+   */
+  async resolveSteer(requestRef: string): Promise<SDKUserMessage> {
+    const request = this.take(requestRef);
+    return buildClaudeSDKUserMessage(
+      request.prompt,
+      continuedSessionId(request.session()) ?? '',
+      request.images ? [...request.images] : undefined,
+    );
   }
 
   /**

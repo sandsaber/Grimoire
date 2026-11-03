@@ -178,8 +178,10 @@ const claudeCapabilities: ProviderCapabilityDescriptor = {
   conversation: {
     fork: 'native',
     rewind: 'native',
-    // The SDK takes one turn at a time; a mid-turn steer has no surface.
-    steering: 'unsupported',
+    // The SDK takes one turn at a time, so steering is queue-based rather than
+    // mid-turn: input enqueues on the live query's channel and lands when the
+    // current turn ends.
+    steering: 'native',
     compaction: 'native',
   },
   security: { enforcement: 'native' },
