@@ -51,7 +51,7 @@ export const CLAUDE_PROVIDER_CAPABILITIES: Readonly<ProviderCapabilities> = Obje
   supportsImageAttachments: true,
   supportsInstructionMode: true,
   supportsMcpTools: true,
-  supportsTurnSteer: false,
+  supportsTurnSteer: true,
   reasoningControl: 'effort',
   planPathPrefix: '/.claude/plans/',
 });

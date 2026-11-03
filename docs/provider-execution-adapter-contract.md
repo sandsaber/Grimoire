@@ -68,6 +68,16 @@ after an exception, and it consumes — a second call returns empty.
 Capability ports are declared by the provider module and **absent when unsupported**. A present port
 that no-ops is a lie the surface cannot detect; an absent one is a fact it can read.
 
+Claude steering keeps every accepted input UUID owned by the active execution run. The SDK may
+fold several inputs into one result (`user_message_uuids`) or answer them in successive native
+turns. The kernel run stays active through both cases, including permissions, cancellation and
+idle suspension, and commits one combined answer after all accepted inputs have results. Native
+turn boundaries reset rendering deduplication without ending the kernel run. Steering is declined
+when the CLI does not advertise both `interrupt_receipt_v1` and `interrupt_cancel_queued_v1`, or
+when 64 input UUIDs are already pending. Cancellation withdraws queued inputs as well as aborting
+the active native turn; a missing receipt or a surviving owned UUID closes the query and leaves
+the outcome indeterminate rather than claiming cancellation succeeded.
+
 ## Process lifetime
 
 A provider process belongs to a kernel session, not to a turn. Claude's persistent SDK query and

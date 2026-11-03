@@ -128,6 +128,14 @@ describe('Claude content presenter', () => {
     expect(chunks).toContainEqual(expect.objectContaining({ type: 'text', content: 'second turn' }));
   });
 
+  it('renders an unstreamed follow-up after a native turn boundary in the same run', () => {
+    const presenter = createPresenter();
+    presenter.present(textDelta('first answer'));
+    expect(presenter.present({ type: 'grimoire_turn_boundary' })).toEqual([]);
+    const chunks = presenter.present(assistantMessage([{ type: 'text', text: 'follow-up answer' }], 'assistant-2'));
+    expect(chunks).toContainEqual(expect.objectContaining({ type: 'text', content: 'follow-up answer' }));
+  });
+
   it('learns the session a conversation has to resume with', () => {
     // The kernel reports the tab's own answer to this question into the
     // registry rather than reading the backend's, so without this a tab starts

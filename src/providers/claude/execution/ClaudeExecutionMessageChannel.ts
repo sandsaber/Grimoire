@@ -33,6 +33,11 @@ export class ClaudeExecutionMessageChannel implements AsyncIterable<SDKUserMessa
     }
   }
 
+  /** Withdraws input the SDK has not read yet, without closing the warm query. */
+  discardPending(): void {
+    this.queue.length = 0;
+  }
+
   [Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> {
     return {
       next: () => {

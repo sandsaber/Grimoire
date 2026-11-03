@@ -88,6 +88,10 @@
     },
     "obsidian": {
       "moment": "2.31.0"
-    }
+    },
+    "glob@>=10 <14.0.2": "14.0.2",
+    "minimatch@>=8 <11.0.1": "11.0.1",
+    "@isaacs/nonrecursive-glob-match": "1.0.1",
+    "path-scurry@>=3 <4": "3.0.0"
   }
 }

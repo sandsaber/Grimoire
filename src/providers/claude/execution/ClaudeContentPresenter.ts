@@ -149,6 +149,11 @@ export class ClaudeContentPresenter {
 
   present(payload: unknown): readonly StreamChunk[] {
     if (typeof payload === 'object' && payload !== null
+      && 'type' in payload && payload.type === 'grimoire_turn_boundary') {
+      this.beginTurn();
+      return [];
+    }
+    if (typeof payload === 'object' && payload !== null
       && 'type' in payload && payload.type === 'grimoire_dispatch_error') {
       const phase = 'phase' in payload ? payload.phase : undefined;
       if (typeof phase === 'string' && Object.hasOwn(DISPATCH_PHASE_LABELS, phase)) {
