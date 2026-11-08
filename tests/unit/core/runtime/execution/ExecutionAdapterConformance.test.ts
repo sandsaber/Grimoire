@@ -1074,6 +1074,11 @@ describe('the assembled ChatRuntime adapter', () => {
       },
       antigravityProviderModule.runtimePorts({
         commandsPort: () => new AntigravityCommandCatalog(),
+        hydrateConversation: async () => ({ outcome: 'absent' }),
+        deleteConversationSession: async () => undefined,
+        resolveSessionId: () => null,
+        isPendingFork: () => false,
+        readSessionDropped: () => false,
         cachedPlanUsage: () => null,
         listModels: async () => [],
         refreshPlanUsage: async () => null,
@@ -1458,6 +1463,11 @@ describe('concurrent readiness', () => {
       },
       antigravityProviderModule.runtimePorts({
         commandsPort: () => new AntigravityCommandCatalog(),
+        hydrateConversation: async () => ({ outcome: 'absent' }),
+        deleteConversationSession: async () => undefined,
+        resolveSessionId: () => null,
+        isPendingFork: () => false,
+        readSessionDropped: () => false,
         cachedPlanUsage: () => null,
         listModels: async () => [],
         refreshPlanUsage: async () => null,

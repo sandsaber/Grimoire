@@ -81,6 +81,8 @@ export interface ManagedAcpExecutionInvocation {
 
 export interface ManagedAcpExecutionRequestResolver {
   resolve(requestRef: string): Promise<ManagedAcpExecutionInvocation>;
+  /** Release invocation resources only once the run can no longer retry them. */
+  release?(requestRef: string): void;
 }
 
 export interface ManagedAcpExecutionDynamicApplier {
@@ -281,6 +283,8 @@ export interface ManagedAcpExecutionBackendContext {
    */
   readonly runAbsoluteTimeoutMs?: () => number;
   readonly maxResultBytes: number;
+  /** A delivered denial can be the whole projection result for a native tool-only turn. */
+  readonly acceptEmptyResultAfterPermissionDenied?: (response: AcpPromptResponse) => boolean;
   /**
    * Whether a failed `session/load` means the saved session is gone.
    *
@@ -297,6 +301,7 @@ export interface ManagedAcpExecutionBackendContext {
 }
 
 interface PendingInteraction {
+  readonly rejectionOptionIds: ReadonlySet<string>;
   readonly interactionId: InteractionId;
   readonly run: ManagedAcpExecutionRun;
   readonly prepared: ManagedAcpPreparedInteraction;
@@ -491,6 +496,9 @@ implements ExecutionBackend, InteractionPort, ExecutionRecoveryPort {
     const interactionId = this.context.interactionIdFactory();
     return new Promise(resolve => {
       const pending: PendingInteraction = {
+        rejectionOptionIds: new Set(request.options
+          .filter(option => option.kind === 'reject_once' || option.kind === 'reject_always')
+          .map(option => option.optionId)),
         interactionId,
         run,
         prepared,
@@ -545,6 +553,10 @@ implements ExecutionBackend, InteractionPort, ExecutionRecoveryPort {
     this.interactions.delete(pending.interactionId);
     this.settledInteractions.set(pending.interactionId, responseId);
     trimOldestMapEntries(this.settledInteractions, 1024);
+    if (response.outcome.outcome === 'selected'
+      && pending.rejectionOptionIds.has(response.outcome.optionId)) {
+      pending.run.notePermissionDenied();
+    }
     pending.run.resolveInteraction(pending.interactionId, responseId);
     pending.complete(response);
   }
@@ -1143,6 +1155,7 @@ class ManagedAcpExecutionRun implements ExecutionRun {
   private timeoutHandle?: unknown;
   private absoluteTimeoutHandle?: unknown;
   private attempt = 0;
+  private permissionDenied = false;
   private recoveringAttempt?: number;
   private terminationTask?: Promise<void>;
   private completionTask?: Promise<void>;
@@ -1172,7 +1185,10 @@ class ManagedAcpExecutionRun implements ExecutionRun {
   async start(): Promise<void> {
     try {
       const invocation = await this.context.requestResolver.resolve(this.request.requestRef);
-      if (this.terminal) return;
+      if (this.terminal) {
+        this.releaseRequest();
+        return;
+      }
       validateInvocation(invocation);
       this.invocation = invocation;
       await this.session.prepare(this, invocation);
@@ -1196,7 +1212,12 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     }
   }
 
+  notePermissionDenied(): void {
+    if (!this.terminal) this.permissionDenied = true;
+  }
+
   beginDispatch(sessionRef: string, nativeRunRef?: string): number {
+    this.permissionDenied = false;
     this.dispatched = true;
     this.sessionRef = sessionRef;
     this.nativeRunRef = nativeRunRef;
@@ -1351,11 +1372,14 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     }
     const output = this.output.trim() || await this.recoverOutput();
     if (this.terminal || attempt !== this.attempt) return;
-    if (!output) {
+    if (!output && !(this.permissionDenied
+      && this.context.acceptEmptyResultAfterPermissionDenied?.(response) === true)) {
       this.finishForMissingResult();
       return;
     }
-    this.completionTask = this.commitCompletion(output, attempt);
+    // A provider may end immediately after a rejected tool. Its persisted
+    // approval/tool projection is the result; inventing assistant text is not.
+    this.completionTask = this.commitCompletion(output ?? '', attempt);
     await this.completionTask;
   }
 
@@ -1612,6 +1636,13 @@ class ManagedAcpExecutionRun implements ExecutionRun {
     this.session.publish(delivery);
   }
 
+  private releaseRequest(): void {
+    try { this.context.requestResolver.release?.(this.request.requestRef); }
+    catch {
+      // Reference cleanup must not prevent a confirmed run terminal.
+    }
+  }
+
   private finish(
     terminal: RunTerminalKind,
     reason: RunTerminalReason,
@@ -1619,6 +1650,7 @@ class ManagedAcpExecutionRun implements ExecutionRun {
   ): void {
     if (this.terminal) return;
     this.terminal = true;
+    this.releaseRequest();
     if (this.timeoutHandle !== undefined) this.context.scheduler.clearTimeout(this.timeoutHandle);
     if (this.absoluteTimeoutHandle !== undefined) {
       this.context.scheduler.clearTimeout(this.absoluteTimeoutHandle);

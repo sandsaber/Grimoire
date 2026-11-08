@@ -1,11 +1,12 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
+import { NodeManagedAcpProcessLauncher } from '@/app/execution/acp/NodeManagedAcpProcessLauncher';
 import { delayThroughWindow } from '@/app/execution/hostTimers';
 import { ProviderWorkspaceHolder } from '@/app/execution/ProviderWorkspaceHolder';
 import type { RunTerminalReason } from '@/core/execution/ExecutionContracts';
-import { executionSessionId, runId, sessionInstanceId } from '@/core/execution/ExecutionIds';
-import type { ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
-import type { ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
+import { executionSessionId, interactionId, runId, sessionInstanceId } from '@/core/execution/ExecutionIds';
+import type { BackendLifecycleRegistration, ExecutionLifecycleRegistry } from '@/core/execution/ExecutionLifecycleRegistry';
+import type { ProviderRuntimePorts, ProviderWorkspaceSlots } from '@/core/providers/ProviderModule';
 import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import {
   type BoundConversation,
@@ -20,6 +21,14 @@ import type {
 import type { ChatMessage } from '@/core/types';
 import { t } from '@/i18n/i18n';
 import type GrimoirePlugin from '@/main';
+import { AcpApprovalPresenter } from '@/providers/acp/execution/AcpApprovalPresenter';
+import { acpCancellationEvidence } from '@/providers/acp/execution/acpCancellationEvidence';
+import { AcpManagedClientAdapterFactory } from '@/providers/acp/execution/AcpManagedClientAdapter';
+import { AcpPermissionBridge } from '@/providers/acp/execution/AcpPermissionBridge';
+import { describeAcpSessionOpenFailure } from '@/providers/acp/execution/describeAcpSessionOpenFailure';
+import type { ManagedAcpClient, ManagedAcpClientFactory } from '@/providers/acp/execution/ManagedAcpClient';
+import { ManagedAcpExecutionBackend } from '@/providers/acp/execution/ManagedAcpExecutionBackend';
+import type { AcpNewSessionResponse } from '@/providers/acp/types';
 import { antigravityProviderModule } from '@/providers/antigravity/AntigravityProviderModule';
 import { createAntigravityModuleContext } from '@/providers/antigravity/app/AntigravityModuleContext';
 import { maybeGetAntigravityWorkspaceServices } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
@@ -46,12 +55,15 @@ import {
 import { buildAntigravityRuntimeEnv } from '@/providers/antigravity/runtime/AntigravityRuntimeEnvironment';
 import { expandAntigravityVaultSkillInvocation } from '@/providers/antigravity/runtime/AntigravityVaultSkills';
 import { getAntigravityProviderSettings } from '@/providers/antigravity/settings';
+import { updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
 import { getVaultPath } from '@/utils/path';
 
 import {
   type AntigravityImageAttachmentBundle,
   attachAntigravityImages,
 } from '../runtime/AntigravityImageAttachments';
+import { AntigravityAcpContentPresenter } from './AntigravityAcpContentPresenter';
+import { AntigravityAcpRequests } from './AntigravityAcpRequests';
 
 /** Combined stdout, stderr, and recovered-transcript ceiling for one run. */
 /**
@@ -81,12 +93,34 @@ const OUTPUT_BYTE_LIMIT = ANTIGRAVITY_OUTPUT_BYTE_LIMIT;
  * given its own copy — a reference minted against one store and resolved
  * against another resolves to nothing.
  *
- * It lives in `src/app/` because the backend takes no plugin, no process
- * module, and no vault: it is a strict module by the composition gate, and
- * everything ambient reaches it as a port constructed here.
+ * Ambient plugin and process state reaches the backends through ports built here.
  */
 export class AntigravityExecution {
   private readonly requests = new AntigravityRequestStore(() => opaqueId('agyreq'));
+  private readonly acpRequests = new AntigravityAcpRequests(
+    this.requests,
+    () => {
+      if (!getAntigravityProviderSettings(this.plugin.settings).enabled) {
+        throw new Error('Antigravity is disabled.');
+      }
+      const command = this.plugin.getResolvedProviderCliPath('antigravity') ?? 'agy';
+      return {
+        command,
+        cwd: getVaultPath(this.plugin.app) ?? process.cwd(),
+        environment: buildAntigravityRuntimeEnv(this.plugin.settings, command),
+        permissionMode: antigravityPermissionMode(this.plugin),
+      };
+    },
+    prompt => expandAntigravityVaultSkillInvocation(prompt,
+      maybeGetAntigravityWorkspaceServices(this.plugin)?.commandCatalog ?? null),
+  );
+  private readonly interactions = new AcpPermissionBridge((request, input) => ({
+    toolName: request.toolCall.title || request.toolCall.kind || 'Antigravity tool',
+    description: request.toolCall.title || 'Antigravity requests permission to use a tool.',
+    ...(typeof input.TargetFile === 'string' ? { blockedPath: input.TargetFile } : {}),
+  }), () => opaqueId('agyix'));
+  private readonly presenters = new Set<AcpApprovalPresenter>();
+  private acpBackend: ManagedAcpExecutionBackend | undefined;
   /**
    * The temp files each tab's currently dispatched turn handed to `agy`, by tab.
    *
@@ -103,10 +137,7 @@ export class AntigravityExecution {
   private readonly liveAttachments = new Map<string, AntigravityImageAttachmentBundle>();
 
   /**
-   * This provider's workspace slots, built on the first question.
-   *
-   * No runtime ports to refuse: print mode binds to no conversation, so the
-   * whole context is the workspace half.
+   * This provider's workspace slots, built independently of any tab's session.
    */
   private readonly workspaceHolder = new ProviderWorkspaceHolder(
     antigravityProviderModule.workspace,
@@ -149,23 +180,36 @@ export class AntigravityExecution {
   }
 
 
-  /**
-   * Releases the workspace, which is all this composition holds.
-   *
-   * It had no `dispose` at all until it had a workspace: print mode keeps no
-   * session, no daemon and no scratch, so there was nothing to release and the
-   * application never called one. A lazily built workspace is still a
-   * workspace, and the contract's `dispose` half is mandatory for that reason.
-   */
+  /** Releases presentation, launch references and legacy attachment files. */
   async dispose(): Promise<void> {
     this.freeAttachments();
+    this.acpRequests.dispose();
+    for (const presenter of this.presenters) presenter.dismissAll();
+    this.presenters.clear();
     await this.workspaceHolder.dispose();
   }
 
   createBackend(
     processRunner: AntigravityProcessRunner = this.createProcessRunner(),
+    clientFactory?: ManagedAcpClientFactory,
   ): AntigravityExecutionBackend {
+    const acp = this.createAcpBackend(clientFactory);
+    this.acpBackend = acp;
     const context: AntigravityExecutionBackendContext = {
+      acp: {
+        backend: acp,
+        available: async () => {
+          if (!getAntigravityProviderSettings(this.plugin.settings).enabled) return false;
+          const command = this.plugin.getResolvedProviderCliPath('antigravity') ?? 'agy';
+          const capabilities = await this.probeCapabilities(command,
+            buildAntigravityRuntimeEnv(this.plugin.settings, command));
+          if (capabilities.conclusive === false) {
+            throw new Error('Could not inspect the Antigravity CLI. Check that agy is installed, '
+              + 'set its absolute path in Antigravity settings, then try again.');
+          }
+          return capabilities.acp === true;
+        },
+      },
       requestResolver: {
         resolve: async requestRef => this.resolveInvocation(requestRef),
       },
@@ -189,6 +233,87 @@ export class AntigravityExecution {
     return new AntigravityExecutionBackend(context);
   }
 
+  createBackendRegistration(
+    processRunner?: AntigravityProcessRunner,
+    clientFactory?: ManagedAcpClientFactory,
+  ): BackendLifecycleRegistration {
+    const backend = this.createBackend(processRunner, clientFactory);
+    return { backend, interactions: this.acpBackend!, recovery: this.acpBackend! };
+  }
+
+  private createAcpBackend(factory?: ManagedAcpClientFactory): ManagedAcpExecutionBackend {
+    const underlying = factory ?? new AcpManagedClientAdapterFactory({
+      clientInfo: { name: 'grimoire', version: this.plugin.manifest?.version ?? '0.0.0' },
+      processLauncher: new NodeManagedAcpProcessLauncher({
+        resolve: startupRef => this.acpRequests.resolveLaunch(startupRef),
+      }),
+    });
+    const clientFactory: ManagedAcpClientFactory = {
+      create: async input => {
+        const client = await underlying.create(input);
+        const wrapped: ManagedAcpClient = {
+          initialize: () => client.initialize(),
+          newSession: async request => {
+            const session = await client.newSession(request);
+            this.acpRequests.rememberSession(wrapped, session);
+            return session;
+          },
+          loadSession: async request => {
+            const session = await client.loadSession(request);
+            this.acpRequests.rememberSession(wrapped, { ...session, sessionId: request.sessionId });
+            return session;
+          },
+          prompt: request => client.prompt(request),
+          setConfigOption: request => client.setConfigOption(request),
+          setMode: request => client.setMode(request),
+          setModel: request => client.setModel(request),
+          ...(client.listSessions ? { listSessions: request => client.listSessions!(request) } : {}),
+          cancel: sessionId => client.cancel(sessionId),
+          onSessionNotification: listener => client.onSessionNotification(listener),
+          onConnectionLost: listener => client.onConnectionLost(listener),
+          close: async () => {
+            try { return await client.close(); }
+            finally { this.acpRequests.forgetClient(wrapped); }
+          },
+        };
+        return wrapped;
+      },
+      ...(underlying.dispose ? { dispose: () => underlying.dispose!() } : {}),
+    };
+    return new ManagedAcpExecutionBackend({
+      descriptor: antigravityProviderModule.execution.descriptor,
+      clientFactory,
+      requestResolver: this.acpRequests,
+      dynamicApplier: { apply: input => this.acpRequests.configure(input) },
+      interactionBridge: this.interactions,
+      resultSink: {
+        storeResult: async input => input.signal.aborted ? { kind: 'aborted' } : {
+          kind: 'committed',
+          result: {
+            resultId: opaqueId('result'),
+            storage: 'projection',
+            digest: createHash('sha256').update(input.output).digest('hex'),
+          },
+        },
+      },
+      reconciler: { reconcile: async query => acpCancellationEvidence(query)
+        ?? { kind: 'unknown', effectsPossible: true } },
+      auxiliaryQueries: { execute: async () => { throw new Error('Antigravity auxiliary execution is unsupported.'); } },
+      scheduler: {
+        setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+        clearTimeout: handle => window.clearTimeout(handle as ReturnType<typeof setTimeout>),
+      },
+      sessionInstanceIdFactory: () => sessionInstanceId(opaqueId('si')),
+      interactionIdFactory: () => interactionId(opaqueId('ix')),
+      resultCommitTimeoutMs: 2_000,
+      recoveryTimeoutMs: 2_000,
+      runTimeoutMs: 10 * 60_000,
+      runAbsoluteTimeoutMs: () => 30 * 60_000,
+      maxResultBytes: OUTPUT_BYTE_LIMIT,
+      acceptEmptyResultAfterPermissionDenied: response => response.stopReason === 'end_turn',
+    });
+  }
+
   private createProcessRunner(): AntigravityProcessRunner {
     return new AntigravityPrintProcessRunner({
       transport: new NodeAntigravityProcessTransport(),
@@ -199,9 +324,7 @@ export class AntigravityExecution {
   /**
    * The Antigravity chat runtime, over the kernel.
    *
-   * One per tab, not one per provider.
-   * Print mode has no resume and keeps nothing per conversation, so the only
-   * thing the binding below is for is naming the owner of what a turn records.
+   * One per tab: native identity and approval presentation belong to its conversation.
    */
   createRuntime(): ExecutionChatRuntimeAdapter {
     const plugin = this.plugin;
@@ -210,12 +333,28 @@ export class AntigravityExecution {
     // owners, which the registry refuses.
     const agyTab = opaqueId('agytab');
 
-    // Print mode keeps nothing per conversation; this is here so the records a
-    // turn writes name the chat that owns them, which is what deleting that
-    // chat then finds them by (D4).
+    // Control records and the native binding belong to this conversation.
     let conversation: BoundConversation | null = null;
+    let sessionDropped = false;
+    let adapter: ExecutionChatRuntimeAdapter | undefined;
+    const content = new AntigravityAcpContentPresenter({
+      displayModel: () => selectedModel(plugin) ?? undefined,
+      onSessionResume: outcome => { sessionDropped = outcome === 'replaced'; },
+      onSessionOpened: session => this.syncAcpModels(session),
+    });
+    const legacy = new AntigravityContentPresenter();
+    const presenter = new AcpApprovalPresenter(this.interactions,
+      () => adapter?.interactionCallbacks() ?? {});
+    this.presenters.add(presenter);
+    const releaseSettled = this.interactions.onSettled(ref => presenter.dismiss(ref));
     const ports: ExecutionChatRuntimeHostPorts = {
-      syncConversation: next => { conversation = next; },
+      syncConversation: next => {
+        if (next?.id !== conversation?.id) {
+          content.forgetConversation();
+          sessionDropped = next?.providerState?.sessionDropped === true;
+        }
+        conversation = next;
+      },
       prepareTurn: (request: ChatTurnRequest) => {
         const prompt = buildAntigravityPromptText(request);
         return {
@@ -226,12 +365,19 @@ export class AntigravityExecution {
           request,
         };
       },
-      encodeRequestRef: (turn, history?: ChatMessage[], options?: ChatRuntimeQueryOptions) => (
-        this.requests.reference(buildAntigravityRequest(plugin, agyTab, turn, history, options))
-      ),
-      // Print mode has no provider-native session, which is what the legacy
-      // runtime reported too — it returned null and wrote `sessionId: null`.
-      currentSessionId: () => null,
+      encodeRequestRef: (turn, history?: ChatMessage[], options?: ChatRuntimeQueryOptions) => {
+        content.beginTurn();
+        return this.requests.reference({
+          ...buildAntigravityRequest(plugin, agyTab, turn, history, options),
+          acpPrompt: buildAntigravityPrintPrompt(turn.prompt,
+            ports.currentSessionId() ? [] : history),
+        });
+      },
+      // The live ACP binding takes precedence over the last persisted one.
+      currentSessionId: () => content.lastSessionId() ?? conversation?.sessionId ?? null,
+      sessionDropped: () => sessionDropped,
+      interactionPresenter: presenter,
+      consumeProviderTurnMetadata: () => content.consumeTurnMetadata(),
       delay: delayThroughWindow,
       reportCleanupFailure: error => {
         plugin.recordDebugLog({
@@ -241,13 +387,23 @@ export class AntigravityExecution {
           scope: 'antigravity',
         });
       },
-      describeFailure: reason => describeAntigravityFailure(plugin, reason),
-      // One presenter per runtime, because a tool card belongs to the tab that
-      // opened it. It holds nothing across turns — print mode has no session —
-      // so this is a translator rather than a state machine.
-      presentProviderContent: payload => new AntigravityContentPresenter().present(payload),
+      describeFailure: reason => {
+        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
+          const refusal = content.consumeTurnRefusal();
+          if (refusal) return describeAcpSessionOpenFailure('Antigravity', refusal.message, refusal.origin);
+        }
+        // A native session always stays on ACP, so an ACP error must not be
+        // explained as the legacy print transport refusing Safe mode.
+        return ports.currentSessionId() && reason === 'pre-dispatch-rejected'
+          ? describeAcpSessionOpenFailure('Antigravity')
+          : describeAntigravityFailure(plugin, reason);
+      },
+      // Each transport retains its own content vocabulary, scoped to this tab.
+      presentProviderContent: payload => [
+        ...content.present(payload), ...legacy.present(payload),
+      ],
     };
-    return new ExecutionChatRuntimeAdapter(
+    adapter = new AntigravityRuntimeAdapter(
       {
         registry: this.registry,
         backendId: antigravityProviderModule.execution.descriptor.backendId,
@@ -268,8 +424,29 @@ export class AntigravityExecution {
         nextRunId: () => runId(opaqueId('run')),
       },
       ports,
-      antigravityProviderModule.runtimePorts(createAntigravityModuleContext(plugin)),
+      antigravityProviderModule.runtimePorts(createAntigravityModuleContext(plugin,
+        () => conversation, { sessionDropped: () => sessionDropped })),
+      () => {
+        presenter.dismissAll();
+        releaseSettled();
+        this.presenters.delete(presenter);
+      },
     );
+    return adapter;
+  }
+
+  private syncAcpModels(session: AcpNewSessionResponse): void {
+    const models = session.models?.availableModels
+      .filter(model => Boolean((model.modelId ?? model.id)?.trim() && model.name.trim()))
+      .map(model => ({ rawId: model.name.trim(), label: model.name.trim(), description: model.description }));
+    if (!models?.length) return;
+    const current = getAntigravityProviderSettings(this.plugin.settings).discoveredModels;
+    if (JSON.stringify(models) === JSON.stringify(current)) return;
+    updateAntigravityProviderSettings(this.plugin.settings, { discoveredModels: models });
+    void this.plugin.saveSettings?.().catch(error => this.plugin.recordDebugLog?.({
+      error, event: 'execution.sessionConfig.failed', level: 'warn', scope: 'antigravity',
+    }));
+    for (const view of this.plugin.getAllViews?.() ?? []) view.refreshModelSelector();
   }
 
   /**
@@ -449,4 +626,19 @@ function selectedModel(
 
 function opaqueId(prefix: string): string {
   return `${prefix}-${randomUUID().replaceAll('-', '')}`;
+}
+
+/** Releases only this tab's approval presentation after the kernel releases it. */
+class AntigravityRuntimeAdapter extends ExecutionChatRuntimeAdapter {
+  constructor(
+    context: ConstructorParameters<typeof ExecutionChatRuntimeAdapter>[0],
+    ports: ExecutionChatRuntimeHostPorts,
+    features: ProviderRuntimePorts,
+    private readonly releaseTab: () => void,
+  ) { super(context, ports, features); }
+
+  override async cleanup(): Promise<void> {
+    try { await super.cleanup(); }
+    finally { this.releaseTab(); }
+  }
 }

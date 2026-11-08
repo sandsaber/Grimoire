@@ -171,10 +171,8 @@ export class ApplicationRuntime {
     this.localShell = new LocalShellExecution(registry);
     this.kernel.registerBackend({ backend: this.localShell.createBackend() });
 
-    // Print mode, and the only provider with no interaction channel: approval
-    // is refused before a process exists, so it registers as a bare backend.
     this.antigravity = new AntigravityExecution(plugin, registry);
-    this.kernel.registerBackend({ backend: this.antigravity.createBackend() });
+    this.kernel.registerBackend(this.antigravity.createBackendRegistration());
     this.commandcode = new CommandcodeExecution(plugin, registry);
     const commandcodeBackend = this.commandcode.createBackend();
     this.kernel.registerBackend({ backend: commandcodeBackend, interactions: commandcodeBackend.interactions });
@@ -601,9 +599,6 @@ export class ApplicationRuntime {
   dispose(): void {
     this.disposed = true;
     void this.localShell.dispose();
-    // Added when it acquired something to release: print mode keeps no session
-    // and no daemon, so this composition had no `dispose` and the application
-    // never called one.
     void this.antigravity.dispose();
     void this.commandcode.dispose();
     this.codex.dispose();

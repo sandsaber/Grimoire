@@ -6,12 +6,18 @@ const HELP_PROBE_TIMEOUT_MS = 10_000;
 const PROBE_OUTPUT_LIMIT = 64_000;
 
 export interface AntigravityCliCapabilities {
+  /** False for a timed-out, cancelled or failed probe; retry the next admission. */
+  conclusive?: boolean;
+  /** `agy acp` is advertised as a subcommand by modern CLI builds. */
+  acp?: boolean;
   addDir: boolean;
   printTimeout: boolean;
   streamJson: boolean;
 }
 
 export const NO_ANTIGRAVITY_CLI_CAPABILITIES: AntigravityCliCapabilities = {
+  conclusive: false,
+  acp: false,
   addDir: false,
   printTimeout: false,
   streamJson: false,
@@ -90,6 +96,8 @@ function detectCliCapabilities(
     let settled = false;
     let timer: number | undefined;
     const evaluate = (): AntigravityCliCapabilities => ({
+      conclusive: true,
+      acp: /^\s*acp(?:\s|$)/m.test(output),
       addDir: ADD_DIR_FLAG_PATTERN.test(output),
       printTimeout: PRINT_TIMEOUT_FLAG_PATTERN.test(output),
       streamJson: INPUT_FORMAT_FLAG_PATTERN.test(output) && OUTPUT_FORMAT_FLAG_PATTERN.test(output),
@@ -125,7 +133,7 @@ function detectCliCapabilities(
       // Help output that already advertises every probed flag cannot gain
       // more capabilities, so the child can be released early.
       const capabilities = evaluate();
-      if (capabilities.addDir && capabilities.printTimeout && capabilities.streamJson) {
+      if (capabilities.acp && capabilities.addDir && capabilities.printTimeout && capabilities.streamJson) {
         settle(true);
       }
     };

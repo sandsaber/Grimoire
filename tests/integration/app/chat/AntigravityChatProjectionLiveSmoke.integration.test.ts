@@ -1,6 +1,7 @@
 import '@/providers';
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -23,14 +24,11 @@ import { updateAntigravityProviderSettings } from '@/providers/antigravity/setti
  * The Antigravity chat projection, against a real `agy`.
  *
  * A live smoke matrix splits into rows a person has to watch and rows that can
- * be driven. This is the driven half for the smallest provider: a turn submitted the way a tab submits one, run by the
- * kernel over a real CLI, drawn by the real render target, and read back out of
- * a real record store.
+ * be driven. This is the driven half: a turn submitted the way a tab submits
+ * one, run by the kernel over a real CLI, drawn by the real render target, and
+ * read back out of a real record store.
  *
- * Print mode is the smallest whole turn there is — no session to resume, no
- * interaction channel, one `output-delta` carrying the whole answer — so what
- * these rows measure is submit, draw, barrier and terminal, with none of the
- * couplings that would confound a first reading of them.
+ * Includes ACP approvals and native session resume through the same entrypoint.
  *
  * Off by default — it starts a CLI and spends the account's tokens. Run it with
  * `GRIMOIRE_ANTIGRAVITY_LIVE=1`.
@@ -44,28 +42,29 @@ live('Antigravity chat projection live smoke', () => {
   const CONVERSATION_ID = 'conv-agy-projection';
 
   const running: Array<() => Promise<void>> = [];
+  const vaults: string[] = [];
 
   afterEach(async () => {
-    for (const release of running.splice(0)) {
+    for (const release of running.splice(0).reverse()) {
       await release().catch(() => undefined);
     }
+    for (const vault of vaults.splice(0)) rmSync(vault, { force: true, recursive: true });
   });
 
   /** The `agy` invocations this process is responsible for, right now. */
   function agyProcesses() {
-    return ownedProcesses(command => command.includes(cli) && command.includes('--print'));
+    return ownedProcesses(command => command.includes(cli)
+      && (/(?:^|\s)acp(?:\s|$)/.test(command) || command.includes('--print')));
   }
 
   function report(...parts: readonly string[]): void {
     process.stdout.write(`${parts.join(' ')}\n`);
   }
 
-  function createPlugin(vault: string): any {
+  function createPlugin(vault: string, permissionMode: 'normal' | 'full_access'): any {
     const settings: Record<string, unknown> = {
-      // Print mode cannot ask for approval, so anything short of full access is
-      // refused before a process exists.
-      permissionMode: 'full_access',
-      savedProviderPermissionMode: { antigravity: 'full_access' },
+      permissionMode,
+      savedProviderPermissionMode: { antigravity: permissionMode },
       userName: 'Michael',
     };
     updateAntigravityProviderSettings(settings, {
@@ -79,12 +78,20 @@ live('Antigravity chat projection live smoke', () => {
       app: { vault: { adapter: { basePath: vault } } },
       getResolvedProviderCliPath: () => cli,
       recordDebugLog: () => undefined,
+      saveSettings: async () => undefined,
     };
   }
 
-  async function createHarness() {
-    const vault = mkdtempSync(join(tmpdir(), 'grimoire-agy-projection-'));
-    writeFileSync(join(vault, 'Note.md'), '# Note\n\nThe vault has one note in it.\n');
+  async function createHarness(
+    permissionMode: 'normal' | 'full_access' = 'full_access',
+    vaultAdapter = createDurableInMemoryVaultAdapter(),
+    reuseVault?: string,
+  ) {
+    const vault = reuseVault ?? mkdtempSync(join(tmpdir(), 'grimoire-agy-projection-'));
+    if (!reuseVault) vaults.push(vault);
+    if (!existsSync(join(vault, 'Note.md'))) {
+      writeFileSync(join(vault, 'Note.md'), '# Note\n\nThe vault has one note in it.\n');
+    }
     const host = new ExecutionKernelHost({
       storage: new VaultDurableStorage(createDurableInMemoryVaultAdapter()),
       scheduler: {
@@ -92,9 +99,9 @@ live('Antigravity chat projection live smoke', () => {
         clearTimeout: handle => clearTimeout(handle as NodeJS.Timeout),
       },
     });
-    const execution = new AntigravityExecution(createPlugin(vault), host.registry);
+    const execution = new AntigravityExecution(createPlugin(vault, permissionMode), host.registry);
     // No runner argument: the default is the OS one, which is the whole point.
-    host.registerBackend({ backend: execution.createBackend() });
+    host.registerBackend(execution.createBackendRegistration());
     await host.start();
 
     const runtime = execution.createRuntime();
@@ -104,16 +111,23 @@ live('Antigravity chat projection live smoke', () => {
       lifecycle: host.registry,
       providerId: 'antigravity',
       runtime,
+      vaultAdapter,
+      syncConversation: true,
       // The vault the CLI is working in, so the column normalizes a written
       // file's path against the same root the product would.
       vaultPath: vault,
     });
-    running.push(async () => {
+    let released = false;
+    const release = async () => {
+      if (released) return;
+      released = true;
       await harness.close();
+      await runtime.cleanup();
       await host.dispose();
-      rmSync(vault, { force: true, recursive: true });
-    });
-    return harness;
+      await execution.dispose();
+    };
+    running.push(release);
+    return { ...harness, runtime, vault, release };
   }
 
   function pause(delayMs: number): Promise<void> {
@@ -143,7 +157,7 @@ live('Antigravity chat projection live smoke', () => {
   });
 
   it('row A: draws a real answer once and leaves it in the vault', async () => {
-    const { column, sessions, tab } = await createHarness();
+    const { column, sessions, tab, release, runtime } = await createHarness();
     const text = 'Reply with exactly: ok';
 
     const submitted = await tab.send({ text }, userMessage(text));
@@ -213,8 +227,11 @@ live('Antigravity chat projection live smoke', () => {
     expect(storedAnswer?.id).toBe(assistants[0]?.id);
     expect(storedAnswer?.content.trim()).not.toBe('');
 
-    // A turn that ended by itself owns the same cleanup a cancelled one does.
-    expect(agyProcesses().map(row => row.command)).toEqual([]);
+    expect(runtime.getSessionId()).toBeTruthy();
+    await release();
+    if (process.platform !== 'win32') {
+      await waitFor('idle chat session cleanup', 20_000, () => agyProcesses().length === 0 ? [] : undefined);
+    }
   });
 
   it('row B: keeps a cancelled turn drawn and leaves no agy behind', async () => {
@@ -222,7 +239,7 @@ live('Antigravity chat projection live smoke', () => {
       report('ROW B skipped: Windows job-object ownership is not observable this way');
       return;
     }
-    const { column, tab } = await createHarness();
+    const { column, tab, release } = await createHarness();
     const text = 'Run the shell command `sleep 120` and then reply with exactly: done';
 
     const submitted = await tab.send({ text }, userMessage(text));
@@ -240,23 +257,134 @@ live('Antigravity chat projection live smoke', () => {
     expect(column.finished).toHaveLength(1);
     expect(column.chunks.filter(chunk => chunk.type === 'error')).toHaveLength(0);
 
+    // ACP may remain warm after cancellation until its last surface releases it.
+    await release();
     const survivors = await waitFor('the agy tree to disappear', 20_000, () => (
       agyProcesses().length === 0 ? [] : undefined
     ));
     expect(survivors).toEqual([]);
   });
 
+  it('Safe mode: rejects one edit, allows the next turn, and resumes the saved native session', async () => {
+    const vaultAdapter = createDurableInMemoryVaultAdapter();
+    const first = await createHarness('normal', vaultAdapter);
+    const file = join(first.vault, 'Note.md');
+    const original = 'OLD_MARKER\n';
+    const updated = 'NEW_MARKER\n';
+    const secret = `memory-${randomUUID()}`;
+    writeFileSync(file, original);
+    let decision: 'allow' | 'deny' = 'deny';
+    const asked: Array<{ input: string; before: string; after: string; decision: string }> = [];
+    const native: Array<{ kind: string; phase?: string; stopReason?: string; status?: string;
+      values?: readonly unknown[]; models?: number; configOptions?: number }> = [];
+    // Observe native completion evidence while retaining the real presenter.
+    const observe = (runtime: typeof first.runtime, phase: string) => {
+      const present = runtime.surfacePorts.presentProviderContent!;
+      jest.spyOn(runtime.surfacePorts, 'presentProviderContent').mockImplementation(payload => {
+        const content = payload as any;
+        if (content?.kind === 'session-config') native.push({ kind: content.kind, phase,
+          models: content.session?.models?.availableModels?.length ?? 0,
+          configOptions: content.session?.configOptions?.length ?? 0 });
+        if (content?.kind === 'prompt-result') native.push({ kind: content.kind, stopReason: content.response?.stopReason });
+        if (content?.kind === 'session-update' && content.notification?.update?.sessionUpdate === 'tool_call_update') {
+          native.push({ kind: 'tool_call_update', status: content.notification.update.status });
+        }
+        return present(payload);
+      });
+    };
+    observe(first.runtime, 'first');
+    const diagnostics = (phase: string, terminal: unknown, column = first.column) => {
+      const redact = (value: unknown) => JSON.stringify(value).replaceAll(secret, '[memory token]').slice(0, 700);
+      report('SAFE', phase, JSON.stringify(terminal), `approvals=${asked.length}`,
+        redact(column.chunks.filter(chunk => chunk.type === 'error').map(chunk => chunk.content)),
+        redact(column.failures), JSON.stringify(native), `drawnChars=${column.drawn.join('').length}`);
+    };
+    first.runtime.installInteractions({ approval: async (_tool, input, _description, options) => {
+      native.push({ kind: 'offered', values: options?.decisionOptions?.map(option => option.value) });
+      const before = readFileSync(file, 'utf8');
+      // A real edit must stay blocked while the UI is still considering it.
+      await pause(250);
+      asked.push({ input: JSON.stringify(input), before, after: readFileSync(file, 'utf8'), decision });
+      return decision;
+    } });
+
+    const deniedText = `Remember this secret code for later: ${secret}. `
+      + 'Use your file editing tool to replace OLD_MARKER with NEW_MARKER in Note.md, preserving its final newline. '
+      + 'If permission is denied, stop and do not retry or use another tool. Reply briefly.';
+    const denied = await first.tab.send({ text: deniedText }, userMessage(deniedText));
+    const deniedResult = await denied.ticket.completion;
+    await first.tab.settled();
+    if (deniedResult.terminal.kind !== 'succeeded') diagnostics('denied', deniedResult.terminal);
+    expect(deniedResult.terminal.kind).toBe('succeeded');
+    expect(native.some(event => event.kind === 'offered' && event.values?.includes('reject-once'))).toBe(true);
+    expect(native.some(event => event.kind === 'prompt-result' && event.stopReason === 'end_turn')).toBe(true);
+    expect(first.column.failures).toEqual([]);
+    expect(asked.some(item => item.decision === 'deny' && item.input.includes('Note.md'))).toBe(true);
+    expect(asked.every(item => item.before === original && item.after === original)).toBe(true);
+    expect(readFileSync(file, 'utf8')).toBe(original);
+    await first.saveAfterTurn();
+    const sessionId = first.runtime.getSessionId();
+    expect(sessionId).toBeTruthy();
+
+    // Remove replayable history: the next answer must come from this native session.
+    await first.sessions.records.apply(CONVERSATION_ID, current => ({ ...current, messages: [] }));
+    decision = 'allow';
+    const approvedText = 'Try the same Note.md edit again using your file editing tool: replace OLD_MARKER '
+      + 'with NEW_MARKER, preserving the final newline. Then repeat only the secret code I asked you to remember.';
+    const drawnBefore = first.column.drawn.length;
+    const approved = await first.tab.send({ text: approvedText }, userMessage(approvedText));
+    const approvedResult = await approved.ticket.completion;
+    await first.tab.settled();
+    if (approvedResult.terminal.kind !== 'succeeded') diagnostics('approved', approvedResult.terminal);
+    expect(approvedResult.terminal.kind).toBe('succeeded');
+    expect(asked.some(item => item.decision === 'allow' && item.input.includes('Note.md'))).toBe(true);
+    expect(asked.every(item => item.before === item.after)).toBe(true);
+    expect(readFileSync(file, 'utf8')).toBe(updated);
+    expect(first.column.drawn.slice(drawnBefore).join('')).toContain(secret);
+    expect(first.runtime.getSessionId()).toBe(sessionId);
+    await first.saveAfterTurn();
+    const saved = await first.sessions.records.read(CONVERSATION_ID);
+    expect(saved.kind === 'present' ? saved.metadata.sessionId : null).toBe(sessionId);
+    await first.sessions.records.apply(CONVERSATION_ID, current => ({ ...current, messages: [] }));
+    await first.release();
+    if (process.platform !== 'win32') {
+      await waitFor('the saved session process to close', 20_000, () => agyProcesses().length === 0 ? [] : undefined);
+    }
+
+    // New kernel, composition and CLI; only the saved binding and native transcript survive.
+    const resumed = await createHarness('normal', vaultAdapter, first.vault);
+    observe(resumed.runtime, 'resumed');
+    const recall = 'Without using tools, repeat only the secret code I asked you to remember.';
+    const next = await resumed.tab.send({ text: recall }, userMessage(recall), {
+      ...(sessionId ? { nativeSessionRef: sessionId } : {}),
+    });
+    const resumedResult = await next.ticket.completion;
+    await resumed.tab.settled();
+    if (resumedResult.terminal.kind !== 'succeeded') diagnostics('resumed', resumedResult.terminal, resumed.column);
+    expect(resumedResult.terminal.kind).toBe('succeeded');
+    expect(resumed.column.drawn.join('')).toContain(secret);
+    expect(resumed.runtime.getSessionId()).toBe(sessionId);
+    expect(resumed.column.chunks.filter(chunk => chunk.type === 'error')).toEqual([]);
+    await resumed.saveAfterTurn();
+    const reloaded = await resumed.sessions.records.read(CONVERSATION_ID);
+    expect(reloaded.kind === 'present' ? reloaded.metadata.sessionId : null).toBe(sessionId);
+    await resumed.release();
+    if (process.platform !== 'win32') {
+      await waitFor('the resumed session process to close', 20_000, () => agyProcesses().length === 0 ? [] : undefined);
+    }
+    report('SAFE deny/allow + native resume', String(sessionId),
+      `denied=${asked.filter(item => item.decision === 'deny').length}`,
+      `allowed=${asked.filter(item => item.decision === 'allow').length}`,
+      JSON.stringify(native.filter(event => event.kind === 'session-config')));
+  }, 600_000);
+
   // Matrix rows 11 and 12, driven rather than watched: a turn that outlives the
   // tab that started it, and one run drawn into two surfaces. The bodies are
   // shared with every other provider's file — see `chatProjectionSurfaceRows` —
   // because what they certify is the path rather than the provider.
-  // Row 13 is not here — print mode reports no usage at all, so a row about the
-  // context meter would be a row about `agy --print`.
   const surfaceRows = chatProjectionSurfaceRows({
-    createHarness,
+    createHarness: () => createHarness(),
     report,
-    // Print mode answers in one delta, so the slow prompt is what gives the tab
-    // something to close on.
     slowPrompt: 'Count from 1 to 30, one number per line, then reply with exactly: done',
   });
 

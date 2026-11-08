@@ -423,24 +423,15 @@ describe('Antigravity execution composition', () => {
     expect(runner.invocations[0]?.command).toBe('/opt/agy');
   });
 
-  it('persists the same session binding the runtime it replaced did', async () => {
-    // Persisted-state parity across the flip. The legacy runtime wrote
-    // `sessionId: null` and echoed `providerState` back unchanged — a no-op
-    // patch, since print mode has no native session to record. The adapter
-    // contributes no history port for this provider and so patches nothing.
-    // The one observable difference, an explicit null against an absent key,
-    // cannot change a conversation whose session id was never anything else.
+  it('keeps the legacy print transport without a native binding', async () => {
     const { runtime } = await createTurnHarness(createPlugin());
 
     expect(runtime.getSessionId()).toBeNull();
     expect(runtime.resolveSessionIdForFork?.({ id: 'conversation-1' })).toBeNull();
-    // `null`, not an empty patch: no history port means no opinion about this
-    // conversation's binding, and the barrier writes nothing rather than
-    // writing an empty object over what is there.
     expect(runtime.sessionBinding?.({
       conversation: { id: 'conversation-1' },
       sessionInvalidated: false,
-    })).toBeNull();
+    })).toEqual({ sessionId: null });
   });
 
   it('explains the failures it can, and defers on the rest', () => {

@@ -1,25 +1,22 @@
+import type { BoundConversation } from '@/core/runtime/execution/ExecutionChatRuntimeAdapter';
+
 import type GrimoirePlugin from '../../../main';
 import type {
   ProviderSettingsTabRenderer,
 } from '../../../providers/shared/providerHostContracts';
 import { createWorkspaceContextSlots } from '../../shared/workspaceContextSlots';
 import type { AntigravityWorkspaceContext } from '../AntigravityProviderModule';
+import { AntigravityConversationHistoryService } from '../history/AntigravityConversationHistoryService';
 import { antigravityChatUIConfig } from '../ui/AntigravityChatUIConfig';
 import { maybeGetAntigravityWorkspaceServices } from './AntigravityWorkspaceServices';
 
-/**
- * The module's context over the running plugin.
- *
- * The smallest of the nine, and the last to get one: Antigravity runs in print
- * mode, so it has no conversation to bind to, no history to hydrate and no
- * session to resolve. Its vault skills still need a command catalog even though
- * the CLI has no native slash commands. Its workspace contribution
- * was built inline in the module until now, which is why it was the one
- * provider with no context at all.
- */
+/** Workspace services are shared; history ports answer only for the bound tab. */
 export function createAntigravityModuleContext(
   plugin: GrimoirePlugin,
+  conversation: () => BoundConversation | null = () => null,
+  ports: { sessionDropped(): boolean } = { sessionDropped: () => false },
 ): AntigravityWorkspaceContext {
+  const history = new AntigravityConversationHistoryService();
   const workspace = createWorkspaceContextSlots({
     chatUI: antigravityChatUIConfig,
     plugin,
@@ -28,6 +25,12 @@ export function createAntigravityModuleContext(
   });
 
   return {
+    hydrateConversation: async () => ({ outcome: 'absent' }),
+    deleteConversationSession: async () => undefined,
+    resolveSessionId: id => conversation()?.id === id
+      ? history.resolveSessionIdForConversation(conversation()) : null,
+    isPendingFork: () => false,
+    readSessionDropped: id => conversation()?.id === id ? ports.sessionDropped() : null,
     commandsPort: () => workspace.commandsPort(),
     cachedPlanUsage: () => workspace.cachedPlanUsage(),
     listModels: () => workspace.listModels(),

@@ -62,6 +62,7 @@ describe('probeAntigravityCliCapabilities', () => {
     const promise = probeAntigravityCliCapabilities('/usr/local/bin/agy', runtimeEnv);
     emitHelpAndExit(proc, [
       'Usage: agy [flags]',
+      '  acp                    Start the ACP server',
       '  --add-dir <dir>          Add a workspace directory',
       '  --input-format <format>  Input format',
       '  --output-format <format> Output format',
@@ -70,6 +71,8 @@ describe('probeAntigravityCliCapabilities', () => {
     ].join('\n'));
 
     await expect(promise).resolves.toEqual({
+      conclusive: true,
+      acp: true,
       addDir: true,
       printTimeout: true,
       streamJson: true,
@@ -86,6 +89,32 @@ describe('probeAntigravityCliCapabilities', () => {
     );
   });
 
+  it('waits for trailing subcommands after the legacy flags', async () => {
+    const proc = createMockChildProcess();
+    mockedSpawn.mockReturnValue(proc);
+    const promise = probeAntigravityCliCapabilities('agy', {});
+    proc.stdout.write('--add-dir --input-format --output-format --print-timeout\n');
+    await flushAsyncQueue();
+    expect(proc.kill).not.toHaveBeenCalled();
+    proc.stderr.write('Commands:\n  acp   Start the ACP server\n');
+    proc.emit('close', 0, null);
+    await expect(promise).resolves.toEqual({ conclusive: true, acp: true, addDir: true, printTimeout: true, streamJson: true });
+  });
+
+  it('detects the modern subcommand without assuming print flags or matching sibling names', async () => {
+    const proc = createMockChildProcess();
+    mockedSpawn.mockReturnValue(proc);
+    const promise = probeAntigravityCliCapabilities('agy', {});
+    emitHelpAndExit(proc, 'Commands:\n  acp  Start ACP\n');
+    await expect(promise).resolves.toEqual({ conclusive: true, acp: true, addDir: false, printTimeout: false, streamJson: false });
+    resetAntigravityCliCapabilitiesCache();
+    const sibling = createMockChildProcess();
+    mockedSpawn.mockReturnValue(sibling);
+    const negative = probeAntigravityCliCapabilities('agy', {});
+    emitHelpAndExit(sibling, 'Commands:\n  acp-debug  Inspect ACP\n  --acp  Deprecated flag');
+    expect((await negative).acp).toBe(false);
+  });
+
   it('reports mixed capabilities when help advertises only some flags', async () => {
     const proc = createMockChildProcess();
     mockedSpawn.mockReturnValue(proc);
@@ -99,6 +128,8 @@ describe('probeAntigravityCliCapabilities', () => {
     ].join('\n'));
 
     await expect(promise).resolves.toEqual({
+      conclusive: true,
+      acp: false,
       addDir: true,
       printTimeout: true,
       streamJson: false,
@@ -128,6 +159,8 @@ describe('probeAntigravityCliCapabilities', () => {
     emitHelpAndExit(proc, 'Usage: agy [flags]\n  --print');
 
     await expect(promise).resolves.toEqual({
+      conclusive: true,
+      acp: false,
       addDir: false,
       printTimeout: false,
       streamJson: false,
@@ -142,6 +175,8 @@ describe('probeAntigravityCliCapabilities', () => {
     proc.emit('error', new Error('ENOENT'));
 
     await expect(promise).resolves.toEqual({
+      conclusive: false,
+      acp: false,
       addDir: false,
       printTimeout: false,
       streamJson: false,
@@ -154,6 +189,8 @@ describe('probeAntigravityCliCapabilities', () => {
     });
 
     await expect(probeAntigravityCliCapabilities('agy', {})).resolves.toEqual({
+      conclusive: false,
+      acp: false,
       addDir: false,
       printTimeout: false,
       streamJson: false,
@@ -204,6 +241,7 @@ describe('probeAntigravityCliCapabilities', () => {
 
     const promise = probeAntigravityCliCapabilities('agy', {});
     proc.stdout.write([
+      '  acp    Start the ACP server',
       '  --add-dir <dir>',
       '  --input-format <format>',
       '  --output-format <format>',
@@ -212,6 +250,8 @@ describe('probeAntigravityCliCapabilities', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     await expect(promise).resolves.toEqual({
+      conclusive: true,
+      acp: true,
       addDir: true,
       printTimeout: true,
       streamJson: true,
@@ -229,6 +269,8 @@ describe('probeAntigravityCliCapabilities', () => {
       jest.advanceTimersByTime(10_000);
 
       await expect(promise).resolves.toEqual({
+        conclusive: false,
+        acp: false,
         addDir: false,
         printTimeout: false,
         streamJson: false,
@@ -245,6 +287,8 @@ describe('probeAntigravityCliCapabilities', () => {
       retryProc.emit('close', 0, null);
 
       await expect(retry).resolves.toEqual({
+        conclusive: true,
+        acp: false,
         addDir: true,
         printTimeout: true,
         streamJson: true,
@@ -327,6 +371,8 @@ describe('probeAntigravityCliCapabilities', () => {
       '  --print',
     ].join('\n'));
     await expect(directoryPromise).resolves.toEqual({
+      conclusive: true,
+      acp: false,
       addDir: false,
       printTimeout: false,
       streamJson: false,

@@ -31,11 +31,13 @@ const ANTIGRAVITY_REASONING_OPTIONS: ProviderReasoningOption[] = [
 const DEFAULT_CONTEXT_WINDOW = 1_000_000;
 const ANTIGRAVITY_PERMISSION_MODE_TOGGLE: ProviderPermissionModeToggleConfig = {
   inactiveValue: 'normal',
-  inactiveLabel: 'Blocked',
-  inactiveDescription: 'Safe approvals are unavailable for agy --print; Windows uses best-effort CLI fallbacks',
+  inactiveLabel: 'Safe',
+  inactiveDescription: 'Review Antigravity permission requests in chat. Requires agy acp.',
   activeValue: 'full_access',
   activeLabel: 'Auto-approve',
   activeDescription: 'Antigravity may edit files without Grimoire prompts',
+  planValue: 'plan',
+  planLabel: 'Plan',
 };
 
 function getAntigravityModelOptions(settings: Record<string, unknown>): ProviderUIOption[] {

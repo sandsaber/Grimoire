@@ -43,12 +43,12 @@ It's built for people who already work in Obsidian and want AI help that behaves
 
 | Capability | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix | Command Code | Pi |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Local persistent runtime | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No | Yes |
+| Local persistent runtime | Yes | Yes | Yes | Yes | Yes | Yes | ACP | Yes | Yes | Yes | Yes | No | Yes |
 | Native history hydration | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No | No | No | No | Yes |
-| Plan mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No | No |
-| Image attachments | Yes | Yes | Yes | No | Yes | Yes | Files | Yes | Yes | Yes | Files (opt-in) | Files (opt-in) | Yes |
+| Plan mode | Yes | Yes | Yes | Yes | Yes | Yes | ACP | Yes | Yes | Yes | Yes | No | No |
+| Image attachments | Yes | Yes | Yes | No | Yes | Yes | ACP / files in print mode | Yes | Yes | Yes | Files (opt-in) | Files (opt-in) | Yes |
 | Instruction mode | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No | No |
-| Reasoning effort controls | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes (model-specific) | Yes (model-specific) |
+| Reasoning effort controls | Yes | Yes | Yes | Yes | Yes | Yes | Model variants | Yes | Yes | No | Yes | Yes (model-specific) | Yes (model-specific) |
 | Rewind | No | Yes | No | Yes | No | No | No | No | No | No | No | No | No |
 | Fork | Yes | Yes | No | Yes | No | No | No | No | No | No | No | No | No |
 | Provider slash commands | No | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | Yes | Yes | No | Yes |
@@ -108,7 +108,7 @@ Enable the providers you want under Settings, Grimoire, Providers, and they'll a
 
 For the best Grimoire experience, start with Codex, Claude Code, OpenCode, MiMoCode, Kimi Code, Grok Build, or Qwen Code. These providers currently expose the strongest runtime surfaces for vault-native work: persistent sessions, plan-oriented workflows, tool activity, and rich model controls.
 
-Antigravity CLI and Gemini CLI (Legacy) remain available for Google accounts and compatibility cases, but they are not recommended as primary Grimoire providers today. Grimoire supports them on a best-effort basis, and we have implemented the fallbacks their current CLIs make possible, but their ACP and runtime surfaces are technically limited: sessions, approvals, streaming, tool/edit metadata, model discovery, and usage reporting are incomplete or unreliable compared with the recommended providers.
+Antigravity CLI supports Google accounts through ACP on compatible versions. Gemini CLI (Legacy) remains available for accounts that still use Gemini CLI.
 
 ### Codex
 
@@ -170,13 +170,12 @@ agy
 Install the official Antigravity CLI from Google, authenticate it locally, then enable Antigravity in Grimoire. Grimoire auto-detects `agy` from PATH, or you can set a custom CLI path in provider settings.
 
 - [Antigravity CLI](https://antigravity.google/product/antigravity-cli)
+- [Antigravity ACP documentation](https://antigravity.google/docs/cli/acp/)
 - [Gemini CLI migration guide](https://goo.gle/gemini-cli-migration)
 
-Inside Grimoire, Antigravity runs through `agy --print` with optional model selection from `agy models`, and Grimoire folds the active note plus editor, browser, canvas, vault-search, and project-workspace context into that print prompt. Images are supplied as temporary files for the model to read; attach them again for follow-up turns. This is a best-effort integration because `agy` does not currently expose a strong ACP-compatible runtime to Grimoire. Persistent sessions, native history, plan mode, streaming, approval-safe file edits, reliable usage reporting, and auxiliary workflows stay disabled or limited until Antigravity exposes stable runtime surfaces for them.
+Grimoire uses `agy acp` when the installed CLI advertises the subcommand (introduced in 1.5.0). ACP keeps a native session for follow-up turns, accepts image attachments directly, and streams answers and tool activity. **Safe** brings permission requests into chat. **Plan** selects the CLI’s plan mode. **Auto-approve** allows tool requests automatically. Model selections use the variants available to the signed-in account.
 
-Known Windows limitation: current Windows `agy` builds can finish successfully while returning empty stdout for `agy models` and `agy --print`. Grimoire uses best-effort recovery from Antigravity logs, transcripts, settings, and a seeded Pro AI model list, but Windows Antigravity support may be less reliable than macOS or Linux until the upstream CLI exposes stable output. If your account shows additional models in Antigravity, add their exact labels under Antigravity settings > Custom models.
-
-`agy --print` does not expose Grimoire file-edit approval hooks. For safety, Antigravity's shared Safe/normal mode is blocked in Grimoire; switch the Antigravity toolbar toggle to Auto-approve only when you are comfortable with AGY editing files without Grimoire prompts.
+Older versions use print mode, which requires **Auto-approve**. Grimoire includes conversation context in each print prompt and passes images as temporary file paths. On older Windows builds that return empty stdout, Grimoire can recover print output and model choices from CLI files. If model discovery misses an account-specific variant, add its exact label in Antigravity settings under **Custom models**.
 
 ### Gemini CLI (Legacy)
 
@@ -463,7 +462,7 @@ A badge next to the model selector keeps the active provider's usage in view, wi
 | --- | --- |
 | Codex | Account rate-limit notifications and `account/rateLimits/read` when available |
 | Claude Code | SDK rate-limit events, optional `.grimoire/claude/statusline-usage.json`, and SDK result cost metadata |
-| Antigravity CLI | Not reliably available from `agy --print` yet |
+| Antigravity CLI | Account usage windows from the CLI’s `/usage` command when available |
 | Gemini CLI (Legacy) | ACP cost metadata when Gemini CLI reports it; legacy provider only |
 | Qwen Code | ACP token and cost metadata when Qwen Code reports it |
 | Devin | Session credit total reported over ACP, as monthly spend |

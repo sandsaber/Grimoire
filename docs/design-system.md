@@ -590,6 +590,8 @@ Reasonix uses the same native toggle, also off by default, below its CLI path. I
 states that images are saved in the vault and sent as paths for a capable model or tool to read,
 with an extra tool call and no ACP image blocks. Screen `2f` includes this Reasonix row.
 
+Antigravity ACP uses the existing **Safe**, **Auto-approve** and **Plan** composer modes. Permission requests in Safe mode use the shared decision card. The legacy print transport requires Auto-approve.
+
 Pi follows the same native provider rows and shared model picker. Screen `2f` records its adapter
 path and native-permissions explanation. Both Pi and pi-acp are installed externally. Its composer
 has no Safe, Auto-approve or Plan toggle: ACP modes mean thinking levels, and tool execution remains

@@ -28,9 +28,8 @@ import { updateAntigravityProviderSettings } from '@/providers/antigravity/setti
  * process table it did not write.
  *
  * That is why nothing here is stubbed below the composition: the backend is the
- * one production builds, over `NodeAntigravityProcessTransport`, over a real
- * login-shell launch of a real CLI. A green row with a fake anywhere under it
- * would prove the fake.
+ * one production builds, over a real launch of the CLI. A green row with a fake
+ * anywhere under it would prove the fake.
  *
  * Off by default: it starts a CLI and spends the account's tokens, so CI must
  * never reach it. Run it with `GRIMOIRE_ANTIGRAVITY_LIVE=1`.
@@ -66,8 +65,6 @@ live('Antigravity live smoke', () => {
 
   function createPlugin(vault: string, overrides: Record<string, unknown> = {}): any {
     const settings: Record<string, unknown> = {
-      // Print mode cannot ask for approval, so anything short of full access is
-      // refused before a process exists — and this file is about processes.
       permissionMode: 'full_access',
       savedProviderPermissionMode: { antigravity: 'full_access' },
       userName: 'Michael',
@@ -75,7 +72,7 @@ live('Antigravity live smoke', () => {
     };
     updateAntigravityProviderSettings(settings, {
       enabled: true,
-      // Empty by default, which sends no `--model` and lets the CLI pick what
+      // Empty by default, which lets the CLI pick what
       // the account is configured for: the rows are about the path, not the
       // answer, and a stale model name would fail them for the wrong reason.
       visibleModels: process.env.GRIMOIRE_ANTIGRAVITY_MODEL
@@ -87,6 +84,7 @@ live('Antigravity live smoke', () => {
       app: { vault: { adapter: { basePath: vault } } },
       getResolvedProviderCliPath: () => cli,
       recordDebugLog: () => undefined,
+      saveSettings: async () => undefined,
     };
   }
 
@@ -107,10 +105,14 @@ live('Antigravity live smoke', () => {
     });
     const execution = new AntigravityExecution(createPlugin(vault, overrides), host.registry);
     // No runner argument: the default is the OS one, which is the whole point.
-    host.registerBackend({ backend: execution.createBackend() });
+    host.registerBackend(execution.createBackendRegistration());
     await host.start();
+    let released = false;
     const release = async (): Promise<void> => {
+      if (released) return;
+      released = true;
       await host.dispose();
+      await execution.dispose();
       rmSync(vault, { force: true, recursive: true });
     };
     running.push(release);
@@ -140,7 +142,8 @@ live('Antigravity live smoke', () => {
 
   /** The `agy` invocations this process is responsible for, right now. */
   function agyProcesses() {
-    return ownedProcesses(command => command.includes(cli) && command.includes('--print'));
+    return ownedProcesses(command => command.includes(cli)
+      && (/(?:^|\s)acp(?:\s|$)/.test(command) || command.includes('--print')));
   }
 
   function pause(delayMs: number): Promise<void> {
@@ -167,7 +170,7 @@ live('Antigravity live smoke', () => {
     }
   }
 
-  it('row 1: answers a plain message and leaves nothing running', async () => {
+  it('row 1: answers a plain message and releases its warm session on cleanup', async () => {
     const { runtime, shutdown } = await createHarness();
 
     const chunks = await drain(runtime.query(
@@ -178,12 +181,19 @@ live('Antigravity live smoke', () => {
     expect(chunks.filter(chunk => chunk.type === 'error')).toEqual([]);
     expect(chunks.some(chunk => chunk.type === 'text' && chunk.content.trim() !== '')).toBe(true);
     expect(runtime.consumeTurnMetadata()).toMatchObject({ wasSent: true });
-    // A turn that ends by itself owns the same cleanup a cancelled one does.
-    expect(agyProcesses().map(row => row.command)).toEqual([]);
+    expect(runtime.getSessionId()).toBeTruthy();
+    // ACP keeps the process warm between turns; the tab's release owns it.
+    const warm = process.platform === 'win32'
+      || agyProcesses().some(row => /(?:^|\s)acp(?:\s|$)/.test(row.command));
+    expect(warm).toBe(true);
+    await runtime.cleanup();
+    if (process.platform !== 'win32') {
+      await waitFor('idle session cleanup', 20_000, () => agyProcesses().length === 0 ? [] : undefined);
+    }
     await shutdown();
   });
 
-  it('row 2: cancels a running turn and leaves no agy process tree behind', async () => {
+  it('row 2: cancels a running turn and releases the agy process tree on cleanup', async () => {
     if (process.platform === 'win32') {
       // Windows owns the tree through a job object rather than a process group,
       // and `ps` is not how that is read. The row stays a person's check there.
@@ -192,6 +202,7 @@ live('Antigravity live smoke', () => {
     }
     const { runtime, shutdown } = await createHarness();
     const chunks: StreamChunk[] = [];
+    let turnEnded = false;
     const turn = (async () => {
       for await (const chunk of runtime.query(runtime.prepareTurn({
         // A tool call that sleeps, rather than a long answer, and deliberately.
@@ -205,6 +216,7 @@ live('Antigravity live smoke', () => {
       }))) {
         chunks.push(chunk);
       }
+      turnEnded = true;
     })();
 
     const root = await waitFor('an agy process', 120_000, () => (
@@ -213,7 +225,7 @@ live('Antigravity live smoke', () => {
     owned.add(root.pid);
     const sleeping = await waitFor('the sleep the model was asked to run', 120_000, () => (
       processTree(processTable(), root.pid)
-        .find(row => row.command.includes('sleep 120') && !row.command.includes('--print'))
+        .find(row => row.command.includes('sleep 120') && row.pid !== root.pid)
     ));
     const tree = processTree(processTable(), root.pid);
     for (const row of tree) {
@@ -224,7 +236,11 @@ live('Antigravity live smoke', () => {
     expect(tree.every(row => isAlive(row.pid))).toBe(true);
 
     runtime.cancel();
+    // A no-op cancel must fail before the real sleep could finish by itself.
+    await waitFor('the cancelled turn to settle', 20_000, () => turnEnded ? true : undefined);
     await turn;
+    // Cancellation stops the turn. Closing its tab also releases the warm ACP session.
+    await runtime.cleanup();
 
     // The operating system's answer, not the runner's. Bounded, because the
     // backend escalates SIGTERM to SIGKILL after its own two seconds and the

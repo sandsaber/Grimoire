@@ -84,8 +84,7 @@ describe('provider conversation state', () => {
     },
   );
 
-  /** Antigravity resumes nothing, which is why it is the one exception. */
-  it.each(catalog.ids().filter(id => id !== 'antigravity'))(
+  it.each(catalog.ids())(
     '%s resolves a bound session id',
     (providerId) => {
       const state = catalog.declarations(providerId).conversationState!;
@@ -94,11 +93,4 @@ describe('provider conversation state', () => {
         .toBe('live-session');
     },
   );
-
-  it('answers no session for the provider that has none to resume', () => {
-    const state = catalog.declarations('antigravity').conversationState!;
-
-    expect(state.resolveSessionId(conversation('antigravity', { sessionId: 'live-session' })))
-      .toBeNull();
-  });
 });
