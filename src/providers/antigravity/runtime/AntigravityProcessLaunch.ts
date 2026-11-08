@@ -12,10 +12,11 @@ export function buildAntigravityProcessLaunch(
   platform: NodeJS.Platform = process.platform,
 ): AntigravityProcessLaunch {
   if (platform === 'win32') {
-    if (canLaunchDirectlyOnWindows(command)) {
+    const executable = command === 'agy' ? 'agy.exe' : command;
+    if (executable.toLowerCase().endsWith('.exe')) {
       return {
         args,
-        command,
+        command: executable,
         launchMode: 'direct',
         shell: false,
       };
@@ -94,11 +95,6 @@ function quoteWindowsArgument(value: string): string {
     .replace(/(\\*)"/g, '$1$1""')
     .replace(/(\\+)$/, '$1$1');
   return `"${prepared}"`;
-}
-
-function canLaunchDirectlyOnWindows(command: string): boolean {
-  const lowerCommand = command.toLowerCase();
-  return lowerCommand.endsWith('.exe');
 }
 
 function resolveUserShell(runtimeEnv: NodeJS.ProcessEnv): string | null {

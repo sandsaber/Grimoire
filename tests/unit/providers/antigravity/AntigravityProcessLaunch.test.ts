@@ -129,16 +129,16 @@ describe('buildAntigravityProcessLaunch', () => {
     });
   });
 
-  it('resolves bare Windows command names through cmd.exe with quoted arguments', () => {
+  it('launches the Windows agy fallback directly and preserves prompt arguments', () => {
     const launch = buildAntigravityProcessLaunch('agy', [
       '--print',
-      'hello',
+      'hello & goodbye',
     ], {}, 'win32');
 
     expect(launch).toEqual({
-      args: ['/d', '/s', '/c', '"agy" "--print" "hello"'],
-      command: 'cmd.exe',
-      launchMode: 'cmdShell',
+      args: ['--print', 'hello & goodbye'],
+      command: 'agy.exe',
+      launchMode: 'direct',
       shell: false,
     });
   });
