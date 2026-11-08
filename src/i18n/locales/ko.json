@@ -505,7 +505,7 @@
           "emptyResponse": "{provider}이(가) 응답을 반환하지 않고 완료되었습니다. 제공업체 자격 증명과 로그를 확인한 후 다시 시도하세요.",
           "requestFailed": "{provider} 요청에 실패했습니다",
           "antigravityDisabled": "Antigravity가 비활성화되어 있습니다. 제공자 설정에서 활성화하세요.",
-          "antigravitySafeModeUnavailable": "agy --print가 Grimoire 파일 편집 승인을 요청할 수 없어 Antigravity 안전 모드를 사용할 수 없습니다. AGY가 확인 없이 파일을 편집해도 되는 경우에만 자동 승인을 사용하세요.",
+          "antigravitySafeModeUnavailable": "인쇄 모드에서는 안전 모드를 사용할 수 없습니다. Antigravity CLI를 agy acp 지원 버전으로 업데이트하세요. 확인 없이 편집을 허용하려면 자동 승인을 선택하세요.",
           "antigravityEmptyOutput": "Antigravity가 응답 없이 종료되었습니다. 인증을 확인하거나 터미널에서 agy --print를 실행한 뒤 다시 시도하세요.",
           "claudeVaultPathUnavailable": "Claude의 Vault 경로를 확인할 수 없습니다.",
           "claudeCliNotFound": "Claude Code CLI를 찾을 수 없습니다. 설치하거나 제공자 설정에서 경로를 지정하세요."
@@ -1046,7 +1046,7 @@
         "desc": "OpenAI의 코딩 에이전트입니다."
       },
       "antigravity": {
-        "desc": "Google의 새 멀티모델 에이전트 CLI입니다. 권장 Google 제공업체입니다."
+        "desc": "여러 모델과 ACP 채팅을 지원하는 Google의 코딩 에이전트입니다."
       },
       "gemini": {
         "desc": "Standard, Enterprise 및 유료 API 키 사용자를 위한 레거시 Gemini CLI입니다."
@@ -1276,7 +1276,7 @@
       "antigravity": {
         "windowsLimitations": {
           "name": "Windows CLI 제한 사항",
-          "desc": "Windows에서 현재 agy 빌드는 모델 검색 및 출력 응답에 빈 stdout을 반환하면서도 성공적으로 종료될 수 있습니다. Grimoire는 가능한 경우 기록, 설정 및 대체 복구를 사용하지만 Antigravity는 macOS나 Linux보다 Windows에서 덜 안정적일 수 있습니다."
+          "desc": "이전 Windows용 agy는 모델 목록이나 인쇄 모드 응답을 출력하지 않을 수 있습니다. Grimoire는 로컬 CLI 파일에서 모델 이름과 응답을 복구할 수 있습니다."
         },
         "cliPath": {
           "name": "Antigravity CLI 경로",
@@ -1386,7 +1386,7 @@
       "reasonix": {
         "cliPath": {
           "name": "Reasonix CLI 경로",
-          "desc": "로컬 Reasonix CLI의 사용자 지정 경로입니다. PATH에서 `reasonix`를 시작하려면 비워 두세요."
+          "desc": "비워 두면 Reasonix를 자동으로 찾습니다. 여러 버전을 설치했다면 사용할 CLI의 전체 경로를 입력하세요."
         },
         "hiddenCommands": {
           "name": "숨겨진 명령",

@@ -22,9 +22,10 @@ export function resolveCliExecutable(
   }
 
   const providerPath = parseEnvironmentVariables(environmentText).PATH;
+  const preferredPath = [providerPath, options.pathText ?? process.env.PATH].filter(Boolean).join(path.delimiter);
   const searchPath = options.pathText === undefined
-    ? getEnhancedPath(providerPath)
-    : [providerPath, options.pathText].filter(Boolean).join(path.delimiter);
+    ? getEnhancedPath(preferredPath)
+    : preferredPath;
   const detected = resolveExecutableFromPath(command, searchPath);
   if (detected) return detected;
 

@@ -505,7 +505,7 @@
           "emptyResponse": "{provider} foi concluído sem retornar uma resposta. Verifique as credenciais e os logs do provedor e tente novamente.",
           "requestFailed": "Falha na solicitação para {provider}",
           "antigravityDisabled": "O Antigravity está desativado. Ative-o nas configurações do provedor.",
-          "antigravitySafeModeUnavailable": "O modo seguro do Antigravity não está disponível porque agy --print não pode solicitar aprovações do Grimoire para editar arquivos. Use a aprovação automática apenas se quiser que o AGY edite arquivos sem confirmação.",
+          "antigravitySafeModeUnavailable": "O modo seguro não está disponível no modo de impressão. Atualize a CLI do Antigravity para uma versão com agy acp ou ative a aprovação automática para permitir edições sem confirmação.",
           "antigravityEmptyOutput": "O Antigravity terminou sem responder. Verifique a autenticação ou execute agy --print em um terminal e tente novamente.",
           "claudeVaultPathUnavailable": "Não foi possível determinar o caminho do vault para o Claude.",
           "claudeCliNotFound": "A CLI do Claude Code não foi encontrada. Instale-a ou configure o caminho nas configurações do provedor."
@@ -1046,7 +1046,7 @@
         "desc": "Agente de programação da OpenAI."
       },
       "antigravity": {
-        "desc": "Nova CLI agêntica multimodelo do Google. Provedor Google recomendado."
+        "desc": "Agente de programação do Google com vários modelos e chat nativo via ACP."
       },
       "gemini": {
         "desc": "CLI Gemini legada para usuários Standard, Enterprise e de chaves de API pagas."
@@ -1276,7 +1276,7 @@
       "antigravity": {
         "windowsLimitations": {
           "name": "Limitações da CLI no Windows",
-          "desc": "No Windows, versões atuais do agy podem terminar com sucesso e retornar stdout vazio para descoberta de modelos e respostas de impressão. O Grimoire usa transcrições, configurações e recuperação alternativa quando possível, mas o Antigravity pode ser menos confiável no Windows do que no macOS ou Linux."
+          "desc": "Versões antigas do agy para Windows podem não exibir a lista de modelos ou a resposta no modo de impressão. O Grimoire pode recuperar esses dados dos arquivos locais da CLI."
         },
         "cliPath": {
           "name": "Caminho da CLI Antigravity",
@@ -1386,7 +1386,7 @@
       "reasonix": {
         "cliPath": {
           "name": "Caminho da CLI Reasonix",
-          "desc": "Caminho personalizado para a CLI Reasonix local. Deixe vazio para executar `reasonix` do PATH."
+          "desc": "Deixe em branco para detectar o Reasonix. Se houver várias instalações, informe o caminho completo da CLI que deseja usar."
         },
         "hiddenCommands": {
           "name": "Comandos ocultos",

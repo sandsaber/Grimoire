@@ -45,12 +45,12 @@ Grimoire는 에이전트형 CLI 어시스턴트를 Obsidian 안으로 가져옵�
 
 | 기능 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix | Command Code | Pi |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 로컬 영구 실행 환경 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | 미지원 | 지원 | 지원 | 지원 | 지원 | 미지원 | 지원 |
+| 로컬 영구 실행 환경 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | ACP | 지원 | 지원 | 지원 | 지원 | 미지원 | 지원 |
 | 네이티브 기록 복원 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | 미지원 | 지원 | 미지원 | 미지원 | 미지원 | 미지원 | 지원 |
-| 계획 모드 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | 미지원 | 지원 | 지원 | 지원 | 지원 | 미지원 | 미지원 |
-| 이미지 첨부 | 지원 | 지원 | 지원 | 미지원 | 지원 | 지원 | 파일 | 지원 | 지원 | 지원 | 파일(선택적 활성화) | 파일(선택적 활성화) | 지원 |
+| 계획 모드 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | ACP | 지원 | 지원 | 지원 | 지원 | 미지원 | 미지원 |
+| 이미지 첨부 | 지원 | 지원 | 지원 | 미지원 | 지원 | 지원 | ACP / print 모드에서는 파일 | 지원 | 지원 | 지원 | 파일(선택적 활성화) | 파일(선택적 활성화) | 지원 |
 | 지침 모드 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | 미지원 | 지원 | 지원 | 지원 | 지원 | 미지원 | 미지원 |
-| 추론 강도 제어 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | 미지원 | 지원 | 지원(모델별) | 지원(모델별) |
+| 추론 강도 제어 | 지원 | 지원 | 지원 | 지원 | 지원 | 지원 | 모델 변형 | 지원 | 지원 | 미지원 | 지원 | 지원(모델별) | 지원(모델별) |
 | 되감기 | 미지원 | 지원 | 미지원 | 지원 | 미지원 | 미지원 | 미지원 | 미지원 | 미지원 | 미지원 | 미지원 | 미지원 | 미지원 |
 | 분기 | 지원 | 지원 | 미지원 | 지원 | 미지원 | 미지원 | 미지원 | 미지원 | 미지원 | 미지원 | 미지원 | 미지원 | 미지원 |
 | 제공자 슬래시 명령 | 미지원 | 지원 | 지원 | 지원 | 지원 | 지원 | 미지원 | 지원 | 지원 | 지원 | 지원 | 미지원 | 지원 |
@@ -110,7 +110,7 @@ cp dist/grimoire/main.js dist/grimoire/manifest.json dist/grimoire/styles.css \
 
 최상의 Grimoire 경험을 위해 Codex, Claude Code, OpenCode, MiMoCode, Kimi Code, Grok Build 또는 Qwen Code부터 사용하세요. 이 제공자들은 현재 볼트 네이티브 작업에 가장 강력한 런타임 기능, 즉 영속 세션, 계획 중심 워크플로, 도구 활동, 풍부한 모델 제어를 제공합니다.
 
-Antigravity CLI와 Gemini CLI (Legacy)는 Google 계정 및 호환성 사례를 위해 계속 제공되지만, 현재 주 Grimoire 제공자로 권장하지는 않습니다. Grimoire는 최선의 노력으로 지원하며 현재 CLI가 가능하게 하는 폴백을 구현했지만, ACP와 런타임 기능에는 기술적 제약이 있습니다. 세션, 승인, 스트리밍, 도구·편집 메타데이터, 모델 검색, 사용량 보고가 권장 제공자와 비교해 불완전하거나 신뢰하기 어렵습니다.
+Antigravity CLI는 호환되는 버전에서 ACP로 Google 계정을 지원합니다. Gemini CLI (Legacy)는 여전히 Gemini CLI를 사용하는 계정에서 사용할 수 있습니다.
 
 ### Codex
 
@@ -127,6 +127,8 @@ codex
 - [OpenAI code generation guide](https://developers.openai.com/api/docs/guides/code-generation)
 
 Grimoire에서 Codex는 app-server 프로토콜로 실행되며 네이티브 기록, 포크, 계획 모드, 이미지 입력, 추론 강도 제어를 제공합니다. Codex가 속도 제한 메타데이터를 보고하면 요금제 사용량이 표시됩니다.
+
+**사용자 지정 엔드포인트의 이미지 제한:** [#208](https://github.com/sandsaber/Grimoire/issues/208)은 Command Code의 `/provider/v1/responses` 엔드포인트가 `view_image` 같은 도구 결과의 이미지를 base64 텍스트로 전달한다고 보고합니다. 모델은 이미지를 볼 수 없으며 텍스트 토큰 비용이 컨텍스트 한도를 초과할 수 있습니다. 보고된 구성에서는 사용자 메시지의 이미지 첨부가 작동합니다. 이는 해당 엔드포인트를 사용하는 Codex에 영향을 주며, Grimoire의 Command Code 제공자와는 별개입니다. [제한 및 복구 안내](../provider-image-limitations.md)를 참고하세요.
 
 ### Claude Code
 
@@ -168,13 +170,12 @@ agy
 Google의 공식 Antigravity CLI를 설치하고 로컬에서 인증한 다음 Grimoire에서 Antigravity를 활성화하세요. Grimoire는 PATH에서 `agy`를 자동 감지하거나, 제공자 설정에서 사용자 지정 CLI 경로를 지정할 수 있습니다.
 
 - [Antigravity CLI](https://antigravity.google/product/antigravity-cli)
+- [Antigravity ACP](https://antigravity.google/docs/cli/acp/)
 - [Gemini CLI migration guide](https://goo.gle/gemini-cli-migration)
 
-Grimoire에서 Antigravity는 `agy models`의 선택적 모델 선택과 함께 `agy --print`로 실행됩니다. Grimoire는 활성 노트와 편집기, 브라우저, 캔버스, 볼트 검색, 프로젝트 작업 공간 컨텍스트를 이 print 프롬프트에 포함합니다. `agy`가 현재 Grimoire에 강력한 ACP 호환 런타임을 제공하지 않으므로 이는 최선의 노력 기반 통합입니다. Antigravity가 이를 위한 안정적인 런타임 기능을 제공할 때까지 영속 세션, 네이티브 기록, 계획 모드, 스트리밍, 승인 안전 파일 편집, 신뢰할 수 있는 사용량 보고, 보조 워크플로는 비활성화되거나 제한됩니다. 이미지는 임시 파일로 전달되며 이후 메시지에서는 다시 첨부해야 합니다.
+설치된 CLI가 하위 명령을 제공하면 Grimoire는 `agy acp`를 사용합니다(1.5.0에서 도입). ACP는 후속 턴에서 네이티브 세션을 유지하고, 이미지 첨부를 직접 받으며, 답변과 도구 활동을 스트리밍합니다. **Safe**는 권한 요청을 채팅에 표시합니다. **Plan**은 CLI의 계획 모드를 선택합니다. **Auto-approve**는 도구 요청을 자동으로 허용합니다. 모델 선택에는 로그인한 계정에서 사용할 수 있는 변형이 사용됩니다.
 
-알려진 Windows 제한 사항: 현재 Windows `agy` 빌드는 `agy models`와 `agy --print`에 빈 stdout을 반환하면서도 성공적으로 완료될 수 있습니다. Grimoire는 Antigravity 로그, 트랜스크립트, 설정, 미리 채운 Pro AI 모델 목록에서 최선의 노력으로 복구하지만, 업스트림 CLI가 안정적인 출력을 제공할 때까지 Windows의 Antigravity 지원은 macOS나 Linux보다 신뢰성이 낮을 수 있습니다. 계정의 Antigravity에 추가 모델이 표시되면 Antigravity 설정 > 사용자 지정 모델에 정확한 레이블을 추가하세요.
-
-`agy --print`는 Grimoire 파일 편집 승인 훅을 노출하지 않습니다. 안전을 위해 Antigravity의 공유 Safe/일반 모드는 Grimoire에서 차단됩니다. AGY가 Grimoire 프롬프트 없이 파일을 편집해도 괜찮을 때만 Antigravity 도구 모음 토글을 Auto-approve로 바꾸세요.
+이전 버전은 **Auto-approve**가 필요한 print 모드를 사용합니다. Grimoire는 각 프롬프트에 대화 컨텍스트를 포함하고 이미지를 임시 파일 경로로 전달합니다. stdout이 비어 있는 이전 Windows 빌드에서는 CLI 파일에서 print 답변과 모델 선택지를 복구할 수 있습니다. 계정별 모델 변형을 찾지 못하면 Antigravity 설정의 **Custom models**에 정확한 레이블을 추가하세요.
 
 ### Gemini CLI (Legacy)
 
@@ -189,6 +190,8 @@ gemini
 ### Qwen Code
 
 Qwen Code는 선택적으로 활성화하는 ACP 제공자입니다. 제공자 네이티브 영속 세션, 재개, 모델 컨텍스트를 유지하며, 실시간 ACP 세션에서 모델과 모드를 검색하고, 메시지·도구 활동·계획을 스트리밍하며, 이미지 입력·제공자 명령·파일 승인을 지원합니다. Grimoire는 제공자 네이티브 메시지 기록을 복원하지 않습니다.
+
+이미지 입력에는 이미지를 이해하는 모델과 해당 모델에 대한 계정 접근 권한이 필요합니다. 사용자 지정 비전 모델을 자동으로 인식하지 못한다면 Qwen 모델 항목에 `generationConfig.modalities.image: true`가 선언되어 있는지 확인하세요. 그렇지 않으면 Qwen이 모델을 호출하기 전에 이미지를 텍스트 자리표시자로 바꿀 수 있습니다. [Qwen 모델 설정](https://qwenlm.github.io/qwen-code-docs/en/users/configuration/settings/)을 참고하세요.
 
 ```bash
 # Linux 및 macOS(권장 독립형 설치)
@@ -257,7 +260,11 @@ reasonix setup
 reasonix --version
 ```
 
+업그레이드 전에 `reasonix --version`을 확인하고 설치에 사용한 패키지 관리자로 업데이트하세요. npm에서 정확히 2.58.0을 설치하려면 `npm install -g reasonix@2.58.0`을 사용하세요. Homebrew에서는 설치된 formula 또는 cask를 `brew upgrade`로 업데이트하고, cask 설치가 실패하면 npm을 사용하세요. 여러 설치가 공존한다면 macOS/Linux의 `type -a reasonix` 또는 Windows의 `where.exe reasonix`로 경로를 확인하고, Grimoire의 **Reasonix CLI path**에 원하는 실행 파일의 절대 경로를 지정하세요.
+
 `reasonix setup`으로 모델 공급자와 자격 증명을 설정한 뒤 Grimoire에서 Reasonix를 켜세요. Reasonix는 다른 제공자가 하나만 두는 설정을 둘로 나눕니다. 세션 모드(`normal`, `plan`, `goal`)와 별도의 도구 승인 태도(`ask`, `auto`, `yolo`)입니다. Grimoire 툴바가 둘 다 조작합니다. Safe는 묻는 `normal`, Plan은 묻는 `plan`, Auto-approve는 `yolo` 상태의 `normal`입니다. `goal`은 Reasonix 고유이며 Safe로 표시됩니다. Safe와 Auto-approve를 가르는 것은 태도뿐이므로, 그것을 설정하지 못한 턴은 더 느슨한 쪽에서 조용히 실행되는 대신 거부됩니다.
+
+이 매핑은 Reasonix **2.58.0**의 ACP에서 검증되었습니다. 이전 CLI는 `read-only`와 `danger-full-access`를 제공할 수 있으며, Grimoire는 실제 세션이 제공하는 값을 선택합니다.
 
 Reasonix는 권한만이 아니라 질문도 합니다. `ask` 도구는 같은 채널로 도착하며, 설명이 질문이고 번호가 붙은 선택지가 답인 카드로 그려집니다. 번호로 고르세요. 답이 여러 개인 카드에서는 `Enter`가 아무 일도 하지 않으므로 습관적인 키 입력이 대신 선택하지 않습니다.
 
@@ -270,7 +277,7 @@ Safe 모드에 대해 알아둘 점이 하나 있습니다. `ask`는 Reasonix가
 
 Reasonix는 설정을 `~/.reasonix/config.toml`에 두고, API 키는 그 파일이 지정한 이름으로 환경에서 읽습니다. 볼트 스킬은 `.reasonix/skills`와 `.agents/skills`에서 읽습니다. Grimoire는 `.grimoire/mcp/reasonix.json`에 별도의 프로젝트 MCP 목록을 관리하고 ACP 세션에 주입합니다. 사용량은 Reasonix 자체 상태 알림에서 오며, 비용은 모델 공급자에 가격이 있을 때만 표시됩니다. 포크, 되감기는 지원하지 않습니다.
 
-**Image attachments as files**를 켜면 이미지를 `.grimoire/attachments/`의 파일로 전달합니다. 이미지 지원 모델과 파일 읽기 도구가 필요하며, 읽을 때 추가 도구 호출이 발생합니다. 파일이 없거나 쓸 수 없으면 전송이 실패합니다. 기본값은 꺼짐입니다.
+**Image attachments as files**를 켜면 이미지를 `.grimoire/attachments/`의 파일로 전달합니다. 이미지 지원 모델과 파일 읽기 도구가 필요하며, 읽을 때 추가 도구 호출이 발생합니다. 파일이 없거나 쓸 수 없으면 전송이 실패합니다. 기본값은 꺼짐입니다. Reasonix 2.58.0은 네이티브 이미지 입력을 제공하지만, 이 버전에서도 Grimoire는 이미지를 파일 경로로 전달하며 ACP 네이티브 이미지 블록은 보내지 않습니다.
 
 ### Pi
 
@@ -333,18 +340,24 @@ Grimoire는 CLI의 헤드리스 JSON 출력에서 응답과 도구 활동을 스
 
 자체 제공자 구성을 갖춘 모델 불문 에이전트가 필요하면 OpenCode를 선택하세요.
 
+Grimoire는 같은 제공자 항목에서 **OpenCode V1과 V2**를 지원합니다. V2에는 [V2 통합](https://github.com/sandsaber/Grimoire/pull/223)이 포함된 Grimoire 빌드가 필요합니다. 전용 설치 프로그램으로 V2 CLI를 설치하세요:
+
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+curl -fsSL https://opencode.ai/v2/install | bash
+opencode --version
 opencode
 ```
 
-Homebrew, npm, bun, 패키지 관리자를 통한 설치도 작동합니다. OpenCode에서 제공자 자격 증명을 구성한 다음 Grimoire에서 활성화하세요.
+V2는 `npm install -g @opencode/cli` 또는 `brew install anomalyco/tap/opencode-v2`로도 설치할 수 있습니다. Windows에서는 [V2 설치 페이지](https://opencode.ai/v2/docs)의 독립 실행형 바이너리를 사용하세요. V1과 V2 모두 `opencode` 명령을 사용하므로 기존 설치를 교체할 때는 [마이그레이션 안내](https://opencode.ai/v2/docs/migrate-v1/)를 따르세요.
 
-- [OpenCode 다운로드](https://opencode.ai/download)
-- [OpenCode 제공자 문서](https://opencode.ai/docs/providers)
-- [OpenCode config docs](https://opencode.ai/docs/config)
+OpenCode에서 제공자를 연결한 다음 Grimoire의 제공자 설정에서 **OpenCode**를 활성화하세요. CLI가 여러 개 설치되어 있다면 **OpenCode CLI path**를 원하는 실행 파일로 설정하세요. 업그레이드 후 Grimoire를 다시 로드하고 **Refresh all models**를 누른 뒤 **Browse models**에서 모델을 선택하세요. 기존 선택은 유지되지만 새로 발견한 모델은 선택해야 채팅에 표시됩니다. 열려 있는 채팅 탭에도 변경 사항이 반영됩니다.
 
-Grimoire에서 OpenCode는 Grimoire 관리 시작 아티팩트와 함께 ACP로 실행되며, 영속 런타임, 네이티브 기록, 계획 모드, 이미지 입력, 제공자 명령, 추론 강도를 제공합니다. 비용 메타데이터가 있으면 월간 지출을 보고합니다.
+V1은 [기존 설치 방식](https://opencode.ai/docs)으로 계속 지원됩니다. Grimoire가 실행 파일 버전을 감지하여 V1은 ACP를, V2는 비공개 인증 로컬 OpenCode 서버를 사용합니다. 서버는 Grimoire가 자동으로 시작하고 종료합니다.
+
+V2는 영속 세션, 네이티브 기록, Safe 및 Plan 모드, 도구 활동 스트리밍, 모델 및 추론 설정, 제공자 명령, 기존 채팅 카드를 통한 질문을 지원합니다. 비용 메타데이터가 있으면 월간 지출도 표시됩니다. 검증된 CLI 버전은 **1.18.32, 2.0.15, 2.0.16**입니다. 테스트 범위와 외부/조건부 양식 및 SSE MCP 전송 미지원 등의 제한은 [OpenCode V2 설정 및 호환성](../opencode-v2-compatibility.md)을 참고하세요.
+
+- [OpenCode V2 제공자](https://opencode.ai/v2/docs/providers)
+- [OpenCode V2 설정](https://opencode.ai/v2/docs/config)
 
 ### MiMoCode
 
@@ -435,13 +448,13 @@ OpenCode, MiMoCode, Kimi Code, Grok Build, Command Code, Pi는 설정에서 같�
 | --- | --- |
 | Codex | 계정 속도 제한 알림 및 사용 가능한 경우 `account/rateLimits/read` |
 | Claude Code | SDK 속도 제한 이벤트, 선택 사항인 `.grimoire/claude/statusline-usage.json`, SDK 결과 비용 메타데이터 |
-| Antigravity CLI | 아직 `agy --print`에서 신뢰성 있게 제공되지 않음 |
+| Antigravity CLI | CLI의 `/usage` 명령이 제공하는 계정 사용량 한도 |
 | Gemini CLI (Legacy) | Gemini CLI가 보고할 때의 ACP 비용 메타데이터, 레거시 제공자 전용 |
 | Qwen Code | Qwen Code가 보고할 때의 ACP 토큰 및 비용 메타데이터 |
 | Devin | ACP가 보고하는 세션 크레딧 합계를 월간 지출로 |
 | Reasonix | 자체 상태 알림이 보고하는 턴당 비용. 설정한 모델 공급자에 가격이 있을 때만 |
 | Pi | pi-acp 어댑터에서 보고하지 않음 |
-| OpenCode | ACP 및 세션 비용 메타데이터에서 집계한 월간 지출 |
+| OpenCode | 네이티브 런타임 이벤트와 세션 비용 메타데이터의 월간 지출(V1 및 V2) |
 | MiMoCode | ACP 및 세션 비용 메타데이터에서 집계한 월간 지출 |
 | Kimi Code | ACP 및 세션 비용 메타데이터에서 집계한 월간 지출 |
 | Grok Build | OAuth를 통한 공유 주간 Grok 사용량, 초기화 시간, Extra Usage Credits, 세션 비용 메타데이터의 월간 API 지출 |

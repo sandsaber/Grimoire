@@ -45,12 +45,12 @@ Grimoire ist für Menschen gebaut, die bereits in Obsidian arbeiten und AI-Hilfe
 
 | Funktion | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix | Command Code | Pi |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Lokale dauerhafte Laufzeit | Ja | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja | Ja | Nein | Ja |
+| Lokale dauerhafte Laufzeit | Ja | Ja | Ja | Ja | Ja | Ja | ACP | Ja | Ja | Ja | Ja | Nein | Ja |
 | Wiederherstellung des nativen Verlaufs | Ja | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Nein | Nein | Nein | Nein | Ja |
-| Planmodus | Ja | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja | Ja | Nein | Nein |
-| Bildanhänge | Ja | Ja | Ja | Nein | Ja | Ja | Dateien | Ja | Ja | Ja | Dateien (optional) | Dateien (optional) | Ja |
+| Planmodus | Ja | Ja | Ja | Ja | Ja | Ja | ACP | Ja | Ja | Ja | Ja | Nein | Nein |
+| Bildanhänge | Ja | Ja | Ja | Nein | Ja | Ja | ACP / Dateien im Print-Modus | Ja | Ja | Ja | Dateien (optional) | Dateien (optional) | Ja |
 | Anweisungsmodus | Ja | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja | Ja | Nein | Nein |
-| Einstellbarer Denkaufwand | Ja | Ja | Ja | Ja | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Ja (modellabhängig) | Ja (modellabhängig) |
+| Einstellbarer Denkaufwand | Ja | Ja | Ja | Ja | Ja | Ja | Modellvarianten | Ja | Ja | Nein | Ja | Ja (modellabhängig) | Ja (modellabhängig) |
 | Zurückspulen | Nein | Ja | Nein | Ja | Nein | Nein | Nein | Nein | Nein | Nein | Nein | Nein | Nein |
 | Verzweigen | Ja | Ja | Nein | Ja | Nein | Nein | Nein | Nein | Nein | Nein | Nein | Nein | Nein |
 | Slash-Befehle des Anbieters | Nein | Ja | Ja | Ja | Ja | Ja | Nein | Ja | Ja | Ja | Ja | Nein | Ja |
@@ -110,7 +110,7 @@ Aktiviere die gewünschten providers unter Settings, Grimoire, Providers. Danach
 
 Für die beste Grimoire-Erfahrung beginne mit Codex, Claude Code, OpenCode, MiMoCode, Kimi Code, Grok Build oder Qwen Code. Diese provider bieten aktuell die stärksten runtime surfaces für vault-native Arbeit: persistent sessions, plan-oriented workflows, tool activity und umfangreiche model controls.
 
-Antigravity CLI und Gemini CLI (Legacy) bleiben für Google accounts und compatibility-Fälle verfügbar, werden heute aber nicht als primäre Grimoire-Provider empfohlen. Grimoire unterstützt sie best-effort und wir haben die Fallbacks implementiert, die ihre aktuellen CLIs erlauben, aber ihre ACP und runtime surfaces sind technisch begrenzt: sessions, approvals, streaming, tool/edit metadata, model discovery und usage reporting sind im Vergleich zu den empfohlenen Providern unvollständig oder unzuverlässig.
+Antigravity CLI unterstützt Google-Konten über ACP, wenn die installierte Version kompatibel ist. Gemini CLI (Legacy) bleibt für Konten verfügbar, die weiterhin Gemini CLI verwenden.
 
 ### Codex
 
@@ -127,6 +127,8 @@ Starte Codex einmal, melde dich an und aktiviere es dann in Grimoire. Der standa
 - [OpenAI code generation guide](https://developers.openai.com/api/docs/guides/code-generation)
 
 In Grimoire läuft Codex über sein app-server protocol mit native history, fork, plan mode, image input und reasoning effort controls. Plan usage erscheint, wenn Codex rate-limit metadata meldet.
+
+**Bildbeschränkung bei benutzerdefinierten Endpunkten:** [#208](https://github.com/sandsaber/Grimoire/issues/208) berichtet, dass der Command-Code-Endpunkt `/provider/v1/responses` Bilder aus Tool-Ergebnissen wie `view_image` als Base64-Text übermittelt. Das Modell kann sie nicht sehen; ihre Texttoken können das Kontextfenster überfüllen. Bildanhänge in Nutzernachrichten funktionieren im gemeldeten Aufbau. Betroffen ist Codex mit diesem Endpunkt, unabhängig vom Command-Code-Provider in Grimoire. Siehe [Einschränkung und Wiederherstellung](../provider-image-limitations.md).
 
 ### Claude Code
 
@@ -166,9 +168,12 @@ agy
 Installiere die offizielle Antigravity CLI von Google, authentifiziere sie lokal und aktiviere danach Antigravity in Grimoire. Grimoire erkennt `agy` automatisch aus PATH, oder du setzt einen custom CLI path in den provider settings.
 
 - [Antigravity CLI](https://antigravity.google/product/antigravity-cli)
+- [Antigravity ACP](https://antigravity.google/docs/cli/acp/)
 - [Gemini CLI migration guide](https://goo.gle/gemini-cli-migration)
 
-In Grimoire läuft Antigravity über `agy --print`, mit optionaler model selection aus `agy models`. Das ist eine best-effort integration, weil `agy` Grimoire derzeit keinen starken ACP-compatible runtime bereitstellt. Persistent sessions, native history, plan mode, streaming, approval-safe file edits, reliable usage reporting und auxiliary workflows bleiben deaktiviert oder eingeschränkt, bis Antigravity stabile runtime surfaces bereitstellt. Bilder werden als temporäre Dateien übergeben und müssen in späteren Nachrichten erneut angehängt werden.
+Grimoire verwendet `agy acp`, wenn die installierte CLI den Unterbefehl anbietet (seit Version 1.5.0). ACP behält eine native Sitzung für Folgeturns, nimmt Bildanhänge direkt entgegen und streamt Antworten sowie Tool-Aktivität. **Safe** zeigt Berechtigungsanfragen im Chat. **Plan** wählt den Plan-Modus der CLI. **Auto-approve** erlaubt Tool-Anfragen automatisch. Die Modellauswahl verwendet die Varianten, die dem angemeldeten Konto zur Verfügung stehen.
+
+Ältere Versionen verwenden den Print-Modus, der **Auto-approve** voraussetzt. Grimoire fügt den Gesprächskontext jedem Print-Prompt hinzu und übergibt Bilder als temporäre Dateipfade. Bei älteren Windows-Builds mit leerer Standardausgabe kann Grimoire Print-Antworten und Modelloptionen aus CLI-Dateien wiederherstellen. Fehlt bei der Modellerkennung eine kontospezifische Variante, füge ihre genaue Bezeichnung in den Antigravity-Einstellungen unter **Custom models** hinzu.
 
 ### Gemini CLI (Legacy)
 
@@ -183,6 +188,8 @@ Aktiviere Gemini CLI nur, wenn dein account tier weiterhin unterstuetzt wird und
 ### Qwen Code
 
 Qwen Code ist ein opt-in ACP-provider mit provider-nativen persistenten Sessions, Resume und model context sowie live model- und mode-discovery. Es streamt Nachrichten, Tool- und Plan-Aktivität und unterstützt image input, provider commands und file approvals. Grimoire hydriert keine provider-native message history.
+
+Bildeingabe erfordert ein bildfähiges Modell und Zugriff darauf über dein Konto. Prüfe bei einem benutzerdefinierten Vision-Modell, ob sein Qwen-Modelleintrag `generationConfig.modalities.image: true` enthält, falls die automatische Erkennung es nicht erkennt. Andernfalls kann Qwen Bilder vor dem Modellaufruf durch Textplatzhalter ersetzen. Siehe [Qwen-Modellkonfiguration](https://qwenlm.github.io/qwen-code-docs/en/users/configuration/settings/).
 
 ```bash
 # macOS und Linux
@@ -251,7 +258,11 @@ reasonix setup
 reasonix --version
 ```
 
+Prüfe vor einem Upgrade `reasonix --version` und aktualisiere mit demselben Paketmanager, mit dem Reasonix installiert wurde. Um genau Version 2.58.0 über npm zu verwenden: `npm install -g reasonix@2.58.0`. Aktualisiere bei Homebrew die tatsächlich installierte Formula bzw. Cask mit `brew upgrade`; falls die Cask-Installation fehlschlägt, verwende den npm-Weg. Sind mehrere Installationen vorhanden, zeigt `type -a reasonix` unter macOS/Linux bzw. `where.exe reasonix` unter Windows ihre Pfade. Wähle die gewünschte absolute ausführbare Datei in Grimoire unter **Reasonix CLI path**.
+
 Führe `reasonix setup` aus, um einen model provider und dessen Zugangsdaten einzurichten, und aktiviere Reasonix anschließend in Grimoire. Reasonix hält zwei Einstellungen, wo andere provider eine haben: den session mode (`normal`, `plan`, `goal`) und eine getrennte tool-approval-Haltung (`ask`, `auto`, `yolo`). Die Grimoire-Toolbar steuert beide. Safe ist `normal` mit Nachfrage, Plan ist `plan` mit Nachfrage, Auto-approve ist `normal` auf `yolo`; `goal` gehört Reasonix und wird als Safe angezeigt. Da allein die Haltung Safe von Auto-approve trennt, wird ein turn, der sie nicht setzen kann, abgelehnt statt stillschweigend in der lockereren zu laufen.
+
+Diese Zuordnung ist für ACP in Reasonix **2.58.0** verifiziert. Ältere CLI-Versionen können stattdessen `read-only` und `danger-full-access` anbieten; Grimoire wählt die Werte, die die laufende Sitzung tatsächlich meldet.
 
 Reasonix stellt auch Fragen, nicht nur Berechtigungen: sein `ask`-tool kommt über denselben Kanal und wird als Karte gezeichnet, deren Beschreibung die Frage ist und deren nummerierte Optionen die Antworten sind. Wähle eine über ihre Nummer; `Enter` tut auf einer Karte mit mehreren Antworten nichts, damit ein gewohnter Tastendruck nicht für dich entscheidet.
 
@@ -264,7 +275,7 @@ Eines solltest du über Safe wissen: `ask` sichert die tools ab, die Reasonix al
 
 Reasonix verwaltet seine Konfiguration in `~/.reasonix/config.toml` und liest API keys unter den dort genannten Namen aus der Umgebung. Vault skills werden aus `.reasonix/skills` und `.agents/skills` gelesen. Grimoire pflegt eine separate Projekt-MCP-Liste in `.grimoire/mcp/reasonix.json` und übergibt sie an ACP-sessions. Verbrauch kommt aus den eigenen status notifications von Reasonix, Kosten erscheinen nur, wenn dein model provider einen Preis hat. Fork und rewind werden nicht unterstützt.
 
-Aktiviere **Image attachments as files**, um Bilder über Dateien in `.grimoire/attachments/` zu senden. Dafür sind ein bildfähiges Modell und ein Dateilesewerkzeug erforderlich; das Lesen benötigt einen zusätzlichen Werkzeugaufruf. Fehlende oder nicht schreibbare Dateien lassen die Anfrage fehlschlagen. Die Funktion ist standardmäßig deaktiviert.
+Aktiviere **Image attachments as files**, um Bilder über Dateien in `.grimoire/attachments/` zu senden. Dafür sind ein bildfähiges Modell und ein Dateilesewerkzeug erforderlich; das Lesen benötigt einen zusätzlichen Werkzeugaufruf. Fehlende oder nicht schreibbare Dateien lassen die Anfrage fehlschlagen. Die Funktion ist standardmäßig deaktiviert. Grimoire verwendet für Reasonix-Bilder weiterhin Dateipfade, auch mit Version 2.58.0, die native Bildeingabe anbietet; native ACP-Bildblöcke werden nicht gesendet.
 
 ### Pi
 
@@ -327,18 +338,24 @@ Aktiviere **Image attachments as files**, um Bilder über Dateien in `.grimoire/
 
 Wähle OpenCode, wenn du einen model-agnostic agent mit eigener provider configuration möchtest.
 
+Grimoire unterstützt **OpenCode V1 und V2** über denselben Provider-Eintrag. V2 benötigt einen Grimoire-Build mit [der V2-Integration](https://github.com/sandsaber/Grimoire/pull/223). Installiere die V2-CLI mit ihrem eigenen Installer:
+
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+curl -fsSL https://opencode.ai/v2/install | bash
+opencode --version
 opencode
 ```
 
-Homebrew, npm, bun und package-manager installs funktionieren ebenfalls. Konfiguriere deine provider credentials in OpenCode und aktiviere es danach in Grimoire.
+V2 ist auch über `npm install -g @opencode/cli` oder `brew install anomalyco/tap/opencode-v2` verfügbar. Verwende unter Windows eine eigenständige Binärdatei von der [V2-Installationsseite](https://opencode.ai/v2/docs). V1 und V2 verwenden beide den Befehl `opencode`; beachte beim Ersetzen einer Installation die [Migrationsanleitung](https://opencode.ai/v2/docs/migrate-v1/).
 
-- [OpenCode herunterladen](https://opencode.ai/download)
-- [OpenCode-Anbieterdokumentation](https://opencode.ai/docs/providers)
-- [OpenCode config docs](https://opencode.ai/docs/config)
+Verbinde deine Anbieter in OpenCode und aktiviere anschließend **OpenCode** in den Grimoire-Provider-Einstellungen. Bei mehreren installierten CLI-Versionen setzt du **OpenCode CLI path** auf die gewünschte ausführbare Datei. Lade Grimoire nach einem Upgrade neu, klicke auf **Refresh all models** und wähle unter **Browse models** die Modelle aus. Das Aktualisieren behält deine Auswahl; neu entdeckte Modelle müssen ausgewählt werden, bevor sie im Chat erscheinen. Der offene Chat übernimmt die Änderungen.
 
-In Grimoire läuft OpenCode über ACP mit Grimoire-managed launch artifacts sowie persistent runtime, native history, plan mode, image input, provider commands und reasoning effort. Monthly spend wird angezeigt, wenn cost metadata verfügbar ist.
+V1 wird weiterhin über seinen [ursprünglichen Installationsweg](https://opencode.ai/docs) unterstützt. Grimoire erkennt die Version: V1 verwendet ACP; V2 verwendet einen privaten, authentifizierten lokalen OpenCode-Server, den Grimoire automatisch startet und beendet.
+
+V2 unterstützt dauerhafte Sitzungen, nativen Verlauf, Safe- und Plan-Modus, gestreamte Tool-Aktivität, Modell- und Denksteuerung, Provider-Befehle und Fragen über die vorhandenen Chat-Karten. Monatliche Ausgaben erscheinen, wenn Kostenmetadaten vorliegen. Geprüfte CLI-Versionen: **1.18.32, 2.0.15 und 2.0.16**. Siehe [OpenCode V2: Einrichtung und Kompatibilität](../opencode-v2-compatibility.md) für Testumfang und Grenzen, einschließlich nicht unterstützter externer/bedingter Formulare und SSE-MCP-Transport.
+
+- [OpenCode V2: Anbieter](https://opencode.ai/v2/docs/providers)
+- [OpenCode V2: Konfiguration](https://opencode.ai/v2/docs/config)
 
 ### MiMoCode
 
@@ -437,13 +454,13 @@ Ein badge neben dem model selector hält die usage des aktiven provider sichtbar
 | --- | --- |
 | Codex | Account rate-limit notifications und `account/rateLimits/read`, wenn verfügbar |
 | Claude Code | SDK rate-limit events, optional `.grimoire/claude/statusline-usage.json` und SDK result cost metadata |
-| Antigravity CLI | Noch nicht zuverlässig über `agy --print` verfügbar |
+| Antigravity CLI | Kontingentfenster des Kontos aus dem CLI-Befehl `/usage`, sofern verfügbar |
 | Gemini CLI (Legacy) | ACP cost metadata, wenn Gemini CLI sie meldet; nur legacy provider |
 | Qwen Code | ACP token- und cost-metadata, wenn Qwen Code sie meldet |
 | Devin | Credit-Summe der session über ACP, als monatliche Ausgaben |
 | Reasonix | Kosten pro turn aus den eigenen status notifications, sofern der konfigurierte model provider einen Preis hat |
 | Pi | Vom pi-acp-Adapter nicht gemeldet |
-| OpenCode | Monthly spend aggregiert aus ACP und session cost metadata |
+| OpenCode | Monatliche Ausgaben aus nativen Runtime-Ereignissen und Sitzungskostenmetadaten (V1 und V2) |
 | MiMoCode | Monthly spend aggregiert aus ACP und session cost metadata |
 | Kimi Code | Monthly spend aggregiert aus ACP und session cost metadata |
 | Grok Build | Gemeinsame wöchentliche Grok-Nutzung, Reset-Zeitpunkt und Extra Usage Credits über OAuth; monthly API spend aus session cost metadata |

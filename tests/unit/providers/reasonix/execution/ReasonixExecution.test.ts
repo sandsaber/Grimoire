@@ -46,10 +46,15 @@ describe('Reasonix dynamic configuration', () => {
   });
 
   it.each([
-    ['normal', 'read-only', 'normal'],
-    ['plan', 'read-only', 'plan'],
-    ['full_access', 'danger-full-access', 'normal'],
-  ])('applies the advertised permission preset for %s on fresh and warm sessions', async (modeId, approval, mode) => {
+    ['normal', 'read-only', 'normal', ['read-only', 'workspace-write', 'danger-full-access']],
+    ['plan', 'read-only', 'plan', ['read-only', 'workspace-write', 'danger-full-access']],
+    ['full_access', 'danger-full-access', 'normal', ['read-only', 'workspace-write', 'danger-full-access']],
+    // Reasonix 2.58.0 still offers ACP ask/auto/yolo; its CLI flag aliases are
+    // not valid tool_approval config values. Keep choosing the session's ids.
+    ['normal', 'ask', 'normal', ['ask', 'auto', 'yolo']],
+    ['plan', 'ask', 'plan', ['ask', 'auto', 'yolo']],
+    ['full_access', 'yolo', 'normal', ['ask', 'auto', 'yolo']],
+  ])('applies the advertised permission preset for %s (%s) on fresh and warm sessions', async (modeId, approval, mode, values) => {
     const { client, calls } = createClient();
     const applier = new ReasonixAcpDynamicConfigApplier({ resolve: async () => ({ modeId }) });
     const input = {
@@ -58,7 +63,10 @@ describe('Reasonix dynamic configuration', () => {
 
     await applier.apply({
       ...input,
-      sessionConfigOptions: [permissions.toolApproval] as AcpSessionConfigOption[],
+      sessionConfigOptions: [{
+        ...permissions.toolApproval,
+        options: values.map(value => ({ value, name: value })),
+      }] as AcpSessionConfigOption[],
     });
     await applier.apply(input);
 

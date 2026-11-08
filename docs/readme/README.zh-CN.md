@@ -43,12 +43,12 @@ Grimoire 面向已经使用 Obsidian 工作，并希望 AI 助手像仓库的一
 
 | 功能 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix | Command Code | Pi |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 本地持久运行环境 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | 不支持 | 支持 | 支持 | 支持 | 支持 | 不支持 | 支持 |
+| 本地持久运行环境 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | ACP | 支持 | 支持 | 支持 | 支持 | 不支持 | 支持 |
 | 原生历史恢复 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | 不支持 | 支持 | 不支持 | 不支持 | 不支持 | 不支持 | 支持 |
-| 计划模式 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | 不支持 | 支持 | 支持 | 支持 | 支持 | 不支持 | 不支持 |
-| 图片附件 | 支持 | 支持 | 支持 | 不支持 | 支持 | 支持 | 文件 | 支持 | 支持 | 支持 | 文件（需启用） | 文件（需启用） | 支持 |
+| 计划模式 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | ACP | 支持 | 支持 | 支持 | 支持 | 不支持 | 不支持 |
+| 图片附件 | 支持 | 支持 | 支持 | 不支持 | 支持 | 支持 | ACP / print 模式使用文件 | 支持 | 支持 | 支持 | 文件（需启用） | 文件（需启用） | 支持 |
 | 指令模式 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | 不支持 | 支持 | 支持 | 支持 | 支持 | 不支持 | 不支持 |
-| 推理强度控制 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | 不支持 | 支持 | 是（取决于模型） | 是（取决于模型） |
+| 推理强度控制 | 支持 | 支持 | 支持 | 支持 | 支持 | 支持 | 模型变体 | 支持 | 支持 | 不支持 | 支持 | 是（取决于模型） | 是（取决于模型） |
 | 回退 | 不支持 | 支持 | 不支持 | 支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 |
 | 分支 | 支持 | 支持 | 不支持 | 支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 |
 | 供应商斜杠命令 | 不支持 | 支持 | 支持 | 支持 | 支持 | 支持 | 不支持 | 支持 | 支持 | 支持 | 支持 | 不支持 | 支持 |
@@ -108,7 +108,7 @@ cp dist/grimoire/main.js dist/grimoire/manifest.json dist/grimoire/styles.css \
 
 为了获得最佳 Grimoire 体验，建议先从 Codex、Claude Code、OpenCode、MiMoCode、Kimi Code、Grok Build 或 Qwen Code 开始。这些供应商目前为仓库原生工作提供最强的运行时接口：持久会话、面向规划的工作流、工具活动和丰富的模型控制。
 
-Antigravity CLI 和 Gemini CLI（旧版）仍可用于 Google 账户和兼容性场景，但目前不建议将它们作为 Grimoire 的主要供应商。Grimoire 会在现有条件下尽力支持它们，并已实现当前 CLI 所允许的回退方案；不过，它们的 ACP 与运行时接口在技术上仍有局限：与推荐供应商相比，会话、授权、流式输出、工具/编辑元数据、模型发现和用量报告并不完整，或不够可靠。
+Antigravity CLI 在兼容版本中通过 ACP 支持 Google 账户。Gemini CLI（旧版）仍供继续使用 Gemini CLI 的账户使用。
 
 ### Codex
 
@@ -125,6 +125,8 @@ codex
 - [OpenAI 代码生成指南](https://developers.openai.com/api/docs/guides/code-generation)
 
 在 Grimoire 中，Codex 通过 app-server 协议运行，支持原生历史记录、分叉、规划模式、图片输入和推理强度控制。当 Codex 返回速率限制元数据时，界面会显示套餐用量。
+
+**自定义端点的图片限制：** [#208](https://github.com/sandsaber/Grimoire/issues/208) 报告称，Command Code 的 `/provider/v1/responses` 端点会将 `view_image` 等工具结果中的图片作为 base64 文本传递。模型无法看到图片，文本 token 消耗还可能超出上下文。报告中的配置支持用户消息的图片附件。这影响使用该端点的 Codex，与 Grimoire 的 Command Code 供应商无关。参阅[限制及恢复建议](../provider-image-limitations.md)。
 
 ### Claude Code
 
@@ -166,13 +168,12 @@ agy
 从 Google 安装官方 Antigravity CLI，在本机完成身份验证，然后在 Grimoire 中启用 Antigravity。Grimoire 会从 PATH 自动检测 `agy`；也可以在供应商设置的**Antigravity CLI 路径**中指定本机命令路径。
 
 - [Antigravity CLI](https://antigravity.google/product/antigravity-cli)
+- [Antigravity ACP](https://antigravity.google/docs/cli/acp/)
 - [Gemini CLI 迁移指南](https://goo.gle/gemini-cli-migration)
 
-在 Grimoire 中，Antigravity 通过 `agy --print` 运行，并可选择使用 `agy models` 中的模型；Grimoire 会将当前笔记，以及编辑器、浏览器、画布、仓库搜索和项目工作区上下文合并到这条 `--print` 提示词中。由于 `agy` 目前没有向 Grimoire 提供能力完备、兼容 ACP 的运行时，本集成只能在现有条件下尽力工作。在 Antigravity 提供稳定的运行时接口之前，持久会话、原生历史记录、规划模式、流式输出、具备安全授权的文件编辑、可靠的用量报告和辅助工作流都会保持关闭或受到限制。 图片以临时文件传递，后续消息需要重新附加。
+当已安装的 CLI 声明支持 `acp` 子命令时，Grimoire 使用 `agy acp`（自 1.5.0 引入）。ACP 为后续消息保留原生会话，直接接收图片附件，并流式传输回答与工具活动。**Safe** 在聊天中显示权限请求；**Plan** 选择 CLI 的规划模式；**Auto-approve** 自动允许工具请求。模型选择使用当前登录账户可用的变体。
 
-**已知的 Windows 限制：**当前 Windows 版 `agy` 可能在命令成功结束时，仍为 `agy models` 和 `agy --print` 返回空的标准输出。Grimoire 会尽力从 Antigravity 的日志、会话记录、设置和预置的 Pro AI 模型列表中恢复结果；在上游 CLI 提供稳定输出之前，Antigravity 在 Windows 上的可靠性可能低于 macOS 或 Linux。如果你的账户在 Antigravity 中显示了其他模型，请将其准确标签添加到“Antigravity 设置 → 自定义模型”。
-
-`agy --print` 不会向 Grimoire 提供文件编辑授权钩子。为确保安全，Grimoire 会禁用 Antigravity 共用的“安全”/普通模式；只有当你愿意让 AGY 在不经 Grimoire 提示的情况下编辑文件时，才应将 Antigravity 工具栏开关切换为“自动批准”。
+旧版本使用需要 **Auto-approve** 的 print 模式。Grimoire 在每次提示词中包含对话上下文，并以临时文件路径传递图片。对于返回空 stdout 的旧 Windows 构建，Grimoire 可从 CLI 文件中恢复 print 回答和模型选项。如果自动发现遗漏了账户专属的模型变体，请在 Antigravity 设置的 **Custom models** 中添加其准确标签。
 
 ### Gemini CLI（旧版）
 
@@ -187,6 +188,8 @@ gemini
 ### Qwen Code
 
 Qwen Code 是需要手动启用的 ACP 供应商。它保留供应商原生的持久会话、会话恢复和模型上下文；从当前 ACP 会话发现模型与模式；以流式方式呈现消息、工具活动和规划；并支持图片输入、供应商命令和文件授权。Grimoire 不会恢复供应商原生的消息历史。
+
+图片输入需要支持视觉的模型，以及账户对该模型的访问权限。如果 Qwen 未能自动识别自定义视觉模型，请确认其模型配置声明了 `generationConfig.modalities.image: true`。否则，Qwen 可能在调用模型之前将图片替换为文本占位符。参阅 [Qwen 模型配置](https://qwenlm.github.io/qwen-code-docs/en/users/configuration/settings/)。
 
 ```bash
 # Linux 和 macOS：推荐的独立安装方式
@@ -255,7 +258,11 @@ reasonix setup
 reasonix --version
 ```
 
+升级前请检查 `reasonix --version`，并使用原安装所用的包管理器更新。若需通过 npm 安装指定的 2.58.0 版本，运行 `npm install -g reasonix@2.58.0`。Homebrew 用户应通过 `brew upgrade` 更新已安装的 formula 或 cask；如果 cask 安装失败，请改用 npm。若存在多个安装，请在 macOS/Linux 中运行 `type -a reasonix`，或在 Windows 中运行 `where.exe reasonix`，然后在 Grimoire 的 **Reasonix CLI path** 中指定目标可执行文件的绝对路径。
+
 运行 `reasonix setup` 配置模型供应商及其凭据，然后在 Grimoire 中启用 Reasonix。别的供应商只有一项设置的地方，Reasonix 有两项：会话模式（`normal`、`plan`、`goal`）以及单独的工具批准姿态（`ask`、`auto`、`yolo`）。Grimoire 的工具栏同时驱动两者。Safe 是会询问的 `normal`，Plan 是会询问的 `plan`，Auto-approve 是处于 `yolo` 的 `normal`；`goal` 是 Reasonix 自有的模式，显示为 Safe。 由于区分 Safe 与 Auto-approve 的只有批准姿态，无法设置该姿态的回合会被拒绝，而不是悄悄以更宽松的方式执行。
+
+上述映射已在 Reasonix **2.58.0** 的 ACP 中验证。旧版本 CLI 可能声明 `read-only` 和 `danger-full-access`；Grimoire 会选择当前会话实际提供的值。
 
 Reasonix 不只请求权限，也会提问：它的 `ask` 工具经由同一通道到达，绘制为一张卡片，描述是问题，带编号的选项是答案。请按编号选择；在有多个答案的卡片上 `Enter` 不做任何事，习惯性的按键不会替你做决定。
 
@@ -268,7 +275,7 @@ Reasonix 不只请求权限，也会提问：它的 `ask` 工具经由同一通�
 
 Reasonix 的配置保存在 `~/.reasonix/config.toml`，API 密钥按该文件给出的名称从环境变量读取。仓库技能从 `.reasonix/skills` 和 `.agents/skills` 读取。Grimoire 在 `.grimoire/mcp/reasonix.json` 中维护独立的项目 MCP 列表，并注入到 ACP 会话。用量来自 Reasonix 自身的状态通知；只有当你的模型供应商有价格时才会显示费用。分叉与回退均不支持。
 
-启用 **Image attachments as files** 后，图片通过 `.grimoire/attachments/` 中的文件传递。需要支持图片的模型和文件读取工具；读取会增加一次工具调用。文件丢失或无法写入时，发送会失败。此选项默认关闭。
+启用 **Image attachments as files** 后，图片通过 `.grimoire/attachments/` 中的文件传递。需要支持图片的模型和文件读取工具；读取会增加一次工具调用。文件丢失或无法写入时，发送会失败。此选项默认关闭。 Grimoire 仍通过文件路径传递 Reasonix 图片，包括在声明支持原生图片输入的 2.58.0 版本中；不会发送原生 ACP 图片块。
 
 ### Pi
 
@@ -331,18 +338,24 @@ Grimoire 从 CLI 的无界面 JSON 输出中流式显示回答和工具活动，
 
 如果你需要一个不绑定特定模型、并自带供应商配置的代理，可以选择 OpenCode。
 
+Grimoire 通过同一个供应商入口支持 **OpenCode V1 和 V2**。V2 需要包含 [V2 集成](https://github.com/sandsaber/Grimoire/pull/223)的 Grimoire 构建。请使用专用安装程序安装 V2 CLI：
+
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+curl -fsSL https://opencode.ai/v2/install | bash
+opencode --version
 opencode
 ```
 
-也可以使用 Homebrew、npm、bun 或其他包管理器安装。请先在 OpenCode 中配置供应商凭据，然后在 Grimoire 中启用。
+V2 也可通过 `npm install -g @opencode/cli` 或 `brew install anomalyco/tap/opencode-v2` 安装。Windows 请使用 [V2 安装页面](https://opencode.ai/v2/docs)的独立二进制文件。V1 与 V2 都使用 `opencode` 命令；替换现有安装时，请遵循[迁移指南](https://opencode.ai/v2/docs/migrate-v1/)。
 
-- [下载 OpenCode](https://opencode.ai/download)
-- [OpenCode 供应商文档](https://opencode.ai/docs/providers)
-- [OpenCode 配置文档](https://opencode.ai/docs/config)
+在 OpenCode 中连接供应商，然后在 Grimoire 的供应商设置中启用 **OpenCode**。如果安装了多个 CLI 副本，请将 **OpenCode CLI path** 指向所需的可执行文件。升级后重新加载 Grimoire，点击 **Refresh all models**，并在 **Browse models** 中选择模型。刷新会保留现有选择；新发现的模型需要选中后才会显示在聊天中。已打开的聊天标签页会应用这些更改。
 
-在 Grimoire 中，OpenCode 通过 ACP 运行，使用由 Grimoire 管理的启动文件，并支持持久运行时、原生历史记录、规划模式、图片输入、供应商命令和推理强度控制。当费用元数据可用时，界面会显示月度支出。
+V1 仍支持[原有安装方式](https://opencode.ai/docs)。Grimoire 会检测可执行文件的版本：V1 使用 ACP；V2 使用经过身份验证的私有本地 OpenCode 服务器，由 Grimoire 自动启动和停止。
+
+V2 支持持久会话、原生历史记录、Safe 与 Plan 模式、流式工具活动、模型和推理控制、供应商命令，以及现有聊天卡片中的问题。提供费用元数据时会显示月度支出。已验证的 CLI 版本为 **1.18.32、2.0.15 和 2.0.16**。测试范围与限制请参阅 [OpenCode V2 设置与兼容性](../opencode-v2-compatibility.md)，包括不支持的外部/条件表单和 SSE MCP 传输。
+
+- [OpenCode V2 供应商](https://opencode.ai/v2/docs/providers)
+- [OpenCode V2 配置](https://opencode.ai/v2/docs/config)
 
 ### MiMoCode
 
@@ -433,13 +446,13 @@ OpenCode、MiMoCode、Kimi Code、Grok Build、Command Code 和 Pi 在设置中�
 | --- | --- |
 | Codex | 账户速率限制通知，以及可用时的 `account/rateLimits/read` |
 | Claude Code | SDK 速率限制事件、可选的 `.grimoire/claude/statusline-usage.json`，以及 SDK 返回的费用元数据 |
-| Antigravity CLI | `agy --print` 目前还不能可靠提供 |
+| Antigravity CLI | CLI 的 `/usage` 命令提供的账户用量窗口（如可用） |
 | Gemini CLI（旧版） | Gemini CLI 返回的 ACP 费用元数据；仅用于旧版兼容 |
 | Qwen Code | Qwen Code 返回的 ACP 令牌与费用元数据 |
 | Devin | ACP 报告的会话积分总额，按月度支出显示 |
 | Reasonix | 来自其自有状态通知的单轮费用，前提是所配置的模型供应商有价格 |
 | Pi | pi-acp 适配器未提供 |
-| OpenCode | 从 ACP 与会话费用元数据汇总的月度支出 |
+| OpenCode | 原生运行时事件与会话费用元数据中的月度支出（V1 和 V2） |
 | MiMoCode | 从 ACP 与会话费用元数据汇总的月度支出 |
 | Kimi Code | 从 ACP 与会话费用元数据汇总的月度支出 |
 | Grok Build | 通过 OAuth 获取的每周共享额度、重置时间和 Extra Usage Credits；以及从会话费用元数据汇总的月度 API 支出 |
