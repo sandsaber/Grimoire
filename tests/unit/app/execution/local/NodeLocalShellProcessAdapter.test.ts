@@ -153,6 +153,17 @@ describe('NodeLocalShellProcessAdapter', () => {
       .toThrow('positive safe integer');
   });
 
+  it('prevents the Framework stdin writer from emitting a BOM before the raw pipe pump starts', () => {
+    const source = windowsJobGuardianPreamble(null)[0];
+    const configureInput = 'if (pipeInput) Console.InputEncoding = new System.Text.UnicodeEncoding(false, false);';
+
+    // LE Unicode with no preamble also avoids SetConsoleCP, which throws when
+    // a hidden guardian has no console. The pump still transports raw bytes.
+    expect(source).toContain(configureInput);
+    expect(source.indexOf(configureInput)).toBeLessThan(source.indexOf('Process.Start(start)'));
+    expect(source).toContain('StartPump(Console.OpenStandardInput(), process.StandardInput.BaseStream, true)');
+  });
+
   /**
    * The compiled guardian, on a machine that cannot run it.
    *

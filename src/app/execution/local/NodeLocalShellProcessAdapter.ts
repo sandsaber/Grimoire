@@ -738,6 +738,12 @@ public static class GrimoireJobGuardian
             start.RedirectStandardError = true;
             start.RedirectStandardInput = pipeInput;
 
+            // Framework creates and flushes a StreamWriter during Process.Start,
+            // so its encoding must have no BOM even though we only use BaseStream.
+            // LE Unicode bypasses SetConsoleCP, which fails without a console;
+            // the redirected streams below remain byte pipes, with no transcoding.
+            if (pipeInput) Console.InputEncoding = new System.Text.UnicodeEncoding(false, false);
+
             using (Process process = Process.Start(start))
             {
                 if (process == null)
