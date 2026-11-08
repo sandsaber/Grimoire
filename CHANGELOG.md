@@ -2,6 +2,24 @@
 
 User-facing changes by release.
 
+## 2.0.13 - 2026-11-08
+
+### Added
+
+- Antigravity now uses native ACP chat when the installed CLI supports `agy acp`. You can review tool requests in Safe mode, use Plan mode, attach images directly, and resume the same conversation after restarting Obsidian. Older CLIs still use print mode with Auto-approve (#275, #278).
+
+### Fixed
+
+- On Windows, Grimoire preserves the bytes sent to a CLI’s standard input. This fixes Antigravity rejecting the first JSON message because of an extra byte-order mark. Grimoire also launches `agy.exe` directly when it cannot detect the full path (#276, #277).
+- Restored Antigravity vault skills in the slash-command menu (#262).
+- Claude Code now keeps follow-up instructions sent during a response attached to the running turn. Cancelling the turn also withdraws queued instructions (#274).
+- CLI discovery now checks your configured paths and `PATH` before common installation directories, so an older Homebrew copy no longer takes precedence over a CLI selected through `PATH` (#279).
+
+### Improved
+
+- Updated provider setup and troubleshooting guidance across all ten supported languages, including Antigravity ACP, Reasonix 2.58, OpenCode V2 and image support (#279).
+- Updated the Claude Agent SDK to 0.3.310, the OpenCode client to 2.1.4 and the MCP SDK to 1.32.2 (#269, #270, #271).
+
 ## 2.0.12 - 2026-10-30
 
 ### Fixed
