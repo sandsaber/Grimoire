@@ -46,7 +46,7 @@ describe('Antigravity ACP execution composition', () => {
     return {
       settings,
       app: { vault: { adapter: { basePath: '/vault' } } },
-      getResolvedProviderCliPath: () => '/usr/local/bin/agy',
+      getResolvedProviderCliPath: () => process.platform === 'win32' ? 'C:\\Tools\\agy.exe' : '/usr/local/bin/agy',
       recordDebugLog: () => undefined,
       saveSettings: async () => undefined,
       getAllViews: () => [],
