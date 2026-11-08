@@ -40,7 +40,7 @@ explicit:
 
 `invalidated` is not the same fact as a presentation that moved on. A tab closing or a conversation
 switching means the *view* left; this terminal means the turn was rejected before anything ran,
-and the second one needs saying. Antigravity's fail-closed permission check on the shipped default
+and the second one needs saying. Antigravity print mode's fail-closed permission check on the shipped default
 mode is the case that made it visible.
 
 **Provider wording for a classified failure.** The kernel refuses to forward provider error text,
@@ -82,7 +82,7 @@ the outcome indeterminate rather than claiming cancellation succeeded.
 
 A provider process belongs to a kernel session, not to a turn. Claude's persistent SDK query and
 every ACP client are launched by the first turn and held warm for the next one; Codex shares one
-app-server across sessions; Command Code and Antigravity spawn per turn. A backend that holds a
+app-server across sessions; Command Code and the legacy Antigravity print fallback spawn per turn. A backend that holds a
 process must be reachable through these release paths:
 
 | Event | What happens |

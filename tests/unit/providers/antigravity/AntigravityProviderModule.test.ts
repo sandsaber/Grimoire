@@ -52,25 +52,30 @@ describe('Antigravity provider module', () => {
       expect(sources).not.toContain("'antigravity'");
     });
 
-    it('declares the stateless topology and no resume', () => {
+    it('declares the native ACP topology and resume', () => {
       const capabilities = antigravityProviderModule.capabilities;
 
-      expect(capabilities.process.topology).toBe('process-per-run');
-      expect(capabilities.session.resume).toBe('unsupported');
+      expect(capabilities.process.topology).toBe('managed-acp-subprocess');
+      expect(capabilities.session.resume).toBe('native');
       expect(capabilities.session.transcriptHydration).toBe('unsupported');
     });
 
-    it('declares no interactions, which is why Safe mode stays fail-closed', () => {
+    it('declares native approvals and plan mode', () => {
       expect(antigravityProviderModule.capabilities.interactions).toEqual({
-        approvals: 'unsupported',
+        approvals: 'native',
         questions: 'unsupported',
-        planMode: 'unsupported',
+        planMode: 'native',
       });
-      expect(antigravityProviderModule.capabilities.security.enforcement).toBe('grimoire');
+      expect(antigravityProviderModule.capabilities.security.enforcement).toBe('native');
     });
 
     it('omits the ports it has nothing to put in', () => {
       const ports = antigravityProviderModule.runtimePorts({
+        hydrateConversation: async () => ({ outcome: 'absent' }),
+        deleteConversationSession: async () => undefined,
+        resolveSessionId: () => null,
+        isPendingFork: () => false,
+        readSessionDropped: () => null,
         commandsPort: () => new AntigravityCommandCatalog(),
         cachedPlanUsage: () => null,
         listModels: async () => [],
@@ -79,7 +84,7 @@ describe('Antigravity provider module', () => {
         renderSettingsTab: () => undefined,
       });
 
-      expect(ports.history).toBeUndefined();
+      expect(ports.history).toBeDefined();
       expect(ports.rewind).toBeUndefined();
       expect(antigravityProviderModule.declarations.taskResults).toBeUndefined();
       expect(antigravityProviderModule.declarations.nativeAgents).toBeUndefined();
@@ -161,6 +166,11 @@ describe('Antigravity provider module', () => {
   describe('workspace contribution', () => {
     const commandCatalog = new AntigravityCommandCatalog();
     const context = {
+      hydrateConversation: async () => ({ outcome: 'absent' as const }),
+      deleteConversationSession: async () => undefined,
+      resolveSessionId: () => null,
+      isPendingFork: () => false,
+      readSessionDropped: () => null,
       commandsPort: () => commandCatalog,
       cachedPlanUsage: jest.fn().mockReturnValue(null),
       listModels: jest.fn().mockResolvedValue([{ id: 'a', label: 'A' }]),

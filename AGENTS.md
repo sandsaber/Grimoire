@@ -15,7 +15,7 @@ Repository documentation and user-facing product copy should be in English unles
 
 - `src/providers/claude/` - Claude Code SDK adapter and Claude-compatible vault files.
 - `src/providers/codex/` - Codex app-server adapter and Codex-owned workspace services.
-- `src/providers/antigravity/` - Antigravity CLI print-mode adapter and Google's official Gemini CLI replacement.
+- `src/providers/antigravity/` - Antigravity CLI ACP adapter and print fallback for older versions of Google's Gemini CLI replacement.
 - `src/providers/gemini/` - Legacy Gemini CLI ACP adapter and Google-owned runtime, history, settings, and UI behavior.
 - `src/providers/grok/` - Grok Build ACP adapter and xAI-owned runtime, history, settings, and UI behavior.
 - `src/providers/opencode/` - OpenCode V1 ACP and V2 native API adapters, plus launch/workspace artifacts.

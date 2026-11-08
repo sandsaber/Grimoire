@@ -11,6 +11,8 @@ import type { ImageAttachment } from '../../../core/types';
  */
 export interface AntigravityRequest {
   readonly prompt: string;
+  /** ACP carries history itself after the first native session is bound. */
+  readonly acpPrompt?: string;
   readonly model: string | null;
   /**
    * What the user attached, still in memory.

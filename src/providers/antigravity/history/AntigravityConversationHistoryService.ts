@@ -22,8 +22,8 @@ export class AntigravityConversationHistoryService implements ProviderConversati
     _vaultPath: string | null,
   ): Promise<void> {}
 
-  resolveSessionIdForConversation(_conversation: Conversation | null): string | null {
-    return null;
+  resolveSessionIdForConversation(conversation: { readonly sessionId?: string | null } | null): string | null {
+    return conversation?.sessionId ?? null;
   }
 
   isPendingForkConversation(_conversation: Conversation): boolean {

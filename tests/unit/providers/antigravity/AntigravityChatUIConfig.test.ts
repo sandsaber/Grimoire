@@ -76,16 +76,18 @@ describe('antigravityChatUIConfig', () => {
     ]);
   });
 
-  it('exposes blocked/auto-approve, and offers no thinking level it cannot send', () => {
+  it('exposes Safe, Auto-approve and Plan, with the CLI default for reasoning', () => {
     const settings: Record<string, unknown> = {};
 
     expect(antigravityChatUIConfig.getPermissionModeToggle?.()).toEqual({
       inactiveValue: 'normal',
-      inactiveLabel: 'Blocked',
-      inactiveDescription: 'Safe approvals are unavailable for agy --print; Windows uses best-effort CLI fallbacks',
+      inactiveLabel: 'Safe',
+      inactiveDescription: 'Review Antigravity permission requests in chat. Requires agy acp.',
       activeValue: 'full_access',
       activeLabel: 'Auto-approve',
       activeDescription: 'Antigravity may edit files without Grimoire prompts',
+      planValue: 'plan',
+      planLabel: 'Plan',
     });
     // One entry, which is the picker not offering a choice. The tiers that were
     // here reached no argument and no prompt: `agy --print` takes no flag for a

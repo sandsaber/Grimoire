@@ -2,6 +2,7 @@ import type {
   ProviderCapabilityDescriptor,
   ProviderChatUiContribution,
   ProviderCommandsPort,
+  ProviderHistoryHydration,
   ProviderModelDescriptor,
   ProviderModelRefreshOptions,
   ProviderModule,
@@ -31,33 +32,7 @@ import {
 } from './settings';
 import { antigravityChatUIConfig } from './ui/AntigravityChatUIConfig';
 
-/**
- * Antigravity's contribution to the provider catalog.
- *
- * Written against the M1 `ProviderModule` contract rather than harvested: the
- * v1 module targets the contract harvest ban 1 excludes, whose feature ports
- * were bare `object`. The settings decode and encode logic is reused as
- * material, because it is real validation with a real preserved-unknown path.
- *
- * In production: `AntigravityExecution` builds the backend from
- * `execution.create` and the chat runtime from `features`.
- *
- * Honest absences, per the contract's "absent means unsupported" rule:
- * Antigravity has no resume, no native history, no native commands, no MCP, no
- * interactions, and no agents — and its auxiliary services are registered
- * today as no-ops, so this module contributes none rather than contributing
- * three that silently do nothing.
- */
-
-/**
- * Normalizers this module needs that the provider's settings module does not
- * export.
- *
- * `normalizeHostnameCliPaths` used to be here too, with the note that it lived
- * here "until the Antigravity flip, when the module becomes the settings
- * authority". The flip shipped; it is imported from `settings.ts` now, which is
- * where one rule with two implementations belongs.
- */
+/** Antigravity uses native ACP when available and keeps print mode for older CLIs. */
 
 function normalizeCustomModels(value: unknown): string {
   return typeof value === 'string' ? value : '';
@@ -83,6 +58,11 @@ const KNOWN_SETTINGS_FIELDS = new Set([
 ]);
 
 export interface AntigravityWorkspaceContext {
+  hydrateConversation(conversationId: string): Promise<ProviderHistoryHydration>;
+  deleteConversationSession(conversationId: string): Promise<void>;
+  resolveSessionId(conversationId: string): string | null;
+  isPendingFork(conversationId: string): boolean;
+  readSessionDropped(conversationId: string): boolean | null;
   commandsPort(): ProviderCommandsPort;
   cachedPlanUsage(): ProviderUsageSnapshot | null;
   listModels(): Promise<readonly ProviderModelDescriptor[]>;
@@ -107,13 +87,12 @@ export type AntigravityWorkspace = ProviderWorkspaceSlots;
 const antigravityCapabilities: ProviderCapabilityDescriptor = {
   providerId: 'antigravity',
   process: {
-    // One print-mode process per run: the stateless topology the plan uses as
-    // proof that the contract does not assume a persistent session.
-    topology: 'process-per-run',
+    // Modern CLIs keep one managed ACP process per kernel session.
+    topology: 'managed-acp-subprocess',
     concurrency: 'serial-runs',
   },
   session: {
-    resume: 'unsupported',
+    resume: 'native',
     transcriptHydration: 'unsupported',
   },
   history: { ownership: 'grimoire-projection' },
@@ -138,17 +117,14 @@ const antigravityCapabilities: ProviderCapabilityDescriptor = {
     reattachment: false,
   },
   input: {
-    // `grimoire` rather than `native`: agy has no image flag and its
-    // stream-json user event carries `content` as a plain string, so Grimoire
-    // writes each attachment to a temp file and names the absolute path in the
-    // prompt. The CLI opens it; the capability is ours.
-    imageAttachments: 'grimoire',
+    // Legacy print mode retains its temporary-file attachment fallback.
+    imageAttachments: 'native',
     instructionMode: 'unsupported',
   },
   interactions: {
-    approvals: 'unsupported',
+    approvals: 'native',
     questions: 'unsupported',
-    planMode: 'unsupported',
+    planMode: 'native',
   },
   conversation: {
     fork: 'unsupported',
@@ -156,9 +132,8 @@ const antigravityCapabilities: ProviderCapabilityDescriptor = {
     steering: 'unsupported',
     compaction: 'unsupported',
   },
-  // Grimoire enforces the process boundary because the CLI exposes no approval
-  // surface; that is why Safe mode stays fail-closed for this provider.
-  security: { enforcement: 'grimoire' },
+  // ACP enforces native approvals; print mode refuses every mode except full access.
+  security: { enforcement: 'native' },
   reasoningControl: { kind: 'none' },
   workspace: {
     // `readonly`, since `main`'s vault-skills fix: the slash menu lists the
@@ -227,8 +202,7 @@ export const antigravitySettingsCodec: ProviderSettingsCodec<AntigravityProvider
   isEnabled: settings => settings.enabled,
   withEnabled: (settings, enabled) => ({ ...settings, enabled }),
 
-  // Antigravity reads its environment at launch, so an environment change
-  // invalidates the next run rather than a live session.
+  // An environment change is part of the ACP restart fingerprint.
   runtimeInputKeys: ['environmentVariables', 'environmentHash', 'cliPath', 'cliPathsByHost'],
 
   environmentKeyPrefixes: ['ANTIGRAVITY_', 'GOOGLE_', 'GEMINI_', 'VERTEX_'],
@@ -289,7 +263,7 @@ AntigravityProviderSettings
 
   capabilities: antigravityCapabilities,
 
-  // No task results or native agents: print mode spawns no subagents.
+  // AGY exposes no Grimoire-observable native agent lifecycle.
   declarations: {
     warmup: 'none',
     providerId: 'antigravity',
@@ -313,9 +287,23 @@ AntigravityProviderSettings
     },
   },
 
-  // No history and no rewind: print mode keeps no transcript Grimoire could
-  // hydrate, and there is nothing to rewind to.
-  runtimePorts: () => ({ providerId: 'antigravity' }),
+  // ACP resumes by native id; message history remains the Grimoire projection.
+  runtimePorts: context => ({
+    providerId: 'antigravity',
+    history: {
+      hydrate: id => context.hydrateConversation(id),
+      deleteSession: id => context.deleteConversationSession(id),
+      resolveSessionId: id => context.resolveSessionId(id),
+      isPendingFork: id => context.isPendingFork(id),
+      buildSessionPatch: input => {
+        const dropped = context.readSessionDropped(input.conversationId);
+        return {
+          sessionId: input.sessionInvalidated ? null : input.nativeSessionRef,
+          ...(dropped === null ? {} : { providerState: dropped ? { sessionDropped: true } : {} }),
+        };
+      },
+    },
+  }),
 };
 
 function createDefaultSettings(): AntigravityProviderSettings {

@@ -17,26 +17,18 @@ import type { ProviderCapabilities } from '@/core/providers/types';
 
 export const ANTIGRAVITY_PROVIDER_CAPABILITIES: Readonly<ProviderCapabilities> = Object.freeze({
   providerId: 'antigravity',
-  supportsPersistentRuntime: false,
+  supportsPersistentRuntime: true,
   supportsNativeHistory: false,
-  supportsPlanMode: false,
+  supportsPlanMode: true,
   supportsRewind: false,
   supportsFork: false,
   supportsProviderCommands: false,
-  // Raised on `main` at the image-attachment feature and carried here with it:
-  // `agy` has no image flag, so Grimoire writes each attachment to a temp file
-  // and names the absolute path in the prompt. The descriptor says the same in
-  // its own language — `imageAttachments: 'grimoire'` — so this is a baseline
-  // that moved, not a divergence to declare.
+  // ACP sends native blocks. The print fallback supplies temporary image files.
   supportsImageAttachments: true,
   supportsInstructionMode: false,
   supportsMcpTools: false,
   supportsTurnSteer: false,
-  // Declared 'none' because nothing in the print path reads an effort level.
-  // `agy` takes no flag for it and the prompt composer ignores it, so the
-  // picker changed a settings field and nothing else — a control that promises
-  // the model will think harder and does not ask it to. Gemini declares 'none'
-  // for the same reason. Restore the tiers when the CLI exposes a flag.
+  // The selected model variant carries its thinking level.
   reasoningControl: 'none',
 });
 

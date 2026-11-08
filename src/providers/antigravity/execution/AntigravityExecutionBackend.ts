@@ -143,6 +143,11 @@ export interface AntigravityScheduler {
 }
 
 export interface AntigravityExecutionBackendContext {
+  /** Selected before a session dispatches; a native binding must stay on ACP. */
+  readonly acp?: {
+    readonly backend: ExecutionBackend;
+    readonly available: () => Promise<boolean>;
+  };
   readonly requestResolver: AntigravityRequestResolver;
   readonly processRunner: AntigravityProcessRunner;
   readonly resultSink: AntigravityResultSink;
@@ -204,6 +209,10 @@ export class AntigravityExecutionBackend implements ExecutionBackend {
     if (this.disposing) {
       throw new Error('Antigravity execution backend is disposing.');
     }
+    const useAcp = this.context.acp
+      && (config.nativeSessionRef || await this.context.acp.available());
+    if (this.disposing) throw new Error('Antigravity execution backend is disposing.');
+    if (useAcp && this.context.acp) return this.context.acp.backend.createSession(config);
     const session = new AntigravityExecutionSession(
       config,
       this.context,
@@ -218,7 +227,10 @@ export class AntigravityExecutionBackend implements ExecutionBackend {
       return;
     }
     this.disposing = true;
-    await Promise.all([...this.sessions].map(session => session.dispose()));
+    await Promise.all([
+      ...[...this.sessions].map(session => session.dispose()),
+      this.context.acp?.backend.dispose(),
+    ]);
   }
 }
 

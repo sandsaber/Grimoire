@@ -54,7 +54,7 @@ This file tracks future provider integrations and the implementation sequence fo
 
 - Claude Code, Codex, OpenCode, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin, and Reasonix are current integrations. Their runtime capabilities differ, but each has a registered provider adapter. OpenCode V1, MiMoCode, Kimi Code, Grok Build, Qwen Code, Devin, and Reasonix use ACP-based runtime paths where their CLI supports them.
 - OpenCode V2 uses a provider-owned native API/event-stream adapter over an authenticated loopback server. `OpencodeClientFactory` selects the transport by CLI version; both versions use the existing managed execution session contract. See [OpenCode V2 setup and compatibility](opencode-v2-compatibility.md) for discovery readiness, permissions, history schemas, verification, and limits. MiMoCode retains its own ACP transport.
-- Antigravity CLI and Gemini CLI (Legacy) are current Google integrations with more limited runtime surfaces. Keep Antigravity as the recommended Google path and Gemini only for legacy-compatible accounts; treat provider-specific enhancements as runtime-limited until their CLIs expose richer event streams, safer approval flows, and stronger session/tool metadata.
+- Extend the Antigravity ACP integration for current Google accounts. Keep the print fallback for older CLI installations and Gemini CLI for legacy-compatible accounts.
 - Context visibility should stay provider-neutral. The Context tab should show both user-pinned files and provider runtime file loads when Grimoire can infer them from tool events, while avoiding provider-specific assumptions in shared feature code.
 
 ## Integrated Provider: Command Code
@@ -178,7 +178,7 @@ effort discovery test makes no model requests.
 
 ## Other Candidates
 
-- Google consumer provider work should extend `src/providers/antigravity/`; Antigravity CLI is Grimoire's recommended Google provider. Keep `src/providers/gemini/` available only for legacy Gemini CLI compatibility with Standard, Enterprise, Google Cloud, and paid API-key users. Both Google providers should receive the same Grimoire per-turn context shape (active note, editor/browser/canvas selections, vault search, and project workspace), even though Antigravity currently carries it through `agy --print` and Gemini carries it through ACP prompt blocks. Until AGY exposes an approval-capable runtime, keep Antigravity Safe/normal mode fail-closed and launch `agy --print` only from explicit Auto-approve/full-access mode.
+- Both Google providers accept active notes, editor/browser/canvas selections, vault search, and project context. Antigravity uses ACP when available. Older CLIs use print mode only with explicit Auto-approve, because print mode cannot ask the user for permission.
 - GitHub Copilot CLI: validate whether it exposes a stable agentic CLI/runtime surface suitable for non-interactive Obsidian embedding.
 - Additional ACP providers: prefer shared ACP helpers only after confirming event compatibility with OpenCode V1 and other confirmed ACP providers. OpenCode V2's native events are not an ACP wire-format reference.
 - Local model CLIs: treat as a separate milestone because tool execution, files, and usage indicators usually differ from hosted provider CLIs.
