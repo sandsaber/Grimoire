@@ -797,3 +797,8 @@ The additional microphone consumes one toolbar hit target. At composer widths
 at or below 360px, the model therefore takes its own row above configuration
 controls and Send. A full-toolbar render with Obsidian app.css found overflow at
 320px before this adjustment; the idle 520px drawing stays one row.
+
+Native Obsidian first-open QA also covers the release-notes card above the tab.
+Its list yields height to the tab's minimum composer size, preserving the title,
+dismiss action and changelog link. Only the list scrolls; this is a containment
+correction to the existing composition, with no new surface or drawing change.

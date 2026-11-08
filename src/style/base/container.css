@@ -49,8 +49,10 @@
   overflow: hidden;
 }
 
-.grimoire-tab-chat-window {
+/* Keep the composer accessible when release notes need part of the pane. */
+.grimoire-tab-content.grimoire-tab-chat-window {
   height: 100%;
+  min-height: min-content;
 }
 
 .grimoire-chat-window-grid {

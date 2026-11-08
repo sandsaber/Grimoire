@@ -99,7 +99,9 @@ Grimoire view and exercised the production bridge/controller against real Audio
 and the approved synthetic WAV. Exact native textarea/caret insertion, accepted
 job cancellation, concurrent-edit preservation, tab-switch suppression, recovery,
 zero keyboard/submit events, the same Audio GUI PID and one model load all pass.
-No product code correction was required by this native run.
+Native first-open QA found and corrected a composer containment defect: a long
+release-notes card could shrink the tab below its toolbar height. The notice now
+yields height and scrolls only its list while preserving the composer minimum.
 
 The file producer is injected only into the in-memory QA session and restored
 afterward; product microphone capture has no file-input override. The native
@@ -111,10 +113,12 @@ reloads its renderer when Restricted Mode is switched off, so the harness waits
 for readiness before issuing further commands. This changes no trust setting in
 the working vault.
 
-A native screenshot initially caught the right-sidebar opening animation; after
-settling, both microphone and Send fit inside the composer and viewport. The
-acceptance now checks stable geometry rather than inferring visibility from a
-transient screenshot. Screenshots are taken only after clearing the test draft.
+The native acceptance waits for the sidebar animation, then checks actual
+`elementFromPoint` hits at the center and inset corners of microphone and Send,
+and also checks Cancel during an admitted job. Geometry alone missed clipping
+by a parent container. The stronger check failed on the pre-fix deployed bundle;
+it passes after the containment fix. Screenshots are taken only after clearing
+the test draft.
 
 Linux developers can reproduce with the installed app/CLI and explicit approved
 inputs (Python and Xvfb are QA tools, not plugin runtime requirements):

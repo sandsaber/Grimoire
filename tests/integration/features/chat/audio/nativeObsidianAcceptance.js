@@ -16,7 +16,9 @@
   const mic = tab.dom.inputWrapper.querySelector('.grimoire-audio-controls button');
   const fits = button => {
     const box = button.getBoundingClientRect(); const editor = tab.dom.inputWrapper.getBoundingClientRect();
-    return box.width > 0 && box.height > 0 && box.left >= editor.left && box.right <= editor.right + 1 &&
+    const exposed = [[0.5, 0.5], [0.2, 0.2], [0.8, 0.8]].every(([x, y]) =>
+      button.contains(document.elementFromPoint(box.left + box.width * x, box.top + box.height * y)));
+    return exposed && box.width > 0 && box.height > 0 && box.left >= editor.left && box.right <= editor.right + 1 &&
       box.top >= editor.top && box.bottom <= editor.bottom + 1 && box.right <= innerWidth && box.bottom <= innerHeight;
   };
   const layoutDeadline = Date.now() + 3000;
@@ -49,11 +51,18 @@
     input.setSelectionRange(16, 16);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   };
+  const clickAndFinish = async () => {
+    mic.click();
+    check(control.isActive(), 'Native microphone click did not start dictation');
+    const end = Date.now() + 30000;
+    while (control.isActive() && Date.now() < end) await pause(20);
+    check(!control.isActive(), 'Native microphone click did not finish');
+  };
   const originalMessages = tab.state.messages.length;
   const keyboard = () => { metrics.keyboardEvents++; };
   const submit = () => { metrics.submitEvents++; };
   const metrics = { nativeObsidian: true, pluginVersion: plugin.manifest.version,
-    keyboardEvents: 0, submitEvents: 0, nativeControlsVisible: true, microphone: false, producer: 'QA-only file transcription, unchanged production bridge/controller',
+    keyboardEvents: 0, submitEvents: 0, nativeControlsVisible: true, nativeControlsHitTest: true, nativeMicrophoneClick: true, microphone: false, producer: 'QA-only file transcription, unchanged production bridge/controller',
     transcriptRetained: false };
   input.addEventListener('keydown', keyboard); input.addEventListener('submit', submit);
   try {
@@ -67,14 +76,18 @@
       return session;
     };
     prepare(); const original = input.value; const caret = input.selectionStart;
-    await control.toggle();
+    await clickAndFinish();
     check(input.value === original.slice(0, caret) + reference + original.slice(caret), 'Exact native composer insertion mismatch');
     check(input.selectionStart === caret + reference.length && input.selectionEnd === input.selectionStart, 'Native caret mismatch');
     check(!tab.state.isStreaming && tab.state.messages.length === originalMessages, 'Dictation submitted a chat turn');
     metrics.exactNativeDraftAndCaret = true;
 
     prepare(); const cancelledValue = input.value;
-    const cancelled = control.toggle(); await admitted(); control.cancel(); await cancelled;
+    const cancelled = control.toggle(); await admitted();
+    check(fits(mic) && fits(tab.dom.sendButtonEl) && fits(tab.dom.inputWrapper.querySelector('.grimoire-audio-cancel')),
+      'Active dictation controls clipped');
+    metrics.activeControlsHitTest = true;
+    tab.dom.inputWrapper.querySelector('.grimoire-audio-cancel').click(); await cancelled;
     check(input.value === cancelledValue, 'Cancelled native job inserted text'); await readyAfterJob();
     metrics.acceptedCancelSuppressesInsertion = true;
 
@@ -89,7 +102,7 @@
     check(next.dom.inputEl.value === '', 'Native result leaked to another tab'); metrics.tabSwitchSuppressesInsertion = true;
     await manager.switchToTab(tab.id);
 
-    prepare(); await control.toggle();
+    prepare(); await clickAndFinish();
     const after = await readyAfterJob();
     check(after.pid === before.pid && after.status.engineLoads === before.status.engineLoads, 'Native GUI/model owner changed');
     check(!after.status.listening && !after.status.hasResult, 'Capture/result leaked after file jobs');
