@@ -1192,8 +1192,8 @@ describe('Reasonix execution composition', () => {
       executable: '/usr/local/bin/reasonix',
       arguments: ['acp'],
     });
-    // Nothing is forced into the environment: this CLI needs no quietening.
-    expect(launch.environment.RUST_LOG).toBeUndefined();
+    // Preserve the host environment rather than imposing another CLI's log filter.
+    expect(launch.environment.RUST_LOG).toBe(process.env.RUST_LOG);
     execution.dispose();
     await host.dispose();
   });

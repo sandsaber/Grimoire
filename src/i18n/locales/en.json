@@ -505,7 +505,7 @@
           "emptyResponse": "{provider} completed without returning a response. Check provider credentials and logs, then retry.",
           "requestFailed": "{provider} request failed",
           "antigravityDisabled": "Antigravity is disabled. Enable it in provider settings.",
-          "antigravitySafeModeUnavailable": "Antigravity Safe mode is unavailable because agy --print cannot request Grimoire file-edit approvals. Use Auto-approve only if you want AGY to edit files without prompts.",
+          "antigravitySafeModeUnavailable": "Safe mode is unavailable in print mode. Update Antigravity CLI to a version with agy acp, or select Auto-approve to allow edits without prompts.",
           "antigravityEmptyOutput": "Antigravity finished without a response. Check authentication or run agy --print in a terminal, then retry.",
           "claudeVaultPathUnavailable": "Could not determine vault path",
           "claudeCliNotFound": "Claude CLI not found"
@@ -1046,7 +1046,7 @@
         "desc": "OpenAI's coding agent."
       },
       "antigravity": {
-        "desc": "Google's new multi-model agent CLI. Recommended Google provider."
+        "desc": "Google’s multi-model coding agent with native ACP chat."
       },
       "gemini": {
         "desc": "Legacy Gemini CLI for Standard, Enterprise, and paid API-key users."
@@ -1276,7 +1276,7 @@
       "antigravity": {
         "windowsLimitations": {
           "name": "Windows CLI limitations",
-          "desc": "On Windows, current agy builds can finish successfully while returning empty stdout for model discovery and print responses. Grimoire uses transcript, settings, and fallback recovery where possible, but Antigravity may be less reliable on Windows than on macOS or Linux."
+          "desc": "Older Windows builds of agy can return no output for model discovery or print-mode chats. Grimoire can recover model names and print responses from local CLI files."
         },
         "cliPath": {
           "name": "Antigravity CLI path",
@@ -1386,7 +1386,7 @@
       "reasonix": {
         "cliPath": {
           "name": "Reasonix CLI path",
-          "desc": "Custom path to the local Reasonix CLI. Leave empty to launch `reasonix` from PATH."
+          "desc": "Leave empty to detect Reasonix. If you have multiple installations, enter the full path to the CLI version you want to use."
         },
         "hiddenCommands": {
           "name": "Hidden commands",

@@ -13,7 +13,7 @@ and chat persistence barrier. It checks the answer, saved attachment hashes, and
 rehydration from the saved references. Image names and the prompt do not reveal the
 expected colors. Model IDs are passed in query options, as the composer does.
 
-## Live results
+## Live results from 2026-09-18
 
 | Provider | Selected model | Result |
 | --- | --- | --- |
@@ -34,6 +34,10 @@ Early runs used a malformed PNG and the older test harness's global model settin
 those runs are not evidence for the model-specific passes above. The PNG chunk CRCs
 and decompressed pixel bytes were subsequently checked, and the listed passing paths
 were rerun with valid fixtures. Personal CLI configuration was not changed.
+
+## Follow-up on 2026-11-08
+
+Antigravity 1.5.3 read the two-color image through Grimoire’s native ACP path on macOS and answered “red, blue”. Older CLIs continue to use temporary files in print mode. Reasonix 2.58.0 now advertises ACP image input. Its Grimoire adapter still uses the opt-in file attachment path. The Reasonix check on this date covered text chat and rejection of a file write.
 
 ## Reproduce
 

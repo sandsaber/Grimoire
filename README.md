@@ -259,7 +259,9 @@ reasonix setup
 reasonix --version
 ```
 
-Run `reasonix setup` to configure a model provider and its credentials, then enable Reasonix in Grimoire. Reasonix keeps two settings where other providers keep one: the session mode (`normal`, `plan`, `goal`) and a separate tool-approval posture (`ask`, `auto`, `yolo`). Grimoire's toolbar drives both. Safe is `normal` asking, Plan is `plan` asking, and Auto-approve is `normal` on `yolo`; `goal` is Reasonix's own and reads as Safe. Because the posture is the only thing separating Safe from Auto-approve, a turn that cannot set it is refused rather than run quietly in the looser one.
+Check which executable you are updating with `type -a reasonix` on macOS or Linux, or `where.exe reasonix` on Windows. Update through the manager that installed that copy. For Homebrew, use `brew upgrade` with the installed cask name. If Homebrew cannot load the cask, you can install the CLI through npm instead. For example, `npm install -g reasonix@2.58.0` installs that specific version. If several copies exist, enter the full path of the intended executable under **Reasonix CLI path** and check its version directly.
+
+Run `reasonix setup` to configure your model provider, then enable Reasonix in Grimoire. On 2.58.0, Safe selects the native `normal` mode with `ask` tool approval, Plan selects `plan` with `ask`, and Auto-approve selects `normal` with `yolo`. Other CLI versions can advertise `read-only` and `danger-full-access` instead. Grimoire uses the values offered by the session and refuses to send a turn if it cannot apply the required approval policy.
 
 Reasonix also asks questions, not only permissions: its `ask` tool arrives on the same channel and is drawn as a card whose description is the question and whose numbered options are the answers. Pick one by its number; `Enter` does nothing on a card with several answers, so a habitual keypress cannot choose for you.
 
@@ -272,7 +274,7 @@ One thing to know about Safe mode: `ask` gates the tools Reasonix classifies as 
 
 Reasonix owns its configuration in `~/.reasonix/config.toml` and reads API keys from the environment under the names that file gives. Vault skills are read from `.reasonix/skills` and `.agents/skills`. Grimoire manages an isolated project MCP list in `.grimoire/mcp/reasonix.json` and injects it into ACP sessions. Usage comes from Reasonix's own status notifications, and a cost appears only when your model provider has a price. Fork and rewind are not supported.
 
-Enable **Image attachments as files** in Reasonix settings to use pasted or dropped images. Grimoire saves them in `.grimoire/attachments/` and sends absolute paths with an instruction to read each file. This is off by default: choose a model or tool that can read images, and expect an extra tool call. Reasonix does not advertise ACP image input, so Grimoire sends no image blocks. Missing or unwritable files stop the turn with an error.
+Enable **Image attachments as files** in Reasonix settings to use pasted or dropped images. Grimoire saves them in `.grimoire/attachments/` and sends absolute paths with an instruction to read each file. This is off by default: choose a model or tool that can read images, and expect an extra tool call. Grimoire uses this file-based path even on Reasonix 2.58.0, which advertises native ACP image input. Missing or unwritable files stop the turn with an error.
 
 ### Pi
 

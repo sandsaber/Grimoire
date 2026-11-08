@@ -45,12 +45,12 @@ Grimoire は、すでに Obsidian で作業している人のために作られ�
 
 | 機能 | Codex | Claude Code | OpenCode | Grok Build | MiMoCode | Kimi Code | Antigravity CLI | Gemini CLI (Legacy) | Qwen Code | Devin | Reasonix | Command Code | Pi |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ローカルの永続実行環境 | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | 非対応 | 対応 | 対応 | 対応 | 対応 | 非対応 | 対応 |
+| ローカルの永続実行環境 | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | ACP | 対応 | 対応 | 対応 | 対応 | 非対応 | 対応 |
 | ネイティブ履歴の復元 | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | 非対応 | 対応 | 非対応 | 非対応 | 非対応 | 非対応 | 対応 |
-| 計画モード | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | 非対応 | 対応 | 対応 | 対応 | 対応 | 非対応 | 非対応 |
-| 画像添付 | 対応 | 対応 | 対応 | 非対応 | 対応 | 対応 | ファイル | 対応 | 対応 | 対応 | ファイル（任意で有効化） | ファイル（任意で有効化） | 対応 |
+| 計画モード | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | ACP | 対応 | 対応 | 対応 | 対応 | 非対応 | 非対応 |
+| 画像添付 | 対応 | 対応 | 対応 | 非対応 | 対応 | 対応 | ACP / print モードではファイル | 対応 | 対応 | 対応 | ファイル（任意で有効化） | ファイル（任意で有効化） | 対応 |
 | 指示モード | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | 非対応 | 対応 | 対応 | 対応 | 対応 | 非対応 | 非対応 |
-| 推論の強度設定 | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | 非対応 | 対応 | 対応（モデルによる） | 対応（モデルによる） |
+| 推論の強度設定 | 対応 | 対応 | 対応 | 対応 | 対応 | 対応 | モデルのバリアント | 対応 | 対応 | 非対応 | 対応 | 対応（モデルによる） | 対応（モデルによる） |
 | 巻き戻し | 非対応 | 対応 | 非対応 | 対応 | 非対応 | 非対応 | 非対応 | 非対応 | 非対応 | 非対応 | 非対応 | 非対応 | 非対応 |
 | 分岐 | 対応 | 対応 | 非対応 | 対応 | 非対応 | 非対応 | 非対応 | 非対応 | 非対応 | 非対応 | 非対応 | 非対応 | 非対応 |
 | プロバイダーのスラッシュコマンド | 非対応 | 対応 | 対応 | 対応 | 対応 | 対応 | 非対応 | 対応 | 対応 | 対応 | 対応 | 非対応 | 対応 |
@@ -110,7 +110,7 @@ Settings, Grimoire, Providers で使いたい providers を有効化すると、
 
 Grimoire で最高の体験を得るには、まず Codex、Claude Code、OpenCode、MiMoCode、Kimi Code、Grok Build、Qwen Code から始めるのがおすすめです。これらの providers は現在、vault-native な作業に必要な runtime surface が最も強く、persistent sessions、plan-oriented workflows、tool activity、豊富な model controls を扱えます。
 
-Antigravity CLI と Gemini CLI (Legacy) も Google accounts や compatibility cases 向けに引き続き利用できますが、現時点では Grimoire の primary provider としては推奨していません。Grimoire は best-effort でこれらをサポートし、現在の CLI が許す fallback は実装していますが、ACP と runtime surfaces には技術的な制限があります。sessions、approvals、streaming、tool/edit metadata、model discovery、usage reporting は、推奨 providers と比べて不完全または不安定です。
+Antigravity CLI は対応バージョンで ACP を通じて Google アカウントをサポートします。Gemini CLI (Legacy) は、引き続き Gemini CLI を利用するアカウント向けに提供されています。
 
 ### Codex
 
@@ -127,6 +127,8 @@ Codex を一度実行して sign in し、その後 Grimoire で有効化しま�
 - [OpenAI code generation guide](https://developers.openai.com/api/docs/guides/code-generation)
 
 Grimoire 内では、Codex は app-server protocol で動作し、native history、fork、plan mode、image input、reasoning effort controls をサポートします。Codex が rate-limit metadata を報告すると、plan usage が表示されます。
+
+**カスタムエンドポイントの画像制限：** [#208](https://github.com/sandsaber/Grimoire/issues/208) では、Command Code の `/provider/v1/responses` エンドポイントが `view_image` などのツール結果の画像を base64 テキストとして渡すことが報告されています。モデルは画像を見ることができず、テキストのトークン消費でコンテキストを超過する場合があります。報告された構成では、ユーザーメッセージの画像添付は動作します。これはそのエンドポイントを使う Codex の制限であり、Grimoire の Command Code プロバイダーとは別です。[制限と復旧方法](../provider-image-limitations.md)を参照してください。
 
 ### Claude Code
 
@@ -166,11 +168,12 @@ agy
 Google 公式の Antigravity CLI をインストールし、ローカルで認証してから Grimoire で Antigravity を有効化します。Grimoire は PATH から `agy` を自動検出しますが、provider settings で custom CLI path を指定することもできます。
 
 - [Antigravity CLI](https://antigravity.google/product/antigravity-cli)
+- [Antigravity ACP](https://antigravity.google/docs/cli/acp/)
 - [Gemini CLI migration guide](https://goo.gle/gemini-cli-migration)
 
-Grimoire 内では、Antigravity は `agy --print` で実行され、`agy models` から model selection もできます。これは best-effort integration です。`agy` は現時点で Grimoire に十分強い ACP-compatible runtime を公開していません。Antigravity が安定した runtime surfaces を公開するまで、persistent sessions、native history、plan mode、streaming、approval-safe file edits、reliable usage reporting、auxiliary workflows は無効または制限されたままです。 画像は一時ファイルとして渡されます。後続のメッセージでは再添付が必要です。
+インストール済みの CLI がサブコマンドを公開している場合、Grimoire は `agy acp` を使用します（1.5.0 で導入）。ACP は後続のターンでネイティブセッションを保持し、画像添付を直接受け取り、回答とツールの動作をストリーミングします。**Safe** は権限の要求をチャットに表示します。**Plan** は CLI のプランモードを選択します。**Auto-approve** はツールの要求を自動的に許可します。モデル選択では、ログイン中のアカウントで利用できるバリアントを使用します。
 
-Windows note: current Windows `agy` builds can finish successfully while returning empty stdout for `agy models` and `agy --print`. Grimoire uses best-effort recovery from Antigravity logs, transcripts, settings, and a seeded Pro AI model list, but Windows Antigravity support may be less reliable than macOS or Linux. If your account shows additional models in Antigravity, add their exact labels under Antigravity settings > Custom models.
+古いバージョンは **Auto-approve** が必要な print モードを使用します。Grimoire は毎回のプロンプトに会話の文脈を含め、画像を一時ファイルのパスとして渡します。標準出力が空になる古い Windows ビルドでは、CLI のファイルから print の回答とモデル候補を復元できます。アカウント固有のバリアントが検出されない場合は、Antigravity 設定の **Custom models** に正確なラベルを追加してください。
 
 ### Gemini CLI (Legacy)
 
@@ -185,6 +188,8 @@ Gemini CLI は、account tier がまだサポートされていて、その lega
 ### Qwen Code
 
 Qwen Code は opt-in の ACP provider です。provider-native persistent sessions、resume、model context、live の model/mode discovery を提供します。messages と tool/plan activity を streaming し、image input、provider commands、file approvals をサポートします。Grimoire は provider-native message history を hydrate しません。
+
+画像入力には、画像対応モデルとそのモデルへのアカウントのアクセス権が必要です。カスタム画像モデルが自動認識されない場合は、Qwen のモデル設定に `generationConfig.modalities.image: true` が指定されていることを確認してください。指定がないと、モデル呼び出し前に画像がテキストのプレースホルダーへ置き換えられる場合があります。[Qwen のモデル設定](https://qwenlm.github.io/qwen-code-docs/en/users/configuration/settings/)を参照してください。
 
 ```bash
 # macOS と Linux
@@ -253,7 +258,11 @@ reasonix setup
 reasonix --version
 ```
 
+更新前に `reasonix --version` を確認し、インストール時と同じパッケージマネージャーで更新してください。npm で 2.58.0 を指定する場合は `npm install -g reasonix@2.58.0` を使用します。Homebrew ではインストール済みの formula または cask を `brew upgrade` で更新します。cask のインストールに失敗した場合は npm を使用してください。複数のインストールがある場合、macOS/Linux では `type -a reasonix`、Windows では `where.exe reasonix` でパスを確認し、Grimoire の **Reasonix CLI path** に目的の実行ファイルの絶対パスを指定してください。
+
 `reasonix setup` を実行して model provider と認証情報を設定し、Grimoire で Reasonix を有効にしてください。Reasonix は他の provider が 1 つ持つ設定を 2 つ持ちます。session mode（`normal`、`plan`、`goal`）と、別立ての tool 承認姿勢（`ask`、`auto`、`yolo`）です。Grimoire のツールバーは両方を操作します。Safe は確認する `normal`、Plan は確認する `plan`、Auto-approve は `yolo` の `normal` です。`goal` は Reasonix 固有で、Safe として表示されます。 Safe と Auto-approve を分けているのは姿勢だけなので、それを設定できなかった turn は、緩いほうで黙って走るのではなく拒否されます。
+
+この対応は Reasonix **2.58.0** の ACP で確認済みです。古い CLI は `read-only` や `danger-full-access` を公開する場合があります。Grimoire は実際のセッションが公開する値を使用します。
 
 Reasonix は許可だけでなく質問もします。`ask` tool は同じチャネルで届き、説明が質問、番号付きの選択肢が回答というカードとして描かれます。番号で選んでください。回答が複数あるカードでは `Enter` は何もしないので、習慣的なキー操作があなたの代わりに選ぶことはありません。
 
@@ -266,7 +275,7 @@ Safe モードについて 1 つ。`ask` が守るのは Reasonix が permission
 
 Reasonix は設定を `~/.reasonix/config.toml` に持ち、API キーはそのファイルが指定する名前で環境から読み取ります。Vault の skills は `.reasonix/skills` と `.agents/skills` から読まれます。Grimoire は `.grimoire/mcp/reasonix.json` に独立した project MCP リストを管理し、ACP session に注入します。使用量は Reasonix 自身の status notification から得られ、cost は model provider に価格がある場合のみ表示されます。fork、rewind には対応していません。
 
-**Image attachments as files** を有効にすると、画像を `.grimoire/attachments/` のファイルとして渡します。画像対応モデルとファイル読み取りツールが必要で、読み取りには追加のツール呼び出しが発生します。ファイルがない場合や書き込めない場合は送信が失敗します。既定では無効です。
+**Image attachments as files** を有効にすると、画像を `.grimoire/attachments/` のファイルとして渡します。画像対応モデルとファイル読み取りツールが必要で、読み取りには追加のツール呼び出しが発生します。ファイルがない場合や書き込めない場合は送信が失敗します。既定では無効です。 Reasonix 2.58.0 はネイティブ画像入力を公開していますが、このバージョンでも Grimoire は画像をファイルパスで渡し、ACP のネイティブ画像ブロックは送信しません。
 
 ### Pi
 
@@ -329,18 +338,24 @@ Grimoire は CLI のヘッドレス JSON 出力から回答とツールの動作
 
 独自の provider configuration を持つ model-agnostic agent を使いたい場合は OpenCode を選びます。
 
+Grimoire は同じプロバイダー項目から **OpenCode V1 と V2** をサポートします。V2 には [V2 統合](https://github.com/sandsaber/Grimoire/pull/223)を含む Grimoire ビルドが必要です。専用インストーラーで V2 CLI をインストールしてください：
+
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+curl -fsSL https://opencode.ai/v2/install | bash
+opencode --version
 opencode
 ```
 
-Homebrew、npm、bun、package-manager installs も使えます。OpenCode 側で provider credentials を設定し、その後 Grimoire で有効化します。
+V2 は `npm install -g @opencode/cli` または `brew install anomalyco/tap/opencode-v2` でも導入できます。Windows では [V2 インストールページ](https://opencode.ai/v2/docs)のスタンドアロンバイナリを使用してください。V1 と V2 はどちらも `opencode` コマンドを使います。既存のインストールを置き換える際は[移行ガイド](https://opencode.ai/v2/docs/migrate-v1/)に従ってください。
 
-- [OpenCode のダウンロード](https://opencode.ai/download)
-- [OpenCode のプロバイダードキュメント](https://opencode.ai/docs/providers)
-- [OpenCode config docs](https://opencode.ai/docs/config)
+OpenCode でプロバイダーを接続してから、Grimoire のプロバイダー設定で **OpenCode** を有効にします。CLI が複数ある場合は **OpenCode CLI path** に目的の実行ファイルを指定してください。更新後は Grimoire を再読み込みし、**Refresh all models** を押して、**Browse models** で使うモデルを選択します。更新時に既存の選択は保持されますが、新しく見つかったモデルは選択するまでチャットに表示されません。開いているチャットにも変更が反映されます。
 
-Grimoire 内では、OpenCode は ACP で動作し、Grimoire-managed launch artifacts、persistent runtime、native history、plan mode、image input、provider commands、reasoning effort をサポートします。Cost metadata が利用できる場合は monthly spend を表示します。
+V1 も[従来のインストール方法](https://opencode.ai/docs)で引き続きサポートされます。Grimoire は実行ファイルのバージョンを検出し、V1 では ACP、V2 では認証付きの非公開ローカル OpenCode サーバーを使用します。サーバーは Grimoire が自動的に起動・停止します。
+
+V2 は永続セッション、ネイティブ履歴、Safe/Plan モード、ツール動作のストリーミング、モデルと推論の設定、プロバイダーコマンド、既存のチャットカードでの質問に対応します。コスト情報があれば月間支出も表示します。検証済み CLI は **1.18.32、2.0.15、2.0.16** です。テスト範囲や、未対応の外部・条件付きフォーム、SSE MCP トランスポートなどの制限は [OpenCode V2 の設定と互換性](../opencode-v2-compatibility.md)を参照してください。
+
+- [OpenCode V2 のプロバイダー](https://opencode.ai/v2/docs/providers)
+- [OpenCode V2 の設定](https://opencode.ai/v2/docs/config)
 
 ### MiMoCode
 
@@ -439,13 +454,13 @@ Model selector の横の badge が active provider の usage を表示します�
 | --- | --- |
 | Codex | Account rate-limit notifications、利用可能な場合は `account/rateLimits/read` |
 | Claude Code | SDK rate-limit events、任意の `.grimoire/claude/statusline-usage.json`、SDK result cost metadata |
-| Antigravity CLI | `agy --print` からはまだ信頼性高く取得不可 |
+| Antigravity CLI | CLI の `/usage` コマンドが提供するアカウントの使用枠 |
 | Gemini CLI (Legacy) | Gemini CLI が返す場合の ACP cost metadata。legacy provider のみ |
 | Qwen Code | Qwen Code が返す場合の ACP token と cost metadata |
 | Devin | ACP が報告する session の credit 合計を月次の spend として |
 | Reasonix | 独自の status notification が報告する turn ごとの cost（設定した model provider に価格がある場合） |
 | Pi | pi-acp アダプターから報告されません |
-| OpenCode | ACP と session cost metadata から集計した monthly spend |
+| OpenCode | ネイティブランタイムのイベントとセッションのコスト情報から算出する月間支出（V1/V2） |
 | MiMoCode | ACP と session cost metadata から集計した monthly spend |
 | Kimi Code | ACP と session cost metadata から集計した monthly spend |
 | Grok Build | OAuth 認証による共有の週間 Grok 使用枠、リセット時刻、Extra Usage Credits；session cost metadata からの monthly API spend |

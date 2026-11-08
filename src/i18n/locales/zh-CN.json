@@ -505,7 +505,7 @@
           "emptyResponse": "{provider} 已完成，但没有返回响应。请检查供应商凭据和日志，然后重试。",
           "requestFailed": "{provider} 请求失败",
           "antigravityDisabled": "Antigravity 已禁用。请在供应商设置中启用它。",
-          "antigravitySafeModeUnavailable": "Antigravity 安全模式不可用，因为 agy --print 无法请求 Grimoire 文件编辑批准。仅当你允许 AGY 无需确认即可编辑文件时，才使用自动批准。",
+          "antigravitySafeModeUnavailable": "打印模式不支持安全模式。请将 Antigravity CLI 更新到支持 agy acp 的版本；如需允许免确认编辑，可选择自动批准。",
           "antigravityEmptyOutput": "Antigravity 未返回响应便已结束。请检查身份验证，或在终端中运行 agy --print 后重试。",
           "claudeVaultPathUnavailable": "无法确定 Claude 的仓库路径。",
           "claudeCliNotFound": "未找到 Claude Code CLI。请安装它，或在供应商设置中配置其路径。"
@@ -1046,7 +1046,7 @@
         "desc": "OpenAI 的编程代理。"
       },
       "antigravity": {
-        "desc": "Google 的新款多模型代理 CLI，推荐的 Google 供应商。"
+        "desc": "Google 的多模型编程代理，支持原生 ACP 聊天。"
       },
       "gemini": {
         "desc": "面向标准版、企业版及付费 API 密钥用户的旧版 Gemini CLI。"
@@ -1276,7 +1276,7 @@
       "antigravity": {
         "windowsLimitations": {
           "name": "Windows CLI 限制",
-          "desc": "在 Windows 上，当前 agy 构建可能在成功结束时仍为模型发现和打印响应返回空 stdout。Grimoire 会尽量通过记录、设置和回退机制恢复，但 Antigravity 在 Windows 上的可靠性可能低于 macOS 或 Linux。"
+          "desc": "旧版 Windows agy 在查找模型或使用打印模式聊天时可能没有输出。Grimoire 可以从本地 CLI 文件中恢复模型名称和回复。"
         },
         "cliPath": {
           "name": "Antigravity CLI 路径",
@@ -1386,7 +1386,7 @@
       "reasonix": {
         "cliPath": {
           "name": "Reasonix CLI 路径",
-          "desc": "Reasonix CLI 的本地路径。留空则从 PATH 启动 `reasonix`。"
+          "desc": "留空以自动检测 Reasonix。如果安装了多个版本，请输入要使用的 CLI 的完整路径。"
         },
         "hiddenCommands": {
           "name": "隐藏的命令",

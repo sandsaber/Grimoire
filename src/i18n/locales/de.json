@@ -505,7 +505,7 @@
           "emptyResponse": "{provider} wurde ohne Antwort beendet. Prüfe die Provider-Anmeldedaten und Protokolle und versuche es erneut.",
           "requestFailed": "Anfrage an {provider} fehlgeschlagen",
           "antigravityDisabled": "Antigravity ist deaktiviert. Aktiviere es in den Anbietereinstellungen.",
-          "antigravitySafeModeUnavailable": "Der sichere Modus von Antigravity ist nicht verfügbar, da agy --print keine Grimoire-Genehmigungen für Dateiänderungen anfordern kann. Verwende die automatische Genehmigung nur, wenn AGY Dateien ohne Rückfrage bearbeiten darf.",
+          "antigravitySafeModeUnavailable": "Im Druckmodus ist der sichere Modus nicht verfügbar. Aktualisiere die Antigravity CLI auf eine Version mit agy acp oder aktiviere die automatische Genehmigung für Änderungen ohne Rückfrage.",
           "antigravityEmptyOutput": "Antigravity wurde ohne Antwort beendet. Prüfe die Anmeldung oder führe agy --print in einem Terminal aus und versuche es erneut.",
           "claudeVaultPathUnavailable": "Der Vault-Pfad für Claude konnte nicht ermittelt werden.",
           "claudeCliNotFound": "Die Claude Code CLI wurde nicht gefunden. Installiere sie oder konfiguriere ihren Pfad in den Anbietereinstellungen."
@@ -1046,7 +1046,7 @@
         "desc": "OpenAIs Coding-Agent."
       },
       "antigravity": {
-        "desc": "Googles neue Multi-Modell-Agent-CLI. Empfohlener Google-Anbieter."
+        "desc": "Googles Coding-Agent mit mehreren Modellen und nativem ACP-Chat."
       },
       "gemini": {
         "desc": "Ältere Gemini CLI für Standard-, Enterprise- und zahlende API-Key-Nutzer."
@@ -1276,7 +1276,7 @@
       "antigravity": {
         "windowsLimitations": {
           "name": "Einschränkungen der Windows-CLI",
-          "desc": "Unter Windows können aktuelle agy-Builds erfolgreich enden, dabei aber leeres stdout für Modellermittlung und Druckausgaben zurückgeben. Grimoire nutzt, wo möglich, Transkript, Einstellungen und Wiederherstellung, doch Antigravity kann unter Windows weniger zuverlässig sein als unter macOS oder Linux."
+          "desc": "Ältere Windows-Versionen von agy geben bei der Modellsuche oder bei Chats im Druckmodus manchmal nichts aus. Grimoire kann Modellnamen und Antworten aus lokalen CLI-Dateien wiederherstellen."
         },
         "cliPath": {
           "name": "Antigravity-CLI-Pfad",
@@ -1386,7 +1386,7 @@
       "reasonix": {
         "cliPath": {
           "name": "Reasonix-CLI-Pfad",
-          "desc": "Benutzerdefinierter Pfad zur lokalen Reasonix CLI. Leer lassen, um `reasonix` über PATH zu starten."
+          "desc": "Leer lassen, um Reasonix automatisch zu erkennen. Bei mehreren Installationen den vollständigen Pfad zur gewünschten CLI angeben."
         },
         "hiddenCommands": {
           "name": "Ausgeblendete Befehle",

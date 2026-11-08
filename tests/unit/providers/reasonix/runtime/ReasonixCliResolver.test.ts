@@ -1,6 +1,8 @@
 import * as fs from 'fs';
+import * as path from 'path';
 
 import { ReasonixCliResolver } from '@/providers/reasonix/runtime/ReasonixCliResolver';
+import { getEnhancedPath } from '@/utils/env';
 
 jest.mock('fs');
 jest.mock('@/utils/env', () => ({
@@ -14,6 +16,23 @@ const mockedStat = fs.statSync as jest.Mock;
 describe('ReasonixCliResolver', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('prefers the executable on the inherited PATH over a second install in a fallback directory', () => {
+    const bin = path.resolve('active-node', 'bin');
+    const env = jest.replaceProperty(process, 'env', { ...process.env, PATH: bin });
+    try {
+      const fallback = getEnhancedPath().split(path.delimiter).find(directory => directory !== bin)!;
+      const name = process.platform === 'win32' ? 'reasonix.exe' : 'reasonix';
+      const active = path.join(bin, name);
+      const older = path.join(fallback, name);
+      mockedExists.mockImplementation((file: string) => file === older || file === active);
+      mockedStat.mockReturnValue({ isFile: () => true });
+
+      expect(new ReasonixCliResolver().resolve({}, '', '')).toBe(active);
+    } finally {
+      env.restore();
+    }
   });
 
   it('uses the current host path instead of another synced host path', () => {
