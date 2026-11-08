@@ -136,6 +136,36 @@ python3 tests/integration/features/chat/audio/obsidian_native_smoke.py \
 
 The JS acceptance refuses any vault except the owned /qa/vault with its explicit
 marker. The launcher also refuses child mode outside its disposable namespace.
-It never launches the normal working vault. The actual installed user window
-was not accessible to the agent; an already open window needs a plugin/window
-reload to pick up the replaced files. Physical microphone capture remains open.
+It never launches the normal working vault. That initial isolated run did not
+reach the working window because its official CLI was disabled. A separate
+working-window check, after the user enabled the CLI, is recorded below.
+Physical microphone capture remains open.
+
+## Working-window acceptance, 2026-11-08
+
+After the user enabled Obsidian's official CLI, the already open TestVault
+loaded Grimoire 2.0.13 with the Audio control and corrected containment CSS.
+No plugin/window reload was required in this check. Two explicitly owned, blank
+QA tabs exercised the actual working renderer; existing drafts were read only
+for in-memory equality checks and were never included in reports.
+
+Connecting from Grimoire automatically started the normal installed Audio GUI.
+The process start time was checked against the QA start, rather than inferring
+autostart from successful requests. Real local recognition of the previously
+approved synthetic WAV passed through the production bridge and microphone
+button handler into the native composer, with exact surrounding text and caret
+checks. Only the owned QA dictation control temporarily replaced its capture
+producer with file transcription; its production factory was restored afterward.
+
+Microphone/Send hit tests, active Cancel hit tests and button cancellation,
+concurrent-edit preservation, tab-switch suppression, and recovery all pass.
+There were zero keyboard/submit events or chat turns. All file requests reused
+one Audio PID and one model load. Final Audio state is idle, Local and ready,
+with listening false and no retained result. The Audio GUI remains available.
+
+Both QA tabs were cleared and closed. The original four tabs, their draft text
+and caret ranges, and the original active tab were preserved. Reports retain
+only diagnostic metadata, without drafts or transcripts. No microphone, model
+download, remote transcription or global text insertion was invoked. This working-window evidence supplements
+the isolated native run; it does not establish physical microphone acceptance.
+No further product fix was needed.
