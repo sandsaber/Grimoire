@@ -76,11 +76,62 @@ Browser visual QA uses the production controls with an explicitly simulated
 recognition session, actual installed Obsidian app.css and built plugin CSS.
 Dark/light and narrow composer states were checked against the Nordic drawing.
 This is not a live Obsidian recording demonstration. Full microphone Start/Stop,
-OS permission prompts, real speech, native Obsidian end-to-end and macOS/Windows
-acceptance remain open. The branch is not a published plugin release.
+OS permission prompts, real speech, native microphone-to-composer and macOS/Windows
+acceptance remain open. Native Obsidian file-producer acceptance is recorded below. The branch is not a published plugin release.
 
 Final gates: 656 unit suites / 9991 tests, typecheck, lint and release
 build/load/view-open checks pass. Live acceptance keeps one Audio GUI PID and
 one model load, with exact draft/caret checks, no submit/keyboard events and
 recovery after cancellation. The preview bundle is generated under
 `dist/grimoire`; disposable QA metadata and screenshots remain untracked.
+
+## Native Obsidian installation and acceptance, 2026-11-08
+
+The requested preview was installed in the registered TestVault plugin directory.
+A private full plugin backup and deployed-byte backup were saved under
+`.build/obsidian-install-20261108/`. Only main.js, manifest.json and styles.css
+were atomically replaced; all three match the accepted release bundle. Existing
+plugin data.json remained byte-identical. The installed plugin version is 2.0.13.
+
+The installed Obsidian 1.15.0 application then loaded those exact deployed bytes
+in a separate empty QA vault/profile. Its official CLI opened the actual
+Grimoire view and exercised the production bridge/controller against real Audio
+and the approved synthetic WAV. Exact native textarea/caret insertion, accepted
+job cancellation, concurrent-edit preservation, tab-switch suppression, recovery,
+zero keyboard/submit events, the same Audio GUI PID and one model load all pass.
+No product code correction was required by this native run.
+
+The file producer is injected only into the in-memory QA session and restored
+afterward; product microphone capture has no file-input override. The native
+Chromium sandbox stays enabled. Host libraries/application files are read-only;
+normal home/profile and vault contents are not mounted into the test. No sound
+devices or external routes exist. The original approved cache is unchanged.
+The empty QA vault explicitly trusts only our deployed Grimoire code. Obsidian
+reloads its renderer when Restricted Mode is switched off, so the harness waits
+for readiness before issuing further commands. This changes no trust setting in
+the working vault.
+
+A native screenshot initially caught the right-sidebar opening animation; after
+settling, both microphone and Send fit inside the composer and viewport. The
+acceptance now checks stable geometry rather than inferring visibility from a
+transient screenshot. Screenshots are taken only after clearing the test draft.
+
+Linux developers can reproduce with the installed app/CLI and explicit approved
+inputs (Python and Xvfb are QA tools, not plugin runtime requirements):
+
+```sh
+python3 tests/integration/features/chat/audio/obsidian_native_smoke.py \
+  --obsidian /absolute/path/to/obsidian \
+  --asar /absolute/path/to/obsidian-1.15.0.asar \
+  --xvfb /absolute/path/to/Xvfb \
+  --base /absolute/path/to/approved/ggml-base.bin \
+  --wav /absolute/path/to/approved/synthetic.wav \
+  --plugin /absolute/path/to/vault/.obsidian/plugins/grimoire \
+  --work "$PWD/.build/native-obsidian-check"
+```
+
+The JS acceptance refuses any vault except the owned /qa/vault with its explicit
+marker. The launcher also refuses child mode outside its disposable namespace.
+It never launches the normal working vault. The actual installed user window
+was not accessible to the agent; an already open window needs a plugin/window
+reload to pick up the replaced files. Physical microphone capture remains open.
