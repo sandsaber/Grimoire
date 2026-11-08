@@ -11,6 +11,7 @@ import { getBuiltInProviderDefaultConfigs } from '../../providers/defaultProvide
 
 export const DEFAULT_GRIMOIRE_SETTINGS: GrimoireSettings = {
   userName: '',
+  audioCliPath: '',
 
   permissionMode: 'normal',
 

@@ -14,8 +14,8 @@ const projectObsidianRuleOverrides = {
   'obsidianmd/ui/sentence-case': [
     'error',
     {
-      ignoreWords: ['Grimoire', 'Codex', 'OpenCode', 'MiMoCode', 'Mimocode', 'Kimi Code', 'WSL'],
-      brands: [...DEFAULT_BRANDS, 'Grimoire', 'Codex', 'OpenCode', 'MiMoCode', 'Mimocode', 'Kimi Code'],
+      ignoreWords: ['Grimoire', 'Grimoire Audio', 'Codex', 'OpenCode', 'MiMoCode', 'Mimocode', 'Kimi Code', 'WSL'],
+      brands: [...DEFAULT_BRANDS, 'Grimoire', 'Grimoire Audio', 'Codex', 'OpenCode', 'MiMoCode', 'Mimocode', 'Kimi Code'],
       acronyms: [...DEFAULT_ACRONYMS, 'TOML', 'WSL'],
       ignoreRegex: ['\\.(?:claude|codex|opencode|mimocode|kimicode)/'],
       enforceCamelCaseLower: true,

@@ -590,7 +590,7 @@ button.grimoire-queue-indicator-icon-action {
  * Past this there is nothing left to drop, so the row does break - model over
  * controls and Send, rather than an overflowing single line.
  */
-@container grimoire-composer (max-width: 200px) {
+@container grimoire-composer (max-width: 360px) {
   .grimoire-container--chat-window .grimoire-input-toolbar-actions-row {
     display: grid;
     grid-template-areas:
@@ -702,3 +702,16 @@ button.grimoire-queue-indicator-icon-action {
   color: var(--grimoire-accent-contrast);
   filter: none;
 }
+
+/* Dictation is secondary composer chrome; Send keeps the single filled action. */
+.grimoire-audio-controls { display: flex; align-items: center; gap: var(--grimoire-space-4); }
+.grimoire-audio-status { font-size: var(--grimoire-text-xs); color: var(--grimoire-ink-muted); }
+button.grimoire-audio-cancel {
+  background: transparent; color: var(--grimoire-ink-muted);
+  border: 1px solid var(--grimoire-line); border-radius: var(--grimoire-radius-1);
+  font: inherit; box-shadow: none;
+}
+button.grimoire-audio-cancel[hidden] { display: none; }
+
+.grimoire-audio-status-row { display: flex; align-items: center; gap: var(--grimoire-space-8); padding-block: var(--grimoire-space-4); }
+.grimoire-audio-status-row[hidden] { display: none; }

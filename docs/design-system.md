@@ -778,3 +778,22 @@ The system also renders itself at
 built out of these tokens, and the strip at the top writes `--accent-h/s/l` and the theme exactly the
 way Obsidian's Appearance pane does. Nothing on it names a colour, so moving the accent moves the
 whole page.
+
+## Audio dictation addition
+
+The composer drawing in screen 1a now includes the microphone beside Send. Send
+retains the only filled action; Audio uses the existing icon-button primitive.
+During preparation/capture/recognition, the implementation adds a status row
+under the textarea with a word-labelled Cancel action. That active row is absent
+from the idle drawing deliberately: it prevents voice controls from widening the
+model/configuration toolbar in narrow panes. The ordinary composer remains the
+editor; no transcript panel or second provider surface is introduced.
+
+The General executable field uses native settings rows. Visual QA compares actual
+Obsidian app.css plus built plugin CSS with the production controls, in light and
+dark themes; its recognition session is explicitly simulated.
+
+The additional microphone consumes one toolbar hit target. At composer widths
+at or below 360px, the model therefore takes its own row above configuration
+controls and Send. A full-toolbar render with Obsidian app.css found overflow at
+320px before this adjustment; the idle 520px drawing stays one row.

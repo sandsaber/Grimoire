@@ -184,6 +184,8 @@ export interface ContextEngineSettings {
 export interface GrimoireSettings {
   // User preferences
   userName: string;
+  /** Native Grimoire Audio executable; empty uses local discovery. */
+  audioCliPath?: string;
 
   // Security
   permissionMode: PermissionMode;

@@ -39,6 +39,7 @@ import type GrimoirePlugin from '../../../main';
 import { SlashCommandDropdown } from '../../../shared/components/SlashCommandDropdown';
 import { getEnhancedPath } from '../../../utils/env';
 import { getVaultPath } from '../../../utils/path';
+import { mountAudioDictation } from '../audio/AudioDictation';
 import { BrowserSelectionController } from '../controllers/BrowserSelectionController';
 import { CanvasSelectionController } from '../controllers/CanvasSelectionController';
 import { ConversationController } from '../controllers/ConversationController';
@@ -184,9 +185,15 @@ export function createTab(options: TabCreateOptions): TabData {
   const contentEl = containerEl.createDiv({ cls: 'grimoire-tab-content grimoire-hidden' });
 
   const state = new ChatState({
-    onStreamingStateChanged: onStreamingChanged,
+    onStreamingStateChanged: (streaming) => {
+      if (streaming) tab.ui.audioDictation?.cancel();
+      onStreamingChanged?.(streaming);
+    },
     onAttentionChanged: onAttentionChanged,
-    onConversationChanged: onConversationIdChanged,
+    onConversationChanged: (conversationId) => {
+      tab.ui.audioDictation?.cancel();
+      onConversationIdChanged?.(conversationId);
+    },
   });
 
   const vaultTextIndex = new VaultTextIndex(createObsidianVaultNoteSource(plugin.app));
@@ -889,6 +896,14 @@ function initializeInputToolbar(
   const actionsRowEl = inputToolbar.querySelector<HTMLElement>('.grimoire-input-toolbar-actions-row')
     ?? inputToolbar;
   const sendActionsEl = actionsRowEl.createDiv({ cls: 'grimoire-send-actions' });
+  tab.ui.audioDictation?.dispose();
+  tab.ui.audioDictation = mountAudioDictation(sendActionsEl, {
+    input: dom.inputEl,
+    context: () => `${tab.conversationId}:${tab.state.currentConversationId}:${tab.state.streamGeneration}`,
+    available: () => tab.lifecycleState !== 'closing' && !tab.state.isStreaming &&
+      !tab.state.isSwitchingConversation && !tab.state.isCreatingConversation &&
+      !dom.contentEl.hasClass('grimoire-hidden'),
+  }, () => plugin.settings.audioCliPath ?? '');
   dom.stopButtonEl = sendActionsEl.createEl('button', {
     cls: 'grimoire-stop-button grimoire-hidden',
     attr: {
@@ -1630,6 +1645,9 @@ export function wireTabInputEvents(tab: TabData, plugin: GrimoirePlugin): void {
         e.preventDefault();
         return;
       }
+      if (ui.audioDictation?.isActive()) {
+        e.preventDefault(); ui.audioDictation.cancel(); return;
+      }
       if (state.isStreaming) {
         e.preventDefault();
         controllers.inputController?.cancelStreaming();
@@ -1767,6 +1785,7 @@ export function activateTab(tab: TabData): void {
  * Deactivates a tab (hides it and stops services).
  */
 export function deactivateTab(tab: TabData): void {
+  tab.ui.audioDictation?.cancel();
   tab.dom.contentEl.addClass('grimoire-hidden');
   tab.controllers.selectionController?.stop();
   tab.controllers.browserSelectionController?.stop();
@@ -1779,6 +1798,7 @@ export function deactivateTab(tab: TabData): void {
  */
 export async function destroyTab(tab: TabData): Promise<void> {
   tab.lifecycleState = 'closing';
+  tab.ui.audioDictation?.dispose();
 
   // First, and before anything cancels: this ends the *view* of the work. What
   // happens to a run still going is the kernel's to decide, and a tab that

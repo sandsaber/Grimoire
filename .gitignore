@@ -81,6 +81,7 @@ temp/
 data.json
 
 # Test artifacts
+.build/
 test-results/
 
 # Development files

@@ -10,6 +10,7 @@ import type { InstructionRefineService, ProviderId, TitleGenerationService } fro
 import type { ExecutionChatRuntimeAdapter } from '../../../core/runtime/execution/ExecutionChatRuntimeAdapter';
 import type { TitleSource, UsageInfo } from '../../../core/types';
 import type { SlashCommandDropdown } from '../../../shared/components/SlashCommandDropdown';
+import type { AudioDictation } from '../audio/AudioDictation';
 import type { BrowserSelectionController } from '../controllers/BrowserSelectionController';
 import type { CanvasSelectionController } from '../controllers/CanvasSelectionController';
 import type { ConversationController } from '../controllers/ConversationController';
@@ -124,6 +125,7 @@ export interface TabServices {
  * UI components managed per-tab.
  */
 export interface TabUIComponents {
+  audioDictation?: AudioDictation;
   fileContextManager: FileContextManager | null;
   /** The one list behind the composer chips, the manage dialog and the picker. */
   contextAttachments: ContextAttachments | null;

@@ -448,6 +448,8 @@ export class GrimoireSettingTab extends PluginSettingTab {
     const aliases = Array.from(new Set([
       ...GENERAL_SETTINGS_SEARCH_KEYS.map((key) => t(key)),
       ...providerAliases,
+      'Grimoire Audio',
+      'Dictation',
       t('settings.search.providers'),
       t('settings.search.models'),
       t('settings.search.permissions'),
@@ -1924,6 +1926,17 @@ export class GrimoireSettingTab extends PluginSettingTab {
   }
 
   private renderGeneralTab(container: HTMLElement): void {
+    new Setting(container)
+      .setName('Grimoire Audio executable')
+      .setDesc('Local dictation uses the separately installed Grimoire Audio app. Leave empty to detect it automatically. No audio is sent to the chat provider.')
+      .addText(text => text
+        .setPlaceholder('Auto-detect')
+        .setValue(this.plugin.settings.audioCliPath ?? '')
+        .onChange(async value => {
+          this.plugin.settings.audioCliPath = value.trim();
+          await this.plugin.saveSettings();
+        }));
+
     const versionSetting = new Setting(container)
       .setName(t('settings.version.name'))
       .setDesc(formatGrimoireVersion(this.plugin.manifest))

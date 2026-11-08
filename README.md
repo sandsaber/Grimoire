@@ -599,3 +599,10 @@ Next on the list: GitHub Copilot CLI, other ACP-compatible providers, and local 
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Local dictation
+
+The composer can use the separately installed Grimoire Audio app through its
+local bridge. Its microphone button starts/stops local dictation and inserts
+only into the unchanged original draft; sending remains a separate action.
+See [Audio setup, cancellation and verification](docs/audio-bridge.md).

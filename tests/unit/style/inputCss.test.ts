@@ -19,7 +19,7 @@ describe('input.css', () => {
     expect(rule).toContain('max-height: var(--grimoire-textarea-max-height, none)');
   });
 
-  it('keeps the compact toolbar on one row until the pane is genuinely narrow', () => {
+  it('keeps voice and configuration controls inside a narrow composer', () => {
     const css = readInputCss();
     const actionsRule = getRule(css, '.grimoire-container--chat-window .grimoire-input-toolbar-actions-row');
     const configRule = getRule(css, '.grimoire-container--chat-window .grimoire-input-toolbar-config-actions');
@@ -46,8 +46,8 @@ describe('input.css', () => {
     expect(css).toMatch(
       /@container grimoire-composer \(max-width: 520px\)[\s\S]*?\.grimoire-input-toolbar-config-actions[\s\S]*?flex-wrap: nowrap/,
     );
-    // Past this there is nothing left to drop, so the row does break.
-    expect(css).toContain('@container grimoire-composer (max-width: 200px)');
+    // The microphone adds one hit target; the full toolbar is measured to need two rows at 320px.
+    expect(css).toContain('@container grimoire-composer (max-width: 360px)');
     expect(css).toContain('grid-template-areas:');
     expect(css).toContain('"model model"');
     expect(css).toContain('"controls send"');
