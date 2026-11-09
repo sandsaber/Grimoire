@@ -24,6 +24,7 @@ const PLATFORM_SENSITIVE_ROOTS = [
   'tests/unit/core/execution',
   'tests/unit/app/execution',
   'tests/integration/app/execution',
+  'tests/integration/providers/commandcode',
 ];
 
 function readWorkflow(): string {
