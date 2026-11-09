@@ -7,6 +7,7 @@ import { NodeLocalShellProcessAdapter } from '@/app/execution/local/NodeLocalShe
 import type { LocalShellLaunchSpec } from '@/core/execution/local/LocalShellBackend';
 import type { CommandcodeApprovalHandler } from '@/providers/commandcode/runtime/CommandcodeApprovalTransport';
 import { type CommandcodeProcessHandle, NodeCommandcodeProcessRunner } from '@/providers/commandcode/runtime/CommandcodeProcess';
+import { commandcodeEnvironment } from '@/providers/commandcode/settings';
 
 // Exercise the actual process guard and IPC; this fake only replaces the vendor loop.
 const CLI = `
@@ -97,10 +98,10 @@ describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', versio
   const contents = () => readFileSync(join(directory, 'Note.md'), 'utf8');
   const start = (approve: CommandcodeApprovalHandler, scenario = '') => {
     const trace: string[] = [];
+    const command = join(directory, 'dist/index.mjs');
     const processHandle = new NodeCommandcodeProcessRunner(new TracingProcessAdapter(trace)).start({
-      command: join(directory, 'dist/index.mjs'), cwd: directory,
-      environment: { PATH: process.env.PATH!, GUARD_SCENARIO: scenario, NODE_DEBUG: 'net',
-        ...(process.env.LOCALAPPDATA ? { LOCALAPPDATA: process.env.LOCALAPPDATA } : {}) },
+      command, cwd: directory,
+      environment: { ...commandcodeEnvironment({}, command), GUARD_SCENARIO: scenario, NODE_DEBUG: 'net' },
       prompt: 'Edit Note.md', permissionMode: 'normal',
     }, event => { trace.push(`event: ${String(event.type)}`); }, () => undefined, async (request, signal) => {
       trace.push('approval opened');
