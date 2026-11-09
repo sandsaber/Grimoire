@@ -24,6 +24,7 @@ const PLATFORM_SENSITIVE_ROOTS = [
   'tests/unit/core/execution',
   'tests/unit/app/execution',
   'tests/integration/app/execution',
+  'tests/integration/providers/commandcode',
 ];
 
 function readWorkflow(): string {
@@ -101,6 +102,13 @@ describe('cross-platform execution coverage', () => {
       .filter(line => !line.trimStart().startsWith('#'));
 
     expect(commands.join('\n')).not.toContain('--passWithNoTests');
+  });
+
+  it('keeps Windows unit failures blocking', () => {
+    const workflow = readWorkflow();
+    const jobStart = workflow.indexOf('  windows-unit:');
+    expect(jobStart).toBeGreaterThan(-1);
+    expect(workflow.slice(jobStart)).not.toMatch(/^\s*continue-on-error:/m);
   });
 
   it('resolves the platform-sensitive roots to real directories', () => {

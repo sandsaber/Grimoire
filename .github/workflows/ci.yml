@@ -108,24 +108,19 @@ jobs:
         shell: bash
         run: npm run test -- --selectProjects unit --runInBand --testPathPatterns "tests[\\/]unit[\\/](core|app)[\\/]execution"
 
+      # Native approval proofs also own real processes and IPC.
       # Selected by directory rather than by suite name, so a new owned-process
       # proof is covered by where it is filed instead of by remembering to
       # extend this line. `executionPlatformCoverage.test.ts` asserts that both
       # patterns still cover every suite under those directories.
       - name: Verify host process ownership
         shell: bash
-        run: npm run test -- --selectProjects integration --runInBand --testPathPatterns "tests[\\/]integration[\\/]app[\\/]execution"
+        run: npm run test -- --selectProjects integration --runInBand --testPathPatterns "tests[\\/]integration[\\/](app[\\/]execution|providers[\\/]commandcode)"
 
   windows-unit:
-    # Only the test step is non-blocking. The unit suite still has known
-    # Windows-only failures, so this job records the current count rather than
-    # gating merges on it: the step summary shows the gap on every run and the
-    # uploaded log names the failing tests to work from. Setup still fails the
-    # job outright — a Windows install that stops working is a real break, not
-    # a known gap. Drop `continue-on-error` and make the check required once
-    # the count reaches zero. Linux owns the lockfile, audit, and
-    # release-artifact gates; this job covers only what is platform-dependent.
-    name: windows-unit (non-blocking)
+    # Process-heavy approval proofs run serially in the execution matrix.
+    # Unit failures now fail CI; keep their summary and log for diagnosis.
+    name: windows-unit
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -157,7 +152,6 @@ jobs:
 
       - name: Unit tests
         id: unit
-        continue-on-error: true
         shell: bash
         run: npm run test -- --selectProjects unit 2>&1 | tee windows-unit.log
 
@@ -170,7 +164,7 @@ jobs:
           {
             echo "## Windows unit suite"
             echo
-            echo "Outcome: \`${{ steps.unit.outcome }}\` (non-blocking)"
+            echo "Outcome: \`${{ steps.unit.outcome }}\`"
             echo
             if [ -n "${tests}" ]; then
               echo "- ${suites}"
