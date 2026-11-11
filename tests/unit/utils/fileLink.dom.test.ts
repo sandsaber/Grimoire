@@ -25,6 +25,16 @@ function createMockApp(existingFiles: string[]) {
 }
 
 describe('processFileLinks', () => {
+  it('opens an exact inline vault path and leaves examples and missing files alone', () => {
+    const app = createMockApp(['Project Notes/Plan.md']);
+    const container = document.createElement('div');
+    container.innerHTML = '<code>Project Notes/Plan.md</code> <code>Missing.md</code>'
+      + '<pre><code>Project Notes/Plan.md</code></pre>';
+    processFileLinks(app, container);
+    expect([...container.querySelectorAll('a')].map(link => link.dataset.href))
+      .toEqual(['Project Notes/Plan.md']);
+  });
+
   describe('null/empty inputs', () => {
     it('handles null app gracefully', () => {
       const container = document.createElement('div');

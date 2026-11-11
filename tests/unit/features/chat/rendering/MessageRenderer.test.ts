@@ -42,9 +42,7 @@ jest.mock('@/utils/imageEmbed', () => ({
   replaceImageEmbedsWithHtml: jest.fn().mockImplementation((md: string) => md),
 }));
 jest.mock('@/utils/fileLink', () => ({
-  hasProcessableWikilink: jest.fn().mockImplementation((text: string) =>
-    /(^|[^!])\[\[[^\]]+\]\]/.test(text)
-  ),
+  mayContainFileLinks: jest.requireActual('@/utils/fileLink').mayContainFileLinks,
   processFileLinks: jest.fn(),
   registerFileLinkHandler: jest.fn(),
 }));

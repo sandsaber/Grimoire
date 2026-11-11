@@ -35,6 +35,10 @@ export function hasProcessableWikilink(text: string): boolean {
   return pattern.test(text);
 }
 
+export function mayContainFileLinks(text: string): boolean {
+  return hasProcessableWikilink(text) || (text.includes('`') && text.includes('.'));
+}
+
 interface WikilinkMatch {
   index: number;
   fullMatch: string;
@@ -225,10 +229,20 @@ export function processFileLinks(app: App, container: HTMLElement): void {
 
   // Wikilinks in inline code aren't rendered by Obsidian's MarkdownRenderer
   container.querySelectorAll('code').forEach((codeEl) => {
-    if (codeEl.parentElement?.tagName === 'PRE') return;
+    if (codeEl.closest('pre, a')) return;
 
     const text = codeEl.textContent;
-    if (!text || !text.includes('[[')) return;
+    if (!text) return;
+    if (!text.includes('[[')) {
+      // A whole inline code span delimits paths with spaces without guessing
+      // where a filename begins or ends in prose.
+      if (!/\.[\w-]+$/.test(text) || /[\\:#^\n\r]/.test(text) || text.startsWith('/')) return;
+      const file = getVaultFileByPath(app, text);
+      if (file?.path === text) {
+        codeEl.replaceChildren(createWikilink(container.ownerDocument, file.path, text));
+      }
+      return;
+    }
 
     const matches = findWikilinks(app, text);
     if (matches.length === 0) return;

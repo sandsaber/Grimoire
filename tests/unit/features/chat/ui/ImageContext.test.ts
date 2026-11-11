@@ -11,6 +11,8 @@ jest.mock('obsidian', () => ({
   setIcon: jest.fn(),
 }));
 
+jest.mock('electron', () => ({ webUtils: { getPathForFile: jest.fn() } }), { virtual: true });
+
 // Mock document.createElementNS for SVG elements created in setupDragAndDrop
 const mockSvgElement = () => {
   const el = createMockEl('svg');
@@ -489,11 +491,34 @@ describe('ImageContextManager - Private Helpers', () => {
   });
 
   describe('Drag and Drop handlers', () => {
-    it('handleDragEnter should show overlay when dragging files', () => {
+    it('routes a mixed desktop drop anywhere in the tab to image and path attachments', () => {
+      const tab = createMockEl();
+      const { container } = createContainerWithInputWrapper();
+      const onDesktopPaths = jest.fn();
+      const manager = new ImageContextManager(container, createMockTextArea(), {
+        onImagesChanged: jest.fn(), desktopDropTarget: tab, onDesktopPaths,
+      });
+      const image = { name: 'shot.png', type: 'image/png' };
+      const note = { name: 'note.md', type: 'text/markdown' };
+      const folder = { name: 'Folder', type: '' };
+      const getPath = jest.requireMock('electron').webUtils.getPathForFile;
+      getPath.mockReturnValueOnce('/project/note.md').mockReturnValueOnce('/project/Folder');
+      const addImage = jest.spyOn(manager as any, 'addImageFromFile').mockResolvedValue(true);
+      tab.dispatchEvent({
+        type: 'drop', preventDefault: jest.fn(), stopPropagation: jest.fn(),
+        dataTransfer: { files: [image, note, folder] },
+      });
+      expect(getPath.mock.calls).toEqual([[note], [folder]]);
+      expect(onDesktopPaths).toHaveBeenCalledWith(['/project/note.md', '/project/Folder']);
+      expect(addImage).toHaveBeenCalledWith(image, 'drop');
+      manager.destroy();
+      expect(tab.getEventListenerCount('drop')).toBe(0);
+    });
+    it('handleDragEnter should show the image overlay when dragging an image', () => {
       const event = {
         preventDefault: jest.fn(),
         stopPropagation: jest.fn(),
-        dataTransfer: { types: ['Files'] },
+        dataTransfer: { types: ['Files'], items: [{ kind: 'file', type: 'image/png' }] },
       };
 
       manager['handleDragEnter'](event as any);

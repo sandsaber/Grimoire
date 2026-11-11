@@ -255,6 +255,13 @@ describe('ExternalContextSelector', () => {
   });
 
   describe('native picker', () => {
+    it('keeps a dropped filename containing an environment variable literal', () => {
+      const selected = path.resolve('Outside', '$HOME.txt');
+      expect(selector.addSelectedPath(selected)).toEqual({ success: true, normalizedPath: selected });
+      expect(selector.getExternalContexts()).toContain(selected);
+      expect(selector.getPersistentPaths()).not.toContain(selected);
+    });
+
     it('should notify the chat when an individual file is selected', async () => {
       const selectedFile = '/vault/docs/brief.pdf';
       const onExternalContextFileSelect = jest.fn();

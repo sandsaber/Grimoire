@@ -151,7 +151,11 @@ export class FileContextManager {
 
   /** Attaches a vault path the reader picked rather than mentioned. */
   attachFile(path: string): void {
-    this.state.attachFile(path);
+    this.attachFiles([path]);
+  }
+
+  attachFiles(paths: readonly string[]): void {
+    for (const path of paths) this.state.attachFile(path);
     this.refreshCurrentNoteChip();
   }
 

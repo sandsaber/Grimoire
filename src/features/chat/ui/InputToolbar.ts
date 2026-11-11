@@ -1874,7 +1874,11 @@ export class ExternalContextSelector {
     // Expand home directory and normalize path
     const expandedPath = expandHomePath(cleanPath);
     const normalizedPath = normalizePathForFilesystem(expandedPath);
+    return this.addSelectedPath(normalizedPath);
+  }
 
+  /** Native pickers and file drops supply literal paths, including names containing '$'. */
+  addSelectedPath(normalizedPath: string): AddExternalContextResult {
     if (!path.isAbsolute(normalizedPath)) {
       return { success: false, error: t('chat.ui.externalContext.absolutePathRequired') };
     }
@@ -1882,7 +1886,7 @@ export class ExternalContextSelector {
     // Validate path exists and is a file or directory with specific error messages
     const validation = validateContextPath(normalizedPath);
     if (!validation.valid) {
-      return { success: false, error: `${validation.error}: ${pathInput}` };
+      return { success: false, error: `${validation.error}: ${normalizedPath}` };
     }
 
     // Check for duplicate (normalized comparison for cross-platform support)
@@ -2008,26 +2012,14 @@ export class ExternalContextSelector {
       if (!result.canceled && result.filePaths.length > 0) {
         const selectedPath = result.filePaths[0];
 
-        // Check for duplicate (normalized comparison for cross-platform support)
-        if (isDuplicatePath(selectedPath, this.externalContextPaths)) {
-          new Notice(t('chat.ui.externalContext.duplicate'), 3000);
+        const added = this.addSelectedPath(selectedPath);
+        if (!added.success) {
+          new Notice(added.error, 5000);
           return;
         }
-
-        // Check for nested/overlapping paths
-        const conflict = findConflictingPath(selectedPath, this.externalContextPaths);
-        if (conflict) {
-          new Notice(this.formatConflictMessage(selectedPath, conflict), 5000);
-          return;
-        }
-
-        this.externalContextPaths = [...this.externalContextPaths, selectedPath];
         if (validateContextPath(selectedPath).type === 'file') {
           this.callbacks.onExternalContextFileSelect?.(selectedPath);
         }
-        this.onChangeCallback?.(this.externalContextPaths);
-        this.updateDisplay();
-        this.renderDropdown();
       }
     } catch {
       new Notice(t('chat.ui.externalContext.pickerFailed'), 5000);
