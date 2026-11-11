@@ -1,7 +1,9 @@
 import type { App } from 'obsidian';
 import { TFile, TFolder } from 'obsidian';
+import * as path from 'path';
 
 import { t } from '../../../../i18n/i18n';
+import { getVaultPath } from '../../../../utils/path';
 import { ContextAddPicker, type ContextPickerPlacement } from './ContextAddPicker';
 import { ContextComposerView } from './ContextComposerView';
 import type { ContextBudget, ContextItem } from './contextItems';
@@ -11,6 +13,7 @@ import { estimateTokensFromBytes, estimateVaultFileTokens, listFolderFiles } fro
 
 export interface ContextAttachmentsDeps {
   app: App;
+  dropTarget: HTMLElement;
   /** The note the conversation is bound to, attached automatically. */
   getOpenNotePath: () => string | null;
   /** Vault paths the reader mentioned or picked. */
@@ -20,7 +23,8 @@ export interface ContextAttachmentsDeps {
   detachOpenNote: () => void;
   detachVaultPath: (path: string) => void;
   detachExternalPath: (path: string) => void;
-  attachVaultPath: (path: string) => void;
+  attachVaultPaths: (paths: readonly string[]) => void;
+  attachExternalPath: (path: string) => void;
   getBudget: () => ContextBudget;
   /** True while a turn is in flight, which freezes what that turn carries. */
   isStreaming: () => boolean;
@@ -74,6 +78,8 @@ export class ContextAttachments {
     private readonly composerEl: HTMLElement,
     private readonly deps: ContextAttachmentsDeps,
   ) {
+    this.deps.dropTarget.addEventListener('dragover', this.handleVaultDrag, true);
+    this.deps.dropTarget.addEventListener('drop', this.handleVaultDrag, true);
     this.unsubscribe = this.store.subscribe(() => this.onStoreChanged());
     this.view = new ContextComposerView(this.composerEl, this.store, {
       onOpenManager: anchor => this.openManager(anchor),
@@ -85,6 +91,8 @@ export class ContextAttachments {
   }
 
   destroy(): void {
+    this.deps.dropTarget.removeEventListener('dragover', this.handleVaultDrag, true);
+    this.deps.dropTarget.removeEventListener('drop', this.handleVaultDrag, true);
     this.unsubscribe();
     this.picker?.close();
     this.picker = null;
@@ -102,6 +110,47 @@ export class ContextAttachments {
   manage(): void {
     this.openManager(this.composerEl);
   }
+
+  attachDesktopPaths(paths: readonly string[]): void {
+    const { app } = this.deps;
+    const vaultRoot = getVaultPath(app);
+    const candidates: Array<Pick<ContextCandidate, 'path' | 'folder'>> = [];
+    for (const absolute of new Set(paths)) {
+      if (!path.isAbsolute(absolute)) continue;
+      const relative = vaultRoot ? path.relative(vaultRoot, absolute) : null;
+      if (relative !== null && relative !== '..' && !relative.startsWith('..' + path.sep)
+        && !path.isAbsolute(relative)) {
+        const entry = app.vault.getAbstractFileByPath(relative.split(path.sep).join('/') || '/');
+        if (entry instanceof TFile || entry instanceof TFolder) {
+          candidates.push({ path: entry.path, folder: entry instanceof TFolder });
+          continue;
+        }
+      }
+      this.deps.attachExternalPath(absolute);
+    }
+    if (candidates.length) this.attach(candidates);
+  }
+
+  private readonly handleVaultDrag = (event: DragEvent): void => {
+    // Obsidian puts only the folder name on DataTransfer. Its active drag
+    // retains the vault objects, including folders in a mixed selection.
+    const app = this.deps.app as App & {
+      dragManager?: { draggable?: { type: string; file?: unknown; files?: unknown[] } | null };
+    };
+    const drag = app.dragManager?.draggable;
+    if (!drag || !['file', 'folder', 'files'].includes(drag.type)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    if (event.type !== 'drop') return;
+    const entries = drag.type === 'files' ? drag.files ?? [] : [drag.file];
+    if (!Array.isArray(entries)) return;
+    const candidates = entries.flatMap(entry =>
+      (entry instanceof TFile || entry instanceof TFolder)
+        && this.deps.app.vault.getAbstractFileByPath(entry.path) === entry
+        ? [{ path: entry.path, folder: entry instanceof TFolder }] : []);
+    if (candidates.length) this.attach(candidates);
+  };
 
   /** Rebuilds the list from its sources, preserving each source's own order. */
   sync(): void {
@@ -172,7 +221,7 @@ export class ContextAttachments {
   private openManager(anchor: HTMLElement): void {
     new ContextManagerModal(this.deps.app, this.store, {
       search: query => this.searchVault(query),
-      attach: candidate => this.attach(candidate),
+      attach: candidate => this.attach([candidate]),
       openPicker: (mountEl, addButton) => this.openPicker(addButton, mountEl, 'below'),
       // The dialog empties itself on close, taking a picker it was hosting
       // with it - and a picker that was removed but not closed leaves its
@@ -192,7 +241,7 @@ export class ContextAttachments {
     this.picker?.close();
     this.picker = new ContextAddPicker(parentEl, this.store, {
       search: query => this.searchVault(query),
-      attach: candidate => this.attach(candidate),
+      attach: candidate => this.attach([candidate]),
       identify: candidate => `${VAULT_PREFIX}${candidate.path}`,
       quickSources: () => this.quickSources(),
     }, anchor, placement);
@@ -222,16 +271,11 @@ export class ContextAttachments {
     return sources;
   }
 
-  private attach(candidate: ContextCandidate): void {
-    if (candidate.folder) {
-      // Expanded here rather than kept as a row, so what the list shows is
-      // exactly what the turn will carry.
-      for (const file of listFolderFiles(this.deps.app, candidate.path)) {
-        this.deps.attachVaultPath(file.path);
-      }
-    } else {
-      this.deps.attachVaultPath(candidate.path);
-    }
+  private attach(candidates: readonly Pick<ContextCandidate, 'path' | 'folder'>[]): void {
+    const paths = candidates.flatMap(candidate => candidate.folder
+      ? listFolderFiles(this.deps.app, candidate.path).map(file => file.path)
+      : [candidate.path]);
+    this.deps.attachVaultPaths([...new Set(paths)]);
     this.sync();
   }
 

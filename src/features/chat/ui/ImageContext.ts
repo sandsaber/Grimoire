@@ -35,8 +35,16 @@ const ALLOWED_IMAGE_MEDIA_TYPES = new Set<ImageMediaType>([
   'image/webp',
 ]);
 
+function getDroppedFilePath(file: File): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Electron is provided by Obsidian's desktop renderer.
+  const { webUtils } = require('electron') as { webUtils?: { getPathForFile(file: File): string } };
+  return webUtils ? webUtils.getPathForFile(file) : (file as File & { path?: string }).path ?? '';
+}
+
 export interface ImageContextCallbacks {
   onImagesChanged: () => void;
+  desktopDropTarget?: HTMLElement;
+  onDesktopPaths?: (paths: readonly string[]) => void;
 }
 
 export class ImageContextManager {
@@ -50,6 +58,7 @@ export class ImageContextManager {
   private enabled = true;
   private fullImageClose: (() => void) | null = null;
   private readonly attachments: AttachmentStore | null;
+  private removeDesktopDropListeners?: () => void;
 
   constructor(
     containerEl: HTMLElement,
@@ -76,6 +85,7 @@ export class ImageContextManager {
   }
 
   destroy(): void {
+    this.removeDesktopDropListeners?.();
     this.fullImageClose?.();
     this.fullImageClose = null;
     this.attachedImages.clear();
@@ -126,21 +136,29 @@ export class ImageContextManager {
     markDecorative(iconEl);
     dropContent.createSpan({ text: t('chat.ui.images.dropHere') });
 
-    const dropZone = inputWrapper;
-
-    dropZone.addEventListener('dragenter', (e) => this.handleDragEnter(e));
-    dropZone.addEventListener('dragover', (e) => this.handleDragOver(e));
-    dropZone.addEventListener('dragleave', (e) => this.handleDragLeave(e));
-    dropZone.addEventListener('drop', (e) => {
-      void this.handleDrop(e);
-    });
+    const dropZone = this.callbacks.desktopDropTarget ?? inputWrapper;
+    const over = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) this.handleDragOver(e);
+    };
+    const drop = (e: DragEvent) => {
+      if (e.dataTransfer?.files.length) void this.handleDrop(e);
+    };
+    inputWrapper.addEventListener('dragenter', (e) => this.handleDragEnter(e));
+    inputWrapper.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+    dropZone.addEventListener('dragover', over);
+    dropZone.addEventListener('drop', drop);
+    this.removeDesktopDropListeners = () => {
+      dropZone.removeEventListener('dragover', over);
+      dropZone.removeEventListener('drop', drop);
+    };
   }
 
   private handleDragEnter(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (e.dataTransfer?.types.includes('Files')) {
+    if (Array.from(e.dataTransfer?.items ?? []).some(item =>
+      item.kind === 'file' && ALLOWED_IMAGE_MEDIA_TYPES.has(item.type as ImageMediaType))) {
       this.dropOverlay?.addClass('visible');
     }
   }
@@ -148,6 +166,7 @@ export class ImageContextManager {
   private handleDragOver(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
   }
 
   private handleDragLeave(e: DragEvent) {
@@ -176,15 +195,22 @@ export class ImageContextManager {
     e.stopPropagation();
     this.dropOverlay?.removeClass('visible');
 
-    const files = e.dataTransfer?.files;
-    if (!files) return;
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (this.isImageFile(file)) {
-        await this.addImageFromFile(file, 'drop');
+    // Chromium protects the drag data store as soon as the event returns.
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    const images: File[] = [];
+    const paths: string[] = [];
+    let missingPath = false;
+    for (const file of files) {
+      if (this.isImageFile(file)) images.push(file);
+      else if (this.callbacks.onDesktopPaths) {
+        const nativePath = getDroppedFilePath(file);
+        if (nativePath) paths.push(nativePath);
+        else missingPath = true;
       }
     }
+    if (paths.length) this.callbacks.onDesktopPaths?.(paths);
+    if (missingPath) new Notice(t('inlineEdit.invalidFilePath'));
+    for (const image of images) await this.addImageFromFile(image, 'drop');
   }
 
   private setupPasteHandler() {

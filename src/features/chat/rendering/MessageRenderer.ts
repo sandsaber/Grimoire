@@ -19,7 +19,7 @@ import type GrimoirePlugin from '../../../main';
 import { createProviderIconSvg } from '../../../shared/icons';
 import { scheduleAnimationFrame } from '../../../utils/animationFrame';
 import { formatDurationMmSs } from '../../../utils/date';
-import { hasProcessableWikilink, processFileLinks, registerFileLinkHandler } from '../../../utils/fileLink';
+import { mayContainFileLinks, processFileLinks, registerFileLinkHandler } from '../../../utils/fileLink';
 import { replaceImageEmbedsWithHtml } from '../../../utils/imageEmbed';
 import {
   escapeMathDelimitersForStreaming,
@@ -1137,8 +1137,7 @@ export class MessageRenderer {
         }
       });
 
-      // Process wikilinks only when the source can contain them; the DOM pass is expensive.
-      if (hasProcessableWikilink(renderMarkdown) || hasProcessableWikilink(processedMarkdown)) {
+      if (mayContainFileLinks(renderMarkdown) || mayContainFileLinks(processedMarkdown)) {
         processFileLinks(this.app, el);
       }
     } catch {

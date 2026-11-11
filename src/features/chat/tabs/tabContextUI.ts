@@ -287,6 +287,7 @@ export function initializeContextManagers(tab: TabData, plugin: GrimoirePlugin):
    */
   tab.ui.contextAttachments = new ContextAttachments(dom.contextRowEl, {
     app,
+    dropTarget: dom.contentEl,
     getOpenNotePath: () => (typeof tab.ui.fileContextManager?.getCurrentNotePath === 'function'
       ? tab.ui.fileContextManager.getCurrentNotePath()
       : null),
@@ -306,7 +307,11 @@ export function initializeContextManagers(tab: TabData, plugin: GrimoirePlugin):
     detachOpenNote: () => tab.ui.fileContextManager?.clearCurrentNote?.(),
     detachVaultPath: (path) => tab.ui.fileContextManager?.detachFile?.(path),
     detachExternalPath: (path) => tab.ui.externalContextSelector?.removePath?.(path),
-    attachVaultPath: (path) => tab.ui.fileContextManager?.attachFile?.(path),
+    attachVaultPaths: paths => tab.ui.fileContextManager?.attachFiles(paths),
+    attachExternalPath: path => {
+      const result = tab.ui.externalContextSelector?.addSelectedPath(path);
+      if (result && !result.success) new Notice(result.error);
+    },
     getBudget: () => ({
       windowTokens: tab.state.usage?.contextWindow ?? 0,
       usedTokens: tab.state.usage?.contextTokens ?? 0,
@@ -350,6 +355,8 @@ export function initializeContextManagers(tab: TabData, plugin: GrimoirePlugin):
     dom.inputContainerEl,
     dom.inputEl,
     {
+      desktopDropTarget: dom.contentEl,
+      onDesktopPaths: paths => tab.ui.contextAttachments?.attachDesktopPaths(paths),
       onImagesChanged: () => {
         tab.controllers.selectionController?.updateContextRowVisibility();
         tab.controllers.browserSelectionController?.updateContextRowVisibility();
