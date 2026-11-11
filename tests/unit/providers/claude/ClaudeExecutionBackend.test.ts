@@ -1031,9 +1031,18 @@ describe('ClaudeExecutionBackend', () => {
 
     const second = collectEvents(session.createRun(request('2', 'second')));
     await waitFor(() => fixture.query.received.length === 2);
+    const inactivityTimer = fixture.scheduler.pending(60_000)[0];
     fixture.query.emit(resultMessage('message-1', 'late duplicate', 'result-1'));
-    fixture.query.emit(resultMessage('message-2', 'second', 'result-2'));
-    expectTerminal(await second, 'succeeded', 'completed');
+    fixture.query.emit(resultMessage('message-1', 'late result with a fresh id', 'result-late'));
+    await flushPromises();
+    expect(fixture.scheduler.pending(60_000)[0]).toBe(inactivityTimer);
+    const currentResult = resultMessage('message-2', 'second', 'result-2');
+    fixture.query.emit(currentResult);
+    const captured = await second;
+    expectTerminal(captured, 'succeeded', 'completed');
+    const presentedResults = captured.map(item => item.event).filter(event =>
+      event.kind === 'provider-content' && (event.payload as SDKMessage).type === 'result');
+    expect(presentedResults).toEqual([{ kind: 'provider-content', payload: currentResult }]);
     expect(fixture.stored.map(entry => entry.output)).toEqual(['first', 'second']);
 
     const thirdFixture = createFixture();
@@ -1043,6 +1052,22 @@ describe('ClaudeExecutionBackend', () => {
     thirdFixture.query.emit(uncorrelatedResultMessage('ambiguous-result'));
     expectTerminal(await uncorrelated, 'indeterminate', 'effects-unknown');
     expect(thirdFixture.stored).toHaveLength(0);
+  });
+
+  it('records unmatched results when the inactivity window expires', async () => {
+    const fixture = createFixture();
+    const session = await createSession(fixture.backend, 'native-session');
+    const events = collectEvents(session.createRun(request('1', 'default')));
+    await waitFor(() => fixture.query.received.length === 1);
+    fixture.query.emit(resultMessage('other-turn', 'foreign answer', 'foreign-result'));
+    await flushPromises();
+    fixture.scheduler.fireWithin(60_000);
+    expectTerminal(await events, 'failed', 'timeout');
+    expect(fixture.recordDebugLog).toHaveBeenCalledWith({
+      scope: 'claude', event: 'execution.timeout', level: 'warn',
+      data: { reason: 'inactivity', unmatchedResults: 1, pendingCount: 1 },
+    });
+    expect(fixture.stored).toHaveLength(0);
   });
 
   it('treats background task levels as unowned process state until an edge establishes identity', async () => {

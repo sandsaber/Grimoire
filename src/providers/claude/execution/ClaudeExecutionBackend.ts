@@ -1433,6 +1433,18 @@ class ClaudeExecutionSession implements ExecutionSession {
       }
       return;
     }
+    if (message.type === 'result') {
+      const messageId = typeof message.uuid === 'string' ? message.uuid : '';
+      if (messageId) {
+        if (this.seenResultMessageIds.has(messageId)) {
+          return;
+        }
+        this.seenResultMessageIds.add(messageId);
+        trimOldestSetEntries(this.seenResultMessageIds, 2048);
+      }
+      this.activeRun?.handleResult(message);
+      return;
+    }
     // Before anything is read out of it, and before the branches below start
     // consuming messages the surface would never see otherwise: a subagent's
     // tool call, a task notification, the init that names the session. What the
@@ -1478,18 +1490,6 @@ class ClaudeExecutionSession implements ExecutionSession {
         message.event.content_block.id,
         message.event.content_block.name,
       );
-      return;
-    }
-    if (message.type === 'result') {
-      const messageId = typeof message.uuid === 'string' ? message.uuid : '';
-      if (messageId) {
-        if (this.seenResultMessageIds.has(messageId)) {
-          return;
-        }
-        this.seenResultMessageIds.add(messageId);
-        trimOldestSetEntries(this.seenResultMessageIds, 2048);
-      }
-      this.activeRun?.handleResult(message);
       return;
     }
     this.activeRun?.handleMessage(message);
@@ -1836,6 +1836,7 @@ class ClaudeExecutionRun implements ExecutionRun {
   private cancellation: CancellationReason | undefined;
   private nativeUserMessageId: string | undefined;
   private readonly pendingInputIds = new Set<string>();
+  private unmatchedResults = 0;
   private readonly resultParts: string[] = [];
   private resultBytes = 0;
   private steered = false;
@@ -2034,13 +2035,17 @@ class ClaudeExecutionRun implements ExecutionRun {
       ...(message.user_message_uuids ?? []),
     ]);
     if (ids.size === 0) {
+      this.presentMessage(message);
       this.handleUncorrelatedResult();
       return;
     }
     const consumed = [...this.pendingInputIds].filter(id => ids.has(id));
     if (consumed.length === 0) {
+      // A late result from another turn must not reset this turn's UI or silence timer.
+      this.unmatchedResults++;
       return;
     }
+    this.presentMessage(message);
     for (const id of consumed) this.pendingInputIds.delete(id);
     if (message.subtype === 'success' && !message.is_error) {
       const output = message.result.trim();
@@ -2198,13 +2203,9 @@ class ClaudeExecutionRun implements ExecutionRun {
       this.armInactivityTimeout();
       const ceilingMs = this.context.runAbsoluteTimeoutMs?.() ?? 30 * 60_000;
       if (ceilingMs > 0) {
-        this.absoluteTimeoutHandle = this.context.scheduler.setTimeout(() => {
-          if (this.providerCompletionObserved) {
-            return;
-          }
-          this.timeoutTriggered = true;
-          void this.requestTermination();
-        }, ceilingMs);
+        this.absoluteTimeoutHandle = this.context.scheduler.setTimeout(
+          () => this.onTimeout('absolute'), ceilingMs,
+        );
       }
     } catch (error) {
       if (this.terminal) {
@@ -2410,13 +2411,19 @@ class ClaudeExecutionRun implements ExecutionRun {
     if (this.timeoutHandle !== undefined) {
       this.context.scheduler.clearTimeout(this.timeoutHandle);
     }
-    this.timeoutHandle = this.context.scheduler.setTimeout(() => {
-      if (this.providerCompletionObserved) {
-        return;
-      }
-      this.timeoutTriggered = true;
-      void this.requestTermination();
-    }, this.context.runTimeoutMs ?? 10 * 60_000);
+    this.timeoutHandle = this.context.scheduler.setTimeout(
+      () => this.onTimeout('inactivity'), this.context.runTimeoutMs ?? 10 * 60_000,
+    );
+  }
+
+  private onTimeout(reason: 'absolute' | 'inactivity'): void {
+    if (this.terminal || this.providerCompletionObserved || this.timeoutTriggered) return;
+    this.timeoutTriggered = true;
+    this.context.recordDebugLog?.({
+      scope: 'claude', event: 'execution.timeout', level: 'warn',
+      data: { reason, unmatchedResults: this.unmatchedResults, pendingCount: this.pendingInputIds.size },
+    });
+    void this.requestTermination();
   }
 
   private clearRunTimeouts(): void {
