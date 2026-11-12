@@ -38,6 +38,9 @@ export default function(cmd) {
       if (context?.signal?.aborted) return blocked;
       // Native subagents have their own loop without the parent mod's hooks.
       if (call.toolName === 'agent') return { ...blocked, additionalContext: 'Subagents are unavailable in Safe mode.' };
+      // Codemode calls the tool runner directly, bypassing individual mod hooks.
+      if (call.toolName === 'codemode') return { ...blocked,
+        additionalContext: 'Codemode is unavailable in Safe mode. Call tools directly for individual approvals.' };
       let allowed = reads.has(call.toolName);
       if (!allowed) {
         // The native loop executes a tool batch in parallel; the shared decision

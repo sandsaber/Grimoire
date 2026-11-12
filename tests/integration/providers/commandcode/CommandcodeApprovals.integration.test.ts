@@ -21,7 +21,8 @@ if (process.env.GUARD_SCENARIO !== 'missing') {
 }
 emit({type: 'run_start', sessionId: 'probe'});
 async function runTool(id) {
-const call = { toolCallId: id, toolName: 'write_file', input: {file_path: 'Note.md', content: 'NEW'} };
+const toolName = ['agent', 'codemode'].includes(process.env.GUARD_SCENARIO) ? process.env.GUARD_SCENARIO : 'write_file';
+const call = { toolCallId: id, toolName, input: {file_path: 'Note.md', content: 'NEW'} };
 emit({type: 'tool_queued', ...call});
 const result = process.env.GUARD_SCENARIO === 'skipped' ? undefined : await hook(call, {signal: new AbortController().signal});
 if (result?.block) emit({type: 'tool_hook_blocked', ...call, hookOutput: result.additionalContext});
@@ -74,7 +75,7 @@ async function waitForApproval(handle: TracedHandle, opened: Promise<void>): Pro
   })]), 5_000);
 }
 
-describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', version => {
+describe.each(['1.53.0', '1.66.0', '1.88.5'])('Command Code %s Safe process guard', version => {
   // Process startup has its own deadline; approval behavior starts after readiness.
   jest.setTimeout(120_000);
   let directory: string;
@@ -167,6 +168,17 @@ describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', versio
     finally { await handle.terminate('forced'); }
   });
 
+  it.each(['agent', 'codemode'])('blocks %s before it can delegate unguarded tool execution', async scenario => {
+    const approve = jest.fn(async () => true);
+    const handle = start(approve, scenario);
+    try {
+      expect((await handle.completed).code).toBe(0);
+      expect(approve).not.toHaveBeenCalled();
+      expect(contents()).toBe('OLD');
+      expect(handle.trace).toContain('event: tool_hook_blocked');
+    } finally { await handle.terminate('forced'); }
+  });
+
   it('serializes approvals from a parallel native tool batch', async () => {
     let active = 0, maximum = 0, calls = 0;
     const handle = start(async () => {
@@ -182,7 +194,7 @@ describe.each(['1.53.0', '1.66.0'])('Command Code %s Safe process guard', versio
     } finally { await handle.terminate('forced'); }
   });
 
-  it.each(['1.66.1', '9.0.0'])('refuses unverified CLI %s without executing it', unsupportedVersion => {
+  it.each(['1.66.1', '1.88.6', '9.0.0'])('refuses unverified CLI %s without executing it', unsupportedVersion => {
     writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: 'command-code', version: unsupportedVersion }));
     expect(() => start(async () => true)).toThrow('Safe mode requires');
     expect(contents()).toBe('OLD');

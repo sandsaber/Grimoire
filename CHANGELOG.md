@@ -2,6 +2,12 @@
 
 User-facing changes by release.
 
+## 2.0.14 - Unreleased
+
+### Fixed
+
+- Restore Safe mode for Command Code 1.88.5. Native subagents and codemode batches remain unavailable in Safe because their nested tool calls cannot receive individual Grimoire approvals.
+
 ## 2.0.13 - 2026-11-08
 
 ### Added
