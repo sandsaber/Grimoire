@@ -83,10 +83,10 @@ function resolveNodeInstallation(invocation: CommandcodeInvocation): { node: str
     try {
       const manifest = JSON.parse(readFileSync(join(dirname(path), '..', 'package.json'), 'utf8')) as Record<string, unknown>;
       return path.endsWith('index.mjs') && manifest.name === 'command-code'
-        && (manifest.version === '1.53.0' || manifest.version === '1.66.0');
+        && (manifest.version === '1.53.0' || manifest.version === '1.66.0' || manifest.version === '1.88.5');
     } catch { return false; }
   });
   const node = resolveExecutableFromPath(process.platform === 'win32' ? 'node.exe' : 'node', invocation.environment.PATH);
-  if (!entry || !node) throw new Error('Safe mode requires a verified command-code npm installation (1.53.0 or 1.66.0) and Node.js on PATH.');
+  if (!entry || !node) throw new Error('Safe mode requires a verified command-code npm installation (1.53.0, 1.66.0 or 1.88.5) and Node.js on PATH.');
   return { node, entry };
 }
