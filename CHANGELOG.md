@@ -2,11 +2,21 @@
 
 User-facing changes by release.
 
-## 2.0.14 - Unreleased
+## 2.0.14 - 2026-11-12
+
+### Added
+
+- Attach files and folders by dragging them from Obsidian's file explorer, Finder or Windows File Explorer onto chat. Vault folders expand into their files, overlapping selections are deduplicated, and external paths use the chat's context selector (#286, #288).
 
 ### Fixed
 
-- Restore Safe mode for Command Code 1.88.5. Native subagents and codemode batches remain unavailable in Safe because their nested tool calls cannot receive individual Grimoire approvals.
+- Open exact vault-relative file paths written in inline code in chat, including paths with spaces. Missing files and fenced code examples remain plain text (#286, #288).
+- Prevent late or duplicate Claude results from a previous turn from clearing the current response or restarting its inactivity timer (#285, #287).
+- Restore Safe mode for Command Code 1.88.5 and update its setup guidance. Native subagents and codemode batches remain unavailable in Safe because their nested tool calls cannot receive individual Grimoire approvals (#290).
+
+### Improved
+
+- Update the Claude Agent SDK to 0.3.316, tslib to 2.9.1, and development dependencies (#280–#284, #289).
 
 ## 2.0.13 - 2026-11-08
 
