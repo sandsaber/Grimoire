@@ -57,6 +57,39 @@ This file tracks future provider integrations and the implementation sequence fo
 - Extend the Antigravity ACP integration for current Google accounts. Keep the print fallback for older CLI installations and Gemini CLI for legacy-compatible accounts.
 - Context visibility should stay provider-neutral. The Context tab should show both user-pinned files and provider runtime file loads when Grimoire can infer them from tool events, while avoiding provider-specific assumptions in shared feature code.
 
+## Installed CLI Snapshot: 2026-11-12
+
+The following versions were observed on the local macOS arm64 development host.
+Each CLI answered `--version`; pi-acp's version was read from its installed npm
+manifest because its version command returned no text. These are inventory checks,
+not new end-to-end compatibility results or minimum supported versions. Earlier
+dated live-test results elsewhere in this document retain their original scope.
+
+| Provider | Command | Observed version |
+| --- | --- | --- |
+| Claude Code | `claude` | 2.1.322 |
+| Codex | `codex` | 0.167.2 |
+| Antigravity CLI | `agy` | 1.5.7 |
+| Gemini CLI | `gemini` | 0.67.0 |
+| OpenCode V2 | `opencode` | 2.2.7 |
+| MiMoCode | `mimo` | 0.1.16 |
+| Kimi Code | `kimi` | 2.2.0 |
+| Grok Build | `grok` | 1.0.77 |
+| Qwen Code | `qwen` | 0.27.0 |
+| Devin | `devin` | 3000.12.28 |
+| Reasonix | `reasonix` | 2.58.0 |
+| Command Code | `commandcode` | 1.88.5 |
+| Pi / pi-acp | `pi` / `pi-acp` | 1.5.0 / 0.0.34 |
+
+Command Code 1.88.5 is outside the Safe-mode allowlist in
+`CommandcodeApprovalTransport.ts`, which accepts only 1.53.0 and 1.66.0. Safe
+startup therefore rejects this installation. Do not extend the allowlist until
+the current native hook ordering and approval guard have been verified. The
+other versions above also need fresh live-turn, resume, cancellation, and
+permission checks before being described as verified with Grimoire. This
+inventory does not establish that the commands on PATH match every configured
+CLI path in a user's vault.
+
 ## Integrated Provider: Command Code
 
 Initially verified against `command-code 1.53.0` on 2026-09-13. Safe approvals, cancellation, native resume and high-to-max effort were reverified against installed `command-code 1.66.0` on 2026-09-26:
