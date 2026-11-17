@@ -117,7 +117,9 @@ The Obsidian community plugin review may report dependency warnings for packages
 
 Grimoire keeps patched versions selected by the current dependency graph. Server packages such as `hono` and `@hono/node-server` are dependency-review inputs and are not imported as a Grimoire HTTP server. Bundle inclusion must be checked from the actual release build rather than inferred from a package name.
 
-The MCP SDK range is `^1.31.0`, whose dependency contract accepts `@hono/node-server` 2.x. Grimoire uses the npm lockfile plus a narrow override for `@hono/node-server` so a clean release graph can be verified without resolver bypasses or stale advisory assumptions. Vault YAML frontmatter uses the `yaml` package (not `js-yaml`).
+The MCP SDK range is `^1.32.2`, whose dependency contract accepts `@hono/node-server` 2.x. Grimoire uses the npm lockfile plus a narrow override for `@hono/node-server` so a clean release graph can be verified without resolver bypasses or stale advisory assumptions. Vault YAML frontmatter uses the `yaml` package (not `js-yaml`).
+
+The 2026-11-17 dependency refresh selects Hono 4.13.16 for GHSA-46wx-v44x-9hh2, GHSA-4m76-xfj5-7975, GHSA-3gg2-335m-rxc6, GHSA-4h7h-rv7c-7m2v, and GHSA-h7mg-cq63-vhpq, and `@hono/node-server` 2.1.6 for GHSA-qv5m-9pm6-hqp3 and GHSA-jpvv-r467-5p4w. Both releases already satisfy the seven-day release-age policy and require no quarantine exception. Their server-side exploitation conditions are not established by their presence in the dependency graph.
 
 The development-only Obsidian SDK pins an older Moment version. A scoped `obsidian` → `moment` override selects 2.31.0 to resolve GHSA-4p3w-j4w9-5jqw without downgrading the SDK. Obsidian supplies the runtime module; this override applies to the development dependency graph.
 
@@ -133,7 +135,7 @@ The development-only NYC configuration loader uses `js-yaml.load()`. A scoped `@
 
 | Package | Source | In `main.js` | Locked version | Advisory range | Status |
 |---|---|---|---|---|---|
-| `@modelcontextprotocol/sdk` | Direct dependency | Verify from release bundle | 1.32.1 | `>=1.12.0 <1.31.0` | Above [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h); declared range starts at the patched version |
+| `@modelcontextprotocol/sdk` | Direct dependency | Verify from release bundle | 1.32.2 | `>=1.12.0 <1.31.0` | Above [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h); declared range excludes affected versions |
 | `proxy-addr` | MCP SDK / Express | Verify from release bundle | 2.0.8 | `>=1.1.0 <2.0.8` | Patched for [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h) |
 | `smol-toml` | Direct dependency (provider TOML files) | Verify from release bundle | 1.9.0 | `<=1.8.0` | Patched for [GHSA-r4xh-jqrq-34v2](https://github.com/advisories/GHSA-r4xh-jqrq-34v2) |
 | `handlebars` | ts-jest | Development dependency | 4.7.10 | `>=3.0.0 <=4.7.9` | Patched for GHSA-xw65-4hp5-5hc7, GHSA-8r5x-fm3f-whwj, and GHSA-p8wg-vrv2-v86f |
@@ -141,8 +143,8 @@ The development-only NYC configuration loader uses `js-yaml.load()`. A scoped `@
 | `glob` | Jest / coverage tooling | Development dependency | 14.0.3 | `>=9.0.0 <=14.0.1` | Patched for [GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4) |
 | `minimatch` modern API | ESLint / Jest tooling | Development dependency | 11.0.3 | `<11.0.1` | Patched for [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) |
 | `minimatch` legacy API | Two reviewed ESLint paths | Development dependency | 3.1.5 | Broad `<11.0.1` range | Exact temporary exception described above; reported preprocessing algorithm is absent |
-| `hono` | MCP SDK | Verify from release bundle | 4.13.0 | `<4.12.34` | Above tracked ranges |
-| `@hono/node-server` | MCP SDK | Verify from release bundle | 2.1.5 | `<2.0.5`; `>=1.19.10 <=2.1.2` | Patched for tracked ranges, including [GHSA-rmxm-3fg6-px4f](https://github.com/advisories/GHSA-rmxm-3fg6-px4f) |
+| `hono` | MCP SDK | Verify from release bundle | 4.13.16 | `<4.13.16` | Patched for the five November advisories listed above, including [GHSA-46wx-v44x-9hh2](https://github.com/advisories/GHSA-46wx-v44x-9hh2) |
+| `@hono/node-server` | MCP SDK | Verify from release bundle | 2.1.6 | `<2.0.5`; `>=1.19.10 <=2.1.2`; `>=2.0.0 <2.1.6` | Patched for tracked ranges, including [GHSA-qv5m-9pm6-hqp3](https://github.com/advisories/GHSA-qv5m-9pm6-hqp3) and [GHSA-jpvv-r467-5p4w](https://github.com/advisories/GHSA-jpvv-r467-5p4w) |
 | `fast-uri` | MCP SDK / AJV | Verify from release bundle | 3.1.8 | `>=3.0.0 <=3.1.5`; `=2.4.5`, `=3.1.6`, `=4.1.3` | Above tracked ranges, including [GHSA-58mr-gqgx-xq4g](https://github.com/advisories/GHSA-58mr-gqgx-xq4g) |
 | `ip-address` | MCP SDK / Express rate limit | Verify from release bundle | 10.7.2 | `<=10.1.0`; `>=10.2.0 <=10.5.0` | Above tracked ranges, including [GHSA-2vr4-cq9g-pvrc](https://github.com/advisories/GHSA-2vr4-cq9g-pvrc) |
 | `qs` | MCP SDK / Express | Verify from release bundle | 6.16.0 | `>=2.2.5 <6.16.0` | Above tracked range; admitted before the 7-day quarantine through a `lockfile-age-exceptions.json` entry that expires at its natural eligibility |
