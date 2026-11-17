@@ -175,7 +175,7 @@ describe('systemPrompt', () => {
 
       const key = computeSystemPromptKey(settings);
 
-      expect(key).toBe('main-agent-v2::attachments::Be helpful::/vault::Alice');
+      expect(key).toBe('main-agent-v3::attachments::Be helpful::/vault::Alice');
     });
 
     it('handles empty or undefined values', () => {
@@ -186,7 +186,7 @@ describe('systemPrompt', () => {
         userName: '',
       });
 
-      expect(key).toBe('main-agent-v2::::::::');
+      expect(key).toBe('main-agent-v3::::::::');
     });
   });
 });

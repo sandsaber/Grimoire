@@ -14,10 +14,17 @@ const projectObsidianRuleOverrides = {
   'obsidianmd/ui/sentence-case': [
     'error',
     {
-      ignoreWords: ['Grimoire', 'Codex', 'OpenCode', 'MiMoCode', 'Mimocode', 'Kimi Code', 'WSL'],
-      brands: [...DEFAULT_BRANDS, 'Grimoire', 'Codex', 'OpenCode', 'MiMoCode', 'Mimocode', 'Kimi Code'],
+      ignoreWords: ['Grimoire', 'Codex', 'OpenCode', 'MiMoCode', 'Mimocode', 'Kimi Code', 'WSL', 'Safe'],
+      brands: [
+        ...DEFAULT_BRANDS, 'Grimoire', 'Codex', 'OpenCode', 'MiMoCode', 'Mimocode', 'Kimi Code',
+        'Gemini 3.5 Flash (Low)', 'Claude Opus 4.6 (Thinking)',
+      ],
       acronyms: [...DEFAULT_ACRONYMS, 'TOML', 'WSL'],
-      ignoreRegex: ['\\.(?:claude|codex|opencode|mimocode|kimicode)/'],
+      ignoreRegex: [
+        '\\.(?:claude|codex|opencode|mimocode|kimicode)/',
+        '^ask_user$',
+        '^gpt-[a-z0-9.-]+(?:\\ngpt-[a-z0-9.-]+)*$',
+      ],
       enforceCamelCaseLower: true,
     },
   ],

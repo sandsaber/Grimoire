@@ -678,7 +678,7 @@ export default class GrimoirePlugin extends Plugin {
       return;
     }
 
-    const markdown = await readBundledChangelog(this.app.vault.adapter, this.manifest);
+    const markdown = await readBundledChangelog(this.app.vault, this.manifest);
     if (!markdown) {
       return;
     }

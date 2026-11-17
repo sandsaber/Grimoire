@@ -102,6 +102,7 @@ describe('GrimoirePlugin', () => {
 
     mockApp = {
       vault: {
+        configDir: '.obsidian',
         adapter: {
           basePath: '/test/vault',
           exists: jest.fn().mockResolvedValue(false),
@@ -151,6 +152,7 @@ describe('GrimoirePlugin', () => {
     });
 
     it("queues what's new once when installed version has not been seen", async () => {
+      mockApp.vault.configDir = '.custom-config';
       mockApp.vault.adapter.exists.mockImplementation(async (path: string) => (
         path === '.grimoire/grimoire-settings.json'
       ));
@@ -158,7 +160,7 @@ describe('GrimoirePlugin', () => {
         if (path === '.grimoire/grimoire-settings.json') {
           return JSON.stringify({ lastSeenChangelogVersion: '0.0.9' });
         }
-        if (path === '.obsidian/plugins/grimoire/CHANGELOG.md') {
+        if (path === '.custom-config/plugins/grimoire/CHANGELOG.md') {
           return [
             '# Changelog',
             '',

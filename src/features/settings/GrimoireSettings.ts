@@ -1867,7 +1867,7 @@ export class GrimoireSettingTab extends PluginSettingTab {
   private async openCurrentChangelog(): Promise<void> {
     const version = this.plugin.manifest.version?.trim() ?? '';
     const normalizedVersion = version.replace(/-.*$/, '');
-    const markdown = await readBundledChangelog(this.app.vault.adapter, this.plugin.manifest);
+    const markdown = await readBundledChangelog(this.app.vault, this.plugin.manifest);
     const release = markdown ? parseChangelogRelease(markdown, normalizedVersion) : null;
     if (!release) {
       new Notice(t('settings.noReleaseNotes'));

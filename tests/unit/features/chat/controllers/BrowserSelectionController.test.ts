@@ -125,6 +125,30 @@ describe('BrowserSelectionController', () => {
     expect(indicatorEl.textContent).toBe('2 lines selected');
   });
 
+  it('captures selection from a browser view owned by another window', async () => {
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    try {
+      const frameDocument = frame.contentDocument!;
+      const foreignContainer = frameDocument.createElement('div');
+      foreignContainer.textContent = 'popout selection';
+      frameDocument.body.appendChild(foreignContainer);
+      frameDocument.getSelection()!.selectAllChildren(foreignContainer);
+      expect(foreignContainer instanceof HTMLElement).toBe(false);
+      app.workspace.getMostRecentLeaf.mockReturnValue({
+        view: { ...app.workspace.activeLeaf.view, containerEl: foreignContainer },
+      });
+
+      controller.start();
+      jest.advanceTimersByTime(250);
+      await flushMicrotasks();
+
+      expect(controller.getContext()?.selectedText).toBe('popout selection');
+    } finally {
+      frame.remove();
+    }
+  });
+
   it('clears selection when text is deselected and input is not focused', async () => {
     controller.start();
     jest.advanceTimersByTime(250);

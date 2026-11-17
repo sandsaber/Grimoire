@@ -171,7 +171,7 @@ describe('GrimoireSettingTab general tab settings', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(readBundledChangelog).toHaveBeenCalledWith(app.vault.adapter, plugin.manifest);
+    expect(readBundledChangelog).toHaveBeenCalledWith(app.vault, plugin.manifest);
     expect(showWhatsNewModal).toHaveBeenCalledWith({
       app,
       fullChangelogUrl: 'https://github.com/sandsaber/Grimoire/blob/main/CHANGELOG.md',
