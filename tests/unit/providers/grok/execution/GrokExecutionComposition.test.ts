@@ -11,6 +11,7 @@ import type { ExecutionEventEnvelope } from '@/core/execution/ExecutionEvents';
 import { executionSessionId, type InteractionId, runId } from '@/core/execution/ExecutionIds';
 import type { StreamChunk } from '@/core/types';
 import { JsonRpcErrorResponse } from '@/providers/acp';
+import { JsonRpcTransportClosedError } from '@/providers/acp/AcpJsonRpcTransport';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
@@ -74,6 +75,7 @@ describe('Grok execution composition', () => {
   function createFakeAcp(options: {
     asksPermission?: boolean;
     cancelsTheTurn?: boolean;
+    disconnectDuring?: 'initialize' | 'newSession';
     modeIsUnsupported?: boolean;
     reportsNativeModes?: boolean;
     reportsNoModes?: boolean;
@@ -124,6 +126,7 @@ describe('Grok execution composition', () => {
           }));
         };
         let notify: ((notification: AcpSessionNotification) => void) | undefined;
+        let connectionLost: ((error: Error) => void) | undefined;
         const client: ManagedAcpClient = {
           initialize: async () => undefined,
           newSession: async () => (options.reportsNativeModes ? {
@@ -228,12 +231,22 @@ describe('Grok execution composition', () => {
             notify = listener;
             return () => { notify = undefined; };
           },
-          onConnectionLost: () => () => undefined,
+          onConnectionLost: listener => {
+            connectionLost = listener;
+            return () => { connectionLost = undefined; };
+          },
           close: async () => {
             closes.push(input.startupRef);
             return 'confirmed' as const;
           },
         };
+        if (options.disconnectDuring && startupRefs.length === 1) {
+          client[options.disconnectDuring] = async () => {
+            const error = new JsonRpcTransportClosedError('JSON-RPC input closed');
+            connectionLost?.(error);
+            throw error;
+          };
+        }
         return client;
       },
     };
@@ -256,6 +269,7 @@ describe('Grok execution composition', () => {
   async function createHarness(options: {
     asksPermission?: boolean;
     cancelsTheTurn?: boolean;
+    disconnectDuring?: 'initialize' | 'newSession';
     plugin?: any;
     modeIsUnsupported?: boolean;
     reportsNativeModes?: boolean;
@@ -705,6 +719,31 @@ describe('Grok execution composition', () => {
     execution.dispose();
     await host.dispose();
   });
+
+  it.each(['initialize', 'newSession'] as const)(
+    'reports a connection loss during %s and relaunches for the next send',
+    async disconnectDuring => {
+      const { execution, host, prompts, startupRefs } = await createHarness({ disconnectDuring });
+      const runtime = execution.createRuntime();
+
+      try {
+        const failed = await drain(runtime.query(runtime.prepareTurn({ text: 'Hello' })));
+        expect(failed.filter(chunk => chunk.type === 'error')).toEqual([{
+          type: 'error',
+          content: 'The provider connection closed before the message was sent.',
+        }]);
+        expect(prompts).toHaveLength(0);
+
+        const retried = await drain(runtime.query(runtime.prepareTurn({ text: 'Hello' })));
+        expect(retried).toContainEqual({ type: 'text', content: 'the answer' });
+        expect(startupRefs).toHaveLength(2);
+        expect(prompts).toHaveLength(1);
+      } finally {
+        execution.dispose();
+        await host.dispose();
+      }
+    },
+  );
 
   it('saves the conversation pointing at the transcript it can be hydrated from', async () => {
     // A Grok session id alone hydrates nothing: the transcript is a directory

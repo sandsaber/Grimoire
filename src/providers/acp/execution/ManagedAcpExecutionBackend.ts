@@ -794,6 +794,8 @@ class ManagedAcpExecutionSession implements ExecutionSession {
       // answer to that is not `indeterminate` — it is that nothing ran. The
       // client is closed below by the same path, so the next turn launches a
       // process rather than dispatching into a dead one.
+      // The pending RPC can reject and finish the run while cleanup is in progress.
+      run.presentTurnRefusal('The provider connection closed before the message was sent.');
       await this.closeClient();
       run.rejectBeforeDispatch();
       return;
