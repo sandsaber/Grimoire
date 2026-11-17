@@ -104,8 +104,8 @@ describe('Obsidian review gate', () => {
   it('accepts patched hoisted, scoped, and nested lockfile packages', () => {
     const result = runDependencyGate({
       '': { version: '1.0.0' },
-      'node_modules/hono': { version: '4.12.34' },
-      'node_modules/@hono/node-server': { version: '2.1.3' },
+      'node_modules/hono': { version: '4.13.16' },
+      'node_modules/@hono/node-server': { version: '2.1.6' },
       'node_modules/fast-uri': { version: '3.1.7' },
       'node_modules/qs': { version: '6.16.0' },
       'node_modules/brace-expansion': { version: '5.0.9' },
@@ -117,6 +117,14 @@ describe('Obsidian review gate', () => {
   });
 
   it.each([
+    ['hono', '4.13.13', 'GHSA-46wx-v44x-9hh2'],
+    ['hono', '4.13.15', 'GHSA-46wx-v44x-9hh2'],
+    ['hono', '4.13.15', 'GHSA-4m76-xfj5-7975'],
+    ['hono', '4.13.15', 'GHSA-3gg2-335m-rxc6'],
+    ['hono', '4.13.15', 'GHSA-4h7h-rv7c-7m2v'],
+    ['hono', '4.13.15', 'GHSA-h7mg-cq63-vhpq'],
+    ['@hono/node-server', '2.1.5', 'GHSA-qv5m-9pm6-hqp3'],
+    ['@hono/node-server', '2.1.5', 'GHSA-jpvv-r467-5p4w'],
     ['@hono/node-server', '2.1.2', 'GHSA-rmxm-3fg6-px4f'],
     ['fast-uri', '2.4.5', 'GHSA-58mr-gqgx-xq4g'],
     ['fast-uri', '3.1.6', 'GHSA-58mr-gqgx-xq4g'],
