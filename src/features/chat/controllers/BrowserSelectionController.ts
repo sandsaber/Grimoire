@@ -102,8 +102,11 @@ export class BrowserSelectionController {
     }
 
     const candidate = view as Partial<ItemView>;
+    const containerEl = candidate.containerEl;
+    const ElementClass = containerEl?.ownerDocument?.defaultView?.HTMLElement;
     return typeof candidate.getViewType === 'function'
-      && candidate.containerEl instanceof HTMLElement;
+      && ElementClass !== undefined
+      && containerEl instanceof ElementClass;
   }
 
   private isBrowserLikeView(viewType: string, containerEl: HTMLElement): boolean {

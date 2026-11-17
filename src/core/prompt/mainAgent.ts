@@ -10,7 +10,7 @@ export interface SystemPromptBuildOptions {
   orchestratorMode?: boolean;
 }
 
-const SYSTEM_PROMPT_REVISION = 'main-agent-v2';
+const SYSTEM_PROMPT_REVISION = 'main-agent-v3';
 
 function getPathRules(): string {
   return `## Workspace and Paths
@@ -20,7 +20,7 @@ The current working directory is the user's vault root.
 - Use vault-relative paths for files inside the vault, for example \`notes/my-note.md\` or \`.\`. Do not add a leading slash or repeat the absolute vault path.
 - Use absolute paths only for external contexts explicitly supplied by Grimoire. Path format does not grant access; runtime permissions still apply.
 - Inspect relevant existing content before writing, keep changes scoped to the request, and preserve unrelated material.
-- Modify \`.obsidian/\`, \`.grimoire/\`, or provider instruction files only when the user's task requires it.`;
+- Modify the vault's Obsidian configuration folder, \`.grimoire/\`, or provider instruction files only when the user's task requires it.`;
 }
 
 function getBaseSystemPrompt(

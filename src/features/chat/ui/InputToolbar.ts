@@ -998,7 +998,7 @@ export class PlanUsageBadge {
     this.container.addClass('grimoire-plan-usage-badge--spend');
     this.labelEl?.setText('API');
     if (this.fillEl) {
-      this.fillEl.setCssProps({ width: '0%' });
+      this.fillEl.style.width = '';
     }
     this.meterEl?.addClass('grimoire-hidden');
     this.valueEl?.setText(stripThisMonth(usage.spend));
@@ -1999,7 +1999,7 @@ export class ExternalContextSelector {
   async openFolderPicker(target: ExternalContextTarget = 'any'): Promise<void> {
     try {
       // Access Electron's dialog through remote
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Electron remote is exposed only at runtime in Obsidian's renderer.
+      // Electron remote is exposed only at runtime in Obsidian's renderer.
       const { remote } = require('electron') as { remote?: ElectronRemoteApi };
       if (!remote) {
         throw new Error('Electron remote API is unavailable');

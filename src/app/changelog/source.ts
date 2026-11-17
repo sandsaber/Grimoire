@@ -4,6 +4,11 @@ type ReadableAdapter = {
   read: (path: string) => Promise<string>;
 };
 
+type ChangelogVault = {
+  adapter: ReadableAdapter;
+  configDir: string;
+};
+
 type ManifestLike = {
   id?: string;
   dir?: string;
@@ -26,18 +31,18 @@ export function getEmbeddedChangelogMarkdown(): string | null {
   return null;
 }
 
-export function getBundledChangelogPath(manifest: ManifestLike | null | undefined): string {
+export function getBundledChangelogPath(manifest: ManifestLike | null | undefined, configDir: string): string {
   const dir = manifest?.dir?.trim();
   if (dir) {
     return `${dir.replace(/\/+$/, '')}/CHANGELOG.md`;
   }
 
   const id = manifest?.id?.trim() || 'grimoire';
-  return `.obsidian/plugins/${id}/CHANGELOG.md`;
+  return `${configDir.replace(/\/+$/, '')}/plugins/${id}/CHANGELOG.md`;
 }
 
 export async function readBundledChangelog(
-  adapter: ReadableAdapter,
+  vault: ChangelogVault,
   manifest: ManifestLike | null | undefined,
   options: { embeddedMarkdown?: string | null } = {},
 ): Promise<string | null> {
@@ -47,7 +52,7 @@ export async function readBundledChangelog(
   }
 
   try {
-    return await adapter.read(getBundledChangelogPath(manifest));
+    return await vault.adapter.read(getBundledChangelogPath(manifest, vault.configDir));
   } catch {
     return null;
   }

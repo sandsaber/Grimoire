@@ -36,7 +36,7 @@ type LegacySseTransportConstructor = new (
 ) => Transport;
 
 function createLegacySseTransport(url: URL, options: StreamableHttpTransportOptions): Transport {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Legacy SSE MCP servers still need the SDK's deprecated compatibility transport.
+  // Legacy SSE MCP servers still need the SDK's deprecated compatibility transport.
   const module = require('@modelcontextprotocol/sdk/client/sse') as {
     SSEClientTransport: LegacySseTransportConstructor;
   };

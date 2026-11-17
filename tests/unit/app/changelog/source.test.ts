@@ -15,14 +15,14 @@ describe('changelog source', () => {
   });
 
   it('uses manifest.dir when available', () => {
-    expect(getBundledChangelogPath({ id: 'grimoire', dir: '.obsidian/plugins/grimoire' })).toBe(
+    expect(getBundledChangelogPath({ id: 'grimoire', dir: '.obsidian/plugins/grimoire' }, '.custom-config')).toBe(
       '.obsidian/plugins/grimoire/CHANGELOG.md',
     );
   });
 
-  it('falls back to the plugin id when manifest.dir is missing', () => {
-    expect(getBundledChangelogPath({ id: 'grimoire' })).toBe(
-      '.obsidian/plugins/grimoire/CHANGELOG.md',
+  it('uses the configured folder when manifest.dir is missing', () => {
+    expect(getBundledChangelogPath({ id: 'grimoire' }, '.custom-config')).toBe(
+      '.custom-config/plugins/grimoire/CHANGELOG.md',
     );
   });
 
@@ -33,8 +33,10 @@ describe('changelog source', () => {
         .mockRejectedValueOnce(new Error('missing')),
     };
 
-    await expect(readBundledChangelog(adapter as any, { id: 'grimoire' })).resolves.toBe('# Changelog');
-    await expect(readBundledChangelog(adapter as any, { id: 'grimoire' })).resolves.toBeNull();
+    const vault = { adapter, configDir: '.custom-config' };
+    await expect(readBundledChangelog(vault, { id: 'grimoire' })).resolves.toBe('# Changelog');
+    expect(adapter.read).toHaveBeenCalledWith('.custom-config/plugins/grimoire/CHANGELOG.md');
+    await expect(readBundledChangelog(vault, { id: 'grimoire' })).resolves.toBeNull();
   });
 
   it('prefers embedded changelog markdown over adapter reads', async () => {
@@ -43,7 +45,7 @@ describe('changelog source', () => {
     };
 
     await expect(readBundledChangelog(
-      adapter as any,
+      { adapter, configDir: '.custom-config' },
       { id: 'grimoire' },
       { embeddedMarkdown: '# Embedded changelog' },
     )).resolves.toBe('# Embedded changelog');

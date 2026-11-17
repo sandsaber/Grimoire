@@ -36,7 +36,7 @@ const ALLOWED_IMAGE_MEDIA_TYPES = new Set<ImageMediaType>([
 ]);
 
 function getDroppedFilePath(file: File): string {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Electron is provided by Obsidian's desktop renderer.
+  // Electron is provided by Obsidian's desktop renderer.
   const { webUtils } = require('electron') as { webUtils?: { getPathForFile(file: File): string } };
   return webUtils ? webUtils.getPathForFile(file) : (file as File & { path?: string }).path ?? '';
 }
