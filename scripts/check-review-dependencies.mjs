@@ -52,6 +52,18 @@ const advisories = [
     isVulnerable: (version) => lessThan(version, "2.1.3"),
   },
   {
+    packageName: "hono",
+    vulnerableRange: "<4.13.16",
+    advisory: "GHSA-46wx-v44x-9hh2 / GHSA-4m76-xfj5-7975 / GHSA-3gg2-335m-rxc6 / GHSA-4h7h-rv7c-7m2v / GHSA-h7mg-cq63-vhpq",
+    isVulnerable: (version) => lessThan(version, "4.13.16"),
+  },
+  {
+    packageName: "@hono/node-server",
+    vulnerableRange: ">=2.0.0 <2.1.6",
+    advisory: "GHSA-qv5m-9pm6-hqp3 / GHSA-jpvv-r467-5p4w",
+    isVulnerable: (version) => greaterThanOrEqual(version, "2.0.0") && lessThan(version, "2.1.6"),
+  },
+  {
     packageName: "fast-uri",
     vulnerableRange: ">=3.0.0 <=3.1.5",
     advisory: "GHSA-q3j6-qgpj-74h6 / GHSA-v39h-62p7-jpjc / GHSA-7p8r-x3mc-p8w7 / GHSA-5jgf-p345-68v8 / GHSA-f65p-4m7j-42xc / GHSA-fph4-wmhf-6fwf / GHSA-jqff-g426-hqxp",
