@@ -32,6 +32,24 @@ function legacyMinimatchFixture() {
 }
 
 describe('npm audit exception boundary', () => {
+  it('accepts the reviewed picomatch copies and rejects a changed copy', () => {
+    const paths = ['node_modules/picomatch', 'node_modules/anymatch/node_modules/picomatch'];
+    const report = { auditReportVersion: 2, metadata: { vulnerabilities: { total: 2 } }, vulnerabilities: {
+      picomatch: { name: 'picomatch', severity: 'high', nodes: paths, via: [{
+        url: 'https://github.com/advisories/GHSA-fc5q-39xc-vjpf', dependency: 'picomatch', severity: 'high',
+      }] },
+      anymatch: { name: 'anymatch', severity: 'high', nodes: ['node_modules/anymatch'], via: ['picomatch'] },
+    } };
+    const packages = {
+      [paths[0]]: { dev: true, version: '4.0.5' },
+      [paths[1]]: { dev: true, version: '2.3.2' },
+      'node_modules/anymatch': { dev: true, version: '3.1.3' },
+    };
+    expect(evaluateAudit(report, { packages }, now)).toEqual(['anymatch', 'picomatch']);
+    packages[paths[1]].version = '4.0.5';
+    expect(() => evaluateAudit(report, { packages }, now)).toThrow();
+  });
+
   it('accepts only the reviewed legacy minimatch copies and their dev-tooling findings', () => {
     const { report, lockfile } = legacyMinimatchFixture();
     expect(evaluateAudit(report, lockfile, now)).toEqual(['@eslint/eslintrc', 'minimatch']);
