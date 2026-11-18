@@ -2,6 +2,17 @@
 
 User-facing changes by release.
 
+## 2.0.15 - Unreleased
+
+### Fixed
+
+- Explain when an ACP provider disconnects before a chat message is sent (#295).
+- Update Hono dependencies to address security advisories (#296).
+
+### Improved
+
+- Update the Claude Agent SDK to 0.3.319 and the OpenCode client to 2.2.6 (#293, #294).
+
 ## 2.0.14 - 2026-11-12
 
 ### Added

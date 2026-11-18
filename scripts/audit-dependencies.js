@@ -3,6 +3,7 @@ const { readFileSync } = require('node:fs');
 
 const ADVISORY = 'https://github.com/advisories/GHSA-gcqx-w48m-w2h4';
 const LEGACY_MINIMATCH_ADVISORY = 'https://github.com/advisories/GHSA-g3hv-75wg-m249';
+const PICOMATCH_ADVISORY = 'https://github.com/advisories/GHSA-fc5q-39xc-vjpf';
 const EXPIRES = Date.parse('2026-11-30T00:00:00Z');
 const JEST_CHAIN = new Set(['deepmerge', 'jest-config', '@jest/core', 'jest-cli', 'jest', 'ts-jest']);
 const ESLINT_CHAIN = new Set([
@@ -14,7 +15,23 @@ const ESLINT_CHAIN = new Set([
   'eslint-plugin-json-schema-validator', 'eslint-plugin-n', 'eslint-plugin-no-unsanitized',
   'eslint-plugin-obsidianmd', 'eslint-plugin-react', 'eslint-plugin-simple-import-sort',
 ]);
+const PICOMATCH_CHAIN = new Set([
+  '@jest/console', '@jest/core', '@jest/environment', '@jest/environment-jsdom-abstract',
+  '@jest/expect', '@jest/fake-timers', '@jest/globals', '@jest/reporters', '@jest/test-result',
+  '@jest/test-sequencer', '@jest/transform', '@parcel/watcher', '@types/jest', '@typescript-eslint/eslint-plugin',
+  '@typescript-eslint/parser', '@typescript-eslint/type-utils', '@typescript-eslint/typescript-estree',
+  '@typescript-eslint/utils', 'anymatch', 'babel-jest', 'expect', 'fdir', 'jest', 'jest-changed-files',
+  'jest-circus', 'jest-cli', 'jest-config', 'jest-each', 'jest-environment-jsdom',
+  'jest-environment-node', 'jest-haste-map', 'jest-message-util', 'jest-mock', 'jest-resolve',
+  'jest-resolve-dependencies', 'jest-runner', 'jest-runtime', 'jest-snapshot', 'jest-util',
+  'jest-watcher', 'jest-worker', 'picomatch', 'tinyglobby', 'ts-jest', 'typescript-eslint',
+]);
 const POLICIES = [
+  { advisory: PICOMATCH_ADVISORY, dependency: 'picomatch', severity: 'high', chain: PICOMATCH_CHAIN,
+    nodes: {
+      'node_modules/picomatch': '4.0.5',
+      'node_modules/anymatch/node_modules/picomatch': '2.3.2',
+    } },
   { advisory: ADVISORY, dependency: 'deepmerge', severity: 'low', chain: JEST_CHAIN,
     nodes: { 'node_modules/deepmerge': '4.3.1' } },
   { advisory: LEGACY_MINIMATCH_ADVISORY, dependency: 'minimatch', severity: 'moderate', chain: ESLINT_CHAIN,

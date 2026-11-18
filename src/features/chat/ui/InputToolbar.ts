@@ -997,9 +997,6 @@ export class PlanUsageBadge {
     this.container.removeClass('grimoire-hidden');
     this.container.addClass('grimoire-plan-usage-badge--spend');
     this.labelEl?.setText('API');
-    if (this.fillEl) {
-      this.fillEl.style.width = '';
-    }
     this.meterEl?.addClass('grimoire-hidden');
     this.valueEl?.setText(stripThisMonth(usage.spend));
     this.container.setAttribute('aria-label', `${usage.plan}: ${usage.spend}`);
