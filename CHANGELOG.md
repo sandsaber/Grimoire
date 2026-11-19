@@ -11,6 +11,7 @@ User-facing changes by release.
 
 ### Improved
 
+- With debug logging enabled, Grok Build on Windows now records when its process wrapper starts, becomes ready, and exits. Chat and metadata launches are labeled separately, and the log records when Grok answers the chat's ACP handshake (#295).
 - Update the Claude Agent SDK to 0.3.319 and the OpenCode client to 2.2.6 (#293, #294).
 
 ## 2.0.14 - 2026-11-12

@@ -21,6 +21,7 @@ const STDERR_TAIL_BYTES = 4_000;
 const STDERR_PREVIEW_CHARS = 300;
 
 export interface ManagedAcpLaunchInvocation {
+  readonly launchMode?: 'chat' | 'metadata';
   readonly executable: string;
   readonly arguments: readonly string[];
   readonly cwd: string;
@@ -29,7 +30,23 @@ export interface ManagedAcpLaunchInvocation {
 
 export interface ManagedAcpLaunchResolver {
   resolve(startupRef: string): Promise<ManagedAcpLaunchInvocation>;
+  readonly traceWindowsLaunch?: (event: WindowsLaunchEvent) => void;
 }
+
+type WindowsLaunchPhase = 'resolving' | 'spawning' | 'waiting' | 'ready' | 'failed' | 'exited';
+type WindowsLaunchEvent = {
+  phase: WindowsLaunchPhase;
+  launchMode?: ManagedAcpLaunchInvocation['launchMode'];
+  attempt: number;
+  elapsedMs: number;
+  guardianPid?: number;
+  ready: boolean;
+  exitCode?: number | null;
+  errno?: number;
+  aborted: boolean;
+};
+
+let nextLaunchAttempt = 0;
 
 export interface ManagedAcpProcessAdapter extends LocalShellProcessSupervisor {
   launch(spec: LocalShellLaunchSpec): SpawnedLocalProcess;
@@ -57,19 +74,44 @@ export class NodeManagedAcpProcessLauncher implements AcpManagedProcessLauncher 
 
   async launch(startupRef: string, signal: AbortSignal): Promise<AcpManagedOwnedProcess> {
     if (this.disposing) throw new Error('Managed ACP process launcher is disposing.');
-    const invocation = await raceAbort(this.resolver.resolve(startupRef), signal);
-    if (this.disposing) throw new Error('Managed ACP process launcher is disposing.');
-    const child = this.processAdapter.launch({
-      executable: invocation.executable,
-      arguments: [...invocation.arguments],
-      cwd: invocation.cwd,
-      environment: { ...invocation.environment },
-      stdin: 'pipe',
-      terminationKind: localShellPlatformForNode(this.platform) === 'windows'
-        ? 'windows-process-tree'
-        : 'posix-process-group',
-      ...(this.platform === 'win32' ? { windowsInvocationMode: 'argument-array' } : {}),
-    });
+    const observer = this.platform === 'win32' ? this.resolver.traceWindowsLaunch : undefined;
+    const attempt = ++nextLaunchAttempt;
+    const start = Date.now();
+    let guardianPid: number | undefined;
+    let launchMode: ManagedAcpLaunchInvocation['launchMode'];
+    let ready = false;
+    const trace = (phase: WindowsLaunchPhase, details?: Pick<WindowsLaunchEvent, 'exitCode' | 'errno'>) => {
+      try {
+        observer?.({
+          phase, attempt, launchMode, elapsedMs: Date.now() - start, guardianPid, ready, aborted: signal.aborted, ...details,
+        });
+      } catch {
+        // Diagnostics cannot change ownership of a running process.
+      }
+    };
+    let invocation: ManagedAcpLaunchInvocation;
+    let child: SpawnedLocalProcess;
+    try {
+      trace('resolving');
+      invocation = await raceAbort(this.resolver.resolve(startupRef), signal);
+      launchMode = invocation.launchMode;
+      if (this.disposing) throw new Error('Managed ACP process launcher is disposing.');
+      trace('spawning');
+      child = this.processAdapter.launch({
+        executable: invocation.executable,
+        arguments: [...invocation.arguments],
+        cwd: invocation.cwd,
+        environment: { ...invocation.environment },
+        stdin: 'pipe',
+        terminationKind: localShellPlatformForNode(this.platform) === 'windows'
+          ? 'windows-process-tree'
+          : 'posix-process-group',
+        ...(this.platform === 'win32' ? { windowsInvocationMode: 'argument-array' } : {}),
+      });
+    } catch (error) {
+      trace('failed', { errno: numericErrno(error) });
+      throw error;
+    }
     const owned = new OwnedManagedAcpProcess(
       child,
       this.processAdapter,
@@ -79,12 +121,27 @@ export class NodeManagedAcpProcessLauncher implements AcpManagedProcessLauncher 
       process => this.ownedProcesses.delete(process),
     );
     this.ownedProcesses.add(owned);
+    if (observer) {
+      guardianPid = child.termination.pid || undefined;
+      trace('waiting');
+      // With argument-array invocation this acknowledges the PowerShell command
+      // wrapper. The provider executable can still fail to start inside it.
+      void child.started.then(() => {
+        ready = true;
+        trace('ready');
+      }, () => undefined);
+      void child.exited.then(
+        exit => trace('exited', { exitCode: exit.code }),
+        () => trace('exited', { exitCode: null }),
+      );
+    }
     try {
       await raceAbort(child.started, signal);
       owned.requirePipes();
       owned.startObserving();
       return owned;
     } catch (error) {
+      trace('failed', { errno: numericErrno(error) });
       await owned.terminate().catch(() => 'unconfirmed');
       // Described rather than rethrown raw: an `ENOENT` from a spawn reads as a
       // transport failure, and the provider's pre-dispatch wording then offers
@@ -263,4 +320,10 @@ function abortError(signal: AbortSignal): Error {
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function numericErrno(error: unknown): number | undefined {
+  return typeof error === 'object' && error !== null && 'errno' in error && typeof error.errno === 'number'
+    ? error.errno
+    : undefined;
 }

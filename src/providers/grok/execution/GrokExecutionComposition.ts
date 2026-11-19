@@ -343,6 +343,7 @@ export class GrokExecution {
         // transport answers. The legacy runtime did both at the same two
         // moments.
         onClientReady: client => {
+          this.plugin.recordDebugLog?.({ scope: 'provider.grok', event: 'chat.acpInitialized' });
           this.hydrateNativeModelCatalog();
           grokPlanUsageStore.setBillingReader(
             async () => (await client.vendorRequest?.(GROK_BILLING_METHOD, {})) ?? null,
@@ -1173,6 +1174,11 @@ export class GrokExecution {
       },
       processLauncher: new NodeManagedAcpProcessLauncher({
         resolve: startupRef => this.requests.resolveLaunch(startupRef),
+        traceWindowsLaunch: data => this.plugin.recordDebugLog?.({
+          scope: 'provider.grok',
+          event: 'acp.windowsLaunch',
+          data,
+        }),
       }),
     });
   }
@@ -1207,6 +1213,7 @@ export class GrokExecution {
     const runtimeEnv = buildGrokRuntimeEnv(this.plugin.settings, executable, artifacts.grokHomePath);
     return {
       startupRef: this.requests.referenceLaunch({
+        launchMode: 'metadata',
         executable,
         arguments: buildGrokAgentProcessArgs(null, permissionMode),
         cwd,

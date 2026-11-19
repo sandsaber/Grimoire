@@ -467,8 +467,8 @@ function filterGuardianReadiness(
       pending = Buffer.alloc(0);
       resolve();
     });
-    guardian.once('error', () => {
-      finishError(new Error('Windows Job Object guardian failed to start.'));
+    guardian.once('error', (error: NodeJS.ErrnoException) => {
+      finishError(Object.assign(new Error('Windows Job Object guardian failed to start.'), { errno: error.errno }));
     });
     guardian.once('exit', () => {
       if (!ready) {

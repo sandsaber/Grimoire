@@ -10,6 +10,31 @@ import type {
 } from '@/core/execution/local/LocalShellBackend';
 
 describe('NodeManagedAcpProcessLauncher', () => {
+  it.each([true, false])('records Windows guardian readiness and exit (starts=%s)', async starts => {
+    const traceWindowsLaunch = jest.fn();
+    const adapter = new FakeProcessAdapter('windows-process-tree');
+    if (!starts) adapter.startFailure = new Error('private failure detail');
+    const launcher = new NodeManagedAcpProcessLauncher({
+      resolve: async () => ({
+        launchMode: 'chat', executable: 'private-exe', cwd: 'private-vault', arguments: [], environment: {},
+      }),
+      traceWindowsLaunch,
+    }, adapter, { wait: async () => undefined }, 'win32');
+    const launch = launcher.launch('private-startup-ref', new AbortController().signal);
+    await expect(launch.then(() => true, () => false)).resolves.toBe(starts);
+    adapter.exit({ code: starts ? 127 : 1 });
+    await Promise.resolve();
+    const events = traceWindowsLaunch.mock.calls.map(([event]) => event);
+    expect(events.map(event => event.phase)).toEqual([
+      'resolving', 'spawning', 'waiting', starts ? 'ready' : 'failed', 'exited',
+    ]);
+    expect(events.at(-1)).toMatchObject({
+      launchMode: 'chat', guardianPid: 42, ready: starts, exitCode: starts ? 127 : 1,
+      attempt: events[0].attempt, elapsedMs: expect.any(Number),
+    });
+    expect(JSON.stringify(events)).not.toContain('private');
+  });
+
   it.each([
     ['darwin' as const, 'posix-process-group'],
     ['linux' as const, 'posix-process-group'],

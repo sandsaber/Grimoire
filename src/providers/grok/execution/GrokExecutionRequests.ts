@@ -177,6 +177,7 @@ export class GrokExecutionRequests {
     evict(this.startups, this.limit);
     const startupRef = this.nextReference();
     this.startups.set(startupRef, {
+      launchMode: 'chat',
       executable: environment.executable,
       // Grok's flags are the launch, not the session: the permission policy
       // and the reasoning effort are process arguments, which is why a change
