@@ -14,7 +14,7 @@ security, testing, and review expectations that apply to contributions.
 
 ## Development Setup
 
-Grimoire is an Obsidian desktop plugin. Development and CI require npm 12.0.2
+Grimoire is an Obsidian desktop plugin. Development and CI require npm 12.2.2
 with Node.js 22.22.2 through 22.x, Node.js 24.15.0 through 24.x, or Node.js
 26.0.0 or newer.
 

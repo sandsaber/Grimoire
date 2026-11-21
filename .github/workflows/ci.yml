@@ -22,13 +22,13 @@ jobs:
           node-version: 22.22.2
           cache: 'npm'
 
-      - name: Install isolated npm 12.0.2
+      - name: Install isolated npm 12.2.2
         run: |
-          npm install --global --prefix "${RUNNER_TEMP}/npm-12.0.2" npm@12.0.2 --ignore-scripts --no-audit --no-fund
-          echo "${RUNNER_TEMP}/npm-12.0.2/bin" >> "${GITHUB_PATH}"
+          npm install --global --prefix "${RUNNER_TEMP}/npm-12.2.2" npm@12.2.2 --ignore-scripts --no-audit --no-fund
+          echo "${RUNNER_TEMP}/npm-12.2.2/bin" >> "${GITHUB_PATH}"
 
       - name: Verify npm version
-        run: test "$(npm --version)" = "12.0.2"
+        run: test "$(npm --version)" = "12.2.2"
 
       - name: Validate lockfile release age
         run: npm run check:lockfile-age
@@ -77,19 +77,19 @@ jobs:
           node-version: 22.22.2
           cache: 'npm'
 
-      - name: Install isolated npm 12.0.2
+      - name: Install isolated npm 12.2.2
         shell: bash
         run: |
-          npm install --global --prefix "${RUNNER_TEMP}/npm-12.0.2" npm@12.0.2 --ignore-scripts --no-audit --no-fund
+          npm install --global --prefix "${RUNNER_TEMP}/npm-12.2.2" npm@12.2.2 --ignore-scripts --no-audit --no-fund
           if [ "${RUNNER_OS}" = "Windows" ]; then
-            echo "${RUNNER_TEMP}/npm-12.0.2" >> "${GITHUB_PATH}"
+            echo "${RUNNER_TEMP}/npm-12.2.2" >> "${GITHUB_PATH}"
           else
-            echo "${RUNNER_TEMP}/npm-12.0.2/bin" >> "${GITHUB_PATH}"
+            echo "${RUNNER_TEMP}/npm-12.2.2/bin" >> "${GITHUB_PATH}"
           fi
 
       - name: Verify npm version
         shell: bash
-        run: test "$(npm --version)" = "12.0.2"
+        run: test "$(npm --version)" = "12.2.2"
 
       - name: Install dependencies
         shell: bash
@@ -136,15 +136,15 @@ jobs:
       # `strict-allow-scripts`), so the pin is not optional here either. On
       # Windows `--prefix` puts npm.cmd in the prefix directory itself rather
       # than in a bin/ subdirectory.
-      - name: Install isolated npm 12.0.2
+      - name: Install isolated npm 12.2.2
         shell: bash
         run: |
-          npm install --global --prefix "${RUNNER_TEMP}/npm-12.0.2" npm@12.0.2 --ignore-scripts --no-audit --no-fund
-          echo "${RUNNER_TEMP}/npm-12.0.2" >> "${GITHUB_PATH}"
+          npm install --global --prefix "${RUNNER_TEMP}/npm-12.2.2" npm@12.2.2 --ignore-scripts --no-audit --no-fund
+          echo "${RUNNER_TEMP}/npm-12.2.2" >> "${GITHUB_PATH}"
 
       - name: Verify npm version
         shell: bash
-        run: test "$(npm --version)" = "12.0.2"
+        run: test "$(npm --version)" = "12.2.2"
 
       - name: Install dependencies
         shell: bash

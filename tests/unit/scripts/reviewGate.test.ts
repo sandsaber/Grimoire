@@ -50,10 +50,10 @@ describe('Obsidian review gate', () => {
     for (const workflow of ['.github/workflows/ci.yml', '.github/workflows/release.yml']) {
       const contents = readFileSync(workflow, 'utf8');
 
-      expect(contents).toContain('npm install --global --prefix "${RUNNER_TEMP}/npm-12.0.2" npm@12.0.2 --ignore-scripts --no-audit --no-fund');
-      expect(contents).toContain('echo "${RUNNER_TEMP}/npm-12.0.2/bin" >> "${GITHUB_PATH}"');
-      expect(contents).toContain('test "$(npm --version)" = "12.0.2"');
-      expect(contents).not.toContain('npm install --global npm@12.0.2');
+      expect(contents).toContain('npm install --global --prefix "${RUNNER_TEMP}/npm-12.2.2" npm@12.2.2 --ignore-scripts --no-audit --no-fund');
+      expect(contents).toContain('echo "${RUNNER_TEMP}/npm-12.2.2/bin" >> "${GITHUB_PATH}"');
+      expect(contents).toContain('test "$(npm --version)" = "12.2.2"');
+      expect(contents).not.toContain('npm install --global npm@12.2.2');
     }
   });
 
