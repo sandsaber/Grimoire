@@ -112,6 +112,7 @@ describe('OpencodeExecutionBackend', () => {
 
   it('says the startup never finished rather than blaming a saved session', async () => {
     const client = new FakeManagedAcpClient('native-session');
+    client.startupExitHint = jest.fn(() => 'PowerShell hint');
     client.initializeGate = new Promise<void>(() => undefined);
     const fixture = createFixture({ clients: [client] });
     const session = await createSession(fixture.backend);
@@ -128,6 +129,45 @@ describe('OpencodeExecutionBackend', () => {
     // Without an origin the composition falls through to the sentence about a
     // saved session, which a conversation that never had one cannot act on.
     expect(refusals).toEqual([expect.objectContaining({ origin: 'startup' })]);
+    expect(client.startupExitHint).not.toHaveBeenCalled();
+  });
+
+  it('shows the guardian hint when the handshake loses its pipe before the exit code arrives', async () => {
+    const client = new FakeManagedAcpClient('native-session');
+    const handshake = deferred<void>();
+    client.initializeGate = handshake.promise;
+    const hint = 'Check your security software for a blocked PowerShell launch.';
+    client.startupExitHint = () => client.closeCalls > 0 ? hint : undefined;
+    const fixture = createFixture({ clients: [client] });
+    const session = await createSession(fixture.backend);
+    const events = collectEvents(session.createRun(request('1')));
+    await waitFor(() => client.initializeCalls === 1);
+    client.loseConnection();
+    handshake.reject(new Error('JSON-RPC input closed'));
+
+    const captured = await events;
+    expectTerminal(captured, 'invalidated', 'pre-dispatch-rejected');
+    expect(captured.flatMap(({ event }) => event.kind === 'provider-content' ? [event.payload] : []))
+      .toEqual([{ kind: 'turn-refused', origin: 'launch', message: hint }]);
+    expect(client.promptRequests).toHaveLength(0);
+  });
+
+  it('does not report a guardian block when the user cancels the handshake', async () => {
+    const client = new FakeManagedAcpClient('native-session');
+    client.startupExitHint = jest.fn(() => 'PowerShell hint');
+    const handshake = deferred<void>();
+    client.initializeGate = handshake.promise;
+    const session = await createSession(createFixture({ clients: [client] }).backend);
+    const run = session.createRun(request('1'));
+    const events = collectEvents(run);
+    await waitFor(() => client.initializeCalls === 1);
+    await run.cancel();
+    client.loseConnection();
+    handshake.reject(new Error('JSON-RPC input closed'));
+    const captured = await events;
+    expectTerminal(captured, 'cancelled', 'cancellation-confirmed');
+    expect(client.startupExitHint).not.toHaveBeenCalled();
+    expect(captured.filter(({ event }) => event.kind === 'provider-content')).toEqual([]);
   });
 
   it('forwards every session update the surface is drawn from, including the ones it never reads', async () => {
@@ -1364,6 +1404,7 @@ class FakeClientFactory {
 }
 
 class FakeManagedAcpClient implements ManagedAcpClient {
+  startupExitHint?: () => string | undefined;
   initializeCalls = 0;
   readonly newRequests: Parameters<ManagedAcpClient['newSession']>[0][] = [];
   readonly loadRequests: Parameters<ManagedAcpClient['loadSession']>[0][] = [];

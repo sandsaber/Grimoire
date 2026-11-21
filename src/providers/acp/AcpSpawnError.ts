@@ -12,8 +12,8 @@
  * filesystem check that produces its wording.
  */
 export class AcpSpawnError extends Error {
-  constructor(message: string, cause: unknown) {
-    super(message, { cause });
+  constructor(message: string, cause: unknown, readonly hint?: string) {
+    super(hint ?? message, { cause });
     this.name = 'AcpSpawnError';
   }
 }

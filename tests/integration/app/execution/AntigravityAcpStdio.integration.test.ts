@@ -39,3 +39,24 @@ it('round-trips UTF-8 through the Antigravity ACP launch path before stdin close
     rmSync(cwd, { recursive: true, force: true });
   }
 }, 90_000);
+
+const describePosix = process.platform === 'win32' ? describe.skip : describe;
+describePosix('POSIX ACP launch', () => {
+  it('reports EACCES from the OS when the CLI file is not executable', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'Grimoire ACP '));
+    const executable = join(cwd, 'cli');
+    const launcher = new NodeManagedAcpProcessLauncher({
+      resolve: async () => ({ executable, cwd, arguments: [], environment: {} }),
+    });
+    try {
+      writeFileSync(executable, '', { mode: 0o600 });
+      await expect(launcher.launch('startup', new AbortController().signal)).rejects.toMatchObject({
+        name: 'AcpSpawnError',
+        hint: expect.stringMatching(/EACCES.*execute.*directories/),
+      });
+    } finally {
+      await launcher.dispose();
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});

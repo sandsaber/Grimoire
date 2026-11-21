@@ -67,6 +67,39 @@ describe('NodeManagedAcpProcessLauncher', () => {
     await expect(process.terminate()).resolves.toBe('confirmed');
   });
 
+  it.each([
+    ['win32', -1, true],
+    ['win32', 0xffffffff, true],
+    ['win32', 1, false],
+    ['darwin', -1, false],
+  ] as const)('checks the guardian exit signature on %s (code %i)', async (platform, code, expected) => {
+    const adapter = new FakeProcessAdapter(platform === 'win32' ? 'windows-process-tree' : 'posix-process-group');
+    const launcher = new NodeManagedAcpProcessLauncher({
+      resolve: async () => ({ executable: 'cli', arguments: [], cwd: '/vault', environment: {} }),
+    }, adapter, undefined, platform);
+    const owned = await launcher.launch('startup', new AbortController().signal);
+    const closed = new Promise<void>(resolve => owned.onClose(() => resolve()));
+    adapter.exit({ code });
+    await closed;
+    expect(Boolean(owned.startupExitHint?.()?.includes('PowerShell'))).toBe(expected);
+  });
+
+  it.each([
+    ['darwin', /EACCES.*execute.*director/i],
+    ['linux', /EACCES.*execute.*director/i],
+    ['win32', /^spawn cli EACCES$/],
+  ] as const)('explains EACCES on %s', async (platform, message) => {
+    const adapter = new FakeProcessAdapter(platform === 'win32' ? 'windows-process-tree' : 'posix-process-group');
+    adapter.startFailure = Object.assign(new Error('spawn cli EACCES'), { code: 'EACCES' });
+    const launcher = new NodeManagedAcpProcessLauncher({
+      resolve: async () => ({ executable: 'cli', arguments: [], cwd: '/vault', environment: {} }),
+    }, adapter, undefined, platform);
+    await expect(launcher.launch('startup', new AbortController().signal)).rejects.toMatchObject({
+      name: 'AcpSpawnError',
+      message: expect.stringMatching(message),
+    });
+  });
+
   it('escalates graceful to forced termination and reports uncertainty honestly', async () => {
     const adapter = new FakeProcessAdapter('posix-process-group');
     adapter.confirmations = [false, false, false];

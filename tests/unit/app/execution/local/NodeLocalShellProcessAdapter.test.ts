@@ -3,6 +3,7 @@ import {
   localShellPlatformForNode,
   NodeLocalProcessSystem,
   NodeLocalShellProcessAdapter,
+  PosixSpawnFailure,
   type SpawnedLocalProcess,
   windowsCommandArguments,
   windowsJobGuardianAssemblyPath,
@@ -274,12 +275,14 @@ describe('NodeLocalShellProcessAdapter', () => {
   it('settles readiness when a real spawn fails before ownership exists', async () => {
     const adapter = new NodeLocalShellProcessAdapter(new NodeLocalProcessSystem());
 
-    expect(() => adapter.launch({
+    const launch = async () => adapter.launch({
       executable: `missing-grimoire-executable-${Date.now()}`,
       arguments: [],
       terminationKind: 'posix-process-group',
-    })).toThrow('positive safe integer');
-    await new Promise(resolve => setImmediate(resolve));
+    });
+    const failure = await launch().catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(PosixSpawnFailure);
+    await expect((failure as PosixSpawnFailure).reason).resolves.toMatchObject({ code: 'ENOENT' });
   });
 });
 

@@ -27,6 +27,16 @@ export interface SpawnedLocalProcess {
   readonly exited: Promise<LocalShellExit>;
 }
 
+/** Node reports the errno on the next tick when spawn returns without a PID. */
+export class PosixSpawnFailure extends Error {
+  readonly reason: Promise<Error>;
+
+  constructor(child: ChildProcess) {
+    super('The operating system could not start the process.');
+    this.reason = new Promise(resolve => child.once('error', resolve));
+  }
+}
+
 export interface LocalProcessSystem {
   spawn(spec: LocalShellLaunchSpec): SpawnedLocalProcess;
   processGroupExists(pid: number): boolean;
@@ -154,6 +164,7 @@ export class NodeLocalProcessSystem implements LocalProcessSystem {
       detached: true,
       stdio: [spec.stdin === 'pipe' ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     });
+    if (child.pid === undefined) throw new PosixSpawnFailure(child);
     const started = new Promise<void>((resolve, reject) => {
       child.once('spawn', resolve);
       child.once('error', reject);
@@ -162,7 +173,7 @@ export class NodeLocalProcessSystem implements LocalProcessSystem {
     const stdout = requireReadablePipe(child.stdout, child);
     const stderr = requireReadablePipe(child.stderr, child);
     return {
-      termination: { pid: child.pid ?? 0, kind: 'posix-process-group' },
+      termination: { pid: child.pid, kind: 'posix-process-group' },
       ...(child.stdin ? { stdin: child.stdin } : {}),
       stdout,
       stderr,

@@ -21,6 +21,8 @@ import type {
 
 /** An owned protocol connection; provider execution policy stays outside this contract. */
 export interface ManagedAcpClient {
+  /** Read after cleanup when the connection closed during the initialize handshake. */
+  readonly startupExitHint?: () => string | undefined;
   initialize(): Promise<void>;
   newSession(request: AcpNewSessionRequest): Promise<AcpNewSessionResponse>;
   loadSession(request: AcpLoadSessionRequest): Promise<AcpLoadSessionResponse>;

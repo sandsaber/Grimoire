@@ -4,6 +4,7 @@ import { setTimeout as setNodeTimeout } from 'node:timers';
 import {
   localShellPlatformForNode,
   NodeLocalShellProcessAdapter,
+  PosixSpawnFailure,
   type SpawnedLocalProcess,
 } from '@/app/execution/local/NodeLocalShellProcessAdapter';
 import type {
@@ -89,7 +90,7 @@ export class NodeManagedAcpProcessLauncher implements AcpManagedProcessLauncher 
         // Diagnostics cannot change ownership of a running process.
       }
     };
-    let invocation: ManagedAcpLaunchInvocation;
+    let invocation: ManagedAcpLaunchInvocation | undefined;
     let child: SpawnedLocalProcess;
     try {
       trace('resolving');
@@ -109,8 +110,13 @@ export class NodeManagedAcpProcessLauncher implements AcpManagedProcessLauncher 
         ...(this.platform === 'win32' ? { windowsInvocationMode: 'argument-array' } : {}),
       });
     } catch (error) {
-      trace('failed', { errno: numericErrno(error) });
-      throw error;
+      if (!invocation) {
+        trace('failed', { errno: numericErrno(error) });
+        throw error;
+      }
+      const failure = error instanceof PosixSpawnFailure ? await error.reason : toError(error);
+      trace('failed', { errno: numericErrno(failure) });
+      throw describeAcpSpawnError(failure, invocation.executable, invocation.cwd, this.platform);
     }
     const owned = new OwnedManagedAcpProcess(
       child,
@@ -146,7 +152,7 @@ export class NodeManagedAcpProcessLauncher implements AcpManagedProcessLauncher 
       // Described rather than rethrown raw: an `ENOENT` from a spawn reads as a
       // transport failure, and the provider's pre-dispatch wording then offers
       // to start a new chat about a CLI that is not installed.
-      throw describeAcpSpawnError(toError(error), invocation.executable, invocation.cwd);
+      throw describeAcpSpawnError(toError(error), invocation.executable, invocation.cwd, this.platform);
     }
   }
 
@@ -165,6 +171,8 @@ class OwnedManagedAcpProcess implements AcpManagedOwnedProcess {
   private closed = false;
   private observing = false;
   private stderrTail = '';
+  private exitCode?: number | null;
+  readonly startupExitHint?: () => string | undefined;
   private terminateTask?: Promise<'confirmed' | 'unconfirmed'>;
 
   constructor(
@@ -174,7 +182,14 @@ class OwnedManagedAcpProcess implements AcpManagedOwnedProcess {
     private readonly gracefulTimeoutMs: number,
     private readonly forcedTimeoutMs: number,
     private readonly onTerminationConfirmed: (process: OwnedManagedAcpProcess) => void,
-  ) {}
+  ) {
+    if (child.termination.kind === 'windows-process-tree') {
+      this.startupExitHint = () => this.exitCode === -1 || this.exitCode === 0xffffffff
+        ? 'The CLI connection closed during startup. Check your antivirus or endpoint security event history '
+          + 'for a blocked PowerShell or CLI launch from Obsidian.'
+        : undefined;
+    }
+  }
 
   get input(): Readable {
     this.requirePipes();
@@ -200,6 +215,7 @@ class OwnedManagedAcpProcess implements AcpManagedOwnedProcess {
     this.drainStderr();
     void this.child.exited.then(
       exit => {
+        this.exitCode = exit.code;
         this.notifyClose(exit.code === 0 ? undefined : this.describeExit(exit.code));
       },
       error => this.notifyClose(toError(error)),

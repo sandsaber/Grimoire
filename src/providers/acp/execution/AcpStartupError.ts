@@ -10,7 +10,7 @@ import { ExecutionDispatchError } from '@/core/execution/ExecutionContracts';
  * prompt was sent and no tool could have run.
  */
 export class AcpStartupError extends ExecutionDispatchError {
-  constructor(message: string) {
+  constructor(message: string, readonly origin: 'startup' | 'launch' = 'startup') {
     super(message, true);
     this.name = 'AcpStartupError';
   }

@@ -21,16 +21,18 @@ import { AcpSpawnError } from './AcpSpawnError';
  */
 const SPAWN_ERRNOS = new Set(['ENOENT', 'EACCES', 'EPERM', 'ENOTDIR']);
 
-export function describeAcpSpawnError(error: Error, command: string, cwd: string): Error {
+export function describeAcpSpawnError(error: Error, command: string, cwd: string, platform: NodeJS.Platform): Error {
   const code = (error as NodeJS.ErrnoException).code;
   if (code === undefined || !SPAWN_ERRNOS.has(code)) {
     return error;
   }
 
+  if (code === 'EACCES' && (platform === 'darwin' || platform === 'linux')) {
+    const hint = `Permission denied (EACCES) starting "${command}". Check that you can execute the CLI file `
+      + 'and access its parent directories and the working directory.';
+    return new AcpSpawnError(error.message, error, hint);
+  }
   if (code !== 'ENOENT') {
-    // Classified but not reworded. `ENOENT` is the one that reads as something
-    // it is not; a permission or path-type error already says what happened,
-    // and the legacy subprocess path shows this message verbatim.
     return new AcpSpawnError(error.message, error);
   }
 

@@ -12,6 +12,7 @@ import { executionSessionId, type InteractionId, runId } from '@/core/execution/
 import type { StreamChunk } from '@/core/types';
 import { JsonRpcErrorResponse } from '@/providers/acp';
 import { JsonRpcTransportClosedError } from '@/providers/acp/AcpJsonRpcTransport';
+import { describeAcpSpawnError } from '@/providers/acp/describeAcpSpawnError';
 import type {
   ManagedAcpClient,
   ManagedAcpClientFactory,
@@ -76,6 +77,8 @@ describe('Grok execution composition', () => {
     asksPermission?: boolean;
     cancelsTheTurn?: boolean;
     disconnectDuring?: 'initialize' | 'newSession';
+    spawnFailure?: Error;
+    startupExitHint?: () => string | undefined;
     modeIsUnsupported?: boolean;
     reportsNativeModes?: boolean;
     reportsNoModes?: boolean;
@@ -106,6 +109,7 @@ describe('Grok execution composition', () => {
     const factory: ManagedAcpClientFactory = {
       create: async (input: ManagedAcpClientFactoryInput) => {
         startupRefs.push(input.startupRef);
+        if (options.spawnFailure) throw options.spawnFailure;
         lastPermissionRequest = input.requestPermission;
         const ask = (): void => {
           permissions.push(input.requestPermission({
@@ -128,6 +132,7 @@ describe('Grok execution composition', () => {
         let notify: ((notification: AcpSessionNotification) => void) | undefined;
         let connectionLost: ((error: Error) => void) | undefined;
         const client: ManagedAcpClient = {
+          startupExitHint: options.startupExitHint,
           initialize: async () => undefined,
           newSession: async () => (options.reportsNativeModes ? {
             sessionId: 'grok-session',
@@ -270,6 +275,8 @@ describe('Grok execution composition', () => {
     asksPermission?: boolean;
     cancelsTheTurn?: boolean;
     disconnectDuring?: 'initialize' | 'newSession';
+    spawnFailure?: Error;
+    startupExitHint?: () => string | undefined;
     plugin?: any;
     modeIsUnsupported?: boolean;
     reportsNativeModes?: boolean;
@@ -718,6 +725,38 @@ describe('Grok execution composition', () => {
     ]);
     execution.dispose();
     await host.dispose();
+  });
+
+  it('shows a POSIX permission failure in chat', async () => {
+    const failure = Object.assign(new Error('spawn grok EACCES'), { code: 'EACCES' });
+    const { execution, host } = await createHarness({
+      spawnFailure: describeAcpSpawnError(failure, 'grok', '/vault', 'linux'),
+    });
+    try {
+      const runtime = execution.createRuntime();
+      const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'Hello' })));
+      expect(chunks.filter(chunk => chunk.type === 'error')).toEqual([{
+        type: 'error', content: expect.stringMatching(/EACCES.*execute.*directories/),
+      }]);
+    } finally {
+      execution.dispose();
+      await host.dispose();
+    }
+  });
+
+  it.each(['initialize', 'newSession'] as const)('shows the Windows hint only before ACP is ready (%s)', async stage => {
+    const hint = 'Check your security software for a blocked PowerShell launch.';
+    const { execution, host } = await createHarness({ disconnectDuring: stage, startupExitHint: () => hint });
+    try {
+      const runtime = execution.createRuntime();
+      const chunks = await drain(runtime.query(runtime.prepareTurn({ text: 'Hello' })));
+      expect(chunks.filter(chunk => chunk.type === 'error')).toEqual([{
+        type: 'error', content: stage === 'initialize' ? hint : 'The provider connection closed before the message was sent.',
+      }]);
+    } finally {
+      execution.dispose();
+      await host.dispose();
+    }
   });
 
   it.each(['initialize', 'newSession'] as const)(

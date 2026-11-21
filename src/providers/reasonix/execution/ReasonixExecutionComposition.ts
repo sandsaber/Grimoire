@@ -368,7 +368,7 @@ export class ReasonixExecution {
           preparationError = undefined;
           return message;
         }
-        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
+        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected' || reason === 'spawn-failed') {
           const refused = content.consumeTurnRefusal();
           if (refused?.origin) {
             return describeAcpSessionOpenFailure('Reasonix', refused.message, refused.origin);

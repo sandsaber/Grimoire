@@ -423,7 +423,7 @@ export class GeminiExecution {
         // earlier and the one a first-run user meets. `undefined` falls through
         // to the sentences below, which are what a provider that refused
         // without saying anything deserves.
-        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
+        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected' || reason === 'spawn-failed') {
           const refused = content.consumeTurnRefusal();
           // A refused *load* is the one refusal whose words are not the whole
           // answer: the session may be fine and the CLI unusable, so the

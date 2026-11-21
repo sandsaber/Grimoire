@@ -34,8 +34,9 @@ import type { AcpNewSessionResponse, AcpPromptResponse, AcpSessionNotification }
  * handshake never finished, so nobody refused and nobody said anything. It
  * still has to be told apart, because it is the only one where *no* session
  * was involved and every sentence about sessions is a wrong turn.
+ * A `launch` refusal already contains the specific OS diagnostic to show.
  */
-export type AcpTurnRefusalOrigin = 'session-load' | 'startup';
+export type AcpTurnRefusalOrigin = 'session-load' | 'startup' | 'launch';
 
 /** What the agent said, and which refusal it was. */
 export interface AcpTurnRefusal {

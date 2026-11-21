@@ -12,6 +12,8 @@ import type {
 } from './ManagedAcpClient';
 
 export interface AcpManagedOwnedProcess {
+  /** Read after cleanup when the connection closed during the initialize handshake. */
+  readonly startupExitHint?: () => string | undefined;
   readonly input: NodeJS.ReadableStream;
   readonly output: NodeJS.WritableStream;
   onClose(listener: (error?: Error) => void): () => void;
@@ -89,6 +91,8 @@ class AcpManagedClientAdapter implements ManagedAcpClient {
     private readonly connection: AcpClientConnection,
   ) {}
 
+  get startupExitHint() { return this.process.startupExitHint; }
+
   async initialize(): Promise<void> {
     await this.connection.initialize();
   }
@@ -134,6 +138,10 @@ class AcpManagedClientAdapter implements ManagedAcpClient {
   }
 
   onConnectionLost(listener: Parameters<ManagedAcpClient['onConnectionLost']>[0]) {
+    if (this.transport.isClosed && this.startupExitHint) {
+      listener();
+      return () => undefined;
+    }
     return this.transport.onClose(listener);
   }
 

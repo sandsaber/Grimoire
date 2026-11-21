@@ -681,7 +681,7 @@ class ManagedAcpExecutionSession implements ExecutionSession {
       // because this is where the run and the failure are both in scope: the
       // client is ensured before the binding is opened, so the catch further
       // down never saw it and the turn reached the tab with no words at all.
-      if (error instanceof AcpStartupError) run.presentTurnRefusal(error.message, 'startup');
+      if (error instanceof AcpStartupError) run.presentTurnRefusal(error.message, error.origin);
       throw error;
     }
     if (run.isTerminal) return;
@@ -881,8 +881,16 @@ class ManagedAcpExecutionSession implements ExecutionSession {
     this.notificationUnsubscribe = client.onSessionNotification(notification => {
       if (generation === this.clientGeneration) this.handleNotification(notification);
     });
+    let initializing = true;
+    let disconnectedDuringInitialize = false;
     this.clientCloseUnsubscribe = client.onConnectionLost(error => {
       if (generation !== this.clientGeneration) return;
+      if (initializing && client.startupExitHint) {
+        // EOF rejects the pending initialize request. The guardian exit code
+        // can arrive later, while closeClient is reaping the process (#295).
+        disconnectedDuringInitialize = true;
+        return;
+      }
       const active = this.activeRun;
       if (active && !active.isTerminal) {
         void this.recover(active, active.invocation, error, active.currentAttempt);
@@ -901,8 +909,18 @@ class ManagedAcpExecutionSession implements ExecutionSession {
       this.context.scheduler,
       this.context.startupTimeoutMs ?? 30_000,
     );
-    if (!initialized) {
+    initializing = false;
+    if (generation !== this.clientGeneration) {
+      throw new ExecutionDispatchError('Managed ACP startup became stale.', true);
+    }
+    if (!initialized || disconnectedDuringInitialize) {
       await this.closeClient();
+      if (disconnectedDuringInitialize) {
+        throw new AcpStartupError(
+          (!initialized && client.startupExitHint?.()) || 'The provider connection closed before the message was sent.',
+          'launch',
+        );
+      }
       throw new AcpStartupError('Managed ACP initialize timed out.');
     }
     this.context.clientObserver?.onClientReady(client);
@@ -1204,6 +1222,7 @@ class ManagedAcpExecutionRun implements ExecutionRun {
         // gone, which for a CLI that is not installed is advice to start a new
         // chat about the wrong problem. `spawn-failed` is the reason the
         // local-shell and Antigravity backends already give for this.
+        if (error.hint) this.presentTurnRefusal(error.hint, 'launch');
         this.finish('failed', 'spawn-failed');
         return;
       }

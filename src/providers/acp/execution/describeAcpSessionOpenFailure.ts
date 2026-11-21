@@ -25,6 +25,7 @@ export function describeAcpSessionOpenFailure(
   origin?: AcpTurnRefusalOrigin,
 ): string {
   const said = refusal?.trim();
+  if (origin === 'launch' && said) return said;
   // No session was opened, refused or resumed here: the agent never finished
   // starting. Both sentences below are about a session, so both are wrong, and
   // the advice to start a new chat sends a user to a chat that fails the same

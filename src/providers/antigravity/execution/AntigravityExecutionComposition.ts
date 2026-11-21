@@ -252,6 +252,7 @@ export class AntigravityExecution {
       create: async input => {
         const client = await underlying.create(input);
         const wrapped: ManagedAcpClient = {
+          startupExitHint: client.startupExitHint,
           initialize: () => client.initialize(),
           newSession: async request => {
             const session = await client.newSession(request);
@@ -388,7 +389,7 @@ export class AntigravityExecution {
         });
       },
       describeFailure: reason => {
-        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
+        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected' || reason === 'spawn-failed') {
           const refusal = content.consumeTurnRefusal();
           if (refusal) return describeAcpSessionOpenFailure('Antigravity', refusal.message, refusal.origin);
         }

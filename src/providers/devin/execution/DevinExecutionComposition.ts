@@ -339,7 +339,7 @@ export class DevinExecution {
       },
       sessionDropped: () => sessionDropped,
       describeFailure: reason => {
-        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected') {
+        if (reason === 'provider-failure' || reason === 'pre-dispatch-rejected' || reason === 'spawn-failed') {
           const refused = content.consumeTurnRefusal();
           if (refused?.origin) {
             return describeAcpSessionOpenFailure('Devin', refused.message, refused.origin);
