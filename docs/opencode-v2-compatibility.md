@@ -67,7 +67,7 @@ In Obsidian 1.13.7 on the local test vault, the installed bundle matched the sou
 - Normalize V2 file-tool `path` inputs and the native `shell` tool name for the existing file and command renderers.
 - MiMoCode keeps its current adapter and storage schema. The V2 transport and database changes are specific to OpenCode.
 
-The official `@opencode/client` dependency is pinned to 2.0.24. Native form answers and cancellation use the SDK's session-scoped `session.form.reply` and `session.form.cancel` methods. Command and permission replies retain the wire payload names verified with CLI 2.0.15/2.0.16. The optional `msgpackr-extract` install script is explicitly denied in `allowScripts`; clean `npm ci` succeeds without relaxing the repository's strict script policy.
+Grimoire pins the official `@opencode/client` SDK to an exact version in [package.json](../package.json). Native form answers and cancellation use the SDK's session-scoped `session.form.reply` and `session.form.cancel` methods. Command and permission replies retain the wire payload names verified with CLI 2.0.15/2.0.16. The optional `msgpackr-extract` install script is explicitly denied in `allowScripts`; clean `npm ci` succeeds without relaxing the repository's strict script policy.
 
 The 2.0.24 SDK update is covered by adapter tests for answers, dismissed questions, and unsupported-form cancellation. Its form HTTP requests were checked through the installed SDK with an intercepted transport; live CLI verification remains limited to the versions listed above.
 
