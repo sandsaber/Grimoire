@@ -193,8 +193,10 @@ export function updateAntigravityProviderSettings(
 ): AntigravityProviderSettings {
   const current = getAntigravityProviderSettings(settings);
   const hostnameKey = getHostnameKey();
+  const discoveredModels = normalizeAntigravityDiscoveredModels(updates.discoveredModels ?? current.discoveredModels);
+  const refreshedIdsByLabel = new Map(updates.discoveredModels?.map(model => [model.label, model.rawId]));
   const nextVisibleModels = normalizeAntigravityVisibleModels(
-    updates.visibleModels ?? current.visibleModels,
+    updates.visibleModels ?? current.visibleModels.map(id => refreshedIdsByLabel.get(id) ?? id),
   );
   const nextCustomModels = normalizeAntigravityCustomModels(
     updates.customModels ?? current.customModels,
@@ -220,10 +222,11 @@ export function updateAntigravityProviderSettings(
     nextCliPath = DEFAULT_ANTIGRAVITY_PROVIDER_SETTINGS.cliPath;
   }
 
-  const nextModelAliases = pruneModelAliasesToVisible(
-    normalizeAntigravityModelAliases(updates.modelAliases ?? current.modelAliases),
-    nextVisibleModels,
-  );
+  const aliases = normalizeAntigravityModelAliases(updates.modelAliases ?? current.modelAliases);
+  for (const [label, id] of refreshedIdsByLabel) {
+    if (aliases[label] && !aliases[id]) aliases[id] = aliases[label];
+  }
+  const nextModelAliases = pruneModelAliasesToVisible(aliases, nextVisibleModels);
 
   const next: AntigravityProviderSettings = {
     ...current,
@@ -231,7 +234,7 @@ export function updateAntigravityProviderSettings(
     cliPath: nextCliPath,
     cliPathsByHost: nextCliPathsByHost,
     customModels: nextCustomModels,
-    discoveredModels: normalizeAntigravityDiscoveredModels(updates.discoveredModels ?? current.discoveredModels),
+    discoveredModels,
     modelAliases: nextModelAliases,
     visibleModels: nextVisibleModels,
   };

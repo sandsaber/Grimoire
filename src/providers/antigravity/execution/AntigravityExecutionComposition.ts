@@ -438,8 +438,11 @@ export class AntigravityExecution {
 
   private syncAcpModels(session: AcpNewSessionResponse): void {
     const models = session.models?.availableModels
-      .filter(model => Boolean((model.modelId ?? model.id)?.trim() && model.name.trim()))
-      .map(model => ({ rawId: model.name.trim(), label: model.name.trim(), description: model.description }));
+      .flatMap(model => {
+        const rawId = (model.modelId ?? model.id)?.trim();
+        const label = model.name.trim();
+        return rawId && label ? [{ rawId, label, description: model.description }] : [];
+      });
     if (!models?.length) return;
     const current = getAntigravityProviderSettings(this.plugin.settings).discoveredModels;
     if (JSON.stringify(models) === JSON.stringify(current)) return;

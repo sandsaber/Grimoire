@@ -6,10 +6,7 @@ import path from 'node:path';
 import type GrimoirePlugin from '../../../main';
 import { getVaultPath } from '../../../utils/path';
 import { createUtf8ChunkDecoder } from '../../../utils/utf8Stream';
-import {
-  ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS,
-  normalizeAntigravityModelSelector,
-} from '../models';
+import { ANTIGRAVITY_FALLBACK_DISCOVERED_MODELS } from '../models';
 import type { AntigravityDiscoveredModel } from '../settings';
 import { buildAntigravityProcessLaunch } from './AntigravityProcessLaunch';
 import { buildAntigravityRuntimeEnv } from './AntigravityRuntimeEnvironment';
@@ -68,18 +65,20 @@ export async function discoverAntigravityModels(plugin: GrimoirePlugin): Promise
 export function parseAntigravityModels(output: string): AntigravityDiscoveredModel[] {
   const models: AntigravityDiscoveredModel[] = [];
   const seen = new Set<string>();
+  const legacy = new Set<string>();
   for (const line of output.split(/\r?\n/)) {
-    const rawId = normalizeAntigravityModelSelector(line);
-    if (!rawId || seen.has(rawId)) {
+    const [rawId, label] = line.split('\t').map(column => column.trim());
+    if (!rawId || /^fetching available models\b/i.test(rawId)) {
       continue;
     }
-    seen.add(rawId);
-    models.push({
-      label: rawId,
-      rawId,
-    });
+    if (!label) {
+      legacy.add(rawId);
+    } else if (!seen.has(rawId)) {
+      seen.add(rawId);
+      models.push({ rawId, label });
+    }
   }
-  return models;
+  return models.length > 0 ? models : [...legacy].map(rawId => ({ rawId, label: rawId }));
 }
 
 function runAgyModels(spec: {

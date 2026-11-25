@@ -23,7 +23,7 @@ import type {
 } from '@/providers/acp/types';
 import type { AntigravityProcessRunner } from '@/providers/antigravity/execution/AntigravityExecutionBackend';
 import { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
-import { updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
+import { getAntigravityProviderSettings, updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
 
 describe('Antigravity ACP execution composition', () => {
   const cleanup: Array<() => Promise<void>> = [];
@@ -352,14 +352,17 @@ describe('Antigravity ACP execution composition', () => {
       .toMatchObject({ sessionId: 'agy-saved' });
   });
 
-  it('selects the native model ID matching the exact label saved by the model picker', async () => {
-    const { runtime, models } = await harness();
+  it('resolves a saved display name and publishes the native model ID in the catalog', async () => {
+    const { runtime, models, plugin } = await harness();
 
     await drain(runtime.query(runtime.prepareTurn({ text: 'Answer.' }), [], {
       model: 'antigravity:Gemini 4 Argon (Medium)',
     }));
 
     expect(models).toEqual([{ sessionId: 'agy-native-1', modelId: 'gemini-4-argon-medium' }]);
+    expect(getAntigravityProviderSettings(plugin.settings).discoveredModels).toMatchObject([
+      { rawId: 'gemini-4-argon-medium', label: 'Gemini 4 Argon (Medium)' },
+    ]);
   });
 
   it('rejects Plan before prompting when the ACP session does not offer it', async () => {
