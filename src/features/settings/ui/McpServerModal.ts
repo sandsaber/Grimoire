@@ -184,7 +184,7 @@ export class McpServerModal extends Modal {
       cls: 'grimoire-mcp-cmd-textarea',
     });
     cmdTextarea.value = this.command;
-    cmdTextarea.placeholder = 'Docker exec -i mcp-server python -m src.server';
+    cmdTextarea.placeholder = 'docker exec -i mcp-server python -m src.server';
     cmdTextarea.rows = 2;
     cmdTextarea.addEventListener('input', () => {
       this.command = cmdTextarea.value;

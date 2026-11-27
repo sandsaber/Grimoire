@@ -23,6 +23,7 @@ const projectObsidianRuleOverrides = {
       ignoreRegex: [
         '\\.(?:claude|codex|opencode|mimocode|kimicode)/',
         '^ask_user$',
+        '^docker exec -i mcp-server python -m src\\.server$',
         '^gpt-[a-z0-9.-]+(?:\\ngpt-[a-z0-9.-]+)*$',
       ],
       enforceCamelCaseLower: true,
