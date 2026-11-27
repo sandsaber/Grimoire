@@ -5,6 +5,7 @@ import { TestDurableStorage } from '@test/unit/core/persistence/TestDurableStora
 import type { ManagedAcpLaunchInvocation } from '@/app/execution/acp/NodeManagedAcpProcessLauncher';
 import { ExecutionKernelHost } from '@/app/execution/ExecutionKernelHost';
 import { executionSessionId } from '@/core/execution/ExecutionIds';
+import { ProviderSettingsCoordinator } from '@/core/providers/ProviderSettingsCoordinator';
 import type { ApprovalDecision, StreamChunk } from '@/core/types';
 import { JsonRpcErrorResponse } from '@/providers/acp';
 import type {
@@ -23,7 +24,9 @@ import type {
 } from '@/providers/acp/types';
 import type { AntigravityProcessRunner } from '@/providers/antigravity/execution/AntigravityExecutionBackend';
 import { AntigravityExecution } from '@/providers/antigravity/execution/AntigravityExecutionComposition';
+import { parseAntigravityModels } from '@/providers/antigravity/runtime/AntigravityModelDiscovery';
 import { getAntigravityProviderSettings, updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
+import { antigravityChatUIConfig } from '@/providers/antigravity/ui/AntigravityChatUIConfig';
 
 describe('Antigravity ACP execution composition', () => {
   const cleanup: Array<() => Promise<void>> = [];
@@ -373,6 +376,31 @@ describe('Antigravity ACP execution composition', () => {
     expect(prompts).toEqual([]);
     expect(printStart).not.toHaveBeenCalled();
     expect(chunks.some(chunk => chunk.type === 'error')).toBe(true);
+  });
+
+  it.each(['antigravity', 'codex'])('preserves the saved second model after discovery and reload with %s active', activeProvider => {
+    const plugin = createPlugin();
+    const label = 'Gemini 4 Argon (Medium)';
+    const rawId = 'gemini-4-argon-medium';
+    const oldModel = `antigravity:${label}`;
+    const newModel = `antigravity:${rawId}`;
+    const codexModel = 'gpt-5.4';
+    const { settings } = plugin;
+    settings.model = activeProvider === 'antigravity' ? oldModel : codexModel;
+    settings.settingsProvider = activeProvider;
+    settings.savedProviderModel = { antigravity: oldModel, codex: codexModel };
+    updateAntigravityProviderSettings(settings, {
+      discoveredModels: [{ label, rawId: label }],
+    });
+
+    const discoveredModels = parseAntigravityModels(`another-model\tAnother model\n${rawId}\t${label}`);
+    updateAntigravityProviderSettings(settings, { discoveredModels });
+    const reloaded = JSON.parse(JSON.stringify(settings));
+    expect(reloaded.model).toBe(activeProvider === 'antigravity' ? newModel : codexModel);
+    expect(reloaded.savedProviderModel).toEqual({ antigravity: newModel, codex: codexModel });
+    ProviderSettingsCoordinator.projectProviderState(reloaded, 'antigravity');
+    const selected = antigravityChatUIConfig.getModelOptions(reloaded).find(option => option.value === reloaded.model);
+    expect(selected).toMatchObject({ value: newModel, label });
   });
 
   it('closes an idle ACP process and reloads its native session on the next turn', async () => {
