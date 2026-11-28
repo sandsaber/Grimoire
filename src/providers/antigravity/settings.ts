@@ -6,7 +6,8 @@ import {
   getLegacyHostnameKey,
   migrateLegacyHostnameKeyedMap,
 } from '../../utils/env';
-import { normalizeAntigravityModelSelector } from './models';
+import { isRecord } from '../../utils/records';
+import { decodeAntigravityModelId, encodeAntigravityModelId, normalizeAntigravityModelSelector } from './models';
 
 export interface AntigravityDiscoveredModel {
   description?: string | null;
@@ -193,8 +194,10 @@ export function updateAntigravityProviderSettings(
 ): AntigravityProviderSettings {
   const current = getAntigravityProviderSettings(settings);
   const hostnameKey = getHostnameKey();
+  const discoveredModels = normalizeAntigravityDiscoveredModels(updates.discoveredModels ?? current.discoveredModels);
+  const refreshedIdsByLabel = new Map(updates.discoveredModels?.map(model => [model.label, model.rawId]));
   const nextVisibleModels = normalizeAntigravityVisibleModels(
-    updates.visibleModels ?? current.visibleModels,
+    updates.visibleModels ?? current.visibleModels.map(id => refreshedIdsByLabel.get(id) ?? id),
   );
   const nextCustomModels = normalizeAntigravityCustomModels(
     updates.customModels ?? current.customModels,
@@ -220,10 +223,11 @@ export function updateAntigravityProviderSettings(
     nextCliPath = DEFAULT_ANTIGRAVITY_PROVIDER_SETTINGS.cliPath;
   }
 
-  const nextModelAliases = pruneModelAliasesToVisible(
-    normalizeAntigravityModelAliases(updates.modelAliases ?? current.modelAliases),
-    nextVisibleModels,
-  );
+  const aliases = normalizeAntigravityModelAliases(updates.modelAliases ?? current.modelAliases);
+  for (const [label, id] of refreshedIdsByLabel) {
+    if (aliases[label] && !aliases[id]) aliases[id] = aliases[label];
+  }
+  const nextModelAliases = pruneModelAliasesToVisible(aliases, nextVisibleModels);
 
   const next: AntigravityProviderSettings = {
     ...current,
@@ -231,7 +235,7 @@ export function updateAntigravityProviderSettings(
     cliPath: nextCliPath,
     cliPathsByHost: nextCliPathsByHost,
     customModels: nextCustomModels,
-    discoveredModels: normalizeAntigravityDiscoveredModels(updates.discoveredModels ?? current.discoveredModels),
+    discoveredModels,
     modelAliases: nextModelAliases,
     visibleModels: nextVisibleModels,
   };
@@ -248,7 +252,26 @@ export function updateAntigravityProviderSettings(
     visibleModels: next.visibleModels,
   });
 
+  if (updates.discoveredModels) {
+    const activeModel = resolveRefreshedSelection(settings.model, discoveredModels);
+    if (activeModel) settings.model = activeModel;
+
+    const savedModels = settings.savedProviderModel;
+    if (isRecord(savedModels)) {
+      const savedModel = resolveRefreshedSelection(savedModels.antigravity, discoveredModels);
+      if (savedModel) settings.savedProviderModel = { ...savedModels, antigravity: savedModel };
+    }
+  }
+
   return next;
+}
+
+function resolveRefreshedSelection(selection: unknown, models: readonly AntigravityDiscoveredModel[]): string | undefined {
+  const oldId = typeof selection === 'string' ? decodeAntigravityModelId(selection) : null;
+  if (!oldId || models.some(model => model.rawId === oldId)) return undefined;
+
+  const matches = models.filter(model => model.label === oldId);
+  return matches.length === 1 ? encodeAntigravityModelId(matches[0].rawId) : undefined;
 }
 
 function pruneModelAliasesToVisible(

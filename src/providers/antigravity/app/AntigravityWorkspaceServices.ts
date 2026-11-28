@@ -16,6 +16,8 @@ import { getAntigravityProviderSettings, updateAntigravityProviderSettings } fro
 import { antigravitySettingsTabRenderer } from '../ui/AntigravitySettingsTab';
 import { antigravityPlanUsageStore } from './AntigravityPlanUsageStore';
 
+const MODEL_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
+
 export interface AntigravityWorkspaceServices extends ProviderWorkspaceServices {
   cliResolver: ProviderCliResolver;
   commandCatalog: ProviderCommandCatalog;
@@ -42,15 +44,14 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
         lastRefreshAt = Date.now();
         lastRefreshCacheKey = cacheKey;
       }
-      // A settled catalog is rediscovered only when its key changes or the
-      // caller asks; the picker that triggers background refreshes must not
-      // spawn agy on a timer.
+      // `agy models` lists the account catalog without launching a chat turn.
+      // Recheck on picker demand after the cooldown, even for a populated list.
       const cacheAgeMs = lastRefreshAt > 0 ? Date.now() - lastRefreshAt : Number.POSITIVE_INFINITY;
       if (
         !force
-        && currentSettings.discoveredModels.length > 0
         && cacheKey === lastRefreshCacheKey
         && lastRefreshAt > 0
+        && cacheAgeMs < MODEL_CATALOG_CACHE_TTL_MS
       ) {
         plugin.recordDebugLog?.({
           data: {
@@ -91,9 +92,10 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
       refreshPromise = (async () => {
         const cliDiscoveredModels = await discoverAntigravityModels(plugin);
         const settingsBeforeUpdate = getAntigravityProviderSettings(settings);
+        if (buildAntigravityModelCatalogCacheKey(settingsBeforeUpdate) !== cacheKey) {
+          return 'failed';
+        }
         if (cliDiscoveredModels.length === 0 && settingsBeforeUpdate.discoveredModels.length > 0) {
-          lastRefreshAt = Date.now();
-          lastRefreshCacheKey = buildAntigravityModelCatalogCacheKey(settingsBeforeUpdate);
           plugin.recordDebugLog?.({
             data: {
               modelCount: settingsBeforeUpdate.discoveredModels.length,
@@ -116,11 +118,9 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
           discoveredModels,
           visibleModels: discoveredModels.map((model) => model.rawId),
         });
-        const updatedSettings = getAntigravityProviderSettings(settings);
-        lastRefreshAt = Date.now();
-        lastRefreshCacheKey = buildAntigravityModelCatalogCacheKey(updatedSettings);
         const after = JSON.stringify(getAntigravityProviderSettings(settings));
         const changed = before !== after;
+        if (changed) await plugin.saveSettings?.();
         plugin.recordDebugLog?.({
           data: {
             changed,
@@ -153,6 +153,8 @@ function createAntigravityModelCatalog(plugin: GrimoirePlugin): ProviderModelCat
         });
         throw error;
       } finally {
+        lastRefreshAt = Date.now();
+        lastRefreshCacheKey = cacheKey;
         refreshPromise = null;
       }
     },

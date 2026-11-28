@@ -7,11 +7,13 @@ import { PassThrough } from 'node:stream';
 
 import { toAgyArgs } from '@test/helpers/antigravityLaunchShape';
 
+import type { VaultFileAdapter } from '@/core/storage/VaultFileAdapter';
+import { createAntigravityWorkspaceServices } from '@/providers/antigravity/app/AntigravityWorkspaceServices';
 import {
   discoverAntigravityModels,
   parseAntigravityModels,
 } from '@/providers/antigravity/runtime/AntigravityModelDiscovery';
-import { updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
+import { getAntigravityProviderSettings, updateAntigravityProviderSettings } from '@/providers/antigravity/settings';
 
 jest.mock('node:child_process', () => ({
   spawn: jest.fn(),
@@ -58,19 +60,20 @@ describe('AntigravityModelDiscovery', () => {
     mockedSpawn.mockReset();
   });
 
-  it('uses the CLI display name from tab-separated model output', () => {
+  it('uses CLI slugs for selection and labels for display', () => {
     expect(parseAntigravityModels([
+      'Fetching available models...',
       'gemini-3.6-flash-high\tGemini 3.6 Flash (High)',
       'claude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)',
       'Gemini 3.6 Flash (High)',
     ].join('\r\n'))).toEqual([
       {
         label: 'Gemini 3.6 Flash (High)',
-        rawId: 'Gemini 3.6 Flash (High)',
+        rawId: 'gemini-3.6-flash-high',
       },
       {
         label: 'Claude Sonnet 4.6 (Thinking)',
-        rawId: 'Claude Sonnet 4.6 (Thinking)',
+        rawId: 'claude-sonnet-4-6',
       },
     ]);
   });
@@ -145,7 +148,40 @@ describe('AntigravityModelDiscovery', () => {
     proc.emit('exit', 0, null);
 
     await expect(resultPromise).resolves.toEqual([
-      { label: '文心模型 (High)', rawId: '文心模型 (High)' },
+      { label: '文心模型 (High)', rawId: 'gemini-3.6-flash-high' },
     ]);
+  });
+
+  it('refreshes an expired saved catalog on demand and persists the new IDs', async () => {
+    const plugin = createMockPlugin();
+    plugin.saveSettings = jest.fn().mockResolvedValue(undefined);
+    const label = 'Gemini 4 Hydrogen (High)';
+    const rawId = 'gemini-4-hydrogen-high';
+    updateAntigravityProviderSettings(plugin.settings, {
+      discoveredModels: [{ label, rawId: label }],
+      visibleModels: [label],
+      modelAliases: { [label]: 'Hydrogen' },
+    });
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    const { modelCatalog } = await createAntigravityWorkspaceServices(plugin, {} as VaultFileAdapter);
+    const request = { plugin, settings: plugin.settings };
+    await expect(modelCatalog.refreshModels(request)).resolves.toBe('skipped');
+    expect(mockedSpawn).not.toHaveBeenCalled();
+
+    clock.mockReturnValue(1_000 + 10 * 60 * 1000);
+    const proc = createMockChildProcess();
+    mockedSpawn.mockReturnValue(proc);
+    const refresh = modelCatalog.refreshModels(request);
+    proc.stdout.write(`${rawId}\t${label}\n`);
+    proc.emit('exit', 0, null);
+
+    await expect(refresh).resolves.toBe('refreshed');
+    expect(getAntigravityProviderSettings(plugin.settings)).toMatchObject({
+      discoveredModels: [{ rawId, label }],
+      modelAliases: { [rawId]: 'Hydrogen' },
+    });
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    await expect(modelCatalog.refreshModels(request)).resolves.toBe('skipped');
+    expect(mockedSpawn).toHaveBeenCalledTimes(1);
   });
 });
