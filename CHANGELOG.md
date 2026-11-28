@@ -2,6 +2,17 @@
 
 User-facing changes by release.
 
+## 2.0.16 - 2026-11-28
+
+### Fixed
+
+- Refresh the Antigravity model catalog on demand. The picker uses native model IDs and preserves saved model selections and aliases when upgrading from display names (#301, #302).
+- Explain ACP launch failures when Windows blocks the executable or macOS and Linux deny execute permission (#295).
+
+### Improved
+
+- Update the Claude Agent SDK to 0.3.325 and the OpenCode client to 2.3.0.
+
 ## 2.0.15 - 2026-11-19
 
 ### Fixed
